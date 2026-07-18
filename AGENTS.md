@@ -23,6 +23,7 @@
 - 用户已明确当前迁移不需要额外审阅，继续自主推进；下一阶段为 Pi/Gemini 适配。DeepSeek 不迁移。
 - 2026-07-18：Pi/Gemini 阶段已开始；Pi 定位器和包版本化隔离配置已实现，默认位于应用自有缓存目录，不读取或修改 `~/.pi/agent`，配置内容不含凭据。
 - 2026-07-18：Pi RPC 桥已实现严格 LF JSONL、命令 ID 关联、`agent_settled` 最终完成语义、工具事件、脱敏诊断、心跳、取消/硬超时和进程树清理；fake RPC 的分片、CRLF、未知事件、异常退出、stderr 洪泛及孙进程用例已通过。
+- 2026-07-18：Pi adapter 已接入默认 MCP 服务的 runtime map；固定 provider/model/route、隔离配置和模型身份均在适配层校验。Pi 工具开始/结束事件会归一化为命令/结果证据，review 出现 bash/edit/write 事件会以 `review_policy_violation` 失败。
 
 ## 架构与计划索引
 

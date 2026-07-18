@@ -142,27 +142,27 @@ git commit -m "feat: implement Pi RPC process bridge"
 - Test: `test/adapters/pi/adapter.test.ts`
 - Modify: `test/tasks/service.test.ts`
 
-- [ ] **Step 1: 写运行时路由和证据失败测试**
+- [x] **Step 1: 写运行时路由和证据失败测试**
 
 测试 registry profile 的 `runtime: "pi-rpc"` 只会调用 Pi adapter；Kimi profile 仍只会调用 Kimi adapter。Pi fake 声称没有命令/文件改动但发出 bash/write tool events，断言 adapter 收集事件、任务层仍以 after workspace 为最终文件证据。review 若出现 bash/edit/write 工具事件，即使工作区未变也返回 `failed` 和 `review_policy_violation`。
 
-- [ ] **Step 2: 运行并确认失败**
+- [x] **Step 2: 运行并确认失败**
 
 Run: `npm test -- --run test/adapters/pi/adapter.test.ts test/tasks/service.test.ts`
 
 Expected: FAIL，Pi adapter 尚未注册。
 
-- [ ] **Step 3: 实现 Pi adapter 和 runtime map**
+- [x] **Step 3: 实现 Pi adapter 和 runtime map**
 
 `PiAdapter` 实现与 Kimi 相同的 `ExternalAgentAdapter` 接口，实际 model 从 Pi 启动/事件信息获取并校验等于 profile 固定 model。任务服务接收 `ReadonlyMap<RuntimeKind, ExternalAgentAdapter>`；找不到 runtime 明确失败。review 允许的工具名集合固定为 `read/grep/find/ls`，delegate 记录 bash 命令标题、edit/write 相对路径和工具结果摘要，所有字段脱敏和限长。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `npm test -- --run test/adapters/pi/adapter.test.ts test/tasks/service.test.ts && npm run typecheck`
 
 Expected: 全部通过，现有 Kimi 测试无回归。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/adapters/pi/adapter.ts src/adapters/adapter.ts src/tasks/service.ts test/adapters/pi/adapter.test.ts test/tasks/service.test.ts

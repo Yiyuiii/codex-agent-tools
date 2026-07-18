@@ -97,6 +97,25 @@ function extractCommands(events: readonly unknown[]): string[] {
   return commands;
 }
 
+function reviewPolicyViolations(events: readonly unknown[]): string[] {
+  const violations: string[] = [];
+  for (const event of events) {
+    if (typeof event !== "object" || event === null) continue;
+    const record = event as Record<string, unknown>;
+    if (
+      record.type !== "tool_call" ||
+      record.runtime !== "pi-rpc" ||
+      (record.kind !== "execute" && record.kind !== "write")
+    ) {
+      continue;
+    }
+    violations.push(
+      `review_policy_violation: Pi emitted disallowed ${String(record.title ?? record.kind)} tool event`,
+    );
+  }
+  return violations;
+}
+
 function commonResult(
   llm: string,
   startedAt: number,
@@ -185,9 +204,18 @@ export class ExternalAgentService {
       }
       const after = await captureWorkspace(input.cwd);
       const comparison = compareWorkspace(before, after);
+      const policyViolations = reviewPolicyViolations(adapterResult.events);
+      if (policyViolations.length > 0) {
+        adapterResult = {
+          ...adapterResult,
+          diagnostics: [...adapterResult.diagnostics, ...policyViolations],
+        };
+      }
       const status: ExternalTaskStatus =
         comparison.filesChanged.length > 0
           ? "workspace_changed"
+          : policyViolations.length > 0
+            ? "failed"
           : adapterStatus(adapterResult.status);
       return {
         ...commonResult(

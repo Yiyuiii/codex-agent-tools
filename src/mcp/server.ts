@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { KimiAdapter } from "../adapters/kimi/adapter.js";
+import { PiAdapter } from "../adapters/pi/adapter.js";
 import type { ExternalAgentAdapter } from "../adapters/adapter.js";
 import type { RuntimeKind } from "../domain/types.js";
 import {
@@ -23,8 +24,10 @@ const defaultRegistry: LlmRegistry = {
 
 export function createDefaultExternalAgentService(): ExternalAgentService {
   const kimi = new KimiAdapter();
+  const pi = new PiAdapter();
   const adapters = new Map<RuntimeKind, ExternalAgentAdapter>([
     [kimi.runtime, kimi],
+    [pi.runtime, pi],
   ]);
   return new ExternalAgentService({ registry: defaultRegistry, adapters });
 }

@@ -75,6 +75,76 @@ function createService(
 }
 
 describe("ExternalAgentService", () => {
+  it("routes Pi and Kimi profiles only to their bound runtime adapters", async () => {
+    const kimiRun = vi.fn(async () => completed());
+    const piRun = vi.fn(async () =>
+      completed({ actualModel: "gemini-3.5-flash" }),
+    );
+    const piProfile: LlmProfile = {
+      ...enabledProfile(),
+      id: "gemini-3.5-flash",
+      displayName: "Gemini 3.5 Flash",
+      runtime: "pi-rpc",
+      provider: "google",
+      model: "gemini-3.5-flash",
+    };
+    const service = new ExternalAgentService({
+      registry: createLlmRegistry([enabledProfile(), piProfile]),
+      adapters: new Map([
+        ["kimi-acp", { runtime: "kimi-acp", run: kimiRun }],
+        ["pi-rpc", { runtime: "pi-rpc", run: piRun }],
+      ]),
+      parentEnvironment: { PATH: process.env.PATH },
+    });
+
+    await service.delegate({
+      llm: "gemini-3.5-flash",
+      prompt: "Use Pi",
+      cwd,
+    });
+    expect(piRun).toHaveBeenCalledOnce();
+    expect(kimiRun).not.toHaveBeenCalled();
+  });
+
+  it("fails review when Pi reports a disallowed writable tool event", async () => {
+    const piProfile: LlmProfile = {
+      ...enabledProfile(),
+      id: "gemini-3.5-flash",
+      displayName: "Gemini 3.5 Flash",
+      runtime: "pi-rpc",
+      provider: "google",
+      model: "gemini-3.5-flash",
+    };
+    const adapter: ExternalAgentAdapter = {
+      runtime: "pi-rpc",
+      run: async () =>
+        completed({
+          actualModel: "gemini-3.5-flash",
+          events: [
+            {
+              type: "tool_call",
+              runtime: "pi-rpc",
+              kind: "execute",
+              title: "bash",
+              rawInput: { command: "git status" },
+            },
+          ],
+        }),
+    };
+    const service = new ExternalAgentService({
+      registry: createLlmRegistry([piProfile]),
+      adapters: new Map([["pi-rpc", adapter]]),
+    });
+    const result = await service.review({
+      llm: "gemini-3.5-flash",
+      task: "review_diff",
+      prompt: "Review",
+      cwd,
+    });
+    expect(result.status).toBe("failed");
+    expect(result.diagnostics.join("\n")).toContain("review_policy_violation");
+  });
+
   it("fails review when the adapter mutates the workspace", async () => {
     const service = createService(async () => {
       await writeFile(path.join(cwd, "tracked.txt"), "changed", "utf8");

@@ -13,6 +13,7 @@ export interface LlmProfile {
   id: string;
   displayName: string;
   runtime: RuntimeKind;
+  provider?: string;
   model: string;
   network: NetworkPolicy;
   capabilities: Readonly<Record<TaskKind, boolean>>;
