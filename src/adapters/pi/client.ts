@@ -156,6 +156,8 @@ export async function runPiRpc(
     "rpc",
     "--no-approve",
     "--no-session",
+    "--name",
+    "codex-external-agents",
     "--offline",
     "--provider",
     request.provider,

@@ -45,7 +45,7 @@ codex-agent-tools doctor
 - `kimi-k2.7-highspeed`
 - `kimi-k3`
 
-Pi/Gemini 逻辑 ID 为 `gemini-3.5-flash`，固定映射到 Pi、Google provider、同名真实模型和 direct 网络策略。该能力目前保持 pending，直到独立真实 review/delegate 门禁完成。
+Pi/Gemini 逻辑 ID 为 `gemini-3.5-flash`，固定映射到 Pi、Google provider、同名真实模型和 direct 网络策略。review/delegate 均已通过独立真实门禁，证据见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。
 
 每个“逻辑 LLM × 任务”只有通过真实烟测后才会启用。当前三个 Kimi 逻辑 LLM 的 review/delegate 六个组合均已通过，证据见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。未来新增或重新验证中的 pending 能力会被明确拒绝，而不会静默改用另一个模型。
 
@@ -76,4 +76,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 alpha。三个 Kimi 逻辑 LLM 的两类任务已获得真实烟测证据；Pi/Gemini 桥接已经实现但真实门禁尚未完成，Ark 尚未接入。尚未获得证据的能力保持禁用，不会因为出现在模型清单中而自动开放。
+当前版本为开发期 alpha。三个 Kimi 逻辑 LLM和一个 Pi/Gemini 逻辑 LLM的两类任务均已获得真实烟测证据；Ark 尚未接入。尚未获得证据的未来能力保持禁用，不会因为出现在模型清单中而自动开放。

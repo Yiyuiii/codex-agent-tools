@@ -83,7 +83,7 @@ describe("doctor diagnostics", () => {
       "credential environment: GEMINI_API_KEY",
     );
     expect(report.checks.find((check) => check.name === "LLM gemini-3.5-flash")?.detail).toContain(
-      "gemini-3.5-flash via pi-rpc; route=direct; review=pending; delegate=pending",
+      "gemini-3.5-flash via pi-rpc; route=direct; review=passed; delegate=passed",
     );
     expect(JSON.stringify(report)).not.toContain(secret);
   });

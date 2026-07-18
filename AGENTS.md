@@ -20,11 +20,13 @@
 - 本机 Kimi Code 是 0.27.0，位于 `C:\Users\Administrator\.kimi-code\bin\kimi.exe`；本项目通过官方 ACP SDK 调用 `kimi acp`。
 - 当前 Pi 只发现 Google/Gemini 模型；Ark 来源需要由本项目生成隔离的 Pi 模型配置。
 - `codex-agent-tools` 在设计时没有同名 npm 包；发布前必须重新检查。
-- 用户已明确当前迁移不需要额外审阅，继续自主推进；下一阶段为 Pi/Gemini 适配。DeepSeek 不迁移。
-- 2026-07-18：Pi/Gemini 阶段已开始；Pi 定位器和包版本化隔离配置已实现，默认位于应用自有缓存目录，不读取或修改 `~/.pi/agent`，配置内容不含凭据。
+- 用户已明确当前迁移不需要额外审阅，继续自主推进。DeepSeek 不迁移。
+- 2026-07-18：Pi/Gemini 阶段已完成；Pi 定位器和包版本化隔离配置已实现，默认位于应用自有缓存目录，不读取或修改 `~/.pi/agent`，配置内容不含凭据。
 - 2026-07-18：Pi RPC 桥已实现严格 LF JSONL、命令 ID 关联、`agent_settled` 最终完成语义、工具事件、脱敏诊断、心跳、取消/硬超时和进程树清理；fake RPC 的分片、CRLF、未知事件、异常退出、stderr 洪泛及孙进程用例已通过。
 - 2026-07-18：Pi adapter 已接入默认 MCP 服务的 runtime map；固定 provider/model/route、隔离配置和模型身份均在适配层校验。Pi 工具开始/结束事件会归一化为命令/结果证据，review 出现 bash/edit/write 事件会以 `review_policy_violation` 失败。
-- 2026-07-18：`gemini-3.5-flash` 已作为 pending 逻辑 LLM 注册，固定绑定 `pi-rpc` / `google` / `gemini-3.5-flash` / `direct`。凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 只复制第一个非空值；doctor 已覆盖 Pi 版本、隔离配置、凭据变量名和门禁状态。
+- 2026-07-18：`gemini-3.5-flash` 固定绑定 `pi-rpc` / `google` / `gemini-3.5-flash` / `direct`。凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 只复制第一个非空值；doctor 已覆盖 Pi 版本、隔离配置、凭据变量名和门禁状态。
+- 2026-07-18：`gemini-3.5-flash` 的 review/delegate 真实门禁均已通过并启用，证据见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。delegate 首次尝试只写文件、未执行验证命令而正确失败；明确两个动作均为强制验收后通过。
+- 当前下一阶段为 Ark 逻辑 LLM 迁移、真实门禁和本机 MCP 切换。
 
 ## 架构与计划索引
 

@@ -8,6 +8,8 @@
 
 **Tech Stack:** Kimi MVP 技术栈、Pi RPC JSONL、`@earendil-works/pi-coding-agent` 0.80.x 的外部可执行文件契约、Node.js 原生流。
 
+**完成状态（2026-07-18）：** 全部任务完成。`gemini-3.5-flash` 的 review/delegate 真实门禁均已通过；首次 delegate 因未执行强制验证命令被门禁正确拒绝，收紧任务提示后再次运行通过。
+
 ---
 
 ## 文件结构
@@ -225,27 +227,27 @@ git commit -m "feat: register Gemini through isolated Pi"
 - Modify: `src/llms/registry.ts`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: 实现与 Kimi 等价的真实 smoke**
+- [x] **Step 1: 实现与 Kimi 等价的真实 smoke**
 
 脚本创建两个临时 Git 仓库：review 仓库含一个可确定定位的缺陷，调用 `gemini-3.5-flash` 后断言结果命中缺陷且前后 fingerprint 相同；delegate 仓库要求创建文件并运行验证，断言真实文件、Pi tool events 和任务结果一致。记录 Pi/Kimi 不共享环境：Pi 子进程不得看到 Kimi/Ark/Anthropic/OpenAI/DeepSeek 密钥；固定 direct 路由必须清除父环境代理。
 
-- [ ] **Step 2: 运行 review 门禁**
+- [x] **Step 2: 运行 review 门禁**
 
 Run: `npm run build && node scripts/real-pi-smoke.mjs --llm gemini-3.5-flash --task review`
 
 Expected: `completed`，已知缺陷被识别，仓库无修改，实际 model 为 `gemini-3.5-flash`。
 
-- [ ] **Step 3: 运行 delegate 门禁**
+- [x] **Step 3: 运行 delegate 门禁**
 
 Run: `node scripts/real-pi-smoke.mjs --llm gemini-3.5-flash --task delegate`
 
 Expected: `completed`，文件、命令和验证证据一致，结束后无 Pi 子孙进程。
 
-- [ ] **Step 4: 启用通过能力并记录证据**
+- [x] **Step 4: 启用通过能力并记录证据**
 
 只把成功 task 的 quality gate 改为 passed。在 `docs/smoke/pi-gemini.md` 写运行时间、Pi 版本、逻辑 ID、实际 model、direct 路由、任务、耗时、结果、工作区证据摘要和隔离 agentDir 内容哈希；不记录密钥或完整环境。同步 `AGENTS.md`。
 
-- [ ] **Step 5: 完整验证和提交**
+- [x] **Step 5: 完整验证和提交**
 
 Run: `npm run typecheck && npm test && npm run build && npm run smoke:release && node dist/cli.js doctor --json`
 

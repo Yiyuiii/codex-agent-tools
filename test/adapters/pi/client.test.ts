@@ -114,6 +114,8 @@ describe("Pi RPC client", () => {
         "rpc",
         "--no-approve",
         "--no-session",
+        "--name",
+        "codex-external-agents",
         "--provider",
         "google",
         "--model",

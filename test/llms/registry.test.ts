@@ -31,7 +31,7 @@ describe("logical LLM registry", () => {
     ]);
   });
 
-  it("binds Gemini to Pi Google, direct routing, and ordered credentials", () => {
+  it("binds qualified Gemini tasks to Pi Google, direct routing, and ordered credentials", () => {
     expect(resolveLlm("gemini-3.5-flash")).toMatchObject({
       runtime: "pi-rpc",
       provider: "google",
@@ -43,14 +43,23 @@ describe("logical LLM registry", () => {
         "GOOGLE_GENERATIVE_AI_API_KEY",
       ],
       maxConcurrency: 2,
-      capabilities: { review: false, delegate: false },
+      capabilities: { review: true, delegate: true },
       qualityGates: {
-        review: { status: "pending" },
-        delegate: { status: "pending" },
+        review: {
+          status: "passed",
+          evidence: "docs/smoke/pi-gemini.md#gemini-review",
+        },
+        delegate: {
+          status: "passed",
+          evidence: "docs/smoke/pi-gemini.md#gemini-delegate",
+        },
       },
     });
-    expect(() => resolveLlm("gemini-3.5-flash", "review")).toThrow(
-      /disabled pending real smoke/u,
+    expect(resolveLlm("gemini-3.5-flash", "review").model).toBe(
+      "gemini-3.5-flash",
+    );
+    expect(resolveLlm("gemini-3.5-flash", "delegate").provider).toBe(
+      "google",
     );
   });
 

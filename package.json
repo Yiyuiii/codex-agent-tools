@@ -13,6 +13,7 @@
     "LICENSE",
     "docs/operations.md",
     "docs/smoke/kimi.md",
+    "docs/smoke/pi-gemini.md",
     "docs/smoke/evidence"
   ],
   "bin": {
@@ -25,7 +26,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:release": "npm run build && node scripts/release-smoke.mjs",
-    "smoke:kimi": "npm run build && node scripts/real-kimi-smoke.mjs"
+    "smoke:kimi": "npm run build && node scripts/real-kimi-smoke.mjs",
+    "smoke:pi": "npm run build && node scripts/real-pi-smoke.mjs"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.2.1",

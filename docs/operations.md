@@ -54,6 +54,8 @@ codex-agent-tools doctor --strict
 
 普通模式即使存在警告也用于展示完整报告。`--strict` 只在出现错误级诊断时返回非零；质量门禁 pending 是警告，表示该能力尚未通过真实烟测。报告会对环境中的令牌、密钥和认证头脱敏。
 
+Kimi 的真实门禁证据见 [Kimi 真实能力门禁](smoke/kimi.md)，Pi/Gemini 的真实门禁证据见 [Pi / Gemini 真实能力门禁](smoke/pi-gemini.md)。
+
 ## 升级
 
 升级包后重新运行安装器，再重启 Codex：

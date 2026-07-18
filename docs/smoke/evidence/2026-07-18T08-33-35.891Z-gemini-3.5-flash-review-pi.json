@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "timestamp": "2026-07-18T08:33:35.891Z",
+  "piVersion": "0.80.10",
+  "llm": "gemini-3.5-flash",
+  "actualModel": "gemini-3.5-flash",
+  "expectedModel": "gemini-3.5-flash",
+  "runtime": "pi-rpc",
+  "provider": "google",
+  "route": "direct",
+  "credentialEnv": "GEMINI_API_KEY",
+  "configSha256": "7c6003bb69fea9e1c43887372649c46af279a87381fd6ffdaddc2778fcfc51e8",
+  "task": "review",
+  "status": "completed",
+  "passed": true,
+  "elapsedMs": 13436,
+  "outputSha256": "2da38b1ecf4a62a5d63d9d0cf16590bd71e7692674ca25bc111b71504c5ab6f2",
+  "filesChanged": [],
+  "commandCount": 0,
+  "diagnosticCount": 0,
+  "checks": {
+    "actualModelMatches": true,
+    "environmentIsolated": true,
+    "noNewPiRpcProcesses": true,
+    "workspaceUnchanged": true,
+    "knownDefectFound": true
+  }
+}
