@@ -13,7 +13,7 @@
 
 ## 当前事实状态
 
-- 2026-07-18：产品设计已获用户批准，尚未开始实现。
+- 2026-07-18：产品设计已获用户批准；Kimi MVP、Pi/Gemini、Ark 与本机切换三份实施计划已完成，行为代码尚未开始实现。
 - 本机 Pi 是 `@earendil-works/pi-coding-agent` 0.80.10，支持 RPC JSONL 模式。
 - 本机 Kimi Code 是 0.27.0，位于 `C:\Users\Administrator\.kimi-code\bin\kimi.exe`；K3 非交互 JSONL smoke 已成功。
 - 当前 Pi 只发现 Google/Gemini 模型；Ark 来源需要由本项目生成隔离的 Pi 模型配置。
@@ -22,7 +22,11 @@
 ## 架构与计划索引
 
 - [已批准的产品设计](docs/superpowers/specs/2026-07-18-codex-external-agents-design.md)
-- 实施计划将在 `docs/superpowers/plans/` 下维护。
+- [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)
+- [Pi/Gemini 适配实施计划](docs/superpowers/plans/2026-07-18-pi-gemini-adapter.md)
+- [Ark 迁移与本机切换实施计划](docs/superpowers/plans/2026-07-18-ark-migration-and-cutover.md)
+
+当前执行顺序为 Kimi MVP → Pi/Gemini → Ark 与本机切换。三个阶段分别形成可测试软件；尚未通过真实 smoke 的“逻辑 LLM × task”能力必须保持禁用。
 
 ## 开发约定
 
@@ -31,4 +35,3 @@
 - 每个“逻辑 LLM × 任务类型”通过独立真实 smoke 后，才能在内置注册表中启用。
 - 对重要设计和复杂改动优先调用本机 Kimi 做独立 review；审阅结论必须由 Codex 复核后采用。
 - 结构、API、模型清单、网络策略或迁移状态发生变化时，同步更新本文件和相关设计/计划文档。
-
