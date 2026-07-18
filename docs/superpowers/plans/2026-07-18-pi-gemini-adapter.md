@@ -88,7 +88,7 @@ git commit -m "feat: create isolated Pi runtime configuration"
 - Test: `test/adapters/pi/jsonl.test.ts`
 - Test: `test/adapters/pi/client.test.ts`
 
-- [ ] **Step 1: 写分片、未知事件、取消和期限失败测试**
+- [x] **Step 1: 写分片、未知事件、取消和期限失败测试**
 
 ```ts
 import { expect, it } from "vitest";
@@ -104,13 +104,13 @@ it("splits only on LF and retains an incomplete tail", () => {
 
 fake RPC 收到 `{type:"set_model"}`、`{type:"set_thinking_level"}`、`{type:"prompt"}` 后发出 response、message/tool events 和 agent_end；测试断言 command ID 正确关联、未知 event 被记录为限长诊断而不终止、stderr 不进入 stdout parser。AbortSignal 触发 `{type:"abort"}`，随后终止整个 fake 进程树；硬期限映射为 `timed_out`。
 
-- [ ] **Step 2: 运行并确认失败**
+- [x] **Step 2: 运行并确认失败**
 
 Run: `npm test -- --run test/adapters/pi/jsonl.test.ts test/adapters/pi/client.test.ts`
 
 Expected: FAIL，decoder/client 尚不存在。
 
-- [ ] **Step 3: 实现 decoder 和 request/event 循环**
+- [x] **Step 3: 实现 decoder 和 request/event 循环**
 
 `LfJsonlDecoder` 维护 Buffer，只寻找字节 `0x0A`；记录末尾 `0x0D` 时移除 CR 后 JSON.parse；单条记录和总诊断都有大小上限。`PiRpcClient.run` 启动：
 
@@ -118,15 +118,15 @@ Expected: FAIL，decoder/client 尚不存在。
 pi --mode rpc --no-approve --provider google --model gemini-3.5-flash --thinking medium
 ```
 
-review 追加 `--tools read,grep,find,ls`；delegate 追加 `--tools read,bash,edit,write,grep,find,ls`。启动后依序发送带递增 id 的 `set_model`、`set_thinking_level` 和 `prompt`，等待对应 response 与最终 `agent_end`；收集 assistant text、tool_execution_start/update/end、session 信息和非秘密 usage。收到取消时先发送 RPC abort，等待短宽限，再调用公共 `terminateProcessTree`；不使用 stdout 空闲超时，每 15 秒发桥接心跳。
+review 追加 `--tools read,grep,find,ls`；delegate 追加 `--tools read,bash,edit,write,grep,find,ls`。启动后依序发送带递增 id 的 `set_model`、`set_thinking_level` 和 `prompt`，等待对应 response 与最终 `agent_settled`；`agent_end` 只代表一次低层运行完成，后面仍可能自动重试，因此不能作为最终完成信号。收集 assistant text、tool_execution_start/update/end、session 信息和非秘密 usage。收到取消时先发送 RPC abort，等待短宽限，再调用公共 `terminateProcessTree`；不使用 stdout 空闲超时，每 15 秒发桥接心跳。
 
-- [ ] **Step 4: 验证协议和进程生命周期**
+- [x] **Step 4: 验证协议和进程生命周期**
 
 Run: `npm test -- --run test/adapters/pi/jsonl.test.ts test/adapters/pi/client.test.ts && npm run typecheck`
 
 Expected: 正常、分片、CRLF、未知事件、异常退出、取消、超时和 stderr 洪泛用例全部通过且无孤儿进程。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/adapters/pi/jsonl.ts src/adapters/pi/client.ts test/adapters/pi test/fakes/fake-pi-rpc.mjs
