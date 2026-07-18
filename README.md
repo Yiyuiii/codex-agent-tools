@@ -81,3 +81,5 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 ## 发布状态
 
 当前版本为开发期 alpha。三个 Kimi 逻辑 LLM 的两类任务均已获得当前路由下的真实烟测证据；Gemini 与三个 Ark 逻辑 LLM 已固定注册但仍等待逐项真实门禁。尚未获得当前绑定证据的能力保持禁用，不会因为出现在模型清单中而自动开放。
+
+本次确定性验证、本机 MCP 验收、cutover 零写入拒绝和剩余阻塞见 [0.1.0-alpha.1 本机替换验收记录](docs/release/checklist.md)。

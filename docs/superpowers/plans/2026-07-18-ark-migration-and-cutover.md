@@ -306,7 +306,7 @@ Run: `codex-agent-tools doctor --json`
 
 Expected: `codex_external_agents` 已启用，`codex_cc_tools` 已从 Codex MCP 配置移除，备份存在；本机 Claude Code 和旧项目源码均未改变。若 Codex App 需要重启才能刷新 MCP，文档记录这一事实并在重启后重跑 local acceptance。
 
-- [ ] **Step 5: 更新发布清单并提交**
+- [x] **Step 5: 更新发布清单并提交**
 
 `docs/release/checklist.md` 记录版本、commit、Node/Pi/Kimi 版本、确定性检查、真实 smoke 矩阵、local acceptance、cutover 备份和 npm 名称复核。只准备 pack/tarball；没有用户明确授权时不执行公开 `npm publish`。
 

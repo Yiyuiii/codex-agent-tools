@@ -41,6 +41,7 @@
 - [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)
 - [Pi/Gemini 适配实施计划](docs/superpowers/plans/2026-07-18-pi-gemini-adapter.md)
 - [Ark 迁移与本机切换实施计划](docs/superpowers/plans/2026-07-18-ark-migration-and-cutover.md)
+- [0.1.0-alpha.1 本机替换验收记录](docs/release/checklist.md)
 
 当前执行顺序为 Kimi MVP → Pi/Gemini → Ark 与本机切换。三个阶段分别形成可测试软件；尚未通过真实 smoke 的“逻辑 LLM × task”能力必须保持禁用。
 

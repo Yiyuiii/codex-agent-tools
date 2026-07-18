@@ -14,6 +14,7 @@ describe("release assurance", () => {
         "LICENSE",
         "docs/operations.md",
         "docs/migration-from-codex-cc-tools.md",
+        "docs/release/checklist.md",
         "dist/cli.js",
         "dist/mcp.js",
         "dist/index.d.ts",

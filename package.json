@@ -13,6 +13,7 @@
     "LICENSE",
     "docs/operations.md",
     "docs/migration-from-codex-cc-tools.md",
+    "docs/release/checklist.md",
     "docs/smoke/kimi.md",
     "docs/smoke/pi-gemini.md",
     "docs/smoke/ark.md",
