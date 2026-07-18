@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "timestamp": "2026-07-18T08:02:21.349Z",
+  "kimiVersion": "0.27.0",
+  "llm": "kimi-k3",
+  "actualModel": "kimi-code/k3",
+  "expectedModel": "kimi-code/k3",
+  "runtime": "kimi-acp",
+  "route": "direct",
+  "task": "delegate",
+  "status": "completed",
+  "passed": true,
+  "elapsedMs": 74447,
+  "outputSha256": "03e7c021208fa350aa6e40667e32a5cfe14e1098b348eeca49c4ee3e51d2848e",
+  "filesChanged": [
+    "result.txt"
+  ],
+  "commandCount": 1,
+  "diagnosticCount": 0,
+  "checks": {
+    "actualModelMatches": true,
+    "noNewKimiProcesses": true,
+    "resultFileValid": true,
+    "resultFileObserved": true,
+    "onlyExpectedFileChanged": true,
+    "commandObserved": true
+  }
+}

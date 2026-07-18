@@ -5,12 +5,18 @@ export interface LlmRegistry {
   resolve(id: string, task?: TaskKind): LlmProfile;
 }
 
-const pendingTasks = () =>
+const qualifiedTasks = (anchorPrefix: string) =>
   ({
-    capabilities: { review: false, delegate: false },
+    capabilities: { review: true, delegate: true },
     qualityGates: {
-      review: { status: "pending" },
-      delegate: { status: "pending" },
+      review: {
+        status: "passed",
+        evidence: `docs/smoke/kimi.md#${anchorPrefix}-review`,
+      },
+      delegate: {
+        status: "passed",
+        evidence: `docs/smoke/kimi.md#${anchorPrefix}-delegate`,
+      },
     },
   }) as const;
 
@@ -24,7 +30,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     credentialEnv: [],
     timeoutMs: 600_000,
     maxConcurrency: 1,
-    ...pendingTasks(),
+    ...qualifiedTasks("kimi-k27"),
   },
   {
     id: "kimi-k2.7-highspeed",
@@ -35,7 +41,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     credentialEnv: [],
     timeoutMs: 600_000,
     maxConcurrency: 1,
-    ...pendingTasks(),
+    ...qualifiedTasks("kimi-k27-highspeed"),
   },
   {
     id: "kimi-k3",
@@ -46,7 +52,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     credentialEnv: [],
     timeoutMs: 600_000,
     maxConcurrency: 1,
-    ...pendingTasks(),
+    ...qualifiedTasks("kimi-k3"),
   },
 ];
 

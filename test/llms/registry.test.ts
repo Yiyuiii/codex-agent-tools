@@ -39,17 +39,34 @@ describe("logical LLM registry", () => {
     },
   );
 
-  it("keeps tasks disabled until their independent real smoke passes", () => {
-    expect(() => resolveLlm("kimi-k3", "review")).toThrow(
-      /disabled pending real smoke/,
-    );
+  it.each([
+    ["kimi-k2.7", "review", "kimi-k27-review"],
+    ["kimi-k2.7", "delegate", "kimi-k27-delegate"],
+    ["kimi-k2.7-highspeed", "review", "kimi-k27-highspeed-review"],
+    ["kimi-k2.7-highspeed", "delegate", "kimi-k27-highspeed-delegate"],
+    ["kimi-k3", "review", "kimi-k3-review"],
+    ["kimi-k3", "delegate", "kimi-k3-delegate"],
+  ] as const)(
+    "enables %s %s only with its real-smoke evidence",
+    (id, task, anchor) => {
+      const profile = resolveLlm(id, task);
+      expect(profile.capabilities[task]).toBe(true);
+      expect(profile.qualityGates[task]).toEqual({
+        status: "passed",
+        evidence: `docs/smoke/kimi.md#${anchor}`,
+      });
+    },
+  );
+
+  it("still rejects any task whose independent gate is pending", () => {
+    const base = resolveLlm("kimi-k3");
 
     const registry = createLlmRegistry([
       {
-        ...resolveLlm("kimi-k3"),
+        ...base,
         capabilities: { review: true, delegate: false },
         qualityGates: {
-          review: { status: "passed", evidence: "docs/smoke/kimi.md#k3-review" },
+          review: base.qualityGates.review,
           delegate: { status: "pending" },
         },
       },

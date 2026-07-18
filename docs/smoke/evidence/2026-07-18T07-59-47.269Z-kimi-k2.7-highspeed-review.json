@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "timestamp": "2026-07-18T07:59:47.269Z",
+  "kimiVersion": "0.27.0",
+  "llm": "kimi-k2.7-highspeed",
+  "actualModel": "kimi-code/kimi-for-coding-highspeed",
+  "expectedModel": "kimi-code/kimi-for-coding-highspeed",
+  "runtime": "kimi-acp",
+  "route": "direct",
+  "task": "review",
+  "status": "completed",
+  "passed": true,
+  "elapsedMs": 6495,
+  "outputSha256": "ca8f224609c761e9ee6f237ba76ab31bd3c001bc8198d1c09bb52547a8d9788c",
+  "filesChanged": [],
+  "commandCount": 0,
+  "diagnosticCount": 0,
+  "checks": {
+    "actualModelMatches": true,
+    "noNewKimiProcesses": true,
+    "workspaceUnchanged": true,
+    "knownDefectFound": true
+  }
+}

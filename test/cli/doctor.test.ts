@@ -28,7 +28,7 @@ afterEach(async () => {
 });
 
 describe("doctor diagnostics", () => {
-  it("reports Kimi, MCP ownership, fixed logical routes, and pending gates without secrets", async () => {
+  it("reports Kimi, MCP ownership, fixed routes, and qualified gates without secrets", async () => {
     const secret = "must-not-appear";
     const report = await collectDoctorReport({
       configPath,
@@ -54,7 +54,7 @@ describe("doctor diagnostics", () => {
       "external_review, external_delegate",
     );
     expect(report.checks.find((check) => check.name === "LLM kimi-k3")?.detail).toContain(
-      "kimi-code/k3 via kimi-acp; route=direct; review=pending; delegate=pending",
+      "kimi-code/k3 via kimi-acp; route=direct; review=passed; delegate=passed",
     );
     expect(JSON.stringify(report)).not.toContain(secret);
   });

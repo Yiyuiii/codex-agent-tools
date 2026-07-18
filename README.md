@@ -45,7 +45,7 @@ codex-agent-tools doctor
 - `kimi-k2.7-highspeed`
 - `kimi-k3`
 
-每个“逻辑 LLM × 任务”只有通过真实烟测后才会启用。开发中的 pending 能力会被明确拒绝，而不会静默改用另一个模型。
+每个“逻辑 LLM × 任务”只有通过真实烟测后才会启用。当前三个 Kimi 逻辑 LLM 的 review/delegate 六个组合均已通过，证据见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。未来新增或重新验证中的 pending 能力会被明确拒绝，而不会静默改用另一个模型。
 
 完整的安装、诊断、卸载和故障处理见 [运维说明](docs/operations.md)。终端用户不需要手工维护 Pi 模型配置；Pi 接入后，其隔离配置将由本包随版本生成和维护。
 
@@ -74,4 +74,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 alpha。尚未获得真实烟测证据的模型能力保持禁用；不要把版本存在等同于全部逻辑 LLM 已开放。
+当前版本为开发期 alpha。三个 Kimi 逻辑 LLM 的两类任务已获得真实烟测证据；Pi/Gemini 与 Ark 尚未接入。尚未获得证据的未来能力保持禁用，不会因为出现在模型清单中而自动开放。

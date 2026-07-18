@@ -13,11 +13,14 @@
 
 ## 当前事实状态
 
-- 2026-07-18：产品设计已获用户批准；Kimi MVP、Pi/Gemini、Ark 与本机切换三份实施计划已完成，行为代码尚未开始实现。
+- 2026-07-18：产品设计已获用户批准；Kimi MVP、Pi/Gemini、Ark 与本机切换三份实施计划已完成。
+- 2026-07-18：Kimi MVP 的注册表、严格输入契约、环境/脱敏、进程树、ACP 适配、证据编排、MCP、安装/卸载/doctor 和发布烟测均已实现。公开面只有 `external_review` 与 `external_delegate`，且 `llm` 始终必填。
+- 2026-07-18：`kimi-k2.7`、`kimi-k2.7-highspeed`、`kimi-k3` 的 review/delegate 六个真实门禁全部通过并已启用；证据索引见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
 - 本机 Pi 是 `@earendil-works/pi-coding-agent` 0.80.10，支持 RPC JSONL 模式。
-- 本机 Kimi Code 是 0.27.0，位于 `C:\Users\Administrator\.kimi-code\bin\kimi.exe`；K3 非交互 JSONL smoke 已成功。
+- 本机 Kimi Code 是 0.27.0，位于 `C:\Users\Administrator\.kimi-code\bin\kimi.exe`；本项目通过官方 ACP SDK 调用 `kimi acp`。
 - 当前 Pi 只发现 Google/Gemini 模型；Ark 来源需要由本项目生成隔离的 Pi 模型配置。
 - `codex-agent-tools` 在设计时没有同名 npm 包；发布前必须重新检查。
+- 用户已明确当前迁移不需要额外审阅，继续自主推进；下一阶段为 Pi/Gemini 适配。DeepSeek 不迁移。
 
 ## 架构与计划索引
 

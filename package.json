@@ -11,7 +11,9 @@
     "dist",
     "README.md",
     "LICENSE",
-    "docs/operations.md"
+    "docs/operations.md",
+    "docs/smoke/kimi.md",
+    "docs/smoke/evidence"
   ],
   "bin": {
     "codex-agent-tools": "dist/cli.js",
