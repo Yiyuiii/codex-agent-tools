@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { Command } from "commander";
 
 import { VERSION } from "../version.js";
+import { isMainModule } from "../runtime/main-module.js";
 import {
   getDefaultCodexConfigPath,
   installCodexConfig,
@@ -170,10 +171,7 @@ export function createProgram(
   return program;
 }
 
-if (
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+if (isMainModule(import.meta.url)) {
   createProgram().parseAsync(process.argv).catch((error: unknown) => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;

@@ -8,6 +8,7 @@ export default defineConfig({
     mcp: "src/mcp/main.ts",
     "pi-smoke": "src/smoke/pi.ts",
     "ark-smoke": "src/smoke/ark.ts",
+    "local-acceptance": "src/acceptance/local.ts",
     "release-assurance": "src/release/assurance.ts",
   },
   format: ["esm"],

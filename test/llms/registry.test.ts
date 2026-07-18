@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  credentialEnvironmentNames,
   createLlmRegistry,
   resolveLlm,
   supportedLlmIds,
@@ -85,36 +86,41 @@ describe("logical LLM registry", () => {
     },
   );
 
-  it("binds qualified Gemini tasks to Pi Google, direct routing, and ordered credentials", () => {
+  it("binds pending Gemini tasks to Pi Google, fixed 10808 routing, and ordered credentials", () => {
     expect(resolveLlm("gemini-3.5-flash")).toMatchObject({
       runtime: "pi-rpc",
       provider: "google",
       model: "gemini-3.5-flash",
-      network: "direct",
+      network: "proxy-10808",
       credentialEnv: [
         "GEMINI_API_KEY",
         "GOOGLE_API_KEY",
         "GOOGLE_GENERATIVE_AI_API_KEY",
       ],
       maxConcurrency: 2,
-      capabilities: { review: true, delegate: true },
+      capabilities: { review: false, delegate: false },
       qualityGates: {
-        review: {
-          status: "passed",
-          evidence: "docs/smoke/pi-gemini.md#gemini-review",
-        },
-        delegate: {
-          status: "passed",
-          evidence: "docs/smoke/pi-gemini.md#gemini-delegate",
-        },
+        review: { status: "pending" },
+        delegate: { status: "pending" },
       },
     });
-    expect(resolveLlm("gemini-3.5-flash", "review").model).toBe(
-      "gemini-3.5-flash",
+    expect(() => resolveLlm("gemini-3.5-flash", "review")).toThrow(
+      /disabled pending real smoke/u,
     );
-    expect(resolveLlm("gemini-3.5-flash", "delegate").provider).toBe(
-      "google",
+    expect(() => resolveLlm("gemini-3.5-flash", "delegate")).toThrow(
+      /disabled pending real smoke/u,
     );
+  });
+
+  it("derives the complete MCP credential allowlist from logical profiles", () => {
+    expect(credentialEnvironmentNames()).toEqual([
+      "ARK_API_KEY",
+      "VOLCENGINE_API_KEY",
+      "OPENAI_API_KEY_DOUBAO",
+      "GEMINI_API_KEY",
+      "GOOGLE_API_KEY",
+      "GOOGLE_GENERATIVE_AI_API_KEY",
+    ]);
   });
 
   it.each(["claude-opus", "codex", "deepseek"])(

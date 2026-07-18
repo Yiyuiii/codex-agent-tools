@@ -1,7 +1,5 @@
 #!/usr/bin/env node
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
+import { isMainModule } from "../runtime/main-module.js";
 import { serveMcp } from "./server.js";
 
 export function mcpUsage(): string {
@@ -24,8 +22,7 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
   await serveMcp();
 }
 
-const invokedPath = process.argv[1] === undefined ? undefined : path.resolve(process.argv[1]);
-if (invokedPath !== undefined && fileURLToPath(import.meta.url) === invokedPath) {
+if (isMainModule(import.meta.url)) {
   main().catch((error: unknown) => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;

@@ -2,7 +2,7 @@
 
 `codex-agent-tools` 为 Codex 提供两个外部 LLM 工具：只读审阅 `external_review` 和自主委派 `external_delegate`。MCP 服务名固定为 `codex_external_agents`。
 
-当前阶段已接入本机 Kimi Code，以及由隔离 Pi RPC 承载的 Gemini 与 Ark；Ark 逻辑 LLM 已注册但在真实门禁通过前保持禁用。项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或 DeepSeek 模型来源。
+当前阶段已接入本机 Kimi Code，以及由隔离 Pi RPC 承载的 Gemini 与 Ark。Kimi 已启用；Gemini 因固定网络路由变更后尚未重新通过真实门禁、Ark 因凭据或上游额度条件未满足而保持禁用。项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或 DeepSeek 模型来源。
 
 ## 公开契约
 
@@ -47,7 +47,7 @@ codex-agent-tools doctor
 - `kimi-k2.7-highspeed`
 - `kimi-k3`
 
-Pi/Gemini 逻辑 ID 为 `gemini-3.5-flash`，固定映射到 Pi、Google provider、同名真实模型和 direct 网络策略。review/delegate 均已通过独立真实门禁，证据见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。
+Pi/Gemini 逻辑 ID 为 `gemini-3.5-flash`，固定映射到 Pi、Google provider、同名真实模型和 `proxy-10808` 网络策略。历史 direct 路由的 review/delegate 曾通过独立真实门禁，但本机当前 direct 访问 Google 不可达，因此该证据不能授权新路由；`proxy-10808` 的最新 review 因 Google 免费层共享额度耗尽失败，当前两类能力均保持 pending。证据见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。
 
 Ark 逻辑 ID 为 `ark-coding-plan`、`ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro`，分别固定映射到隔离 Pi 中的 Coding Plan 或 Agent Plan provider，全部使用 direct 网络策略。2026-07-18 的六项真实门禁因 Coding Plan 缺少凭据、Agent Plan 周额度耗尽而未通过，因此这些 ID 会被明确拒绝而不会回退到其它模型；证据和复跑条件见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
 
@@ -80,4 +80,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 alpha。三个 Kimi 逻辑 LLM和一个 Pi/Gemini 逻辑 LLM的两类任务均已获得真实烟测证据；三个 Ark 逻辑 LLM 已固定注册但仍等待逐项真实门禁。尚未获得证据的能力保持禁用，不会因为出现在模型清单中而自动开放。
+当前版本为开发期 alpha。三个 Kimi 逻辑 LLM 的两类任务均已获得当前路由下的真实烟测证据；Gemini 与三个 Ark 逻辑 LLM 已固定注册但仍等待逐项真实门禁。尚未获得当前绑定证据的能力保持禁用，不会因为出现在模型清单中而自动开放。

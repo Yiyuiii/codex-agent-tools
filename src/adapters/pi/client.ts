@@ -231,13 +231,13 @@ export async function runPiRpc(
       if (text !== "") textChunks.push(text);
       const message = recordOf(record.message);
       if (typeof message?.stopReason === "string") stopReason = message.stopReason;
-      if (
-        message?.role === "assistant" &&
-        typeof message.errorMessage === "string" &&
-        message.errorMessage.trim() !== ""
-      ) {
-        assistantError = true;
-        appendDiagnostic(`Pi assistant error: ${message.errorMessage}`);
+      if (message?.role === "assistant") {
+        assistantError =
+          typeof message.errorMessage === "string" &&
+          message.errorMessage.trim() !== "";
+        if (assistantError) {
+          appendDiagnostic(`Pi assistant error: ${message.errorMessage}`);
+        }
       }
       return;
     }

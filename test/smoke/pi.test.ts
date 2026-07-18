@@ -30,6 +30,10 @@ afterEach(async () => {
 
 function runtimeEvidence(environment: NodeJS.ProcessEnv = {
   GEMINI_API_KEY: "secret",
+  HTTP_PROXY: "http://127.0.0.1:10808",
+  HTTPS_PROXY: "http://127.0.0.1:10808",
+  http_proxy: "http://127.0.0.1:10808",
+  https_proxy: "http://127.0.0.1:10808",
   PI_CODING_AGENT_DIR: "C:\\cache\\pi",
 }) {
   return {
@@ -61,7 +65,7 @@ describe("Pi/Gemini real-smoke harness", () => {
     ).toThrow(/Pi profile/u);
   });
 
-  it("validates review, direct environment isolation, and process cleanup", async () => {
+  it("validates review, fixed 10808 environment isolation, and process cleanup", async () => {
     const root = await tempRoot();
     const service: PiSmokeService = {
       review: async () => ({
@@ -93,7 +97,7 @@ describe("Pi/Gemini real-smoke harness", () => {
       task: "review",
       actualModel: "gemini-3.5-flash",
       piVersion: "0.80.10",
-      route: "direct",
+      route: "proxy-10808",
       credentialEnv: "GEMINI_API_KEY",
       passed: true,
       checks: {

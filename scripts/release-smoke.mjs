@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -31,6 +31,28 @@ function runNpm(args) {
   return npmExecPath
     ? run(process.execPath, [npmExecPath, ...args])
     : run("npm", args);
+}
+
+function checkNpmNameAvailability() {
+  const npmExecPath = process.env.npm_execpath;
+  const result = npmExecPath
+    ? spawnSync(
+        process.execPath,
+        [npmExecPath, "view", "codex-agent-tools", "name", "version", "--json"],
+        { cwd: root, encoding: "utf8", windowsHide: true },
+      )
+    : spawnSync(
+        process.platform === "win32" ? "npm.cmd" : "npm",
+        ["view", "codex-agent-tools", "name", "version", "--json"],
+        { cwd: root, encoding: "utf8", windowsHide: true },
+      );
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  if (result.status === 0) {
+    throw new Error("npm package name codex-agent-tools is already registered");
+  }
+  if (!/E404|Not Found/iu.test(output)) {
+    throw new Error("Unable to verify npm package name availability");
+  }
 }
 
 function releaseSecrets(environment) {
@@ -142,5 +164,6 @@ run(process.execPath, [mcpPath, "--help"]);
 await checkMcpContract();
 await checkDoctorJson();
 await checkPackage();
+checkNpmNameAvailability();
 
 process.stdout.write("release smoke passed\n");

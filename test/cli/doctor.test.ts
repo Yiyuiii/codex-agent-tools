@@ -104,7 +104,7 @@ describe("doctor diagnostics", () => {
       "credential environment: GEMINI_API_KEY",
     );
     expect(report.checks.find((check) => check.name === "LLM gemini-3.5-flash")?.detail).toContain(
-      "gemini-3.5-flash via pi-rpc; route=direct; review=passed; delegate=passed",
+      "gemini-3.5-flash via pi-rpc; route=proxy-10808; review=pending; delegate=pending",
     );
     expect(report.checks.find((check) => check.name === "Ark Coding authentication")?.detail).toBe(
       "credential environment: ARK_API_KEY -> CODEX_AGENT_ARK_CODING_KEY",

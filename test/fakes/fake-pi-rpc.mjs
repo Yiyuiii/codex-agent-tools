@@ -86,6 +86,43 @@ function handle(command) {
       }, 5);
       return;
     }
+    if (scenario === "retry-success") {
+      setTimeout(() => {
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: "gemini-3.5-flash",
+            provider: "google",
+            content: [],
+            stopReason: "error",
+            errorMessage: "temporary quota fake-secret",
+          },
+        });
+        emit({ type: "agent_end", messages: [], willRetry: true });
+        emit({
+          type: "auto_retry_start",
+          attempt: 1,
+          maxAttempts: 4,
+          delayMs: 1,
+          errorMessage: "temporary quota fake-secret",
+        });
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: "gemini-3.5-flash",
+            provider: "google",
+            content: [{ type: "text", text: "Recovered after retry." }],
+            stopReason: "stop",
+          },
+        });
+        emit({ type: "auto_retry_end", success: true, attempt: 1 });
+        emit({ type: "agent_end", messages: [], willRetry: false });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
     setTimeout(() => {
       const tools = argv[argv.indexOf("--tools") + 1] ?? "";
       const toolName = tools.includes("bash") ? "bash" : "read";

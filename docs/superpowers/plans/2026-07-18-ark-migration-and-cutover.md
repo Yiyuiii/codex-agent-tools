@@ -273,6 +273,8 @@ git commit -m "feat: add reversible Codex MCP cutover"
 
 ### Task 6: 完成本地安装验收和可发布准备
 
+当前状态（2026-07-18）：release/local acceptance 实现已完成；stdio MCP 的工具契约、Kimi review/delegate、取消和进程清理已通过。本机 Codex 凭据转发白名单已加入安装块。Gemini 固定路由变更后重新 pending，Ark 仍 pending，因此端到端 Pi 调用和真实 cutover 按门禁拒绝，下面步骤不能整体勾选为完成。
+
 **Files:**
 - Create: `scripts/local-acceptance.mjs`
 - Create: `docs/release/checklist.md`
@@ -280,11 +282,11 @@ git commit -m "feat: add reversible Codex MCP cutover"
 - Modify: `README.md`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: 扩展 release smoke 和本地 MCP 验收脚本**
+- [x] **Step 1: 扩展 release smoke 和本地 MCP 验收脚本**
 
 release smoke 额外检查 npm 名称当前是否可用、包中不含 secret/smoke 原始会话/开发机绝对路径、安装命令指向有效 bin。local acceptance 通过 stdio MCP client 执行 initialize/listTools，验证两个工具 schema/annotations，再分别用一个已通过的 Kimi 与 Pi logical LLM 做低成本 review；delegate 只在临时仓库运行。取消测试启动长任务后 abort 并验证没有 Kimi/Pi 后代。
 
-- [ ] **Step 2: 执行全部确定性检查**
+- [x] **Step 2: 执行全部确定性检查**
 
 Run: `npm clean-install && npm run typecheck && npm test && npm run build && npm run smoke:release`
 

@@ -4,6 +4,8 @@
 日期：2026-07-18  
 目标仓库：`D:\Codes\codex-agent-tools`
 
+实现状态更新（2026-07-18）：Kimi 六项能力已在 direct 路由通过并启用。Gemini 的历史 direct 门禁曾通过，但本机当前 direct 访问 Google 不可达；固定绑定已改为 `proxy-10808`，两类能力随绑定变化重新置为 pending，最新 review 被 Google 免费层共享额度阻塞。Ark 六项能力也因缺凭据或上游额度保持 pending。可回滚 cutover 已实现，但在这些门禁全部通过前必须零写入拒绝。
+
 ## 1. 背景与目标
 
 `codex-cc-tools` 以 Claude Code 子进程为执行桥梁。新项目要让 Codex 通过统一 MCP 接口调用本机外部智能体，同时移除对 Claude Code 的运行时依赖。
@@ -320,4 +322,3 @@ delegate 额外返回：
 7. 代理、凭据和子进程相互隔离，日志无密钥。
 8. Windows 取消和超时不遗留子进程。
 9. 安装、doctor、卸载和 release smoke 通过。
-

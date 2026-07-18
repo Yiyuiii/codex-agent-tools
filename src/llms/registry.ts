@@ -78,7 +78,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     runtime: "pi-rpc",
     provider: "google",
     model: "gemini-3.5-flash",
-    network: "direct",
+    network: "proxy-10808",
     credentialEnv: [
       "GEMINI_API_KEY",
       "GOOGLE_API_KEY",
@@ -86,17 +86,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     ],
     timeoutMs: 600_000,
     maxConcurrency: 2,
-    capabilities: { review: true, delegate: true },
-    qualityGates: {
-      review: {
-        status: "passed",
-        evidence: "docs/smoke/pi-gemini.md#gemini-review",
-      },
-      delegate: {
-        status: "passed",
-        evidence: "docs/smoke/pi-gemini.md#gemini-delegate",
-      },
-    },
+    ...pendingTasks(),
   },
   {
     id: "kimi-k2.7",
@@ -174,6 +164,12 @@ const registry = createLlmRegistry(DEFAULT_PROFILES);
 
 export function supportedLlmIds(): string[] {
   return registry.ids();
+}
+
+export function credentialEnvironmentNames(): string[] {
+  return [
+    ...new Set(DEFAULT_PROFILES.flatMap((profile) => profile.credentialEnv)),
+  ];
 }
 
 export function resolveLlm(id: string, task?: TaskKind): LlmProfile {

@@ -9,7 +9,7 @@ import { PiAdapter } from "../adapters/pi/adapter.js";
 import { runPiRpc } from "../adapters/pi/client.js";
 import { buildIsolatedPiConfig } from "../adapters/pi/config.js";
 import { locatePi } from "../adapters/pi/locator.js";
-import type { LlmProfile, RuntimeKind } from "../domain/types.js";
+import type { LlmProfile, NetworkPolicy, RuntimeKind } from "../domain/types.js";
 import { createLlmRegistry, resolveLlm } from "../llms/registry.js";
 import type {
   ExternalDelegateResult,
@@ -59,7 +59,7 @@ export interface PiSmokeEvidence {
   runtime: "pi-rpc";
   provider: string;
   endpointHost: string;
-  route: "direct";
+  route: NetworkPolicy;
   credentialEnv: string | null;
   configSha256: string;
   task: PiSmokeTask;
@@ -286,17 +286,41 @@ function inspectEnvironment(
   const credentialNames = expectedCredentialNames.filter((name) =>
     keys.includes(name),
   );
-  const forbidden = keys.some(
+  const forbiddenCredential = keys.some(
     (name) =>
-      (["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"].includes(name) ||
-        /^(?:ANTHROPIC|OPENAI|DEEPSEEK|ARK|VOLCENGINE|KIMI|GEMINI|GOOGLE|CODEX_AGENT)_/u.test(
-          name,
-        )) &&
+      /^(?:ANTHROPIC|OPENAI|DEEPSEEK|ARK|VOLCENGINE|KIMI|GEMINI|GOOGLE|CODEX_AGENT)_/u.test(
+        name,
+      ) &&
       !expectedCredentialNames.includes(name),
   );
+  const proxyEntries = Object.entries(environment).filter(([name]) =>
+    /^(?:HTTP|HTTPS|ALL|SOCKS5)_PROXY$/iu.test(name),
+  );
+  const expectedProxy =
+    profile.network === "direct"
+      ? undefined
+      : `http://127.0.0.1:${profile.network === "proxy-10808" ? 10808 : 11808}`;
+  const proxyIsolated =
+    expectedProxy === undefined
+      ? proxyEntries.length === 0
+      : ["HTTP_PROXY", "HTTPS_PROXY"].every((expectedName) =>
+          proxyEntries.some(
+            ([name, value]) =>
+              name.toUpperCase() === expectedName && value === expectedProxy,
+          ),
+        ) &&
+        proxyEntries.every(
+          ([name, value]) =>
+            ["HTTP_PROXY", "HTTPS_PROXY"].includes(name.toUpperCase()) &&
+            value === expectedProxy,
+        );
   const hasAgentDir = keys.includes("PI_CODING_AGENT_DIR");
   return {
-    isolated: !forbidden && hasAgentDir && credentialNames.length === 1,
+    isolated:
+      !forbiddenCredential &&
+      proxyIsolated &&
+      hasAgentDir &&
+      credentialNames.length === 1,
     credentialEnv: credentialNames[0] ?? null,
   };
 }
@@ -344,7 +368,7 @@ function commonEvidence(
     runtime: "pi-rpc",
     provider: profile.provider!,
     endpointHost: endpointHost(profile),
-    route: "direct",
+    route: profile.network,
     credentialEnv: environment.credentialEnv,
     configSha256: runtimeEvidence.configSha256,
     task: options.task,
@@ -374,10 +398,9 @@ export async function runPiSmoke(
   const profile = resolveLlm(options.llm);
   if (
     profile.runtime !== "pi-rpc" ||
-    profile.provider === undefined ||
-    profile.network !== "direct"
+    profile.provider === undefined
   ) {
-    throw new Error(`Logical llm ${options.llm} is not a direct Pi profile`);
+    throw new Error(`Logical llm ${options.llm} is not a Pi profile`);
   }
   let service = dependencies.service;
   let runtimeEvidence = dependencies.runtimeEvidence;

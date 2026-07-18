@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { credentialEnvironmentNames } from "../llms/registry.js";
+
 export const MCP_SERVER_NAME = "codex_external_agents";
 export const OWNERSHIP_MARKER = "# managed-by: codex-agent-tools";
 
@@ -48,6 +50,7 @@ function buildManagedBlock(
     `[${TARGET_TABLE}]`,
     `command = ${tomlString(options.nodePath)}`,
     `args = [${tomlString(options.mcpPath)}]`,
+    `env_vars = [${credentialEnvironmentNames().map(tomlString).join(", ")}]`,
     "startup_timeout_sec = 20",
     "tool_timeout_sec = 900",
     "required = false",

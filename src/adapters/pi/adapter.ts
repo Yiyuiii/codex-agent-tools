@@ -16,6 +16,50 @@ export interface PiAdapterDependencies {
   locateExecutable?: (environment: NodeJS.ProcessEnv) => Promise<string>;
   buildConfig?: () => Promise<IsolatedPiConfig>;
   runClient?: (request: PiRpcRunRequest) => Promise<AdapterRunResult>;
+  waitForRetry?: (delayMs: number, signal?: AbortSignal) => Promise<void>;
+}
+
+const MAX_GEMINI_FREE_TIER_RETRIES = 1;
+
+async function waitForRetry(
+  delayMs: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal?.aborted) throw new Error("Gemini retry cancelled");
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, delayMs);
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      reject(new Error("Gemini retry cancelled"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function geminiFreeTierRetryDelay(
+  profile: AdapterRunRequest["profile"],
+  result: AdapterRunResult,
+): number | undefined {
+  if (
+    profile.provider !== "google" ||
+    result.status !== "failed" ||
+    !result.diagnostics.some((entry) =>
+      entry.includes("generate_content_free_tier_requests"),
+    )
+  ) {
+    return undefined;
+  }
+  const match = result.diagnostics.join("\n").match(
+    /Please retry in\s+(\d+(?:\.\d+)?)s/iu,
+  );
+  const seconds = match?.[1] === undefined ? Number.NaN : Number(match[1]);
+  if (!Number.isFinite(seconds) || seconds < 0 || seconds > 60) {
+    return undefined;
+  }
+  return 60_000;
 }
 
 function mapToolEvent(event: unknown): unknown {
@@ -68,6 +112,10 @@ export class PiAdapter implements ExternalAgentAdapter {
   readonly #runClient: (
     request: PiRpcRunRequest,
   ) => Promise<AdapterRunResult>;
+  readonly #waitForRetry: (
+    delayMs: number,
+    signal?: AbortSignal,
+  ) => Promise<void>;
 
   public constructor(dependencies: PiAdapterDependencies = {}) {
     this.#locateExecutable =
@@ -81,6 +129,7 @@ export class PiAdapter implements ExternalAgentAdapter {
           providers: ["ark"],
         }));
     this.#runClient = dependencies.runClient ?? runPiRpc;
+    this.#waitForRetry = dependencies.waitForRetry ?? waitForRetry;
   }
 
   public async run(request: AdapterRunRequest): Promise<AdapterRunResult> {
@@ -120,29 +169,65 @@ export class PiAdapter implements ExternalAgentAdapter {
     if (request.onProgress !== undefined) {
       clientRequest.onProgress = request.onProgress;
     }
-    const result = await this.#runClient(clientRequest);
-    const events = result.events
-      .filter((event) =>
-        typeof event === "object" &&
-        event !== null &&
-        ((event as Record<string, unknown>).type === "tool_execution_start" ||
-          (event as Record<string, unknown>).type === "tool_execution_end"),
-      )
-      .map(mapToolEvent);
-    if (
-      result.status === "completed" &&
-      result.actualModel !== request.profile.model
-    ) {
-      return {
-        ...result,
-        status: "failed",
-        events,
-        diagnostics: [
-          ...result.diagnostics,
-          `Model binding violation: expected ${request.profile.model} but Pi reported ${result.actualModel ?? "no model"}`,
-        ],
-      };
+    const events: unknown[] = [];
+    const diagnostics: string[] = [];
+    let elapsedMs = 0;
+    let retryCount = 0;
+
+    for (;;) {
+      const result = await this.#runClient(clientRequest);
+      elapsedMs += result.elapsedMs;
+      diagnostics.push(...result.diagnostics);
+      events.push(
+        ...result.events
+          .filter((event) =>
+            typeof event === "object" &&
+            event !== null &&
+            ((event as Record<string, unknown>).type ===
+              "tool_execution_start" ||
+              (event as Record<string, unknown>).type === "tool_execution_end"),
+          )
+          .map(mapToolEvent),
+      );
+      const combined = { ...result, elapsedMs, events, diagnostics };
+      if (
+        result.status === "completed" &&
+        result.actualModel !== request.profile.model
+      ) {
+        return {
+          ...combined,
+          status: "failed",
+          diagnostics: [
+            ...diagnostics,
+            `Model binding violation: expected ${request.profile.model} but Pi reported ${result.actualModel ?? "no model"}`,
+          ],
+        };
+      }
+
+      const delayMs =
+        request.task === "review"
+          ? geminiFreeTierRetryDelay(request.profile, result)
+          : undefined;
+      if (
+        delayMs === undefined ||
+        retryCount >= MAX_GEMINI_FREE_TIER_RETRIES
+      ) {
+        return combined;
+      }
+      try {
+        await this.#waitForRetry(delayMs, request.signal);
+      } catch (error) {
+        return {
+          ...combined,
+          status: request.signal?.aborted ? "cancelled" : "failed",
+          diagnostics: [
+            ...diagnostics,
+            error instanceof Error ? error.message : String(error),
+          ],
+        };
+      }
+      elapsedMs += delayMs;
+      retryCount += 1;
     }
-    return { ...result, events };
   }
 }

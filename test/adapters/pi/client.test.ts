@@ -264,4 +264,22 @@ describe("Pi RPC client", () => {
     );
     expect(result.diagnostics.join("\n")).not.toContain("fake-secret");
   });
+
+  it("uses the final assistant state after a transient error is retried successfully", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "retry-success",
+      }),
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.text).toBe("Recovered after retry.");
+    expect(result.stopReason).toBe("stop");
+    expect(result.diagnostics.join("\n")).toContain(
+      "Pi assistant error: temporary quota [REDACTED]",
+    );
+  });
 });

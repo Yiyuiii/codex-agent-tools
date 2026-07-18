@@ -4,11 +4,13 @@
 
 **Goal:** 在 Kimi MVP 的统一工具面下加入由本机 Pi RPC 承载的 `gemini-3.5-flash`，并让项目独立维护 Pi 配置、权限、网络和真实质量门禁。
 
-**Architecture:** 新增 `pi-rpc` 适配器而不改变 MCP schema；逻辑注册表把 Gemini 固定绑定到 Pi 的 Google provider 与 direct 网络策略。每次调用生成/使用包版本化的隔离 `PI_CODING_AGENT_DIR`，review 仅以 Pi CLI 参数启用 `read,grep,find,ls`，delegate 启用完整内置工具；JSONL、取消、期限、进程树和证据复用 Kimi MVP 的公共运行层。
+**Architecture:** 新增 `pi-rpc` 适配器而不改变 MCP schema；原计划把 Gemini 固定绑定到 Pi 的 Google provider 与 direct 网络策略。每次调用生成/使用包版本化的隔离 `PI_CODING_AGENT_DIR`，review 仅以 Pi CLI 参数启用 `read,grep,find,ls`，delegate 启用完整内置工具；JSONL、取消、期限、进程树和证据复用 Kimi MVP 的公共运行层。
 
 **Tech Stack:** Kimi MVP 技术栈、Pi RPC JSONL、`@earendil-works/pi-coding-agent` 0.80.x 的外部可执行文件契约、Node.js 原生流。
 
-**完成状态（2026-07-18）：** 全部任务完成。`gemini-3.5-flash` 的 review/delegate 真实门禁均已通过；首次 delegate 因未执行强制验证命令被门禁正确拒绝，收紧任务提示后再次运行通过。
+**历史完成状态（2026-07-18）：** 原 direct 绑定的全部任务曾完成，`gemini-3.5-flash` 的 review/delegate 真实门禁均通过；首次 delegate 因未执行强制验证命令被正确拒绝，收紧任务提示后再次运行通过。
+
+**绑定变更（2026-07-18）：** 后续网络复核发现本机 direct 访问 Google endpoint 超时，而 `10808` 可达；注册表固定绑定已改为 `proxy-10808`。原勾选项和证据保留为历史实施记录，但不授权新绑定。新路由 review 因 Google 共享免费层额度耗尽未通过，review/delegate 已重新置为 pending，必须在额度恢复后分别复跑。
 
 ---
 
@@ -260,7 +262,7 @@ git commit -m "test: qualify Gemini Pi profile"
 
 ## 本计划完成条件
 
-- `gemini-3.5-flash` 是调用者唯一可见的选择，固定映射到 Pi/Google/Gemini 3.5 Flash/direct。
+- `gemini-3.5-flash` 是调用者唯一可见的选择，当前固定映射到 Pi/Google/Gemini 3.5 Flash/`proxy-10808`。
 - 项目只使用自己的 `PI_CODING_AGENT_DIR`，不读取或修改用户日常 Pi 配置。
 - review 只启用只读 Pi 工具；delegate 的真实变更和命令由桥接层取证。
 - Pi 的取消、硬期限和 Windows 进程树清理达到与 Kimi 相同的验收标准。

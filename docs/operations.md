@@ -41,6 +41,7 @@ codex-agent-tools doctor --config D:\path\to\config.toml --json
 [mcp_servers.codex_external_agents]
 command = "<当前 Node 绝对路径>"
 args = ["<当前包 dist/mcp.js 的绝对路径>"]
+env_vars = ["ARK_API_KEY", "VOLCENGINE_API_KEY", "OPENAI_API_KEY_DOUBAO", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"]
 startup_timeout_sec = 20
 tool_timeout_sec = 900
 required = false
@@ -48,7 +49,7 @@ enabled = true
 enabled_tools = ["external_review", "external_delegate"]
 ```
 
-安装可重复运行。它只替换带有上述拥有标记的目标表，保留用户注释和其它 MCP 服务。若同名表没有拥有标记，命令会拒绝覆盖。安装或升级后应重启 Codex，让新的服务进程和工具契约生效。
+`env_vars` 是 Codex stdio MCP 的父环境转发白名单；只有父进程中实际存在的列出变量会进入 MCP 服务。服务随后再按所选逻辑 LLM 只把一个规范化凭据传给对应子进程，不会把所有列出凭据继续下发。安装可重复运行。它只替换带有上述拥有标记的目标表，保留用户注释和其它 MCP 服务。若同名表没有拥有标记，命令会拒绝覆盖。安装或升级后应重启 Codex，让新的服务进程和工具契约生效。
 
 ## 诊断
 
@@ -58,7 +59,7 @@ codex-agent-tools doctor --json
 codex-agent-tools doctor --strict
 ```
 
-诊断会检查：Kimi 可执行文件、版本与登录状态；Pi 可执行文件、版本、隔离配置哈希、Ark endpoint/模型清单以及 Gemini/Ark 凭据变量名；本包拥有的 MCP 注册；公开工具名；各逻辑 LLM 的真实模型、运行时、固定网络路由和 review/delegate 质量门禁。Gemini 凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 的顺序只选择第一个非空值；Ark Coding Plan 按 `ARK_API_KEY`、`VOLCENGINE_API_KEY` 选择，Agent Plan 使用 `OPENAI_API_KEY_DOUBAO`。报告只显示命中的变量名和项目私有目标变量名，不显示凭据内容。
+诊断会检查：Kimi 可执行文件、版本与登录状态；Pi 可执行文件、版本、隔离配置哈希、Ark endpoint/模型清单以及 Gemini/Ark 凭据变量名；本包拥有的 MCP 注册；公开工具名；各逻辑 LLM 的真实模型、运行时、固定网络路由和 review/delegate 质量门禁。Gemini 固定使用 `proxy-10808`，凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 的顺序只选择第一个非空值；Ark Coding Plan 按 `ARK_API_KEY`、`VOLCENGINE_API_KEY` 选择，Agent Plan 使用 `OPENAI_API_KEY_DOUBAO`。报告只显示命中的变量名和项目私有目标变量名，不显示凭据内容。
 
 普通模式即使存在警告也用于展示完整报告。`--strict` 只在出现错误级诊断时返回非零；质量门禁 pending 是警告，表示该能力尚未通过真实烟测。报告会对环境中的令牌、密钥和认证头脱敏。
 
@@ -102,6 +103,8 @@ restore 只将指定备份原子写回 Codex 配置，不删除备份，也不�
 ### 能看到工具但模型能力被拒绝
 
 查看 `doctor` 对应逻辑 LLM 的 review/delegate 门禁。pending 表示该精确组合尚未获得真实烟测证据；系统不会替换成其它后端或模型。需由项目维护流程完成烟测并随新版本启用。
+
+Gemini 的当前固定路由为本机 `10808`。2026-07-18 的 direct 历史通过证据不适用于该路由；只有 `proxy-10808` 的 review/delegate 分别重新通过后才能启用。Google 共享免费层返回配额错误时，review 只在服务明确给出不超过 60 秒的重试窗口时等待一次；delegate 不自动重试。
 
 ### review 返回 workspace_changed
 
