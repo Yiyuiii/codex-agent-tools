@@ -32,7 +32,7 @@
 - Test: `test/adapters/pi/locator.test.ts`
 - Test: `test/adapters/pi/config.test.ts`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```ts
 import { expect, it } from "vitest";
@@ -56,23 +56,23 @@ it("writes no credentials and never targets the user's normal Pi directory", asy
 });
 ```
 
-- [ ] **Step 2: 运行并确认失败**
+- [x] **Step 2: 运行并确认失败**
 
 Run: `npm test -- --run test/adapters/pi/locator.test.ts test/adapters/pi/config.test.ts`
 
 Expected: FAIL，Pi 模块尚不存在。
 
-- [ ] **Step 3: 实现定位和原子配置生成**
+- [x] **Step 3: 实现定位和原子配置生成**
 
 定位顺序为 `PI_COMMAND`、PATH 的 `pi.cmd/pi`、Windows 全局 npm bin 下的 `pi.cmd`。配置根固定为包缓存目录 `.../codex-agent-tools/pi/<package-version>`；先写同目录临时文件，再 rename 替换。首个 Gemini 版本的 `models.json` 可以为空，因为 Google 是 Pi 内置 provider；`settings.json` 只包含非交互运行所需的稳定设置和 `defaultProjectTrust: "never"`。返回的 child env 显式设置 `PI_CODING_AGENT_DIR`，不读取、不复制、不修改用户的 `~/.pi/agent`。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `npm test -- --run test/adapters/pi/locator.test.ts test/adapters/pi/config.test.ts && npm run typecheck`
 
 Expected: 全部通过；重复生成得到相同内容和路径。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/adapters/pi/locator.ts src/adapters/pi/config.ts test/adapters/pi
