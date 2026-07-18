@@ -6,7 +6,7 @@ import path from "node:path";
 export interface BuildIsolatedPiConfigOptions {
   root?: string;
   version: string;
-  providers: Readonly<Record<string, unknown>>;
+  providers?: readonly "ark"[];
 }
 
 export interface IsolatedPiConfig {
@@ -16,6 +16,44 @@ export interface IsolatedPiConfig {
   environment: { PI_CODING_AGENT_DIR: string };
   contentSha256: string;
 }
+
+const ARK_PROVIDERS = {
+  "ark-coding-plan": {
+    baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
+    api: "anthropic-messages",
+    apiKey: "$CODEX_AGENT_ARK_CODING_KEY",
+    models: [
+      {
+        id: "ark-code-latest",
+        name: "Ark Coding Plan",
+        reasoning: true,
+        contextWindow: 200_000,
+        maxTokens: 32_000,
+      },
+    ],
+  },
+  "ark-agent-plan": {
+    baseUrl: "https://ark.cn-beijing.volces.com/api/plan",
+    api: "anthropic-messages",
+    apiKey: "$CODEX_AGENT_ARK_AGENT_KEY",
+    models: [
+      {
+        id: "glm-5.2",
+        name: "GLM 5.2 Agent Plan",
+        reasoning: true,
+        contextWindow: 200_000,
+        maxTokens: 32_000,
+      },
+      {
+        id: "doubao-seed-2.0-pro",
+        name: "Doubao Seed 2.0 Pro Agent Plan",
+        reasoning: true,
+        contextWindow: 200_000,
+        maxTokens: 32_000,
+      },
+    ],
+  },
+} as const;
 
 function stableJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableJson);
@@ -74,6 +112,10 @@ export async function buildIsolatedPiConfig(
   if (!/^[0-9A-Za-z._-]+$/u.test(options.version)) {
     throw new Error("Pi config version must contain only safe path characters");
   }
+  const providerSets = options.providers ?? ["ark"];
+  if (providerSets.length !== 1 || providerSets[0] !== "ark") {
+    throw new Error('Pi config providers must be exactly ["ark"]');
+  }
   const root = path.resolve(options.root ?? getDefaultPiConfigRoot());
   const agentDir = path.join(root, "pi", options.version);
   const settingsPath = path.join(agentDir, "settings.json");
@@ -89,7 +131,7 @@ export async function buildIsolatedPiConfig(
     skills: [],
     themes: [],
   });
-  const models = jsonText({ providers: options.providers });
+  const models = jsonText({ providers: ARK_PROVIDERS });
 
   await mkdir(agentDir, { recursive: true });
   await atomicWrite(settingsPath, settings);

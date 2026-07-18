@@ -109,7 +109,7 @@ export async function collectDoctorReport(
   const locatePiExecutable = options.locatePiExecutable ?? (() => locatePi());
   const buildPiConfig =
     options.buildPiConfig ??
-    (() => buildIsolatedPiConfig({ version: VERSION, providers: {} }));
+    (() => buildIsolatedPiConfig({ version: VERSION, providers: ["ark"] }));
   const runCommand = options.runCommand ?? defaultRunCommand;
   const secrets = secretValues(environment);
   const checks: DoctorCheck[] = [];

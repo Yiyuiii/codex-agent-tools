@@ -24,17 +24,47 @@ afterEach(async () => {
 });
 
 describe("isolated Pi configuration", () => {
+  it("generates the approved Ark providers without literal secrets", async () => {
+    const root = await tempRoot();
+    const result = await buildIsolatedPiConfig({
+      root,
+      version: "0.1.0-alpha.1",
+      providers: ["ark"],
+    });
+    const expected = await readFile(
+      path.resolve("test/fixtures/pi/expected-ark-models.json"),
+      "utf8",
+    );
+    const actual = await readFile(result.modelsPath, "utf8");
+
+    expect(actual).toBe(expected);
+    expect(actual).not.toContain("/v3");
+    const configuredModels = Object.values(
+      JSON.parse(actual).providers as Record<
+        string,
+        { models: Array<{ id: string }> }
+      >,
+    ).flatMap((provider) => provider.models.map((model) => model.id));
+    expect(configuredModels).toEqual([
+      "glm-5.2",
+      "doubao-seed-2.0-pro",
+      "ark-code-latest",
+    ]);
+    expect(configuredModels.join(" ")).not.toMatch(/claude|codex|deepseek/iu);
+    expect(actual).not.toContain("literal-secret");
+  });
+
   it("writes deterministic credential-free settings outside the user's Pi directory", async () => {
     const root = await tempRoot();
     const first = await buildIsolatedPiConfig({
       root,
       version: "0.1.0-alpha.1",
-      providers: {},
+      providers: ["ark"],
     });
     const second = await buildIsolatedPiConfig({
       root,
       version: "0.1.0-alpha.1",
-      providers: {},
+      providers: ["ark"],
     });
 
     expect(first).toEqual(second);
@@ -52,12 +82,16 @@ describe("isolated Pi configuration", () => {
       skills: [],
       themes: [],
     });
-    expect(JSON.parse(await readFile(first.modelsPath, "utf8"))).toEqual({
-      providers: {},
-    });
-    expect(
-      `${await readFile(first.settingsPath, "utf8")}${await readFile(first.modelsPath, "utf8")}`,
-    ).not.toMatch(/api[_-]?key|secret|token|password/iu);
+    const modelsText = await readFile(first.modelsPath, "utf8");
+    const expectedModels = await readFile(
+      path.resolve("test/fixtures/pi/expected-ark-models.json"),
+      "utf8",
+    );
+    expect(modelsText).toBe(expectedModels);
+    expect(modelsText).not.toMatch(
+      /"(?:ARK_API_KEY|VOLCENGINE_API_KEY|OPENAI_API_KEY_DOUBAO)"/u,
+    );
+    expect(modelsText).not.toMatch(/secret|password/iu);
     expect((await readdir(first.agentDir)).sort()).toEqual([
       "models.json",
       "settings.json",
@@ -85,7 +119,7 @@ describe("isolated Pi configuration", () => {
   it("rejects a version that could escape the cache root", async () => {
     const root = await tempRoot();
     await expect(
-      buildIsolatedPiConfig({ root, version: "../escape", providers: {} }),
+      buildIsolatedPiConfig({ root, version: "../escape", providers: ["ark"] }),
     ).rejects.toThrow(/version/u);
   });
 });

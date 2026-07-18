@@ -79,7 +79,7 @@ git commit -m "feat: normalize Ark credentials for Pi"
 - Modify: `test/adapters/pi/config.test.ts`
 - Create: `test/fixtures/pi/expected-ark-models.json`
 
-- [ ] **Step 1: 写完整 models.json 失败测试**
+- [x] **Step 1: 写完整 models.json 失败测试**
 
 ```ts
 it("generates the approved Ark providers without literal secrets", async () => {
@@ -106,23 +106,23 @@ it("generates the approved Ark providers without literal secrets", async () => {
 });
 ```
 
-- [ ] **Step 2: 运行并确认失败**
+- [x] **Step 2: 运行并确认失败**
 
 Run: `npm test -- --run test/adapters/pi/config.test.ts`
 
 Expected: FAIL，Ark provider 尚未生成。
 
-- [ ] **Step 3: 实现确定性配置和内容哈希**
+- [x] **Step 3: 实现确定性配置和内容哈希**
 
 配置键、provider 和 models 以固定顺序输出，结尾一个 LF；同版本内容不变时不重写。只写上述 endpoint、API 类型、变量引用和模型元数据，不写 `/v3` OpenAI endpoint，不写真实 key，不加入 Claude/Codex/DeepSeek 模型。生成结果返回 SHA-256，供 doctor 和 smoke 记录。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `npm test -- --run test/adapters/pi/config.test.ts && npm run typecheck`
 
 Expected: 与 fixture 完全一致，重复生成哈希相同。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/adapters/pi/config.ts test/adapters/pi/config.test.ts test/fixtures/pi/expected-ark-models.json

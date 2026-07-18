@@ -78,7 +78,7 @@ export class PiAdapter implements ExternalAgentAdapter {
       (() =>
         buildIsolatedPiConfig({
           version: VERSION,
-          providers: {},
+          providers: ["ark"],
         }));
     this.#runClient = dependencies.runClient ?? runPiRpc;
   }

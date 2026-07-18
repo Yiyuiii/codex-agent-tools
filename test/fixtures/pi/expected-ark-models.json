@@ -1,0 +1,39 @@
+{
+  "providers": {
+    "ark-agent-plan": {
+      "api": "anthropic-messages",
+      "apiKey": "$CODEX_AGENT_ARK_AGENT_KEY",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/plan",
+      "models": [
+        {
+          "contextWindow": 200000,
+          "id": "glm-5.2",
+          "maxTokens": 32000,
+          "name": "GLM 5.2 Agent Plan",
+          "reasoning": true
+        },
+        {
+          "contextWindow": 200000,
+          "id": "doubao-seed-2.0-pro",
+          "maxTokens": 32000,
+          "name": "Doubao Seed 2.0 Pro Agent Plan",
+          "reasoning": true
+        }
+      ]
+    },
+    "ark-coding-plan": {
+      "api": "anthropic-messages",
+      "apiKey": "$CODEX_AGENT_ARK_CODING_KEY",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/coding",
+      "models": [
+        {
+          "contextWindow": 200000,
+          "id": "ark-code-latest",
+          "maxTokens": 32000,
+          "name": "Ark Coding Plan",
+          "reasoning": true
+        }
+      ]
+    }
+  }
+}

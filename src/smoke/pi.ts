@@ -143,7 +143,7 @@ async function createSmokeRuntime(
   };
   const config = await buildIsolatedPiConfig({
     version: VERSION,
-    providers: {},
+    providers: ["ark"],
   });
   const evidence: PiSmokeRuntimeEvidence = {
     configSha256: config.contentSha256,
