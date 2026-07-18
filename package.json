@@ -10,7 +10,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "docs/operations.md"
   ],
   "bin": {
     "codex-agent-tools": "dist/cli.js",
