@@ -182,11 +182,11 @@ git commit -m "feat: register Ark logical llms"
 - Modify: `src/llms/registry.ts`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: 实现六项独立 smoke 矩阵**
+- [x] **Step 1: 实现六项独立 smoke 矩阵**
 
 复用真实 Pi smoke harness，但每个 logical ID 都创建全新临时仓库和 Pi 进程。review 使用确定缺陷并要求路径/行号；delegate 创建该次运行唯一文件并执行内容校验。每次记录实际 endpoint host、provider、model、direct 路由、配置哈希、elapsed、workspace evidence 和无孤儿进程结果；不记录 key、header、完整 env 或响应原始敏感内容。
 
-- [ ] **Step 2: 运行 Coding Plan 两项门禁**
+- [x] **Step 2: 运行 Coding Plan 两项门禁**
 
 Run: `npm run build && node scripts/real-ark-smoke.mjs --llm ark-coding-plan --task review`
 
@@ -194,7 +194,9 @@ Run: `node scripts/real-ark-smoke.mjs --llm ark-coding-plan --task delegate`
 
 Expected: 两项 `completed`，实际 model 为 `ark-code-latest`；review 零修改，delegate 证据一致。
 
-- [ ] **Step 3: 运行 Agent Plan 四项门禁**
+Actual: 两项均在模型启动前以 `missing_credential` 失败，工作区无修改且无残留进程；对应能力保持 pending。
+
+- [x] **Step 3: 运行 Agent Plan 四项门禁**
 
 Run: `node scripts/real-ark-smoke.mjs --llm ark-agent-glm-5.2 --task review`
 
@@ -206,15 +208,19 @@ Run: `node scripts/real-ark-smoke.mjs --llm ark-agent-doubao-seed-2.0-pro --task
 
 Expected: 四项 `completed`；模型标识正确；无 review 修改和孤儿 Pi 进程。
 
-- [ ] **Step 4: 按实际结果启用能力**
+Actual: 四项均正确命中 provider/model、隔离环境和 direct 路由，但上游以 `AccountQuotaExceeded` 拒绝；对应能力保持 pending。
+
+- [x] **Step 4: 按实际结果启用能力**
 
 在 `docs/smoke/ark.md` 写六行证据矩阵和失败说明。只启用已通过 task；失败项保留 pending 并不影响其它 profile/task。同步 `AGENTS.md` 当前事实。
 
-- [ ] **Step 5: 完整验证和提交**
+- [x] **Step 5: 完整验证和提交**
 
 Run: `npm run typecheck && npm test && npm run build && npm run smoke:release && node dist/cli.js doctor --json`
 
 Expected: 全部通过；doctor 门禁与证据矩阵一致。
+
+Actual: 类型检查、134 项测试、构建和 release smoke 全部通过；doctor 如实报告 Coding Plan 缺凭据、六项 Ark pending，并与证据矩阵一致。
 
 ```bash
 git add scripts/real-ark-smoke.mjs docs/smoke/ark.md src/llms/registry.ts AGENTS.md

@@ -126,6 +126,7 @@ export async function runPiRpc(
   let sequence = 0;
   let actualModel: string | undefined;
   let stopReason: string | undefined;
+  let assistantError = false;
   let cancellationReason: "cancelled" | "timed_out" | undefined;
   let status: AdapterRunResult["status"] = "failed";
   let stderr = "";
@@ -230,6 +231,14 @@ export async function runPiRpc(
       if (text !== "") textChunks.push(text);
       const message = recordOf(record.message);
       if (typeof message?.stopReason === "string") stopReason = message.stopReason;
+      if (
+        message?.role === "assistant" &&
+        typeof message.errorMessage === "string" &&
+        message.errorMessage.trim() !== ""
+      ) {
+        assistantError = true;
+        appendDiagnostic(`Pi assistant error: ${message.errorMessage}`);
+      }
       return;
     }
     if (record.type === "agent_end" && textChunks.length === 0) {
@@ -332,7 +341,7 @@ export async function runPiRpc(
     await sendCommand("prompt", { message: request.prompt });
     emitProgress("pi prompt started");
     await completion;
-    status = cancellationReason ?? "completed";
+    status = cancellationReason ?? (assistantError ? "failed" : "completed");
   } catch (error) {
     status = cancellationReason ?? "failed";
     if (cancellationReason === undefined) {

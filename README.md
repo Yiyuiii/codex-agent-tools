@@ -47,7 +47,7 @@ codex-agent-tools doctor
 
 Pi/Gemini 逻辑 ID 为 `gemini-3.5-flash`，固定映射到 Pi、Google provider、同名真实模型和 direct 网络策略。review/delegate 均已通过独立真实门禁，证据见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。
 
-Ark 逻辑 ID 为 `ark-coding-plan`、`ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro`，分别固定映射到隔离 Pi 中的 Coding Plan 或 Agent Plan provider，全部使用 direct 网络策略。当前六项 review/delegate 真实门禁尚未完成，因此这些 ID 会被明确拒绝而不会回退到其它模型。
+Ark 逻辑 ID 为 `ark-coding-plan`、`ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro`，分别固定映射到隔离 Pi 中的 Coding Plan 或 Agent Plan provider，全部使用 direct 网络策略。2026-07-18 的六项真实门禁因 Coding Plan 缺少凭据、Agent Plan 周额度耗尽而未通过，因此这些 ID 会被明确拒绝而不会回退到其它模型；证据和复跑条件见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
 
 每个“逻辑 LLM × 任务”只有通过真实烟测后才会启用。当前三个 Kimi 逻辑 LLM 的 review/delegate 六个组合均已通过，证据见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。未来新增或重新验证中的 pending 能力会被明确拒绝，而不会静默改用另一个模型。
 

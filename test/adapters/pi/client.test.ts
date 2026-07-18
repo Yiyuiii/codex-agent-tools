@@ -245,4 +245,23 @@ describe("Pi RPC client", () => {
     expect(result.status).toBe("failed");
     expect(result.diagnostics.join("\n")).toMatch(/exit|closed/iu);
   });
+
+  it("fails and redacts an assistant API error with empty content", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "api-error",
+      }),
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.text).toBe("");
+    expect(result.stopReason).toBe("error");
+    expect(result.diagnostics.join("\n")).toContain(
+      "Pi assistant error: upstream rejected [REDACTED]",
+    );
+    expect(result.diagnostics.join("\n")).not.toContain("fake-secret");
+  });
 });

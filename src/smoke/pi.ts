@@ -9,7 +9,7 @@ import { PiAdapter } from "../adapters/pi/adapter.js";
 import { runPiRpc } from "../adapters/pi/client.js";
 import { buildIsolatedPiConfig } from "../adapters/pi/config.js";
 import { locatePi } from "../adapters/pi/locator.js";
-import type { RuntimeKind } from "../domain/types.js";
+import type { LlmProfile, RuntimeKind } from "../domain/types.js";
 import { createLlmRegistry, resolveLlm } from "../llms/registry.js";
 import type {
   ExternalDelegateResult,
@@ -57,13 +57,20 @@ export interface PiSmokeEvidence {
   actualModel: string | null;
   expectedModel: string;
   runtime: "pi-rpc";
-  provider: "google";
+  provider: string;
+  endpointHost: string;
   route: "direct";
   credentialEnv: string | null;
   configSha256: string;
   task: PiSmokeTask;
   status: ExternalReviewResult["status"];
   passed: boolean;
+  failureReason:
+    | "missing_credential"
+    | "account_quota_exceeded"
+    | "adapter_failure"
+    | "acceptance_failed"
+    | null;
   elapsedMs: number;
   outputSha256: string;
   filesChanged: string[];
@@ -90,12 +97,6 @@ export interface PiSmokeDependencies {
   listPiRpcProcessIds?: () => Promise<number[]>;
   now?: () => Date;
 }
-
-const GEMINI_CREDENTIALS = [
-  "GEMINI_API_KEY",
-  "GOOGLE_API_KEY",
-  "GOOGLE_GENERATIVE_AI_API_KEY",
-] as const;
 
 export function parsePiSmokeArguments(args: readonly string[]): {
   llm: string;
@@ -269,24 +270,41 @@ function hasNoNewProcesses(before: readonly number[], after: readonly number[]):
   return after.every((pid) => baseline.has(pid));
 }
 
-function inspectEnvironment(environment: NodeJS.ProcessEnv): {
+function inspectEnvironment(
+  environment: NodeJS.ProcessEnv,
+  profile: LlmProfile,
+): {
   isolated: boolean;
   credentialEnv: string | null;
 } {
   const keys = Object.keys(environment).map((name) => name.toUpperCase());
-  const credentialNames = GEMINI_CREDENTIALS.filter((name) =>
+  const expectedCredentialNames = (
+    profile.credentialTargetEnv === undefined
+      ? profile.credentialEnv
+      : [profile.credentialTargetEnv]
+  ).map((name) => name.toUpperCase());
+  const credentialNames = expectedCredentialNames.filter((name) =>
     keys.includes(name),
   );
   const forbidden = keys.some(
     (name) =>
-      /^(?:ANTHROPIC|OPENAI|DEEPSEEK|ARK|VOLCENGINE|KIMI)_/u.test(name) ||
-      ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"].includes(name),
+      (["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"].includes(name) ||
+        /^(?:ANTHROPIC|OPENAI|DEEPSEEK|ARK|VOLCENGINE|KIMI|GEMINI|GOOGLE|CODEX_AGENT)_/u.test(
+          name,
+        )) &&
+      !expectedCredentialNames.includes(name),
   );
   const hasAgentDir = keys.includes("PI_CODING_AGENT_DIR");
   return {
     isolated: !forbidden && hasAgentDir && credentialNames.length === 1,
     credentialEnv: credentialNames[0] ?? null,
   };
+}
+
+function endpointHost(profile: LlmProfile): string {
+  return profile.provider?.startsWith("ark-") === true
+    ? "ark.cn-beijing.volces.com"
+    : "generativelanguage.googleapis.com";
 }
 
 function commonEvidence(
@@ -297,26 +315,42 @@ function commonEvidence(
   processIdsBefore: readonly number[],
   processIdsAfter: readonly number[],
   now: Date,
+  profile: LlmProfile,
   checks: PiSmokeChecks,
   passed: boolean,
 ): PiSmokeEvidence {
-  const environment = inspectEnvironment(runtimeEvidence.childEnvironment);
+  const environment = inspectEnvironment(
+    runtimeEvidence.childEnvironment,
+    profile,
+  );
   const output = "review" in result ? result.review : result.summary;
+  const diagnosticText = result.diagnostics.join("\n");
+  const failureReason = passed
+    ? null
+    : /Missing credential:/iu.test(diagnosticText)
+      ? "missing_credential"
+      : /AccountQuotaExceeded|weekly usage quota/iu.test(diagnosticText)
+        ? "account_quota_exceeded"
+        : result.status !== "completed"
+          ? "adapter_failure"
+          : "acceptance_failed";
   return {
     schemaVersion: 1,
     timestamp: now.toISOString(),
     piVersion,
     llm: options.llm,
     actualModel: result.actualModel ?? null,
-    expectedModel: "gemini-3.5-flash",
+    expectedModel: profile.model,
     runtime: "pi-rpc",
-    provider: "google",
+    provider: profile.provider!,
+    endpointHost: endpointHost(profile),
     route: "direct",
     credentialEnv: environment.credentialEnv,
     configSha256: runtimeEvidence.configSha256,
     task: options.task,
     status: result.status,
     passed,
+    failureReason,
     elapsedMs: result.elapsedMs,
     outputSha256: sha256(output),
     filesChanged: [...result.filesChanged].sort(),
@@ -339,12 +373,11 @@ export async function runPiSmoke(
 ): Promise<PiSmokeEvidence> {
   const profile = resolveLlm(options.llm);
   if (
-    options.llm !== "gemini-3.5-flash" ||
     profile.runtime !== "pi-rpc" ||
-    profile.provider !== "google" ||
+    profile.provider === undefined ||
     profile.network !== "direct"
   ) {
-    throw new Error(`Logical llm ${options.llm} is not the direct Gemini Pi profile`);
+    throw new Error(`Logical llm ${options.llm} is not a direct Pi profile`);
   }
   let service = dependencies.service;
   let runtimeEvidence = dependencies.runtimeEvidence;
@@ -387,7 +420,10 @@ export async function runPiSmoke(
       );
       const gitClean = (await runGit(cwd, ["status", "--porcelain"])).trim() === "";
       const processIdsAfter = await listPiRpcProcessIds();
-      const environment = inspectEnvironment(runtimeEvidence.childEnvironment);
+      const environment = inspectEnvironment(
+        runtimeEvidence.childEnvironment,
+        profile,
+      );
       const checks: PiSmokeChecks = {
         actualModelMatches: result.actualModel === profile.model,
         environmentIsolated: environment.isolated,
@@ -409,16 +445,25 @@ export async function runPiSmoke(
         processIdsBefore,
         processIdsAfter,
         now(),
+        profile,
         checks,
         passed,
       );
     }
 
+    const resultFileName =
+      profile.provider.startsWith("ark-")
+        ? `${options.llm}-smoke.txt`
+        : "result.txt";
+    const expectedLine =
+      profile.provider.startsWith("ark-")
+        ? `ARK_SMOKE_OK:${options.llm}`
+        : "PI_SMOKE_OK";
     const result = await service.delegate(
       {
         llm: options.llm,
         prompt:
-          "Both actions are mandatory before you finish: (1) create result.txt in the working directory with exactly one line: PI_SMOKE_OK; (2) invoke the bash tool with the exact command `git status --short` to verify the change. Report both actions. Do not modify any other file, and do not substitute a prose claim for the bash invocation.",
+          `Both actions are mandatory before you finish: (1) create ${resultFileName} in the working directory with exactly one line: ${expectedLine}; (2) invoke the bash tool with the exact command \`git status --short\` to verify the change. Report both actions. Do not modify any other file, and do not substitute a prose claim for the bash invocation.`,
         cwd,
         timeoutMs,
       },
@@ -426,12 +471,15 @@ export async function runPiSmoke(
     );
     let resultText = "";
     try {
-      resultText = await readFile(path.join(cwd, "result.txt"), "utf8");
+      resultText = await readFile(path.join(cwd, resultFileName), "utf8");
     } catch {
       resultText = "";
     }
     const processIdsAfter = await listPiRpcProcessIds();
-    const environment = inspectEnvironment(runtimeEvidence.childEnvironment);
+    const environment = inspectEnvironment(
+      runtimeEvidence.childEnvironment,
+      profile,
+    );
     const normalizedFiles = result.filesChanged.map((name) => name.replaceAll("\\", "/"));
     const checks: PiSmokeChecks = {
       actualModelMatches: result.actualModel === profile.model,
@@ -440,10 +488,10 @@ export async function runPiSmoke(
         processIdsBefore,
         processIdsAfter,
       ),
-      resultFileValid: resultText.trim() === "PI_SMOKE_OK",
-      resultFileObserved: normalizedFiles.includes("result.txt"),
+      resultFileValid: resultText.trim() === expectedLine,
+      resultFileObserved: normalizedFiles.includes(resultFileName),
       onlyExpectedFileChanged:
-        normalizedFiles.length === 1 && normalizedFiles[0] === "result.txt",
+        normalizedFiles.length === 1 && normalizedFiles[0] === resultFileName,
       commandObserved: result.commandsRun.length > 0,
     };
     const passed =
@@ -457,6 +505,7 @@ export async function runPiSmoke(
       processIdsBefore,
       processIdsAfter,
       now(),
+      profile,
       checks,
       passed,
     );

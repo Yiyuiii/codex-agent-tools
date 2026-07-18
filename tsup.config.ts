@@ -7,6 +7,7 @@ export default defineConfig({
     "kimi-smoke": "src/smoke/kimi.ts",
     mcp: "src/mcp/main.ts",
     "pi-smoke": "src/smoke/pi.ts",
+    "ark-smoke": "src/smoke/ark.ts",
     "release-assurance": "src/release/assurance.ts",
   },
   format: ["esm"],

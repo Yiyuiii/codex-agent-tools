@@ -68,6 +68,24 @@ function handle(command) {
       spawnGrandchild();
       return;
     }
+    if (scenario === "api-error") {
+      setTimeout(() => {
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: "glm-5.2",
+            provider: "ark-agent-plan",
+            content: [],
+            stopReason: "error",
+            errorMessage: "upstream rejected fake-secret",
+          },
+        });
+        emit({ type: "agent_end", messages: [], willRetry: false });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
     setTimeout(() => {
       const tools = argv[argv.indexOf("--tools") + 1] ?? "";
       const toolName = tools.includes("bash") ? "bash" : "read";
