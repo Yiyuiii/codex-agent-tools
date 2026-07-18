@@ -273,7 +273,7 @@ git commit -m "feat: add reversible Codex MCP cutover"
 
 ### Task 6: 完成本地安装验收和可发布准备
 
-当前状态（2026-07-18）：release/local acceptance 实现已完成；stdio MCP 的工具契约、Kimi review/delegate、取消和进程清理已通过。本机 Codex 凭据转发白名单已加入安装块。Gemini 固定路由变更后重新 pending，Ark 仍 pending，因此端到端 Pi 调用和真实 cutover 按门禁拒绝，下面步骤不能整体勾选为完成。
+当前状态（2026-07-18）：release/local acceptance 实现已完成；stdio MCP 的工具契约、Kimi review/delegate、取消和进程清理已通过。本机 Codex 凭据转发白名单已加入安装块，新 MCP 已以保留旧表的并存模式安装且幂等验证通过。Gemini 固定路由变更后重新 pending，Ark 仍 pending，因此端到端 Pi 调用和正式 cutover 按门禁拒绝，下面步骤不能整体勾选为完成。
 
 **Files:**
 - Create: `scripts/local-acceptance.mjs`

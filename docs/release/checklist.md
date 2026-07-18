@@ -2,7 +2,7 @@
 
 日期：2026-07-18  
 已验证实现提交：`5b563f2ee892650d2d7a47f14b6222109812afb4`  
-结论：**软件与 Kimi 本机链路可验证；尚不可替换 `codex_cc_tools`，也未获授权公开发布。**
+结论：**软件与 Kimi 本机链路可验证，新旧 MCP 已安全并存；尚不可移除 `codex_cc_tools`，也未获授权公开发布。**
 
 ## 环境
 
@@ -47,7 +47,7 @@ Kimi 最新 K3 delegate 证据为 `docs/smoke/evidence/2026-07-18T10-35-18.032Z-
 - `npm link` 成功。
 - `codex-agent-tools --version`、`--help` 成功。
 - `codex-external-agents-mcp --help` 成功，只声明 `external_review` 与 `external_delegate`。
-- `doctor --json` 正确报告 Kimi 六项 passed、Gemini/Ark pending、Ark Coding 缺凭据、真实 MCP 尚未安装。
+- 新 MCP 已用普通 `install` 写入真实 Codex 配置；`doctor --json` 正确报告注册归本包所有、Kimi 六项 passed、Gemini/Ark pending、Ark Coding 缺凭据。
 - stdio MCP 本机验收通过：工具 schema/annotations、`kimi-k2.7-highspeed` review、`kimi-k3` delegate、取消传播、无新增 Kimi/Pi 进程。
 - 本机验收对 Gemini 的调用被硬门禁即时拒绝：`Logical llm "gemini-3.5-flash" review is disabled pending real smoke`。
 - 本机验收摘要 SHA-256：`8cf0b321d73c44802f9f20af44d2f11c5af22d9fd11be2b4aaedcf380b3d0d99`。
@@ -62,7 +62,15 @@ Kimi 最新 K3 delegate 证据为 `docs/smoke/evidence/2026-07-18T10-35-18.032Z-
 - `D:\Codes\codex-cc-tools`：未修改
 - 本机 Claude Code：未调用、未修改、未卸载
 
-因此当前真实 Codex 仍使用原配置；这是门禁的预期行为。
+上述拒绝测试发生在并存安装之前，证明正式替换路径能在 readiness 失败时保持原配置；这是门禁的预期行为。
+
+随后执行普通 `codex-agent-tools install`，只新增本包拥有的 `codex_external_agents` 表，没有删除旧表：
+
+- 并存安装后配置 SHA-256：`06cbc866006bbcb12c8de1b9dd361ddd5507dd8d68a9f95bcc7ffdf23b1d83c5`
+- `codex_cc_tools`：仍存在
+- `codex_external_agents`：存在且包含拥有标记与凭据 `env_vars` 白名单
+- 第二次普通安装：报告 `already installed`，SHA-256 不变
+- 当前运行中的 Codex App：需要重启后才会加载新 MCP
 
 ## 包与发布
 
