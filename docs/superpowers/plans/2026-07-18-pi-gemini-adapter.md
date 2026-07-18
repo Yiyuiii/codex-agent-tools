@@ -178,7 +178,7 @@ git commit -m "feat: route Pi runtimes through the task service"
 - Modify: `test/llms/registry.test.ts`
 - Modify: `test/cli/doctor.test.ts`
 
-- [ ] **Step 1: 写固定绑定失败测试**
+- [x] **Step 1: 写固定绑定失败测试**
 
 ```ts
 it("binds Gemini to Pi Google without caller overrides", () => {
@@ -194,23 +194,23 @@ it("binds Gemini to Pi Google without caller overrides", () => {
 
 doctor 测试断言凭据按优先级只选择第一个非空变量，并只报告变量名；报告 Pi binary/version、隔离 agentDir、direct 路由和 review/delegate pending 状态。
 
-- [ ] **Step 2: 运行并确认失败**
+- [x] **Step 2: 运行并确认失败**
 
 Run: `npm test -- --run test/llms/registry.test.ts test/cli/doctor.test.ts`
 
 Expected: FAIL，Gemini profile 尚不存在。
 
-- [ ] **Step 3: 实现 profile 和诊断**
+- [x] **Step 3: 实现 profile 和诊断**
 
 新增 `provider?: string` 作为内部 profile 字段但不加入 MCP schema。Gemini 固定 `provider: "google"`、`model: "gemini-3.5-flash"`、`network: "direct"`、`timeoutMs: 600000`、`maxConcurrency: 2`，两个 task 初始 pending。环境构造器只把优先级最高的一个 Gemini credential 复制到 Pi 子进程；若本机 Pi 的 Google OAuth 已可用，doctor 报告 `native-auth`，但不显示 token/文件内容。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `npm test -- --run test/llms/registry.test.ts test/cli/doctor.test.ts && npm run typecheck`
 
 Expected: 全部通过，public schema 仍不包含 provider/model/proxy。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/domain/types.ts src/llms/registry.ts src/cli/doctor.ts test/llms/registry.test.ts test/cli/doctor.test.ts

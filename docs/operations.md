@@ -50,7 +50,7 @@ codex-agent-tools doctor --json
 codex-agent-tools doctor --strict
 ```
 
-诊断会检查：Kimi 可执行文件、版本与登录状态；本包拥有的 MCP 注册；公开工具名；各逻辑 LLM 的真实模型、运行时、固定网络路由和 review/delegate 质量门禁。
+诊断会检查：Kimi 可执行文件、版本与登录状态；Pi 可执行文件、版本、隔离配置与 Gemini 凭据变量名；本包拥有的 MCP 注册；公开工具名；各逻辑 LLM 的真实模型、运行时、固定网络路由和 review/delegate 质量门禁。Gemini 凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 的顺序只选择第一个非空值，报告不显示凭据内容。
 
 普通模式即使存在警告也用于展示完整报告。`--strict` 只在出现错误级诊断时返回非零；质量门禁 pending 是警告，表示该能力尚未通过真实烟测。报告会对环境中的令牌、密钥和认证头脱敏。
 
@@ -64,7 +64,7 @@ codex-agent-tools install
 codex-agent-tools doctor
 ```
 
-这是必要步骤，因为 MCP 配置固定保存当前 Node 和包入口的绝对路径。安装器不会要求用户维护 Pi 配置；未来 Pi 运行时使用的模型目录和生成配置由本包版本管理。
+这是必要步骤，因为 MCP 配置固定保存当前 Node 和包入口的绝对路径。安装器不会要求用户维护 Pi 配置；Pi 运行时使用应用缓存下的版本化隔离目录，`settings.json` 和 `models.json` 由本包生成，不读取或修改用户的 `~/.pi/agent`。
 
 ## 卸载
 

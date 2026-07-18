@@ -59,4 +59,25 @@ describe("child environment", () => {
     expect(env.EMPTY_KEY).toBeUndefined();
     expect(env.ARK_API_KEY).toBeUndefined();
   });
+
+  it("treats credential variables as a priority list and copies only the first", () => {
+    const env = buildChildEnvironment(
+      {
+        network: "direct",
+        credentialEnv: [
+          "GEMINI_API_KEY",
+          "GOOGLE_API_KEY",
+          "GOOGLE_GENERATIVE_AI_API_KEY",
+        ],
+      },
+      {
+        GEMINI_API_KEY: "primary",
+        GOOGLE_API_KEY: "secondary",
+        GOOGLE_GENERATIVE_AI_API_KEY: "tertiary",
+      },
+    );
+    expect(env.GEMINI_API_KEY).toBe("primary");
+    expect(env.GOOGLE_API_KEY).toBeUndefined();
+    expect(env.GOOGLE_GENERATIVE_AI_API_KEY).toBeUndefined();
+  });
 });

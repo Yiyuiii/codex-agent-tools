@@ -32,7 +32,12 @@ describe("doctor diagnostics", () => {
     const secret = "must-not-appear";
     const report = await collectDoctorReport({
       configPath,
-      environment: { PATH: "x", SOME_SECRET: secret },
+      environment: {
+        PATH: "x",
+        SOME_SECRET: secret,
+        GEMINI_API_KEY: "primary-gemini-secret",
+        GOOGLE_API_KEY: "secondary-gemini-secret",
+      },
       locateKimiExecutable: async () =>
         "C:\\Users\\test\\.kimi-code\\bin\\kimi.exe",
       runCommand: async (_command, args) => ({
@@ -41,6 +46,17 @@ describe("doctor diagnostics", () => {
           args[0] === "--version"
             ? "kimi-code 0.27.0"
             : `Kimi doctor valid ${secret}`,
+      }),
+      locatePiExecutable: async () => "C:\\Users\\test\\npm\\pi.cmd",
+      buildPiConfig: async () => ({
+        agentDir: "C:\\cache\\codex-agent-tools\\pi\\0.1.0-alpha.1",
+        settingsPath: "C:\\cache\\settings.json",
+        modelsPath: "C:\\cache\\models.json",
+        environment: {
+          PI_CODING_AGENT_DIR:
+            "C:\\cache\\codex-agent-tools\\pi\\0.1.0-alpha.1",
+        },
+        contentSha256: "a".repeat(64),
       }),
     });
 
@@ -56,6 +72,19 @@ describe("doctor diagnostics", () => {
     expect(report.checks.find((check) => check.name === "LLM kimi-k3")?.detail).toContain(
       "kimi-code/k3 via kimi-acp; route=direct; review=passed; delegate=passed",
     );
+    expect(report.checks.find((check) => check.name === "Pi executable")).toMatchObject({
+      level: "ok",
+      detail: "C:\\Users\\test\\npm\\pi.cmd",
+    });
+    expect(report.checks.find((check) => check.name === "Pi isolated config")?.detail).toContain(
+      "C:\\cache\\codex-agent-tools\\pi\\0.1.0-alpha.1",
+    );
+    expect(report.checks.find((check) => check.name === "Gemini authentication")?.detail).toBe(
+      "credential environment: GEMINI_API_KEY",
+    );
+    expect(report.checks.find((check) => check.name === "LLM gemini-3.5-flash")?.detail).toContain(
+      "gemini-3.5-flash via pi-rpc; route=direct; review=pending; delegate=pending",
+    );
     expect(JSON.stringify(report)).not.toContain(secret);
   });
 
@@ -65,6 +94,15 @@ describe("doctor diagnostics", () => {
       locateKimiExecutable: async () => {
         throw new Error("Kimi Code executable not found");
       },
+      locatePiExecutable: async () => "pi.cmd",
+      buildPiConfig: async () => ({
+        agentDir: "C:\\cache\\pi",
+        settingsPath: "C:\\cache\\pi\\settings.json",
+        modelsPath: "C:\\cache\\pi\\models.json",
+        environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
+        contentSha256: "a".repeat(64),
+      }),
+      runCommand: async () => ({ ok: true, output: "0.80.10" }),
     });
     expect(report.ok).toBe(false);
     expect(report.checks.find((check) => check.name === "Kimi executable")).toMatchObject({
@@ -79,6 +117,14 @@ describe("doctor diagnostics", () => {
       configPath,
       locateKimiExecutable: async () => "kimi.exe",
       runCommand: async () => ({ ok: true, output: "0.27.0" }),
+      locatePiExecutable: async () => "pi.cmd",
+      buildPiConfig: async () => ({
+        agentDir: "C:\\cache\\pi",
+        settingsPath: "C:\\cache\\pi\\settings.json",
+        modelsPath: "C:\\cache\\pi\\models.json",
+        environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
+        contentSha256: "a".repeat(64),
+      }),
     });
     expect(report.checks.find((check) => check.name === "MCP registration")).toMatchObject({
       level: "warn",

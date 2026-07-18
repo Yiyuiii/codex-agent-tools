@@ -55,6 +55,7 @@ export function buildChildEnvironment(
     const value = lookupEnvironmentValue(parentEnvironment, name);
     if (value !== undefined && value.trim() !== "") {
       childEnvironment[name] = value;
+      break;
     }
   }
 

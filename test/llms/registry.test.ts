@@ -24,17 +24,41 @@ describe("logical LLM registry", () => {
       network: "direct",
     });
     expect(supportedLlmIds()).toEqual([
+      "gemini-3.5-flash",
       "kimi-k2.7",
       "kimi-k2.7-highspeed",
       "kimi-k3",
     ]);
   });
 
+  it("binds Gemini to Pi Google, direct routing, and ordered credentials", () => {
+    expect(resolveLlm("gemini-3.5-flash")).toMatchObject({
+      runtime: "pi-rpc",
+      provider: "google",
+      model: "gemini-3.5-flash",
+      network: "direct",
+      credentialEnv: [
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+        "GOOGLE_GENERATIVE_AI_API_KEY",
+      ],
+      maxConcurrency: 2,
+      capabilities: { review: false, delegate: false },
+      qualityGates: {
+        review: { status: "pending" },
+        delegate: { status: "pending" },
+      },
+    });
+    expect(() => resolveLlm("gemini-3.5-flash", "review")).toThrow(
+      /disabled pending real smoke/u,
+    );
+  });
+
   it.each(["claude-opus", "codex", "deepseek"])(
     "does not register excluded source %s",
     (id) => {
       expect(() => resolveLlm(id)).toThrow(
-        /Supported llms: kimi-k2\.7, kimi-k2\.7-highspeed, kimi-k3/,
+        /Supported llms: gemini-3\.5-flash, kimi-k2\.7, kimi-k2\.7-highspeed, kimi-k3/,
       );
     },
   );

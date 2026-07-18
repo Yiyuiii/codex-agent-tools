@@ -2,7 +2,7 @@
 
 `codex-agent-tools` 为 Codex 提供两个外部 LLM 工具：只读审阅 `external_review` 和自主委派 `external_delegate`。MCP 服务名固定为 `codex_external_agents`。
 
-当前阶段接入本机 Kimi Code；后续会在同一逻辑 LLM 注册表下加入由 Pi 承载的 Gemini 与 Ark。项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或 DeepSeek 模型来源。
+当前阶段已接入本机 Kimi Code，并加入由隔离 Pi RPC 承载的 Gemini；后续会在同一逻辑 LLM 注册表下迁移 Ark。项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或 DeepSeek 模型来源。
 
 ## 公开契约
 
@@ -45,6 +45,8 @@ codex-agent-tools doctor
 - `kimi-k2.7-highspeed`
 - `kimi-k3`
 
+Pi/Gemini 逻辑 ID 为 `gemini-3.5-flash`，固定映射到 Pi、Google provider、同名真实模型和 direct 网络策略。该能力目前保持 pending，直到独立真实 review/delegate 门禁完成。
+
 每个“逻辑 LLM × 任务”只有通过真实烟测后才会启用。当前三个 Kimi 逻辑 LLM 的 review/delegate 六个组合均已通过，证据见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。未来新增或重新验证中的 pending 能力会被明确拒绝，而不会静默改用另一个模型。
 
 完整的安装、诊断、卸载和故障处理见 [运维说明](docs/operations.md)。终端用户不需要手工维护 Pi 模型配置；Pi 接入后，其隔离配置将由本包随版本生成和维护。
@@ -74,4 +76,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 alpha。三个 Kimi 逻辑 LLM 的两类任务已获得真实烟测证据；Pi/Gemini 与 Ark 尚未接入。尚未获得证据的未来能力保持禁用，不会因为出现在模型清单中而自动开放。
+当前版本为开发期 alpha。三个 Kimi 逻辑 LLM 的两类任务已获得真实烟测证据；Pi/Gemini 桥接已经实现但真实门禁尚未完成，Ark 尚未接入。尚未获得证据的能力保持禁用，不会因为出现在模型清单中而自动开放。

@@ -20,7 +20,32 @@ const qualifiedTasks = (anchorPrefix: string) =>
     },
   }) as const;
 
+const pendingTasks = () =>
+  ({
+    capabilities: { review: false, delegate: false },
+    qualityGates: {
+      review: { status: "pending" },
+      delegate: { status: "pending" },
+    },
+  }) as const;
+
 const DEFAULT_PROFILES: readonly LlmProfile[] = [
+  {
+    id: "gemini-3.5-flash",
+    displayName: "Gemini 3.5 Flash",
+    runtime: "pi-rpc",
+    provider: "google",
+    model: "gemini-3.5-flash",
+    network: "direct",
+    credentialEnv: [
+      "GEMINI_API_KEY",
+      "GOOGLE_API_KEY",
+      "GOOGLE_GENERATIVE_AI_API_KEY",
+    ],
+    timeoutMs: 600_000,
+    maxConcurrency: 2,
+    ...pendingTasks(),
+  },
   {
     id: "kimi-k2.7",
     displayName: "Kimi K2.7 Coding",

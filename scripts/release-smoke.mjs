@@ -92,8 +92,8 @@ async function checkDoctorJson() {
       throw new Error("doctor JSON does not report the public tool contract");
     }
     const logicalLlms = report.checks?.filter((check) => check.name.startsWith("LLM ")) ?? [];
-    if (logicalLlms.length !== 3) {
-      throw new Error(`doctor JSON reported ${logicalLlms.length} logical LLMs, expected 3`);
+    if (logicalLlms.length !== 4) {
+      throw new Error(`doctor JSON reported ${logicalLlms.length} logical LLMs, expected 4`);
     }
   } finally {
     await rm(temp, { recursive: true, force: true });

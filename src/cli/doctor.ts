@@ -3,8 +3,14 @@ import { readFile } from "node:fs/promises";
 import { execa } from "execa";
 
 import { locateKimi } from "../adapters/kimi/locator.js";
+import {
+  buildIsolatedPiConfig,
+  type IsolatedPiConfig,
+} from "../adapters/pi/config.js";
+import { locatePi } from "../adapters/pi/locator.js";
 import { resolveLlm, supportedLlmIds } from "../llms/registry.js";
 import { redactText } from "../runtime/redaction.js";
+import { VERSION } from "../version.js";
 import { getDefaultCodexConfigPath, hasManagedCodexConfig } from "./config.js";
 
 export interface DoctorCheck {
@@ -28,6 +34,8 @@ export interface CollectDoctorOptions {
   configPath?: string;
   environment?: NodeJS.ProcessEnv;
   locateKimiExecutable?: () => Promise<string>;
+  locatePiExecutable?: () => Promise<string>;
+  buildPiConfig?: () => Promise<IsolatedPiConfig>;
   runCommand?: (
     command: string,
     args: readonly string[],
@@ -72,6 +80,19 @@ function secretValues(environment: NodeJS.ProcessEnv): string[] {
     .filter((value) => value.trim() !== "");
 }
 
+function selectedCredentialName(
+  names: readonly string[],
+  environment: NodeJS.ProcessEnv,
+): string | undefined {
+  for (const name of names) {
+    const entry = Object.entries(environment).find(
+      ([key, value]) => key.toUpperCase() === name.toUpperCase() && value?.trim(),
+    );
+    if (entry !== undefined) return name;
+  }
+  return undefined;
+}
+
 function limitedDetail(value: string, secrets: readonly string[]): string {
   const redacted = redactText(value.trim(), secrets);
   return redacted.length <= 1_000
@@ -85,6 +106,10 @@ export async function collectDoctorReport(
   const environment = options.environment ?? process.env;
   const configPath = options.configPath ?? getDefaultCodexConfigPath();
   const locateKimiExecutable = options.locateKimiExecutable ?? (() => locateKimi());
+  const locatePiExecutable = options.locatePiExecutable ?? (() => locatePi());
+  const buildPiConfig =
+    options.buildPiConfig ??
+    (() => buildIsolatedPiConfig({ version: VERSION, providers: {} }));
   const runCommand = options.runCommand ?? defaultRunCommand;
   const secrets = secretValues(environment);
   const checks: DoctorCheck[] = [];
@@ -128,6 +153,72 @@ export async function collectDoctorReport(
       detail: limitedDetail(doctor.output || "kimi doctor failed", secrets),
     });
   }
+
+  let piExecutable: string | undefined;
+  try {
+    piExecutable = await locatePiExecutable();
+    checks.push({
+      name: "Pi executable",
+      ok: true,
+      level: "ok",
+      detail: piExecutable,
+    });
+  } catch (error) {
+    checks.push({
+      name: "Pi executable",
+      ok: false,
+      level: "error",
+      detail: limitedDetail(
+        error instanceof Error ? error.message : String(error),
+        secrets,
+      ),
+    });
+  }
+
+  if (piExecutable !== undefined) {
+    const version = await runCommand(piExecutable, ["--version"], environment);
+    checks.push({
+      name: "Pi version",
+      ok: version.ok,
+      level: version.ok ? "ok" : "error",
+      detail: limitedDetail(version.output || "version check failed", secrets),
+    });
+  }
+
+  try {
+    const piConfig = await buildPiConfig();
+    checks.push({
+      name: "Pi isolated config",
+      ok: true,
+      level: "ok",
+      detail: `${piConfig.agentDir}; sha256=${piConfig.contentSha256.slice(0, 12)}`,
+    });
+  } catch (error) {
+    checks.push({
+      name: "Pi isolated config",
+      ok: false,
+      level: "error",
+      detail: limitedDetail(
+        error instanceof Error ? error.message : String(error),
+        secrets,
+      ),
+    });
+  }
+
+  const gemini = resolveLlm("gemini-3.5-flash");
+  const geminiCredential = selectedCredentialName(
+    gemini.credentialEnv,
+    environment,
+  );
+  checks.push({
+    name: "Gemini authentication",
+    ok: geminiCredential !== undefined,
+    level: geminiCredential === undefined ? "error" : "ok",
+    detail:
+      geminiCredential === undefined
+        ? `missing credential environment; checked ${gemini.credentialEnv.join(", ")}`
+        : `credential environment: ${geminiCredential}`,
+  });
 
   const configText = await readConfig(configPath);
   const registered = hasManagedCodexConfig(configText);

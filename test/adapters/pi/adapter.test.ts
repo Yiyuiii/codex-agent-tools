@@ -12,7 +12,11 @@ function profile(): LlmProfile {
     provider: "google",
     model: "gemini-3.5-flash",
     network: "direct",
-    credentialEnv: ["GEMINI_API_KEY"],
+    credentialEnv: [
+      "GEMINI_API_KEY",
+      "GOOGLE_API_KEY",
+      "GOOGLE_GENERATIVE_AI_API_KEY",
+    ],
     timeoutMs: 600_000,
     maxConcurrency: 2,
     capabilities: { review: true, delegate: true },
@@ -72,6 +76,7 @@ describe("PiAdapter", () => {
         PATH: "C:\\Windows",
         HTTPS_PROXY: "http://parent:9999",
         GEMINI_API_KEY: "gemini-secret",
+        GOOGLE_API_KEY: "must-not-be-copied",
         ANTHROPIC_API_KEY: "forbidden",
       },
     });
