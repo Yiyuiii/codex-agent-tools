@@ -21,6 +21,8 @@
 - 证据：[2026-07-18T10-24-35.508Z-gemini-3.5-flash-review-pi.json](evidence/2026-07-18T10-24-35.508Z-gemini-3.5-flash-review-pi.json)
 - 证据文件 SHA-256：`7105920a222337ee456f59a4ca37888c04ec90e673fb56a832147c0545aab160`。
 
+19:14（UTC+8）再次复跑 review，确认该限制没有恢复：同样正确命中 `proxy-10808`、Google provider 与真实模型，启动第二个 Pi 做一次有界复试后仍失败；环境隔离、工作区零变更和进程清理继续通过。该次耗时 81.592 秒，证据为 [2026-07-18T11-14-05.781Z-gemini-3.5-flash-review-pi.json](evidence/2026-07-18T11-14-05.781Z-gemini-3.5-flash-review-pi.json)，文件 SHA-256 `bd87b76a1d29d1ece12781cdd2068f8efdbf881e09c801f7213416da88091559`。随后 smoke 分类器增加非秘密状态 `google_free_tier_quota`，未来同类失败不再与一般适配器故障混淆。
+
 为了避免在已确认的共享额度阻塞下继续消耗请求，当前路由的 delegate 尚未执行。review 和 delegate 都保持 pending；额度恢复后必须分别复跑，不能以 review 结果推断 delegate。
 
 ## 历史 direct 证据（仅作回归参考）

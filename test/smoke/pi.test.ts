@@ -112,6 +112,41 @@ describe("Pi/Gemini real-smoke harness", () => {
     expect(await readdir(root)).toEqual([]);
   });
 
+  it("classifies Google free-tier quota failures without storing diagnostics", async () => {
+    const root = await tempRoot();
+    const service: PiSmokeService = {
+      review: async () => ({
+        ok: false,
+        status: "failed",
+        llm: "gemini-3.5-flash",
+        actualModel: "gemini-3.5-flash",
+        elapsedMs: 60_010,
+        diagnostics: [
+          "generate_content_free_tier_requests; Please retry in 30s.",
+        ],
+        filesChanged: [],
+        review: "",
+      }),
+      delegate: async () => {
+        throw new Error("not used");
+      },
+    };
+
+    const evidence = await runPiSmoke(
+      { llm: "gemini-3.5-flash", task: "review", tempRoot: root },
+      {
+        service,
+        runtimeEvidence: runtimeEvidence(),
+        readPiVersion: async () => "0.80.10",
+        listPiRpcProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence.failureReason).toBe("google_free_tier_quota");
+    expect(evidence.diagnosticCount).toBe(1);
+    expect(evidence).not.toHaveProperty("diagnostics");
+  });
+
   it("validates delegate file and command evidence", async () => {
     const root = await tempRoot();
     let receivedPrompt = "";

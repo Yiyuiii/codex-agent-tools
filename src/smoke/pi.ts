@@ -67,6 +67,7 @@ export interface PiSmokeEvidence {
   passed: boolean;
   failureReason:
     | "missing_credential"
+    | "google_free_tier_quota"
     | "account_quota_exceeded"
     | "adapter_failure"
     | "acceptance_failed"
@@ -353,6 +354,8 @@ function commonEvidence(
     ? null
     : /Missing credential:/iu.test(diagnosticText)
       ? "missing_credential"
+      : /generate_content_free_tier_requests/iu.test(diagnosticText)
+        ? "google_free_tier_quota"
       : /AccountQuotaExceeded|weekly usage quota/iu.test(diagnosticText)
         ? "account_quota_exceeded"
         : result.status !== "completed"

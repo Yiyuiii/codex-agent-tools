@@ -26,7 +26,7 @@ npm run smoke:release
 git diff --check
 ```
 
-结果：31 个测试文件、155 项测试通过；类型检查、构建、release smoke、stdio MCP 契约、doctor JSON 和包内容检查通过。`npm clean-install` 报告一个低危开发期传递依赖问题：`esbuild` 的 Windows dev server 本地文件读取公告（GHSA-g7r4-m6w7-qqqr）。本项目不启动该 dev server；为避免强制覆盖 `tsup/vite` 依赖图，本阶段不使用 override，发布前随上游依赖更新复核。
+结果：31 个测试文件、156 项测试通过；类型检查、构建、release smoke、stdio MCP 契约、doctor JSON 和包内容检查通过。`npm clean-install` 报告一个低危开发期传递依赖问题：`esbuild` 的 Windows dev server 本地文件读取公告（GHSA-g7r4-m6w7-qqqr）。本项目不启动该 dev server；为避免强制覆盖 `tsup/vite` 依赖图，本阶段不使用 override，发布前随上游依赖更新复核。
 
 ## 真实能力矩阵
 
@@ -35,12 +35,12 @@ git diff --check
 | `kimi-k2.7` | passed | passed | enabled |
 | `kimi-k2.7-highspeed` | passed | passed | enabled |
 | `kimi-k3` | passed | passed | enabled |
-| `gemini-3.5-flash` / `proxy-10808` | pending | pending | 最新 review 被 Google 共享免费层额度阻塞；delegate 未在已知阻塞下继续消耗请求 |
+| `gemini-3.5-flash` / `proxy-10808` | pending | pending | 两次 review 均被 Google 共享免费层额度阻塞；delegate 未在已知阻塞下继续消耗请求 |
 | `ark-coding-plan` | pending | pending | 缺少 `ARK_API_KEY` / `VOLCENGINE_API_KEY` |
 | `ark-agent-glm-5.2` | pending | pending | 上游周额度耗尽 |
 | `ark-agent-doubao-seed-2.0-pro` | pending | pending | 上游周额度耗尽 |
 
-Kimi 最新 K3 delegate 证据为 `docs/smoke/evidence/2026-07-18T10-35-18.032Z-kimi-k3-delegate.json`，文件 SHA-256 `a43c7454eda5bb729155bffbc1de276f8b01fc143178bc73196f69db8a7d7ce8`。Gemini 新路由失败证据为 `docs/smoke/evidence/2026-07-18T10-24-35.508Z-gemini-3.5-flash-review-pi.json`，文件 SHA-256 `7105920a222337ee456f59a4ca37888c04ec90e673fb56a832147c0545aab160`。
+Kimi 最新 K3 delegate 证据为 `docs/smoke/evidence/2026-07-18T10-35-18.032Z-kimi-k3-delegate.json`，文件 SHA-256 `a43c7454eda5bb729155bffbc1de276f8b01fc143178bc73196f69db8a7d7ce8`。Gemini 新路由第二次失败证据为 `docs/smoke/evidence/2026-07-18T11-14-05.781Z-gemini-3.5-flash-review-pi.json`，文件 SHA-256 `bd87b76a1d29d1ece12781cdd2068f8efdbf881e09c801f7213416da88091559`。
 
 ## 本机安装与 MCP 验收
 
@@ -75,7 +75,7 @@ Kimi 最新 K3 delegate 证据为 `docs/smoke/evidence/2026-07-18T10-35-18.032Z-
 ## 包与发布
 
 - npm registry 对 `codex-agent-tools` 当前返回 E404；名称尚未发现公开占用，但发布时必须再次检查。
-- `npm pack --dry-run --json` 共列出 71 个文件；文件白名单由 release smoke 验证，验收清单本身也包含在包内，README 链接不会断开。
+- `npm pack --dry-run --json` 共列出 72 个文件；文件白名单由 release smoke 验证，验收清单本身也包含在包内，README 链接不会断开。
 - release smoke 已检查两个 bin、包文件白名单、开发机绝对路径和当前环境密钥泄漏。
 - 未生成持久 tarball，未执行 `npm publish`，未推送远端。
 

@@ -35,6 +35,8 @@
 - 2026-07-18：Pi adapter 只对 Google 免费层明确返回 `generate_content_free_tier_requests` 且重试窗口不超过 60 秒的 review 失败做一次可取消等待；delegate 不重试。Pi RPC 最终 assistant 状态会覆盖同次运行中的瞬时错误状态，瞬时诊断仍保留。
 - 2026-07-18：本机 stdio MCP 验收已通过工具契约、Kimi highspeed review、K3 delegate、取消和无残留进程检查；K3 delegate 最新独立证据见 `docs/smoke/evidence/2026-07-18T10-35-18.032Z-kimi-k3-delegate.json`。Gemini 调用由 pending 门禁即时拒绝，因此端到端全绿仍受外部门禁阻塞。
 - 2026-07-18：新 MCP 已以并存模式安装到真实 `~/.codex/config.toml`；旧 `codex_cc_tools` 表保留，新 `codex_external_agents` 表由本包拥有并包含凭据 `env_vars` 白名单。安装后配置 SHA-256 为 `06cbc866006bbcb12c8de1b9dd361ddd5507dd8d68a9f95bcc7ffdf23b1d83c5`，第二次安装逐字节幂等。Codex App 需要重启才会加载新 MCP；正式 cutover 仍等待 Gemini/Ark 全绿。
+- 2026-07-18 19:14（UTC+8）：Gemini `proxy-10808` review 再次真实复跑，模型/路由/环境/工作区/进程检查正确，但一次有界复试后仍被相同 Google 免费层额度阻塞；新证据为 `docs/smoke/evidence/2026-07-18T11-14-05.781Z-gemini-3.5-flash-review-pi.json`。smoke 分类器已新增 `google_free_tier_quota`，后续证据会把该外部状态与一般 adapter failure 分开。
+- 2026-07-18：批准凭据变量在 Windows 环境范围的存在性已核对（不读取或记录值）。`GEMINI_API_KEY` 与 `OPENAI_API_KEY_DOUBAO` 存在于 Process/User；`ARK_API_KEY`、`VOLCENGINE_API_KEY` 在 Process/User/Machine 均不存在，因此 Ark Coding 不是仅靠重启可恢复的继承问题。
 
 ## 架构与计划索引
 
