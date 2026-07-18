@@ -49,6 +49,45 @@ describe("codex-agent-tools CLI", () => {
     });
   });
 
+  it("parses fail-closed legacy replacement and explicit backup restore", async () => {
+    const install = vi.fn(async () => undefined);
+    const restore = vi.fn(async () => undefined);
+    const program = createProgram({ install, restore });
+
+    await program.parseAsync(
+      [
+        "node",
+        "codex-agent-tools",
+        "install",
+        "--config",
+        "D:\\config.toml",
+        "--replace-codex-cc-tools",
+      ],
+      { from: "node" },
+    );
+    await program.parseAsync(
+      [
+        "node",
+        "codex-agent-tools",
+        "restore",
+        "--config",
+        "D:\\config.toml",
+        "--backup",
+        "D:\\config.toml.backup",
+      ],
+      { from: "node" },
+    );
+
+    expect(install).toHaveBeenCalledWith({
+      configPath: "D:\\config.toml",
+      replaceCodexCcTools: true,
+    });
+    expect(restore).toHaveBeenCalledWith({
+      configPath: "D:\\config.toml",
+      backupPath: "D:\\config.toml.backup",
+    });
+  });
+
   it("advertises the prerelease package version", () => {
     expect(createProgram().version()).toBe("0.1.0-alpha.1");
   });

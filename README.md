@@ -39,6 +39,8 @@ codex-agent-tools doctor
 
 安装命令只维护带有 `# managed-by: codex-agent-tools` 标记的 `[mcp_servers.codex_external_agents]` 配置块；遇到用户自建的同名配置会拒绝覆盖。安装后重启 Codex 以加载 MCP 服务。
 
+从 `codex_cc_tools` 正式替换时使用 `codex-agent-tools install --replace-codex-cc-tools`。该流程在所有目标门禁通过前拒绝写入，成功时创建备份并进行 MCP 自检，失败则自动恢复。详见 [迁移说明](docs/migration-from-codex-cc-tools.md)。
+
 当前 Kimi 逻辑 ID 为：
 
 - `kimi-k2.7`

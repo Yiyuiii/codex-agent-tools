@@ -30,6 +30,7 @@
 - 2026-07-18：三个 Ark 逻辑 LLM 已以 pending 状态注册并固定绑定到 Pi/provider/model/direct；Coding Plan 与 Agent Plan 各自共享一个并发为 1 的配额池。doctor 会复核配置哈希、两个 endpoint、三个 Pi 模型和凭据来源变量名。尚未完成六项真实门禁，因此 Ark 能力仍禁用。
 - 2026-07-18：Ark 六项真实门禁均已执行但未通过，证据见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。Coding Plan 两项因本机无 `ARK_API_KEY` / `VOLCENGINE_API_KEY` 失败；Agent Plan 四项正确命中真实模型，但因上游周额度耗尽失败，脱敏诊断给出的重置时间为 2026-07-20 00:00（UTC+8）。所有 Ark 能力继续 pending。
 - 2026-07-18：Pi RPC 桥已修复 assistant `errorMessage` 伴随空内容时被误标 completed 的问题；现在会脱敏记录诊断并返回 failed，fake RPC 有回归测试。
+- 2026-07-18：可回滚 cutover 已实现于 CLI `install --replace-codex-cc-tools`。readiness 未全绿时零写入；通过时锁定配置、创建时间戳备份、只删除旧 MCP 表、原子安装新 owned 表并做 MCP initialize/listTools 自检；失败自动恢复。`restore --backup` 可显式回滚。当前真实 Ark 门禁 pending，因此实际 cutover 会按设计拒绝。
 
 ## 架构与计划索引
 

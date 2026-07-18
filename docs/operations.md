@@ -19,6 +19,14 @@ codex-agent-tools install
 codex-agent-tools doctor
 ```
 
+从旧 `codex_cc_tools` 正式切换时使用 fail-closed、带备份和自动回滚的专用流程；当前 Ark 门禁未通过时该命令会拒绝写入：
+
+```powershell
+codex-agent-tools install --replace-codex-cc-tools
+```
+
+完整映射、删除项和回滚说明见 [从 codex-cc-tools 迁移](migration-from-codex-cc-tools.md)。
+
 测试其它 Codex 配置文件时可显式指定路径：
 
 ```powershell
@@ -76,6 +84,14 @@ npm uninstall -g codex-agent-tools
 ```
 
 先运行本包卸载命令，删除拥有标记对应的 MCP 表，再移除 npm 包。卸载器不会删除无标记的同名表，也不会修改其它 MCP 服务、Kimi Code、Pi 或 Claude Code。完成后重启 Codex。
+
+## 从 cutover 备份恢复
+
+```powershell
+codex-agent-tools restore --backup "<cutover 输出的备份绝对路径>"
+```
+
+restore 只将指定备份原子写回 Codex 配置，不删除备份，也不修改旧项目、Kimi、Pi 或 Claude Code。恢复后重启 Codex。
 
 ## 故障处理
 

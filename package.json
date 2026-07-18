@@ -12,6 +12,7 @@
     "README.md",
     "LICENSE",
     "docs/operations.md",
+    "docs/migration-from-codex-cc-tools.md",
     "docs/smoke/kimi.md",
     "docs/smoke/pi-gemini.md",
     "docs/smoke/ark.md",

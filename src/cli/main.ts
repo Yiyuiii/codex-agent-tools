@@ -10,10 +10,20 @@ import {
   installCodexConfig,
   uninstallCodexConfig,
 } from "./config.js";
+import {
+  cutoverCodexConfig,
+  restoreCodexConfigBackup,
+} from "./cutover.js";
 import { collectDoctorReport } from "./doctor.js";
 
 export interface InstallCommandOptions {
   configPath?: string;
+  replaceCodexCcTools?: boolean;
+}
+
+export interface RestoreCommandOptions {
+  configPath?: string;
+  backupPath: string;
 }
 
 export interface DoctorCommandOptions {
@@ -25,6 +35,7 @@ export interface DoctorCommandOptions {
 export interface CreateProgramDependencies {
   install?: (options: InstallCommandOptions) => Promise<void>;
   uninstall?: (options: InstallCommandOptions) => Promise<void>;
+  restore?: (options: RestoreCommandOptions) => Promise<void>;
   doctor?: (options: DoctorCommandOptions) => Promise<void>;
 }
 
@@ -34,6 +45,21 @@ function bundledMcpPath(): string {
 
 async function runInstall(options: InstallCommandOptions): Promise<void> {
   const configPath = options.configPath ?? getDefaultCodexConfigPath();
+  if (options.replaceCodexCcTools === true) {
+    const result = await cutoverCodexConfig({
+      configPath,
+      nodePath: process.execPath,
+      mcpPath: bundledMcpPath(),
+    });
+    if (result.changed) {
+      process.stdout.write(
+        `已切换到 codex_external_agents：${result.configPath}\n备份：${result.backupPath}\n`,
+      );
+    } else {
+      process.stdout.write(`已是目标配置：${result.configPath}\n`);
+    }
+    return;
+  }
   const result = await installCodexConfig(configPath, {
     nodePath: process.execPath,
     mcpPath: bundledMcpPath(),
@@ -41,6 +67,12 @@ async function runInstall(options: InstallCommandOptions): Promise<void> {
   process.stdout.write(
     `${result.changed ? "installed" : "already installed"}: ${result.configPath}\n`,
   );
+}
+
+async function runRestore(options: RestoreCommandOptions): Promise<void> {
+  const configPath = options.configPath ?? getDefaultCodexConfigPath();
+  await restoreCodexConfigBackup(configPath, options.backupPath);
+  process.stdout.write(`已从备份恢复 Codex 配置：${configPath}\n`);
 }
 
 async function runUninstall(options: InstallCommandOptions): Promise<void> {
@@ -73,6 +105,7 @@ export function createProgram(
   const program = new Command();
   const install = dependencies.install ?? runInstall;
   const uninstall = dependencies.uninstall ?? runUninstall;
+  const restore = dependencies.restore ?? runRestore;
   const doctor = dependencies.doctor ?? runDoctor;
 
   program
@@ -84,10 +117,17 @@ export function createProgram(
     .command("install")
     .description("Install the managed codex_external_agents MCP registration.")
     .option("--config <path>", "Codex config path; defaults to ~/.codex/config.toml.")
-    .action(async (options: { config?: string }) => {
-      await install(
-        options.config === undefined ? {} : { configPath: options.config },
-      );
+    .option(
+      "--replace-codex-cc-tools",
+      "Back up the config, remove codex_cc_tools, and install codex_external_agents.",
+    )
+    .action(async (options: { config?: string; replaceCodexCcTools?: boolean }) => {
+      const installOptions: InstallCommandOptions = {};
+      if (options.config !== undefined) installOptions.configPath = options.config;
+      if (options.replaceCodexCcTools !== undefined) {
+        installOptions.replaceCodexCcTools = options.replaceCodexCcTools;
+      }
+      await install(installOptions);
     });
 
   program
@@ -98,6 +138,19 @@ export function createProgram(
       await uninstall(
         options.config === undefined ? {} : { configPath: options.config },
       );
+    });
+
+  program
+    .command("restore")
+    .description("Restore Codex config from a cutover backup.")
+    .requiredOption("--backup <path>", "Backup path created by cutover.")
+    .option("--config <path>", "Codex config path; defaults to ~/.codex/config.toml.")
+    .action(async (options: { backup: string; config?: string }) => {
+      const restoreOptions: RestoreCommandOptions = {
+        backupPath: options.backup,
+      };
+      if (options.config !== undefined) restoreOptions.configPath = options.config;
+      await restore(restoreOptions);
     });
 
   program

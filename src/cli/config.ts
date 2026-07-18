@@ -23,6 +23,7 @@ interface TableRange {
 
 const TABLE_HEADER_PATTERN = /^[ \t]*\[([^\]]+)\][ \t]*$/gm;
 const TARGET_TABLE = `mcp_servers.${MCP_SERVER_NAME}`;
+const LEGACY_TABLE = "mcp_servers.codex_cc_tools";
 
 function newlineFor(text: string): "\r\n" | "\n" {
   return text.includes("\r\n") ? "\r\n" : "\n";
@@ -55,10 +56,10 @@ function buildManagedBlock(
   ].join(newline);
 }
 
-function findTargetTable(text: string): TableRange | undefined {
+function findTable(text: string, tableName: string): TableRange | undefined {
   const headers = Array.from(text.matchAll(TABLE_HEADER_PATTERN));
   const targetIndex = headers.findIndex(
-    (match) => (match[1] ?? "").trim() === TARGET_TABLE,
+    (match) => (match[1] ?? "").trim() === tableName,
   );
   if (targetIndex < 0) return undefined;
 
@@ -67,7 +68,7 @@ function findTargetTable(text: string): TableRange | undefined {
   const markerMatch = beforeHeader.match(
     /(^|\r?\n)(# managed-by: codex-agent-tools)\r?\n$/u,
   );
-  const owned = markerMatch !== null;
+  const owned = tableName === TARGET_TABLE && markerMatch !== null;
   const start = owned
     ? headerStart - `${OWNERSHIP_MARKER}${newlineFor(text)}`.length
     : headerStart;
@@ -82,6 +83,21 @@ function findTargetTable(text: string): TableRange | undefined {
       segment.replace(/(?:\r?\n[ \t]*(?:#.*)?)*$/u, "").length;
   }
   return { start, end, owned };
+}
+
+function findTargetTable(text: string): TableRange | undefined {
+  return findTable(text, TARGET_TABLE);
+}
+
+export function removeLegacyCodexCcToolsText(existing: string): string {
+  const range = findTable(existing, LEGACY_TABLE);
+  if (range === undefined) return existing;
+  const newline = newlineFor(existing);
+  let result = `${existing.slice(0, range.start)}${existing.slice(range.end)}`;
+  if (result.endsWith(`${newline}${newline}`)) {
+    result = result.slice(0, -newline.length);
+  }
+  return result;
 }
 
 export function installCodexConfigText(

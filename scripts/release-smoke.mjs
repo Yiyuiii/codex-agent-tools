@@ -114,6 +114,7 @@ async function checkPackage() {
     "README.md",
     "LICENSE",
     "docs/operations.md",
+    "docs/migration-from-codex-cc-tools.md",
     "dist/cli.js",
     "dist/mcp.js",
   ]) {

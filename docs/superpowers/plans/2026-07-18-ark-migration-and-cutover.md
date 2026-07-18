@@ -236,7 +236,7 @@ git commit -m "test: qualify Ark Pi profiles"
 - Test: `test/cli/cutover.test.ts`
 - Create: `docs/migration-from-codex-cc-tools.md`
 
-- [ ] **Step 1: 写原子性、所有权和回滚失败测试**
+- [x] **Step 1: 写原子性、所有权和回滚失败测试**
 
 临时 config 含用户注释、`codex_cc_tools` 表、其它 MCP 表。测试：
 
@@ -246,23 +246,25 @@ git commit -m "test: qualify Ark Pi profiles"
 4. 第二次执行幂等；
 5. 不删除 Claude Code 文件、不运行旧包 uninstall、不修改 `D:\\Codes\\codex-cc-tools`。
 
-- [ ] **Step 2: 运行并确认失败**
+- [x] **Step 2: 运行并确认失败**
 
 Run: `npm test -- --run test/cli/cutover.test.ts`
 
 Expected: FAIL，cutover 尚不存在。
 
-- [ ] **Step 3: 实现 `install --replace-codex-cc-tools`**
+- [x] **Step 3: 实现 `install --replace-codex-cc-tools`**
 
 流程固定为：运行 doctor 并确认所有目标 enabled → 锁定 config → 同目录写备份 → 在内存中删除旧表/安装新 owned block → 写临时文件并 fsync → rename → 启动新 MCP 做 initialize/listTools → 成功后释放锁。任何错误恢复备份并返回非 0。命令输出中文摘要和备份路径；不会调用或卸载 Claude Code。迁移文档列出旧到新映射、明确删除 Anthropic/DeepSeek/Codex 来源、保留本机 Claude Code 安装以及 `restore --backup <path>` 回滚命令。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `npm test -- --run test/cli/cutover.test.ts && npm run typecheck`
 
 Expected: 全部通过，失败注入均恢复原始 config。
 
-- [ ] **Step 5: 提交**
+Actual: 临时配置测试覆盖 readiness 零写入、成功备份/替换、MCP 自检失败逐字节回滚、幂等与显式 restore；对真实配置副本运行默认 readiness 时退出 1、SHA-256 不变且未创建备份。
+
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/cli test/cli/cutover.test.ts docs/migration-from-codex-cc-tools.md

@@ -14,6 +14,7 @@ const EXACT_PUBLIC_FILES = new Set([
   "LICENSE",
   "README.md",
   "docs/operations.md",
+  "docs/migration-from-codex-cc-tools.md",
   "package.json",
 ]);
 

@@ -13,6 +13,7 @@ describe("release assurance", () => {
         "README.md",
         "LICENSE",
         "docs/operations.md",
+        "docs/migration-from-codex-cc-tools.md",
         "dist/cli.js",
         "dist/mcp.js",
         "dist/index.d.ts",
