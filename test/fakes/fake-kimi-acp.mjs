@@ -100,6 +100,7 @@ const agent = {
         kind: "read",
         status: "in_progress",
         locations: [{ path: path.join(session.cwd, "fixture.txt") }],
+        rawInput: { path: path.join(session.cwd, "fixture.txt") },
       },
     });
 

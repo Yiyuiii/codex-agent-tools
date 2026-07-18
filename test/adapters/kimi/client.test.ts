@@ -66,6 +66,10 @@ describe("runKimiAcp", () => {
       "tool_call_update",
       "message",
     ]);
+    expect(result.events[1]).toMatchObject({
+      type: "tool_call",
+      rawInput: { path: path.join(cwd, "fixture.txt") },
+    });
     expect(result.diagnostics.join("\n")).toContain(
       "Authorization: [REDACTED]",
     );
