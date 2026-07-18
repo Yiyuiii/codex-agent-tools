@@ -1,8 +1,10 @@
 import type { NetworkPolicy } from "../domain/types.js";
+import { resolveCredential } from "./credentials.js";
 
 export interface ChildEnvironmentPolicy {
   network: NetworkPolicy;
   credentialEnv: readonly string[];
+  credentialTargetEnv?: string;
 }
 
 const BASE_ENVIRONMENT_KEYS = [
@@ -51,11 +53,20 @@ export function buildChildEnvironment(
     }
   }
 
-  for (const name of policy.credentialEnv) {
-    const value = lookupEnvironmentValue(parentEnvironment, name);
-    if (value !== undefined && value.trim() !== "") {
-      childEnvironment[name] = value;
-      break;
+  if (policy.credentialTargetEnv !== undefined) {
+    const credential = resolveCredential(
+      policy.credentialEnv,
+      policy.credentialTargetEnv,
+      parentEnvironment,
+    );
+    childEnvironment[credential.targetName] = credential.value;
+  } else {
+    for (const name of policy.credentialEnv) {
+      const value = lookupEnvironmentValue(parentEnvironment, name);
+      if (value !== undefined && value.trim() !== "") {
+        childEnvironment[name] = value;
+        break;
+      }
     }
   }
 

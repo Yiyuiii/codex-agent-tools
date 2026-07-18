@@ -80,4 +80,30 @@ describe("child environment", () => {
     expect(env.GOOGLE_API_KEY).toBeUndefined();
     expect(env.GOOGLE_GENERATIVE_AI_API_KEY).toBeUndefined();
   });
+
+  it("normalizes Ark credentials to one private child variable", () => {
+    const env = buildChildEnvironment(
+      {
+        network: "direct",
+        credentialEnv: ["ARK_API_KEY", "VOLCENGINE_API_KEY"],
+        credentialTargetEnv: "CODEX_AGENT_ARK_CODING_KEY",
+      },
+      {
+        PATH: "C:\\bin",
+        ARK_API_KEY: "ark-primary",
+        VOLCENGINE_API_KEY: "ark-secondary",
+        ANTHROPIC_API_KEY: "forbidden",
+        OPENAI_API_KEY: "forbidden",
+        DEEPSEEK_API_KEY: "forbidden",
+        GEMINI_API_KEY: "forbidden",
+        KIMI_API_KEY: "forbidden",
+        HTTPS_PROXY: "http://parent:9999",
+      },
+    );
+
+    expect(env).toEqual({
+      PATH: "C:\\bin",
+      CODEX_AGENT_ARK_CODING_KEY: "ark-primary",
+    });
+  });
 });

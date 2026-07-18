@@ -31,7 +31,7 @@
 - Modify: `src/runtime/environment.ts`
 - Modify: `test/runtime/environment.test.ts`
 
-- [ ] **Step 1: 写优先级和隔离失败测试**
+- [x] **Step 1: 写优先级和隔离失败测试**
 
 ```ts
 import { expect, it } from "vitest";
@@ -49,23 +49,23 @@ it("normalizes only the first Ark Coding credential", () => {
 
 另测全部为空时错误只列变量名；child env 只含规范化 target，不含原始两个变量、Anthropic、OpenAI、DeepSeek、Gemini 或 Kimi 凭据。
 
-- [ ] **Step 2: 运行并确认失败**
+- [x] **Step 2: 运行并确认失败**
 
 Run: `npm test -- --run test/runtime/credentials.test.ts test/runtime/environment.test.ts`
 
 Expected: FAIL，凭据规范化器尚不存在。
 
-- [ ] **Step 3: 实现纯函数和环境注入**
+- [x] **Step 3: 实现纯函数和环境注入**
 
 `resolveCredential(sourceNames, targetName, parentEnv)` 返回第一个 trim 后非空值；缺失时抛出 `Missing credential: ARK_API_KEY or VOLCENGINE_API_KEY`。Coding Plan 使用目标变量 `CODEX_AGENT_ARK_CODING_KEY`，Agent Plan 使用 `CODEX_AGENT_ARK_AGENT_KEY`，其唯一来源为 `OPENAI_API_KEY_DOUBAO`。诊断只使用 `sourceName/targetName`，`value` 只在构建 child env 时存在，绝不序列化。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `npm test -- --run test/runtime/credentials.test.ts test/runtime/environment.test.ts && npm run typecheck`
 
 Expected: 全部通过，测试 secret 不出现在 snapshot/diagnostics。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/runtime/credentials.ts src/runtime/environment.ts test/runtime
