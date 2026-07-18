@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
 import { execa } from "execa";
@@ -9,6 +10,7 @@ import {
 } from "../adapters/pi/config.js";
 import { locatePi } from "../adapters/pi/locator.js";
 import { resolveLlm, supportedLlmIds } from "../llms/registry.js";
+import { buildChildEnvironment } from "../runtime/environment.js";
 import { redactText } from "../runtime/redaction.js";
 import { VERSION } from "../version.js";
 import { getDefaultCodexConfigPath, hasManagedCodexConfig } from "./config.js";
@@ -100,6 +102,83 @@ function limitedDetail(value: string, secrets: readonly string[]): string {
     : `${redacted.slice(0, 1_000)}[TRUNCATED]`;
 }
 
+const EXPECTED_ARK_MODELS = new Map([
+  ["ark-agent-plan", ["doubao-seed-2.0-pro", "glm-5.2"]],
+  ["ark-coding-plan", ["ark-code-latest"]],
+]);
+
+async function validateArkPiConfig(config: IsolatedPiConfig): Promise<void> {
+  const [settingsText, modelsText] = await Promise.all([
+    readFile(config.settingsPath, "utf8"),
+    readFile(config.modelsPath, "utf8"),
+  ]);
+  const calculatedHash = createHash("sha256")
+    .update(settingsText)
+    .update("\0")
+    .update(modelsText)
+    .digest("hex");
+  if (calculatedHash !== config.contentSha256) {
+    throw new Error("isolated Pi configuration hash mismatch");
+  }
+
+  const root = JSON.parse(modelsText) as {
+    providers?: Record<
+      string,
+      {
+        api?: unknown;
+        apiKey?: unknown;
+        baseUrl?: unknown;
+        models?: Array<{ id?: unknown }>;
+      }
+    >;
+  };
+  const providers = root.providers ?? {};
+  if (JSON.stringify(Object.keys(providers).sort()) !== JSON.stringify([...EXPECTED_ARK_MODELS.keys()].sort())) {
+    throw new Error("isolated Pi Ark provider set mismatch");
+  }
+
+  for (const [providerName, expectedModels] of EXPECTED_ARK_MODELS) {
+    const provider = providers[providerName];
+    const expectedBaseUrl =
+      providerName === "ark-coding-plan"
+        ? "https://ark.cn-beijing.volces.com/api/coding"
+        : "https://ark.cn-beijing.volces.com/api/plan";
+    const expectedKey =
+      providerName === "ark-coding-plan"
+        ? "$CODEX_AGENT_ARK_CODING_KEY"
+        : "$CODEX_AGENT_ARK_AGENT_KEY";
+    if (
+      provider?.api !== "anthropic-messages" ||
+      provider.apiKey !== expectedKey ||
+      provider.baseUrl !== expectedBaseUrl
+    ) {
+      throw new Error(`isolated Pi ${providerName} endpoint or protocol mismatch`);
+    }
+    const actualModels = (provider.models ?? [])
+      .map((model) => model.id)
+      .filter((id): id is string => typeof id === "string")
+      .sort();
+    if (JSON.stringify(actualModels) !== JSON.stringify([...expectedModels].sort())) {
+      throw new Error(`isolated Pi ${providerName} model set mismatch`);
+    }
+  }
+}
+
+function validateArkModelListing(output: string): void {
+  const listed = output
+    .split(/\r?\n/u)
+    .map((line) => line.trim().split(/\s+/u))
+    .filter(([provider]) => EXPECTED_ARK_MODELS.has(provider ?? ""))
+    .map(([provider, model]) => `${provider}/${model}`)
+    .sort();
+  const expected = [...EXPECTED_ARK_MODELS.entries()]
+    .flatMap(([provider, models]) => models.map((model) => `${provider}/${model}`))
+    .sort();
+  if (JSON.stringify(listed) !== JSON.stringify(expected)) {
+    throw new Error("Pi model listing does not match the approved Ark model set");
+  }
+}
+
 export async function collectDoctorReport(
   options: CollectDoctorOptions = {},
 ): Promise<DoctorReport> {
@@ -185,8 +264,9 @@ export async function collectDoctorReport(
     });
   }
 
+  let piConfig: IsolatedPiConfig | undefined;
   try {
-    const piConfig = await buildPiConfig();
+    piConfig = await buildPiConfig();
     checks.push({
       name: "Pi isolated config",
       ok: true,
@@ -205,6 +285,46 @@ export async function collectDoctorReport(
     });
   }
 
+  if (piExecutable !== undefined && piConfig !== undefined) {
+    try {
+      await validateArkPiConfig(piConfig);
+      const listEnvironment = {
+        ...buildChildEnvironment(
+          { network: "direct", credentialEnv: [] },
+          environment,
+        ),
+        ...piConfig.environment,
+        CODEX_AGENT_ARK_CODING_KEY: "doctor-config-check",
+        CODEX_AGENT_ARK_AGENT_KEY: "doctor-config-check",
+      };
+      const listing = await runCommand(
+        piExecutable,
+        ["--offline", "--list-models", "ark"],
+        listEnvironment,
+      );
+      if (!listing.ok) {
+        throw new Error(listing.output || "Pi model listing failed");
+      }
+      validateArkModelListing(listing.output);
+      checks.push({
+        name: "Ark Pi models",
+        ok: true,
+        level: "ok",
+        detail: `ark.cn-beijing.volces.com; models=3; sha256=${piConfig.contentSha256.slice(0, 12)}`,
+      });
+    } catch (error) {
+      checks.push({
+        name: "Ark Pi models",
+        ok: false,
+        level: "error",
+        detail: limitedDetail(
+          error instanceof Error ? error.message : String(error),
+          secrets,
+        ),
+      });
+    }
+  }
+
   const gemini = resolveLlm("gemini-3.5-flash");
   const geminiCredential = selectedCredentialName(
     gemini.credentialEnv,
@@ -219,6 +339,25 @@ export async function collectDoctorReport(
         ? `missing credential environment; checked ${gemini.credentialEnv.join(", ")}`
         : `credential environment: ${geminiCredential}`,
   });
+
+  for (const [name, id] of [
+    ["Ark Coding authentication", "ark-coding-plan"],
+    ["Ark Agent authentication", "ark-agent-glm-5.2"],
+  ] as const) {
+    const profile = resolveLlm(id);
+    const sourceName = selectedCredentialName(profile.credentialEnv, environment);
+    const targetName = profile.credentialTargetEnv;
+    checks.push({
+      name,
+      ok: sourceName !== undefined && targetName !== undefined,
+      level:
+        sourceName !== undefined && targetName !== undefined ? "ok" : "error",
+      detail:
+        sourceName === undefined || targetName === undefined
+          ? `missing credential environment; checked ${profile.credentialEnv.join(", ")}`
+          : `credential environment: ${sourceName} -> ${targetName}`,
+    });
+  }
 
   const configText = await readConfig(configPath);
   const registered = hasManagedCodexConfig(configText);

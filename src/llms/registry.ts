@@ -20,7 +20,58 @@ const qualifiedTasks = (anchorPrefix: string) =>
     },
   }) as const;
 
+const pendingTasks = () =>
+  ({
+    capabilities: { review: false, delegate: false },
+    qualityGates: {
+      review: { status: "pending" },
+      delegate: { status: "pending" },
+    },
+  }) as const;
+
 const DEFAULT_PROFILES: readonly LlmProfile[] = [
+  {
+    id: "ark-coding-plan",
+    displayName: "Ark Coding Plan",
+    runtime: "pi-rpc",
+    provider: "ark-coding-plan",
+    model: "ark-code-latest",
+    network: "direct",
+    credentialEnv: ["ARK_API_KEY", "VOLCENGINE_API_KEY"],
+    credentialTargetEnv: "CODEX_AGENT_ARK_CODING_KEY",
+    timeoutMs: 900_000,
+    maxConcurrency: 1,
+    concurrencyKey: "ark-coding-plan",
+    ...pendingTasks(),
+  },
+  {
+    id: "ark-agent-glm-5.2",
+    displayName: "Ark Agent Plan GLM 5.2",
+    runtime: "pi-rpc",
+    provider: "ark-agent-plan",
+    model: "glm-5.2",
+    network: "direct",
+    credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
+    credentialTargetEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+    timeoutMs: 900_000,
+    maxConcurrency: 1,
+    concurrencyKey: "ark-agent-plan",
+    ...pendingTasks(),
+  },
+  {
+    id: "ark-agent-doubao-seed-2.0-pro",
+    displayName: "Ark Agent Plan Doubao Seed 2.0 Pro",
+    runtime: "pi-rpc",
+    provider: "ark-agent-plan",
+    model: "doubao-seed-2.0-pro",
+    network: "direct",
+    credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
+    credentialTargetEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+    timeoutMs: 900_000,
+    maxConcurrency: 1,
+    concurrencyKey: "ark-agent-plan",
+    ...pendingTasks(),
+  },
   {
     id: "gemini-3.5-flash",
     displayName: "Gemini 3.5 Flash",

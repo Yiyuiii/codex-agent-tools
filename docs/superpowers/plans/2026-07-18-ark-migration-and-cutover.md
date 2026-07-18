@@ -137,7 +137,7 @@ git commit -m "feat: generate Ark providers for isolated Pi"
 - Modify: `src/cli/doctor.ts`
 - Modify: `test/cli/doctor.test.ts`
 
-- [ ] **Step 1: 写唯一映射失败测试**
+- [x] **Step 1: 写唯一映射失败测试**
 
 ```ts
 it.each([
@@ -151,23 +151,23 @@ it.each([
 
 断言 supported IDs 排序稳定，MCP schema 不接受 provider/model/network override；三个 profile 初始 review/delegate 都 pending。
 
-- [ ] **Step 2: 运行并确认失败**
+- [x] **Step 2: 运行并确认失败**
 
 Run: `npm test -- --run test/llms/registry.test.ts test/cli/doctor.test.ts`
 
 Expected: FAIL，Ark profile 尚不存在。
 
-- [ ] **Step 3: 实现 profile 和 doctor**
+- [x] **Step 3: 实现 profile 和 doctor**
 
 三个 profile 的 `network` 均为 `direct`、`timeoutMs` 为 900000、每个 provider pool 的 `maxConcurrency` 为 1。doctor 检查 Pi 能否从隔离目录列出确切 provider/model，endpoint host 为 `ark.cn-beijing.volces.com`，凭据只报告命中的 source variable name。若模型缺失、endpoint 漂移或配置哈希不匹配，能力保持 disabled。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 Run: `npm test -- --run test/llms/registry.test.ts test/cli/doctor.test.ts && npm run typecheck`
 
 Expected: 全部通过。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/llms/registry.ts src/cli/doctor.ts test/llms/registry.test.ts test/cli/doctor.test.ts

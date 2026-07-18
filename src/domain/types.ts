@@ -19,6 +19,8 @@ export interface LlmProfile {
   capabilities: Readonly<Record<TaskKind, boolean>>;
   qualityGates: Readonly<Record<TaskKind, QualityGate>>;
   credentialEnv: readonly string[];
+  credentialTargetEnv?: string;
   timeoutMs: number;
   maxConcurrency: number;
+  concurrencyKey?: string;
 }

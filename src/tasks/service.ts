@@ -146,11 +146,21 @@ export class ExternalAgentService {
     this.#registry = dependencies.registry;
     this.#adapters = dependencies.adapters;
     this.#parentEnvironment = dependencies.parentEnvironment ?? process.env;
-    this.#limiter =
-      dependencies.limiter ??
-      new KeyedLimiter(
-        (llm) => this.#registry.resolve(llm).maxConcurrency,
-      );
+    if (dependencies.limiter !== undefined) {
+      this.#limiter = dependencies.limiter;
+    } else {
+      const limits = new Map<string, number>();
+      for (const id of this.#registry.ids()) {
+        const profile = this.#registry.resolve(id);
+        const key = profile.concurrencyKey ?? profile.id;
+        const existing = limits.get(key);
+        if (existing !== undefined && existing !== profile.maxConcurrency) {
+          throw new Error(`Conflicting concurrency limits for pool "${key}"`);
+        }
+        limits.set(key, profile.maxConcurrency);
+      }
+      this.#limiter = new KeyedLimiter((key) => limits.get(key) ?? 0);
+    }
   }
 
   public async review(
@@ -174,7 +184,10 @@ export class ExternalAgentService {
     context: TaskExecutionContext,
   ): Promise<ExternalReviewResult> {
     const profile = this.#registry.resolve(input.llm, "review");
-    return this.#limiter.run(input.llm, context.signal, async () => {
+    return this.#limiter.run(
+      profile.concurrencyKey ?? input.llm,
+      context.signal,
+      async () => {
       const startedAt = Date.now();
       const captureOptions: {
         includeGitDiff?: boolean;
@@ -227,7 +240,8 @@ export class ExternalAgentService {
         ),
         review: adapterResult.text,
       };
-    });
+      },
+    );
   }
 
   async #runDelegate(
@@ -235,7 +249,10 @@ export class ExternalAgentService {
     context: TaskExecutionContext,
   ): Promise<ExternalDelegateResult> {
     const profile = this.#registry.resolve(input.llm, "delegate");
-    return this.#limiter.run(input.llm, context.signal, async () => {
+    return this.#limiter.run(
+      profile.concurrencyKey ?? input.llm,
+      context.signal,
+      async () => {
       const startedAt = Date.now();
       const before = await captureWorkspace(input.cwd);
       const adapter = this.#adapterFor(profile.runtime);
@@ -269,7 +286,8 @@ export class ExternalAgentService {
         verification: [],
         risks: [],
       };
-    });
+      },
+    );
   }
 
   #adapterFor(runtime: RuntimeKind): ExternalAgentAdapter {

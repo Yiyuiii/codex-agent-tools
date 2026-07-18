@@ -24,12 +24,66 @@ describe("logical LLM registry", () => {
       network: "direct",
     });
     expect(supportedLlmIds()).toEqual([
+      "ark-agent-doubao-seed-2.0-pro",
+      "ark-agent-glm-5.2",
+      "ark-coding-plan",
       "gemini-3.5-flash",
       "kimi-k2.7",
       "kimi-k2.7-highspeed",
       "kimi-k3",
     ]);
   });
+
+  it.each([
+    [
+      "ark-coding-plan",
+      "ark-coding-plan",
+      "ark-code-latest",
+      ["ARK_API_KEY", "VOLCENGINE_API_KEY"],
+      "CODEX_AGENT_ARK_CODING_KEY",
+    ],
+    [
+      "ark-agent-glm-5.2",
+      "ark-agent-plan",
+      "glm-5.2",
+      ["OPENAI_API_KEY_DOUBAO"],
+      "CODEX_AGENT_ARK_AGENT_KEY",
+    ],
+    [
+      "ark-agent-doubao-seed-2.0-pro",
+      "ark-agent-plan",
+      "doubao-seed-2.0-pro",
+      ["OPENAI_API_KEY_DOUBAO"],
+      "CODEX_AGENT_ARK_AGENT_KEY",
+    ],
+  ] as const)(
+    "binds %s to one pending Pi provider/model and provider concurrency pool",
+    (id, provider, model, credentialEnv, credentialTargetEnv) => {
+      const profile = resolveLlm(id);
+      expect(profile).toMatchObject({
+        runtime: "pi-rpc",
+        provider,
+        model,
+        network: "direct",
+        credentialEnv,
+        credentialTargetEnv,
+        concurrencyKey: provider,
+        timeoutMs: 900_000,
+        maxConcurrency: 1,
+        capabilities: { review: false, delegate: false },
+        qualityGates: {
+          review: { status: "pending" },
+          delegate: { status: "pending" },
+        },
+      });
+      expect(() => resolveLlm(id, "review")).toThrow(
+        /disabled pending real smoke/u,
+      );
+      expect(() => resolveLlm(id, "delegate")).toThrow(
+        /disabled pending real smoke/u,
+      );
+    },
+  );
 
   it("binds qualified Gemini tasks to Pi Google, direct routing, and ordered credentials", () => {
     expect(resolveLlm("gemini-3.5-flash")).toMatchObject({
@@ -67,7 +121,7 @@ describe("logical LLM registry", () => {
     "does not register excluded source %s",
     (id) => {
       expect(() => resolveLlm(id)).toThrow(
-        /Supported llms: gemini-3\.5-flash, kimi-k2\.7, kimi-k2\.7-highspeed, kimi-k3/,
+        /Supported llms: ark-agent-doubao-seed-2\.0-pro, ark-agent-glm-5\.2, ark-coding-plan, gemini-3\.5-flash/,
       );
     },
   );

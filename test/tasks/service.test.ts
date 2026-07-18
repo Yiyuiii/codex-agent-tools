@@ -75,6 +75,56 @@ function createService(
 }
 
 describe("ExternalAgentService", () => {
+  it("shares one concurrency slot between logical LLMs in the same provider pool", async () => {
+    const profiles = [
+      enabledProfile("ark-agent-glm-5.2"),
+      enabledProfile("ark-agent-doubao-seed-2.0-pro"),
+    ];
+    let releaseFirst!: () => void;
+    let signalFirstStarted!: () => void;
+    const firstStarted = new Promise<void>((resolve) => {
+      signalFirstStarted = resolve;
+    });
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let active = 0;
+    let maximumActive = 0;
+    const run = vi.fn(async (request: AdapterRunRequest) => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      if (run.mock.calls.length === 1) {
+        signalFirstStarted();
+        await firstGate;
+      }
+      active -= 1;
+      return completed({ actualModel: request.profile.model });
+    });
+    const service = new ExternalAgentService({
+      registry: createLlmRegistry(profiles),
+      adapters: new Map([["pi-rpc", { runtime: "pi-rpc", run }]]),
+    });
+
+    const first = service.delegate({
+      llm: "ark-agent-glm-5.2",
+      prompt: "first",
+      cwd,
+    });
+    await firstStarted;
+    const second = service.delegate({
+      llm: "ark-agent-doubao-seed-2.0-pro",
+      prompt: "second",
+      cwd,
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(run).toHaveBeenCalledTimes(1);
+    releaseFirst();
+    await Promise.all([first, second]);
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(maximumActive).toBe(1);
+  });
+
   it("routes Pi and Kimi profiles only to their bound runtime adapters", async () => {
     const kimiRun = vi.fn(async () => completed());
     const piRun = vi.fn(async () =>

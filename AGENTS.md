@@ -18,7 +18,7 @@
 - 2026-07-18：`kimi-k2.7`、`kimi-k2.7-highspeed`、`kimi-k3` 的 review/delegate 六个真实门禁全部通过并已启用；证据索引见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
 - 本机 Pi 是 `@earendil-works/pi-coding-agent` 0.80.10，支持 RPC JSONL 模式。
 - 本机 Kimi Code 是 0.27.0，位于 `C:\Users\Administrator\.kimi-code\bin\kimi.exe`；本项目通过官方 ACP SDK 调用 `kimi acp`。
-- 当前 Pi 只发现 Google/Gemini 模型；Ark 来源需要由本项目生成隔离的 Pi 模型配置。
+- 本项目的隔离 Pi 配置已能列出 Google/Gemini 内置模型，以及两个 Ark provider 下的三个批准模型；该配置不含真实凭据，也不读取用户日常 Pi 配置。
 - `codex-agent-tools` 在设计时没有同名 npm 包；发布前必须重新检查。
 - 用户已明确当前迁移不需要额外审阅，继续自主推进。DeepSeek 不迁移。
 - 2026-07-18：Pi/Gemini 阶段已完成；Pi 定位器和包版本化隔离配置已实现，默认位于应用自有缓存目录，不读取或修改 `~/.pi/agent`，配置内容不含凭据。
@@ -27,6 +27,7 @@
 - 2026-07-18：`gemini-3.5-flash` 固定绑定 `pi-rpc` / `google` / `gemini-3.5-flash` / `direct`。凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 只复制第一个非空值；doctor 已覆盖 Pi 版本、隔离配置、凭据变量名和门禁状态。
 - 2026-07-18：`gemini-3.5-flash` 的 review/delegate 真实门禁均已通过并启用，证据见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。delegate 首次尝试只写文件、未执行验证命令而正确失败；明确两个动作均为强制验收后通过。
 - 当前下一阶段为 Ark 逻辑 LLM 迁移、真实门禁和本机 MCP 切换。
+- 2026-07-18：三个 Ark 逻辑 LLM 已以 pending 状态注册并固定绑定到 Pi/provider/model/direct；Coding Plan 与 Agent Plan 各自共享一个并发为 1 的配额池。doctor 会复核配置哈希、两个 endpoint、三个 Pi 模型和凭据来源变量名。尚未完成六项真实门禁，因此 Ark 能力仍禁用。
 
 ## 架构与计划索引
 
