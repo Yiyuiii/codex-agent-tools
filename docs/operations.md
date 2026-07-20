@@ -19,7 +19,7 @@ codex-agent-tools install
 codex-agent-tools doctor
 ```
 
-从旧 `codex_cc_tools` 正式切换时使用 fail-closed、带备份和自动回滚的专用流程；当前 Ark 门禁未通过时该命令会拒绝写入：
+从旧 `codex_cc_tools` 正式切换时使用 fail-closed、带备份和自动回滚的专用流程：
 
 ```powershell
 codex-agent-tools install --replace-codex-cc-tools
@@ -41,7 +41,7 @@ codex-agent-tools doctor --config D:\path\to\config.toml --json
 [mcp_servers.codex_external_agents]
 command = "<当前 Node 绝对路径>"
 args = ["<当前包 dist/mcp.js 的绝对路径>"]
-env_vars = ["ARK_API_KEY", "VOLCENGINE_API_KEY", "OPENAI_API_KEY_DOUBAO", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"]
+env_vars = ["ARK_API_KEY", "VOLCENGINE_API_KEY", "API_KEY_DOUBAO_CODING", "OPENAI_API_KEY_DOUBAO", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"]
 startup_timeout_sec = 20
 tool_timeout_sec = 900
 required = false
@@ -59,11 +59,11 @@ codex-agent-tools doctor --json
 codex-agent-tools doctor --strict
 ```
 
-诊断会检查：Kimi 可执行文件、版本与登录状态；Pi 可执行文件、版本、隔离配置哈希、Ark endpoint/模型清单以及 Gemini/Ark 凭据变量名；本包拥有的 MCP 注册；公开工具名；各逻辑 LLM 的真实模型、运行时、固定网络路由和 review/delegate 质量门禁。Gemini 固定使用 `proxy-10808`，凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 的顺序只选择第一个非空值；Ark Coding Plan 按 `ARK_API_KEY`、`VOLCENGINE_API_KEY` 选择，Agent Plan 使用 `OPENAI_API_KEY_DOUBAO`。报告只显示命中的变量名和项目私有目标变量名，不显示凭据内容。
+诊断会检查：Kimi 可执行文件、版本与登录状态；Pi 可执行文件、版本、隔离配置哈希、Ark endpoint/模型清单以及 Gemini/Ark 凭据变量名；本包拥有的 MCP 注册；公开工具名；各逻辑 LLM 的真实模型、运行时、固定网络路由和 review/delegate 质量门禁。Gemini 固定使用 `proxy-10808`，凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 的顺序只选择第一个非空值；Ark Coding Plan 按 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING` 选择，Agent Plan 使用 `OPENAI_API_KEY_DOUBAO`。报告只显示命中的变量名和项目私有目标变量名，不显示凭据内容。
 
 普通模式即使存在警告也用于展示完整报告。`--strict` 只在出现错误级诊断时返回非零；质量门禁 pending 是警告，表示该能力尚未通过真实烟测。报告会对环境中的令牌、密钥和认证头脱敏。
 
-Kimi 的真实门禁证据见 [Kimi 真实能力门禁](smoke/kimi.md)，Pi/Gemini 的真实门禁证据见 [Pi / Gemini 真实能力门禁](smoke/pi-gemini.md)，Ark 的当前失败矩阵和复跑条件见 [Ark / Pi 真实能力门禁](smoke/ark.md)。
+Kimi 的真实门禁证据见 [Kimi 真实能力门禁](smoke/kimi.md)，Pi/Gemini 的真实门禁证据见 [Pi / Gemini 真实能力门禁](smoke/pi-gemini.md)，Ark 的证据矩阵见 [Ark / Pi 真实能力门禁](smoke/ark.md)。
 
 ## 升级
 
@@ -104,7 +104,7 @@ restore 只将指定备份原子写回 Codex 配置，不删除备份，也不�
 
 查看 `doctor` 对应逻辑 LLM 的 review/delegate 门禁。pending 表示该精确组合尚未获得真实烟测证据；系统不会替换成其它后端或模型。需由项目维护流程完成烟测并随新版本启用。
 
-Gemini 的当前固定路由为本机 `10808`。2026-07-18 的 direct 历史通过证据不适用于该路由；只有 `proxy-10808` 的 review/delegate 分别重新通过后才能启用。Google 共享免费层返回配额错误时，review 只在服务明确给出不超过 60 秒的重试窗口时等待一次；delegate 不自动重试。
+Gemini 的当前固定路由为本机 `10808`，其 `proxy-10808` review/delegate 已于 2026-07-20 分别通过。Google 共享免费层返回配额错误时，review 只在服务明确给出不超过 60 秒的重试窗口时等待一次；delegate 不自动重试。
 
 ### review 返回 workspace_changed
 

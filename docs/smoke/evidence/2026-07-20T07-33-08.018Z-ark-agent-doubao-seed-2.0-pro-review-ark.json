@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "timestamp": "2026-07-20T07:33:08.018Z",
+  "piVersion": "0.80.10",
+  "llm": "ark-agent-doubao-seed-2.0-pro",
+  "actualModel": "doubao-seed-2.0-pro",
+  "expectedModel": "doubao-seed-2.0-pro",
+  "runtime": "pi-rpc",
+  "provider": "ark-agent-plan",
+  "endpointHost": "ark.cn-beijing.volces.com",
+  "route": "direct",
+  "credentialEnv": "CODEX_AGENT_ARK_AGENT_KEY",
+  "configSha256": "ab12536cc03dd368115d71bab6eb65216506717fc63b33c4b8a077d82b3ebbf6",
+  "task": "review",
+  "status": "completed",
+  "passed": true,
+  "failureReason": null,
+  "elapsedMs": 47535,
+  "outputSha256": "28813ee09424ad2634db5e304208ecb40f372394c0c733cba954d29cb381d543",
+  "filesChanged": [],
+  "commandCount": 0,
+  "diagnosticCount": 0,
+  "checks": {
+    "actualModelMatches": true,
+    "environmentIsolated": true,
+    "noNewPiRpcProcesses": true,
+    "workspaceUnchanged": true,
+    "knownDefectFound": true
+  }
+}

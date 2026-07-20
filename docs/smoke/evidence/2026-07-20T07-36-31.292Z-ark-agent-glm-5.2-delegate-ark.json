@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "timestamp": "2026-07-20T07:36:31.292Z",
+  "piVersion": "0.80.10",
+  "llm": "ark-agent-glm-5.2",
+  "actualModel": "glm-5.2",
+  "expectedModel": "glm-5.2",
+  "runtime": "pi-rpc",
+  "provider": "ark-agent-plan",
+  "endpointHost": "ark.cn-beijing.volces.com",
+  "route": "direct",
+  "credentialEnv": "CODEX_AGENT_ARK_AGENT_KEY",
+  "configSha256": "ab12536cc03dd368115d71bab6eb65216506717fc63b33c4b8a077d82b3ebbf6",
+  "task": "delegate",
+  "status": "completed",
+  "passed": true,
+  "failureReason": null,
+  "elapsedMs": 41426,
+  "outputSha256": "bf46dc6b31156013aebc63797189baa82edf30a1a298c11daddb064b696b4c13",
+  "filesChanged": [
+    "ark-agent-glm-5.2-smoke.txt"
+  ],
+  "commandCount": 1,
+  "diagnosticCount": 0,
+  "checks": {
+    "actualModelMatches": true,
+    "environmentIsolated": true,
+    "noNewPiRpcProcesses": true,
+    "resultFileValid": true,
+    "resultFileObserved": true,
+    "onlyExpectedFileChanged": true,
+    "commandObserved": true
+  }
+}

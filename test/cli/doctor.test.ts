@@ -38,8 +38,7 @@ describe("doctor diagnostics", () => {
         SOME_SECRET: secret,
         GEMINI_API_KEY: "primary-gemini-secret",
         GOOGLE_API_KEY: "secondary-gemini-secret",
-        ARK_API_KEY: "primary-ark-secret",
-        VOLCENGINE_API_KEY: "secondary-ark-secret",
+        API_KEY_DOUBAO_CODING: "local-ark-coding-secret",
         OPENAI_API_KEY_DOUBAO: "agent-ark-secret",
       },
       locateKimiExecutable: async () =>
@@ -104,16 +103,16 @@ describe("doctor diagnostics", () => {
       "credential environment: GEMINI_API_KEY",
     );
     expect(report.checks.find((check) => check.name === "LLM gemini-3.5-flash")?.detail).toContain(
-      "gemini-3.5-flash via pi-rpc; route=proxy-10808; review=pending; delegate=pending",
+      "gemini-3.5-flash via pi-rpc; route=proxy-10808; review=passed; delegate=passed",
     );
     expect(report.checks.find((check) => check.name === "Ark Coding authentication")?.detail).toBe(
-      "credential environment: ARK_API_KEY -> CODEX_AGENT_ARK_CODING_KEY",
+      "credential environment: API_KEY_DOUBAO_CODING -> CODEX_AGENT_ARK_CODING_KEY",
     );
     expect(report.checks.find((check) => check.name === "Ark Agent authentication")?.detail).toBe(
       "credential environment: OPENAI_API_KEY_DOUBAO -> CODEX_AGENT_ARK_AGENT_KEY",
     );
     expect(report.checks.find((check) => check.name === "LLM ark-agent-glm-5.2")?.detail).toContain(
-      "glm-5.2 via pi-rpc; route=direct; review=pending; delegate=pending",
+      "glm-5.2 via pi-rpc; route=direct; review=passed; delegate=passed",
     );
     expect(JSON.stringify(report)).not.toContain(secret);
   });

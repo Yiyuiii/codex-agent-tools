@@ -273,7 +273,7 @@ git commit -m "feat: add reversible Codex MCP cutover"
 
 ### Task 6: 完成本地安装验收和可发布准备
 
-当前状态（2026-07-18）：release/local acceptance 实现已完成；stdio MCP 的工具契约、Kimi review/delegate、取消和进程清理已通过。本机 Codex 凭据转发白名单已加入安装块，新 MCP 已以保留旧表的并存模式安装且幂等验证通过。Gemini 固定路由变更后重新 pending，Ark 仍 pending，因此端到端 Pi 调用和正式 cutover 按门禁拒绝，下面步骤不能整体勾选为完成。
+完成状态（2026-07-20）：Gemini 与 Ark 的八项补充真实门禁全部通过；本机用户 Ark Coding 变量 `API_KEY_DOUBAO_CODING` 已纳入凭据选择和 MCP 白名单；release/local acceptance 与正式 cutover 均完成。
 
 **Files:**
 - Create: `scripts/local-acceptance.mjs`
@@ -292,13 +292,13 @@ Run: `npm clean-install && npm run typecheck && npm test && npm run build && npm
 
 Expected: 全部退出码 0；`npm pack --dry-run --json` 内容符合 allowlist。
 
-- [ ] **Step 3: 执行本地安装与 MCP 端到端验收**
+- [x] **Step 3: 执行本地安装与 MCP 端到端验收**
 
 Run: `npm link && codex-agent-tools doctor --json && node scripts/local-acceptance.mjs`
 
 Expected: doctor 无阻断项；MCP 仅列两个工具；Kimi/Pi review、临时 delegate 和取消清理均通过。
 
-- [ ] **Step 4: 执行本机 cutover 并复核**
+- [x] **Step 4: 执行本机 cutover 并复核**
 
 Run: `codex-agent-tools install --replace-codex-cc-tools`
 
@@ -323,3 +323,11 @@ git commit -m "chore: complete local replacement acceptance"
 - 本机 Codex 配置已可回滚地从 `codex_cc_tools` 切换到 `codex_external_agents`。
 - 旧仓库未被修改，本机 Claude Code 未被调用、修改或卸载。
 - Kimi、Gemini、Ark 的新工具面完成本地端到端验收；DeepSeek 不迁移。
+
+## 2026-07-20 完成记录
+
+- Ark Coding 真实凭据来源确认是用户环境变量 `API_KEY_DOUBAO_CODING`；注册表、安装白名单、运行时规范化和 doctor 已用 TDD 增加兼容。
+- Gemini `proxy-10808`、Ark Coding direct、Ark Agent GLM direct、Ark Agent Doubao direct 的 review/delegate 八项真实门禁全部 passed；对应注册表能力已启用。
+- 31 个测试文件、157 项测试、类型检查、构建、release smoke、stdio MCP local acceptance 全部退出 0。
+- `install --replace-codex-cc-tools` 已对真实配置成功执行，切换前备份与原配置哈希一致；旧 MCP 表已删除，新 MCP 表保留，切换后 strict doctor 全绿。
+- 未修改旧仓库或 Claude Code，未公开发布 npm。Codex App 需要在切换后重启以刷新本会话已启动的 MCP 进程。

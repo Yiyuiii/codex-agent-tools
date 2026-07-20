@@ -85,13 +85,16 @@ describe("child environment", () => {
     const env = buildChildEnvironment(
       {
         network: "direct",
-        credentialEnv: ["ARK_API_KEY", "VOLCENGINE_API_KEY"],
+        credentialEnv: [
+          "ARK_API_KEY",
+          "VOLCENGINE_API_KEY",
+          "API_KEY_DOUBAO_CODING",
+        ],
         credentialTargetEnv: "CODEX_AGENT_ARK_CODING_KEY",
       },
       {
         PATH: "C:\\bin",
-        ARK_API_KEY: "ark-primary",
-        VOLCENGINE_API_KEY: "ark-secondary",
+        API_KEY_DOUBAO_CODING: "ark-local",
         ANTHROPIC_API_KEY: "forbidden",
         OPENAI_API_KEY: "forbidden",
         DEEPSEEK_API_KEY: "forbidden",
@@ -103,7 +106,7 @@ describe("child environment", () => {
 
     expect(env).toEqual({
       PATH: "C:\\bin",
-      CODEX_AGENT_ARK_CODING_KEY: "ark-primary",
+      CODEX_AGENT_ARK_CODING_KEY: "ark-local",
     });
   });
 });

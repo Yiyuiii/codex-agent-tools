@@ -48,7 +48,7 @@ describe("Codex MCP config ownership", () => {
     expect(installed).toContain('[profiles.default]\nmodel = "gpt"');
     expect(installed).toContain('enabled_tools = ["external_review", "external_delegate"]');
     expect(installed).toContain(
-      'env_vars = ["ARK_API_KEY", "VOLCENGINE_API_KEY", "OPENAI_API_KEY_DOUBAO", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"]',
+      'env_vars = ["ARK_API_KEY", "VOLCENGINE_API_KEY", "API_KEY_DOUBAO_CODING", "OPENAI_API_KEY_DOUBAO", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"]',
     );
   });
 

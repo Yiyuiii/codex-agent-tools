@@ -2,7 +2,7 @@
 
 `codex-agent-tools` 为 Codex 提供两个外部 LLM 工具：只读审阅 `external_review` 和自主委派 `external_delegate`。MCP 服务名固定为 `codex_external_agents`。
 
-当前阶段已接入本机 Kimi Code，以及由隔离 Pi RPC 承载的 Gemini 与 Ark。Kimi 已启用；Gemini 因固定网络路由变更后尚未重新通过真实门禁、Ark 因凭据或上游额度条件未满足而保持禁用。项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或 DeepSeek 模型来源。
+当前已接入本机 Kimi Code，以及由隔离 Pi RPC 承载的 Gemini 与 Ark；七个逻辑 LLM 的 `review` / `delegate` 均已通过独立真实门禁并启用。项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或 DeepSeek 模型来源。
 
 ## 公开契约
 
@@ -47,11 +47,11 @@ codex-agent-tools doctor
 - `kimi-k2.7-highspeed`
 - `kimi-k3`
 
-Pi/Gemini 逻辑 ID 为 `gemini-3.5-flash`，固定映射到 Pi、Google provider、同名真实模型和 `proxy-10808` 网络策略。历史 direct 路由的 review/delegate 曾通过独立真实门禁，但本机当前 direct 访问 Google 不可达，因此该证据不能授权新路由；`proxy-10808` 的最新 review 因 Google 免费层共享额度耗尽失败，当前两类能力均保持 pending。证据见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。
+Pi/Gemini 逻辑 ID 为 `gemini-3.5-flash`，固定映射到 Pi、Google provider、同名真实模型和 `proxy-10808` 网络策略。2026-07-20 的 review/delegate 均通过真实门禁；证据见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。
 
-Ark 逻辑 ID 为 `ark-coding-plan`、`ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro`，分别固定映射到隔离 Pi 中的 Coding Plan 或 Agent Plan provider，全部使用 direct 网络策略。2026-07-18 的六项真实门禁因 Coding Plan 缺少凭据、Agent Plan 周额度耗尽而未通过，因此这些 ID 会被明确拒绝而不会回退到其它模型；证据和复跑条件见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
+Ark 逻辑 ID 为 `ark-coding-plan`、`ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro`，分别固定映射到隔离 Pi 中的 Coding Plan 或 Agent Plan provider，全部使用 direct 网络策略。2026-07-20 的六项 review/delegate 门禁全部通过；Ark Coding 同时兼容本机用户环境变量名 `API_KEY_DOUBAO_CODING`。证据见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
 
-每个“逻辑 LLM × 任务”只有通过真实烟测后才会启用。当前三个 Kimi 逻辑 LLM 的 review/delegate 六个组合均已通过，证据见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。未来新增或重新验证中的 pending 能力会被明确拒绝，而不会静默改用另一个模型。
+每个“逻辑 LLM × 任务”只有通过真实烟测后才会启用。当前 Kimi、Gemini 与 Ark 的 14 个组合均已通过；未来新增或重新验证中的 pending 能力会被明确拒绝，而不会静默改用另一个模型。
 
 完整的安装、诊断、卸载和故障处理见 [运维说明](docs/operations.md)。终端用户不需要手工维护 Pi 模型配置；Pi 接入后，其隔离配置将由本包随版本生成和维护。
 
@@ -73,7 +73,7 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 ## 安全边界
 
 - 子进程只继承最小环境白名单；凭据仅按逻辑 LLM 配置显式传入。
-- Kimi 固定使用直连并清除继承代理；后续 Pi 模型按注册表分别固定为直连、`10808` 或 `11808`。
+- Kimi 固定使用直连并清除继承代理；Gemini 固定使用 `10808`，Ark 固定直连。注册表保留 `11808` 网络策略能力，但当前没有逻辑 LLM 使用它。
 - 诊断、错误和模型输出在离开适配器前进行令牌与认证头脱敏。
 - 取消、硬超时和异常退出会触发进程树清理；并发按固定模型或共享 provider 配额池限制。
 - 委派一旦开始不会自动重试，避免重复写入。

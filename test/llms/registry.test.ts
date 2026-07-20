@@ -40,7 +40,7 @@ describe("logical LLM registry", () => {
       "ark-coding-plan",
       "ark-coding-plan",
       "ark-code-latest",
-      ["ARK_API_KEY", "VOLCENGINE_API_KEY"],
+      ["ARK_API_KEY", "VOLCENGINE_API_KEY", "API_KEY_DOUBAO_CODING"],
       "CODEX_AGENT_ARK_CODING_KEY",
     ],
     [
@@ -58,7 +58,7 @@ describe("logical LLM registry", () => {
       "CODEX_AGENT_ARK_AGENT_KEY",
     ],
   ] as const)(
-    "binds %s to one pending Pi provider/model and provider concurrency pool",
+    "binds %s to one qualified Pi provider/model and provider concurrency pool",
     (id, provider, model, credentialEnv, credentialTargetEnv) => {
       const profile = resolveLlm(id);
       expect(profile).toMatchObject({
@@ -71,22 +71,24 @@ describe("logical LLM registry", () => {
         concurrencyKey: provider,
         timeoutMs: 900_000,
         maxConcurrency: 1,
-        capabilities: { review: false, delegate: false },
+        capabilities: { review: true, delegate: true },
         qualityGates: {
-          review: { status: "pending" },
-          delegate: { status: "pending" },
+          review: {
+            status: "passed",
+            evidence: `docs/smoke/ark.md#${id}-review`,
+          },
+          delegate: {
+            status: "passed",
+            evidence: `docs/smoke/ark.md#${id}-delegate`,
+          },
         },
       });
-      expect(() => resolveLlm(id, "review")).toThrow(
-        /disabled pending real smoke/u,
-      );
-      expect(() => resolveLlm(id, "delegate")).toThrow(
-        /disabled pending real smoke/u,
-      );
+      expect(resolveLlm(id, "review").model).toBe(model);
+      expect(resolveLlm(id, "delegate").model).toBe(model);
     },
   );
 
-  it("binds pending Gemini tasks to Pi Google, fixed 10808 routing, and ordered credentials", () => {
+  it("binds qualified Gemini tasks to Pi Google, fixed 10808 routing, and ordered credentials", () => {
     expect(resolveLlm("gemini-3.5-flash")).toMatchObject({
       runtime: "pi-rpc",
       provider: "google",
@@ -98,24 +100,27 @@ describe("logical LLM registry", () => {
         "GOOGLE_GENERATIVE_AI_API_KEY",
       ],
       maxConcurrency: 2,
-      capabilities: { review: false, delegate: false },
+      capabilities: { review: true, delegate: true },
       qualityGates: {
-        review: { status: "pending" },
-        delegate: { status: "pending" },
+        review: {
+          status: "passed",
+          evidence: "docs/smoke/pi-gemini.md#gemini-review",
+        },
+        delegate: {
+          status: "passed",
+          evidence: "docs/smoke/pi-gemini.md#gemini-delegate",
+        },
       },
     });
-    expect(() => resolveLlm("gemini-3.5-flash", "review")).toThrow(
-      /disabled pending real smoke/u,
-    );
-    expect(() => resolveLlm("gemini-3.5-flash", "delegate")).toThrow(
-      /disabled pending real smoke/u,
-    );
+    expect(resolveLlm("gemini-3.5-flash", "review").model).toBe("gemini-3.5-flash");
+    expect(resolveLlm("gemini-3.5-flash", "delegate").model).toBe("gemini-3.5-flash");
   });
 
   it("derives the complete MCP credential allowlist from logical profiles", () => {
     expect(credentialEnvironmentNames()).toEqual([
       "ARK_API_KEY",
       "VOLCENGINE_API_KEY",
+      "API_KEY_DOUBAO_CODING",
       "OPENAI_API_KEY_DOUBAO",
       "GEMINI_API_KEY",
       "GOOGLE_API_KEY",

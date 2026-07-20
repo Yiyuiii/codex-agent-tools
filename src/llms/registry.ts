@@ -5,27 +5,18 @@ export interface LlmRegistry {
   resolve(id: string, task?: TaskKind): LlmProfile;
 }
 
-const qualifiedTasks = (anchorPrefix: string) =>
+const qualifiedTasks = (evidenceDocument: string, anchorPrefix: string) =>
   ({
     capabilities: { review: true, delegate: true },
     qualityGates: {
       review: {
         status: "passed",
-        evidence: `docs/smoke/kimi.md#${anchorPrefix}-review`,
+        evidence: `${evidenceDocument}#${anchorPrefix}-review`,
       },
       delegate: {
         status: "passed",
-        evidence: `docs/smoke/kimi.md#${anchorPrefix}-delegate`,
+        evidence: `${evidenceDocument}#${anchorPrefix}-delegate`,
       },
-    },
-  }) as const;
-
-const pendingTasks = () =>
-  ({
-    capabilities: { review: false, delegate: false },
-    qualityGates: {
-      review: { status: "pending" },
-      delegate: { status: "pending" },
     },
   }) as const;
 
@@ -37,12 +28,16 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     provider: "ark-coding-plan",
     model: "ark-code-latest",
     network: "direct",
-    credentialEnv: ["ARK_API_KEY", "VOLCENGINE_API_KEY"],
+    credentialEnv: [
+      "ARK_API_KEY",
+      "VOLCENGINE_API_KEY",
+      "API_KEY_DOUBAO_CODING",
+    ],
     credentialTargetEnv: "CODEX_AGENT_ARK_CODING_KEY",
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-coding-plan",
-    ...pendingTasks(),
+    ...qualifiedTasks("docs/smoke/ark.md", "ark-coding-plan"),
   },
   {
     id: "ark-agent-glm-5.2",
@@ -56,7 +51,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-agent-plan",
-    ...pendingTasks(),
+    ...qualifiedTasks("docs/smoke/ark.md", "ark-agent-glm-5.2"),
   },
   {
     id: "ark-agent-doubao-seed-2.0-pro",
@@ -70,7 +65,10 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-agent-plan",
-    ...pendingTasks(),
+    ...qualifiedTasks(
+      "docs/smoke/ark.md",
+      "ark-agent-doubao-seed-2.0-pro",
+    ),
   },
   {
     id: "gemini-3.5-flash",
@@ -86,7 +84,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     ],
     timeoutMs: 600_000,
     maxConcurrency: 2,
-    ...pendingTasks(),
+    ...qualifiedTasks("docs/smoke/pi-gemini.md", "gemini"),
   },
   {
     id: "kimi-k2.7",
@@ -97,7 +95,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     credentialEnv: [],
     timeoutMs: 600_000,
     maxConcurrency: 1,
-    ...qualifiedTasks("kimi-k27"),
+    ...qualifiedTasks("docs/smoke/kimi.md", "kimi-k27"),
   },
   {
     id: "kimi-k2.7-highspeed",
@@ -108,7 +106,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     credentialEnv: [],
     timeoutMs: 600_000,
     maxConcurrency: 1,
-    ...qualifiedTasks("kimi-k27-highspeed"),
+    ...qualifiedTasks("docs/smoke/kimi.md", "kimi-k27-highspeed"),
   },
   {
     id: "kimi-k3",
@@ -119,7 +117,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     credentialEnv: [],
     timeoutMs: 600_000,
     maxConcurrency: 1,
-    ...qualifiedTasks("kimi-k3"),
+    ...qualifiedTasks("docs/smoke/kimi.md", "kimi-k3"),
   },
 ];
 

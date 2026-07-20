@@ -1,8 +1,11 @@
 # 0.1.0-alpha.1 本机替换验收记录
 
-日期：2026-07-18  
-已验证实现提交：`5b563f2ee892650d2d7a47f14b6222109812afb4`  
-结论：**软件与 Kimi 本机链路可验证，新旧 MCP 已安全并存；尚不可移除 `codex_cc_tools`，也未获授权公开发布。**
+日期：2026-07-20
+
+分支：`codex/ark-cutover`
+
+验收前基线提交：`9ea404272bad`
+结论：**Kimi、Gemini、Ark 的 14 项真实能力门禁、确定性检查、stdio MCP 本机验收和可回滚 cutover 均已通过；本机配置已由 `codex_external_agents` 完全替代 `codex_cc_tools`。未获授权公开发布。**
 
 ## 环境
 
@@ -15,74 +18,83 @@
 
 ## 确定性验证
 
-以下命令在实现提交前的同一工作树执行，退出码均为 0：
+以下命令在本轮工作树执行，退出码均为 0：
 
 ```powershell
-npm clean-install
 npm run typecheck
-npm test
+npm test -- --run
 npm run build
 npm run smoke:release
 git diff --check
 ```
 
-结果：31 个测试文件、156 项测试通过；类型检查、构建、release smoke、stdio MCP 契约、doctor JSON 和包内容检查通过。`npm clean-install` 报告一个低危开发期传递依赖问题：`esbuild` 的 Windows dev server 本地文件读取公告（GHSA-g7r4-m6w7-qqqr）。本项目不启动该 dev server；为避免强制覆盖 `tsup/vite` 依赖图，本阶段不使用 override，发布前随上游依赖更新复核。
+结果：31 个测试文件、157 项测试通过；类型检查、构建、release smoke、stdio MCP 契约、doctor JSON、凭据脱敏和包内容检查通过。`npm pack --dry-run --json` 列出 80 个文件，packed 114,917 bytes，unpacked 443,259 bytes。
 
 ## 真实能力矩阵
 
-| 逻辑 LLM | review | delegate | 当前结论 |
+| 逻辑 LLM | 固定路由 | review | delegate |
 | --- | --- | --- | --- |
-| `kimi-k2.7` | passed | passed | enabled |
-| `kimi-k2.7-highspeed` | passed | passed | enabled |
-| `kimi-k3` | passed | passed | enabled |
-| `gemini-3.5-flash` / `proxy-10808` | pending | pending | 两次 review 均被 Google 共享免费层额度阻塞；delegate 未在已知阻塞下继续消耗请求 |
-| `ark-coding-plan` | pending | pending | 缺少 `ARK_API_KEY` / `VOLCENGINE_API_KEY` |
-| `ark-agent-glm-5.2` | pending | pending | 上游周额度耗尽 |
-| `ark-agent-doubao-seed-2.0-pro` | pending | pending | 上游周额度耗尽 |
+| `kimi-k2.7` | Kimi ACP / direct | passed | passed |
+| `kimi-k2.7-highspeed` | Kimi ACP / direct | passed | passed |
+| `kimi-k3` | Kimi ACP / direct | passed | passed |
+| `gemini-3.5-flash` | Pi / Google / `proxy-10808` | passed | passed |
+| `ark-coding-plan` | Pi / `ark-code-latest` / direct | passed | passed |
+| `ark-agent-glm-5.2` | Pi / `glm-5.2` / direct | passed | passed |
+| `ark-agent-doubao-seed-2.0-pro` | Pi / 同名模型 / direct | passed | passed |
 
-Kimi 最新 K3 delegate 证据为 `docs/smoke/evidence/2026-07-18T10-35-18.032Z-kimi-k3-delegate.json`，文件 SHA-256 `a43c7454eda5bb729155bffbc1de276f8b01fc143178bc73196f69db8a7d7ce8`。Gemini 新路由第二次失败证据为 `docs/smoke/evidence/2026-07-18T11-14-05.781Z-gemini-3.5-flash-review-pi.json`，文件 SHA-256 `bd87b76a1d29d1ece12781cdd2068f8efdbf881e09c801f7213416da88091559`。
+Kimi 证据见 [Kimi 门禁](../smoke/kimi.md)，Gemini 证据见 [Gemini 门禁](../smoke/pi-gemini.md)，Ark 证据见 [Ark 门禁](../smoke/ark.md)。2026-07-20 新增的八份 Pi 证据均为串行运行；所有模型身份、固定路由、隔离环境、工作区边界和进程清理检查通过。
 
-## 本机安装与 MCP 验收
+## 凭据与 doctor
 
-- `npm link` 成功。
-- `codex-agent-tools --version`、`--help` 成功。
-- `codex-external-agents-mcp --help` 成功，只声明 `external_review` 与 `external_delegate`。
-- 新 MCP 已用普通 `install` 写入真实 Codex 配置；`doctor --json` 正确报告注册归本包所有、Kimi 六项 passed、Gemini/Ark pending、Ark Coding 缺凭据。
-- stdio MCP 本机验收通过：工具 schema/annotations、`kimi-k2.7-highspeed` review、`kimi-k3` delegate、取消传播、无新增 Kimi/Pi 进程。
-- 本机验收对 Gemini 的调用被硬门禁即时拒绝：`Logical llm "gemini-3.5-flash" review is disabled pending real smoke`。
-- 本机验收摘要 SHA-256：`8cf0b321d73c44802f9f20af44d2f11c5af22d9fd11be2b4aaedcf380b3d0d99`。
+本机用户环境中的 Ark Coding key 命名为 `API_KEY_DOUBAO_CODING`。项目已把它作为 `ARK_API_KEY`、`VOLCENGINE_API_KEY` 之后的兼容候选，并加入 Codex MCP `env_vars` 白名单。doctor 只报告：
 
-## 真实 cutover 的拒绝与不变性
+- Gemini：`GEMINI_API_KEY`；
+- Ark Coding：`API_KEY_DOUBAO_CODING -> CODEX_AGENT_ARK_CODING_KEY`；
+- Ark Agent：`OPENAI_API_KEY_DOUBAO -> CODEX_AGENT_ARK_AGENT_KEY`。
 
-执行 `codex-agent-tools install --replace-codex-cc-tools` 得到预期退出码 1。拒绝项为 Ark Coding 凭据，以及 Gemini/三个 Ark 逻辑 LLM 的 pending 门禁。
+切换前后 `doctor --strict --json` 均返回 `ok: true`，七个逻辑 LLM 的 review/delegate 均报告 passed，未输出密钥值。
 
-- `~/.codex/config.toml` 切换前 SHA-256：`28adad4e2891e0fb5de09e8a8c7472000b761d816a3f3a3522e277b0c8f132ca`
-- 切换后 SHA-256：相同
-- 新建 cutover 备份：0
-- `D:\Codes\codex-cc-tools`：未修改
-- 本机 Claude Code：未调用、未修改、未卸载
+## stdio MCP 本机验收
 
-上述拒绝测试发生在并存安装之前，证明正式替换路径能在 readiness 失败时保持原配置；这是门禁的预期行为。
+`npm run acceptance:local` 退出码为 0：
 
-随后执行普通 `codex-agent-tools install`，只新增本包拥有的 `codex_external_agents` 表，没有删除旧表：
+- 工具清单只有 `external_review`、`external_delegate`；
+- `kimi-k2.7-highspeed` review 命中 `kimi-code/kimi-for-coding-highspeed`；
+- `gemini-3.5-flash` review 命中同名模型和 `10808` 固定代理；
+- `kimi-k3` delegate 一次完成；
+- 取消传播观察到进度，结束后无新增 Kimi/Pi 进程。
 
-- 并存安装后配置 SHA-256：`06cbc866006bbcb12c8de1b9dd361ddd5507dd8d68a9f95bcc7ffdf23b1d83c5`
-- `codex_cc_tools`：仍存在
-- `codex_external_agents`：存在且包含拥有标记与凭据 `env_vars` 白名单
-- 第二次普通安装：报告 `already installed`，SHA-256 不变
-- 当前运行中的 Codex App：需要重启后才会加载新 MCP
+验收摘要 SHA-256：`0e4aca2d35c4e124a5f3b6ca60e8df440bfad27253d3e710334ba0fe29169d04`。
 
-## 包与发布
+## 正式 cutover
 
-- npm registry 对 `codex-agent-tools` 当前返回 E404；名称尚未发现公开占用，但发布时必须再次检查。
-- `npm pack --dry-run --json` 共列出 72 个文件；文件白名单由 release smoke 验证，验收清单本身也包含在包内，README 链接不会断开。
-- release smoke 已检查两个 bin、包文件白名单、开发机绝对路径和当前环境密钥泄漏。
-- 未生成持久 tarball，未执行 `npm publish`，未推送远端。
+执行：
 
-## 解除阻塞后的固定续跑顺序
+```powershell
+codex-agent-tools install --replace-codex-cc-tools
+```
 
-1. Google 额度恢复后分别复跑 Gemini `proxy-10808` review/delegate；仅把各自通过项改为 passed。
-2. 获得 Ark Coding 凭据后复跑其两项门禁；Agent Plan 额度恢复后复跑四项门禁。
-3. 全部目标门禁通过后重跑确定性检查和 `acceptance:local`。
-4. 再执行真实 cutover，核对备份、新旧 MCP 表与 MCP 自检；重启 Codex 后复跑本机验收。
-5. 只有用户明确授权时才准备正式版本并执行公开发布。
+结果：
+
+- 切换前配置 SHA-256：`1595fc9fd379a9b011711666c21c0c2212adacf2d207707146c55b175249d5c2`；
+- 备份：`~/.codex/config.toml.codex-agent-tools-backup-2026-07-20T07-53-30.322Z`；
+- 备份 SHA-256 与切换前配置完全相同；
+- 切换后配置 SHA-256：`b6db369ee23184f4d31cfed45cd5ec24101d094f7b8fe52bf6d40dd26a79de54`；
+- `[mcp_servers.codex_cc_tools]` 已不存在；
+- `[mcp_servers.codex_external_agents]` 存在并包含 `API_KEY_DOUBAO_CODING` 白名单；
+- 内置 MCP initialize/listTools 自检通过；
+- 切换后 `doctor --strict --json` 全绿。
+
+显式回滚命令：
+
+```powershell
+codex-agent-tools restore --backup "$HOME\.codex\config.toml.codex-agent-tools-backup-2026-07-20T07-53-30.322Z"
+```
+
+本轮未修改 `D:\Codes\codex-cc-tools`，未调用、修改或卸载本机 Claude Code。配置切换后需要重启 Codex App，使当前会话中已启动的旧 MCP 进程退出并按新配置重载。
+
+## 发布状态
+
+- 未生成需保留的 tarball。
+- 未执行 `npm publish`，未推送远端。
+- 公开发布必须等待用户明确授权，并在发布时重新检查 npm 名称与依赖公告。
