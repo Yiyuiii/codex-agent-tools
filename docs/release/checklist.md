@@ -5,7 +5,7 @@
 分支：`codex/ark-cutover`
 
 验收前基线提交：`9ea404272bad`
-结论：**Kimi、Gemini、Ark 的 14 项真实能力门禁、确定性检查、stdio MCP 本机验收和可回滚 cutover 均已通过；本机配置已由 `codex_external_agents` 完全替代 `codex_cc_tools`。未获授权公开发布。**
+结论：**Kimi、Gemini、Ark 的 14 项真实能力门禁、确定性检查和独立 stdio MCP 验收已通过；活动 Codex 配置的自动 cutover 在重启后导致 Codex 无法正常运行，用户已于 2026-07-24 恢复原始配置。因此不能声称 `codex_external_agents` 已在真实 Codex App 中完全替代 `codex_cc_tools`。未获授权公开发布。**
 
 ## 环境
 
@@ -71,10 +71,11 @@ Kimi 证据见 [Kimi 门禁](../smoke/kimi.md)，Gemini 证据见 [Gemini 门禁
 执行：
 
 ```powershell
+# 历史事故命令，仅作证据记录
 codex-agent-tools install --replace-codex-cc-tools
 ```
 
-结果：
+2026-07-20 当时观察到：
 
 - 切换前配置 SHA-256：`1595fc9fd379a9b011711666c21c0c2212adacf2d207707146c55b175249d5c2`；
 - 备份：`~/.codex/config.toml.codex-agent-tools-backup-2026-07-20T07-53-30.322Z`；
@@ -85,13 +86,23 @@ codex-agent-tools install --replace-codex-cc-tools
 - 内置 MCP initialize/listTools 自检通过；
 - 切换后 `doctor --strict --json` 全绿。
 
+这些检查只覆盖配置文件、独立 MCP 子进程和项目 doctor，未覆盖重启后的真实 Codex App 启动与完整运行。用户随后确认 Codex 无法正常运行，并于 2026-07-24 恢复原始配置。上述哈希和备份仅作为历史事故证据，不再代表当前活动配置，也不得据此重复 cutover。
+
 显式回滚命令：
 
 ```powershell
+# 历史回滚命令，仅作证据记录
 codex-agent-tools restore --backup "$HOME\.codex\config.toml.codex-agent-tools-backup-2026-07-20T07-53-30.322Z"
 ```
 
-本轮未修改 `D:\Codes\codex-cc-tools`，未调用、修改或卸载本机 Claude Code。配置切换后需要重启 Codex App，使当前会话中已启动的旧 MCP 进程退出并按新配置重载。
+本轮未修改 `D:\Codes\codex-cc-tools`，未调用、修改或卸载本机 Claude Code。
+
+## 2026-07-24 配置事故与当前约束
+
+- 用户已恢复 `~/.codex/config.toml` 原始配置；项目不读取或修改恢复后的文件。
+- 自动 cutover 的“成功”结论撤销。独立 MCP 验收通过不等于 Codex App 集成通过。
+- 后续默认只生成候选配置或操作显式测试副本，不对活动配置执行 `install`、`install --replace-codex-cc-tools` 或 `restore`。
+- 若未来确实需要写活动配置，必须先取得用户对该次写入的明确许可，并在写前提供精确 diff、离线解析结果、Codex 兼容性依据和回滚步骤。
 
 ## 发布状态
 

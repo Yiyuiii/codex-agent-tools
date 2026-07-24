@@ -11,6 +11,7 @@
 - 原 `codex-cc-tools` 中其余可用来源尽量迁移到 Pi；Kimi 使用本机 Kimi Code。
 - 终端用户不手工维护插件或 Pi 配置，由 Codex 随项目版本维护。
 - 当前迁移不需要额外外部审阅，由 Codex 自主推进；未经明确授权不公开发布 npm。
+- 2026-07-24：用户反馈自动修改 `~/.codex/config.toml` 后 Codex 无法正常运行，并已恢复原始配置。后续默认不得写入、替换或恢复该文件；优先使用只读检查、独立测试配置和生成候选配置。若未来确实无法绕开，必须先说明必要性、精确差异、验证与回滚方案，并取得用户针对该次写入的明确许可。
 
 ## 当前事实状态
 
@@ -22,9 +23,9 @@
 - `ark-coding-plan`、`ark-agent-glm-5.2`、`ark-agent-doubao-seed-2.0-pro` 固定绑定 Pi 中对应 provider/model/direct；Coding Plan 和 Agent Plan 各共享并发为 1 的 provider 配额池。2026-07-20 六项真实门禁全部通过并启用，证据见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
 - Ark Coding 凭据候选依次为 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING`；本机用户环境实际命中第三项。Agent Plan 使用 `OPENAI_API_KEY_DOUBAO`。MCP 只转发候选白名单，运行时再向 Pi 注入单个项目私有变量，doctor 只报告变量名而不报告值。
 - 真实 Pi smoke 的残留进程检查使用全机快照，因此不同 smoke 必须串行执行。并行执行会把其它仍在运行的 smoke 进程误判为泄漏；2026-07-20 的最终门禁只采用串行证据。
-- 可回滚 cutover 已实现于 `install --replace-codex-cc-tools`：先做 readiness，随后锁配置、创建时间戳备份、只删除旧 MCP 表、原子安装新表并做 MCP initialize/listTools 自检；失败自动恢复。`restore --backup` 可显式回滚。
+- 历史实现包含 `install --replace-codex-cc-tools` 和 `restore --backup`，但这套应用内自检未能证明真实 Codex App 可正常启动。根据 2026-07-24 用户反馈，不得再对活动的 `~/.codex/config.toml` 执行这些命令；只能在显式测试副本上验证。
 - 2026-07-20：157 项测试、类型检查、构建、release smoke 和真实 stdio MCP 验收全绿；验收摘要 SHA-256 为 `0e4aca2d35c4e124a5f3b6ca60e8df440bfad27253d3e710334ba0fe29169d04`。
-- 2026-07-20：正式 cutover 成功。真实配置已删除 `[mcp_servers.codex_cc_tools]` 并保留本包拥有的 `[mcp_servers.codex_external_agents]`；切换后 SHA-256 为 `b6db369ee23184f4d31cfed45cd5ec24101d094f7b8fe52bf6d40dd26a79de54`。切换前配置备份为 `~/.codex/config.toml.codex-agent-tools-backup-2026-07-20T07-53-30.322Z`，其 SHA-256 为 `1595fc9fd379a9b011711666c21c0c2212adacf2d207707146c55b175249d5c2`。切换后 strict doctor 全绿；需再重启 Codex App 以卸载当前会话已启动的旧 MCP 进程。
+- 2026-07-20 的自动 cutover 当时通过文件级、MCP initialize/listTools 和 strict doctor 检查，但重启后的真实 Codex App 运行异常。用户已于 2026-07-24 恢复原始 `~/.codex/config.toml`。因此“新 MCP 已在活动配置中完全替代旧 MCP”的结论已撤销；当前真实配置内容以用户恢复结果为准，未经许可不读取或修改。
 - Kimi、Gemini、Ark 共七个逻辑 LLM、14 个任务组合现均有独立 passed 证据。禁用或未来 pending 能力不会回退到其它 LLM。
 - `codex-agent-tools` 在设计时没有同名 npm 包；发布前必须重新检查。当前不执行 `npm publish`。
 

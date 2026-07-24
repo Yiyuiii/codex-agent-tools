@@ -331,3 +331,14 @@ git commit -m "chore: complete local replacement acceptance"
 - 31 个测试文件、157 项测试、类型检查、构建、release smoke、stdio MCP local acceptance 全部退出 0。
 - `install --replace-codex-cc-tools` 已对真实配置成功执行，切换前备份与原配置哈希一致；旧 MCP 表已删除，新 MCP 表保留，切换后 strict doctor 全绿。
 - 未修改旧仓库或 Claude Code，未公开发布 npm。Codex App 需要在切换后重启以刷新本会话已启动的 MCP 进程。
+
+## 2026-07-24 事故复核
+
+用户反馈重启后 Codex App 无法正常运行，并已恢复原始 `~/.codex/config.toml`。因此本计划中“正式 cutover 完成”只代表 2026-07-20 的历史命令与独立自检曾返回成功，不再代表真实集成已完成。
+
+后续实施约束：
+
+- 不读取、写入、替换或恢复用户已还原的活动配置。
+- `install`、`install --replace-codex-cc-tools` 与 `restore` 只能在显式测试副本上使用。
+- 先设计不修改活动配置的官方插件安装路径，并增加真实 Codex App 启动兼容性验证；独立 MCP initialize/listTools 与 doctor 不再作为充分完成条件。
+- 任何无法绕开的活动配置写入都需要用户针对该次操作重新明确授权。

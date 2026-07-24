@@ -2,6 +2,8 @@
 
 本文说明 `codex_external_agents` 的本机安装、诊断、升级、卸载和故障排查流程。
 
+> 安全提示（2026-07-24）：不要对本机活动的 `~/.codex/config.toml` 运行本项目的 install、cutover 或 restore 命令。历史自动 cutover 在独立验证通过后仍导致 Codex App 重启异常，用户已恢复原始配置。以下写操作只允许用于显式指定的测试副本；活动配置默认只读。
+
 ## 前置条件
 
 - Node.js 20 或更高版本。
@@ -12,17 +14,17 @@
 
 ## 安装与重载
 
-全局安装后运行：
+全局安装后可运行只读诊断。安装命令只用于显式测试配置：
 
 ```powershell
-codex-agent-tools install
 codex-agent-tools doctor
+codex-agent-tools install --config D:\path\to\test-config.toml
 ```
 
-从旧 `codex_cc_tools` 正式切换时使用 fail-closed、带备份和自动回滚的专用流程：
+历史 cutover 命令不得用于活动配置；若维护者需要回归测试，只能传入测试副本：
 
 ```powershell
-codex-agent-tools install --replace-codex-cc-tools
+codex-agent-tools install --config D:\path\to\test-config.toml --replace-codex-cc-tools
 ```
 
 完整映射、删除项和回滚说明见 [从 codex-cc-tools 迁移](migration-from-codex-cc-tools.md)。
@@ -30,8 +32,8 @@ codex-agent-tools install --replace-codex-cc-tools
 测试其它 Codex 配置文件时可显式指定路径：
 
 ```powershell
-codex-agent-tools install --config D:\path\to\config.toml
-codex-agent-tools doctor --config D:\path\to\config.toml --json
+codex-agent-tools install --config D:\path\to\test-config.toml
+codex-agent-tools doctor --config D:\path\to\test-config.toml --json
 ```
 
 安装器写入一个拥有标记和一个 MCP 表：
@@ -49,7 +51,7 @@ enabled = true
 enabled_tools = ["external_review", "external_delegate"]
 ```
 
-`env_vars` 是 Codex stdio MCP 的父环境转发白名单；只有父进程中实际存在的列出变量会进入 MCP 服务。服务随后再按所选逻辑 LLM 只把一个规范化凭据传给对应子进程，不会把所有列出凭据继续下发。安装可重复运行。它只替换带有上述拥有标记的目标表，保留用户注释和其它 MCP 服务。若同名表没有拥有标记，命令会拒绝覆盖。安装或升级后应重启 Codex，让新的服务进程和工具契约生效。
+`env_vars` 是 Codex stdio MCP 的父环境转发白名单；只有父进程中实际存在的列出变量会进入 MCP 服务。服务随后再按所选逻辑 LLM 只把一个规范化凭据传给对应子进程，不会把所有列出凭据继续下发。安装器只应在测试副本中使用。测试副本的解析和独立 MCP 验证不代表真实 Codex App 集成通过，也不得据此自动写活动配置。
 
 ## 诊断
 
@@ -67,32 +69,30 @@ Kimi 的真实门禁证据见 [Kimi 真实能力门禁](smoke/kimi.md)，Pi/Gemi
 
 ## 升级
 
-升级包后重新运行安装器，再重启 Codex：
+升级包后不要自动改写活动配置。只更新包并执行只读诊断：
 
 ```powershell
 npm update -g codex-agent-tools
-codex-agent-tools install
 codex-agent-tools doctor
 ```
 
-这是必要步骤，因为 MCP 配置固定保存当前 Node 和包入口的绝对路径。安装器不会要求用户维护 Pi 配置；Pi 运行时使用应用缓存下的版本化隔离目录，`settings.json` 和 `models.json` 由本包生成，不读取或修改用户的 `~/.pi/agent`。
+若包入口路径发生变化，先在测试副本生成候选配置与精确 diff，不直接修补活动配置。Pi 运行时使用应用缓存下的版本化隔离目录，`settings.json` 和 `models.json` 由本包生成，不读取或修改用户的 `~/.pi/agent`。
 
 ## 卸载
 
 ```powershell
-codex-agent-tools uninstall
 npm uninstall -g codex-agent-tools
 ```
 
-先运行本包卸载命令，删除拥有标记对应的 MCP 表，再移除 npm 包。卸载器不会删除无标记的同名表，也不会修改其它 MCP 服务、Kimi Code、Pi 或 Claude Code。完成后重启 Codex。
+不要让卸载器修改活动配置。只移除 npm 包；若未来需要清理 MCP 注册，先生成候选 diff 并取得用户明确许可。
 
 ## 从 cutover 备份恢复
 
 ```powershell
-codex-agent-tools restore --backup "<cutover 输出的备份绝对路径>"
+codex-agent-tools restore --config D:\path\to\test-config.toml --backup "<测试备份路径>"
 ```
 
-restore 只将指定备份原子写回 Codex 配置，不删除备份，也不修改旧项目、Kimi、Pi 或 Claude Code。恢复后重启 Codex。
+该命令只用于显式测试副本，不得覆盖用户已恢复的活动配置。
 
 ## 故障处理
 

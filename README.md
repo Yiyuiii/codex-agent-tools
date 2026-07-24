@@ -33,13 +33,11 @@
 
 ```powershell
 npm install -g codex-agent-tools
-codex-agent-tools install
-codex-agent-tools doctor
 ```
 
-安装命令只维护带有 `# managed-by: codex-agent-tools` 标记的 `[mcp_servers.codex_external_agents]` 配置块；遇到用户自建的同名配置会拒绝覆盖。安装后重启 Codex 以加载 MCP 服务。
+2026-07-24 起，本项目不建议自动修改活动的 `~/.codex/config.toml`：历史 cutover 在独立检查通过后仍导致 Codex App 重启异常，用户已恢复原始配置。开发期 `install` 只能与 `--config <测试副本>` 配合；默认使用只读 doctor、候选配置和离线验证。
 
-从 `codex_cc_tools` 正式替换时使用 `codex-agent-tools install --replace-codex-cc-tools`。该流程在所有目标门禁通过前拒绝写入，成功时创建备份并进行 MCP 自检，失败则自动恢复。详见 [迁移说明](docs/migration-from-codex-cc-tools.md)。
+不要对活动配置运行 `install --replace-codex-cc-tools` 或 `restore`。后续正式接入优先采用 Codex 官方插件安装机制；若无法绕开活动配置写入，必须先向用户展示精确差异、验证与回滚方案，并取得针对该次操作的明确许可。详见 [迁移说明](docs/migration-from-codex-cc-tools.md)。
 
 当前 Kimi 逻辑 ID 为：
 
@@ -80,6 +78,6 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 alpha。三个 Kimi 逻辑 LLM 的两类任务均已获得当前路由下的真实烟测证据；Gemini 与三个 Ark 逻辑 LLM 已固定注册但仍等待逐项真实门禁。尚未获得当前绑定证据的能力保持禁用，不会因为出现在模型清单中而自动开放。
+当前版本为开发期 alpha。Kimi、Gemini 与三个 Ark 逻辑 LLM 的 14 项能力均已获得当前路由下的真实烟测证据，但真实 Codex App 集成因配置事故已回滚，不能视为可安装版本。尚未获得当前绑定证据的未来能力仍保持禁用，不会因为出现在模型清单中而自动开放。
 
-本次确定性验证、本机 MCP 验收、cutover 零写入拒绝和剩余阻塞见 [0.1.0-alpha.1 本机替换验收记录](docs/release/checklist.md)。
+本次确定性验证、独立 MCP 验收、自动 cutover 事故和当前安全约束见 [0.1.0-alpha.1 本机替换验收记录](docs/release/checklist.md)。
