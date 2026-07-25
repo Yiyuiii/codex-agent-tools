@@ -172,6 +172,7 @@ export async function runPiRpc(
   const child = execa(request.executable, args, {
     cwd: request.cwd,
     env: request.environment,
+    extendEnv: false,
     detached: process.platform !== "win32",
     reject: false,
     stdio: ["pipe", "pipe", "pipe"],

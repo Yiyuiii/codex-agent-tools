@@ -1,7 +1,7 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -78,6 +78,49 @@ async function readLog(logPath: string): Promise<Array<Record<string, unknown>>>
 }
 
 describe("Pi RPC client", () => {
+  it("spawns Pi with the explicit request environment without parent proxy reinjection", async () => {
+    const cwd = await tempDirectory();
+    const logPath = path.join(cwd, "rpc-log.jsonl");
+    const wrapperPath = path.join(cwd, "assert-environment.mjs");
+    const expectedProxy = "http://127.0.0.1:10808";
+    await writeFile(
+      wrapperPath,
+      [
+        `if (process.env.HTTP_PROXY !== ${JSON.stringify(expectedProxy)}) process.exit(81);`,
+        `if (process.env.HTTPS_PROXY !== ${JSON.stringify(expectedProxy)}) process.exit(82);`,
+        "if (process.env.ALL_PROXY !== undefined || process.env.all_proxy !== undefined) process.exit(83);",
+        "if (!process.env.PATH) process.exit(84);",
+        'if (process.platform === "win32" && !process.env.SYSTEMROOT) process.exit(85);',
+        `await import(${JSON.stringify(pathToFileURL(fakePath).href)});`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const originalAllProxy = process.env.ALL_PROXY;
+    process.env.ALL_PROXY = "socks5://parent.invalid:9999";
+    try {
+      const result = await runPiRpc(
+        {
+          ...baseRequest(cwd, {
+            PATH: process.env.PATH,
+            SYSTEMROOT: process.env.SYSTEMROOT,
+            HTTP_PROXY: expectedProxy,
+            HTTPS_PROXY: expectedProxy,
+            FAKE_PI_LOG: logPath,
+          }),
+          executableArgs: [wrapperPath],
+        },
+      );
+
+      expect(result.status).toBe("completed");
+      expect(result.actualModel).toBe("gemini-3.5-flash");
+      expect((await readLog(logPath)).length).toBeGreaterThan(0);
+    } finally {
+      if (originalAllProxy === undefined) delete process.env.ALL_PROXY;
+      else process.env.ALL_PROXY = originalAllProxy;
+    }
+  });
+
   it("correlates commands, accepts fragmented CRLF, and separates events from stderr", async () => {
     const cwd = await tempDirectory();
     const logPath = path.join(cwd, "rpc-log.jsonl");
