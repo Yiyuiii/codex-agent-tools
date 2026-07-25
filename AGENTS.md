@@ -43,6 +43,7 @@
 - 2026-07-25：任务 7 十项真实门禁随后严格串行执行，每条命令后都逐字段读取新 evidence，并用独立系统进程快照复核无新增 Kimi/Pi RPC 进程；十次均无残留、无 fallback。Kimi 两项通过；Gemini review 通过而 delegate 因 Google 免费层额度失败；Ark Coding review 通过而 delegate 因结果文件内容验收失败；Ark Agent Plan 主档与 DeepSeek V4 Flash 经济档各两项均通过。两个 Agent profile 已用稳定文档 anchor 晋级，Gemini 与 Ark Coding 按成对策略两项均保持 pending；三份 evidence 索引记录了十个实际文件、SHA-256、模型、provider、route、结果与清理证据。
 - 2026-07-26：任务 7 注册表切换后的最终回归发现隔离插件验收仍固定调用已降为 pending 的 Gemini，MCP 正确拒绝后旧脚本误报缺少结构化结果。隔离验收现先证明 pending Gemini 被已安装 MCP 拒绝，再用已晋级的 `ark-agent-deepseek-v4-flash` 与 fake Pi 验证缓存副本调用、direct 父代理清理和 Agent 凭据规范化；Gemini 的固定 10808 替换继续由确定性环境测试与本轮真实 smoke evidence 覆盖。修复没有重新启用 Gemini，也没有使用活动 Codex home。
 - 2026-07-26：任务 7 质量复审进一步收敛了发布状态叙述与后续授权边界：README 明确区分十项原始 8 passed / 2 failed 和成对注册表 6 passed / 4 pending；运维文档不再把隔离 fake Pi 验收误述为成功调用 Gemini。Task 8 当前只能生成 `blocked / not ready` 状态包并报告重入条件，不得索要真实安装授权；Task 9 必须同时满足十门禁全部 passed、状态包重新审阅为 ready 和当前会话精确授权。只读外部审阅只选执行时 qualified 的 profile，当前为 Kimi K3 与 Ark Agent Plan。fake Pi 的 `set_model` 元数据也按生产配置收敛：Google 使用 `google-generative-ai`，Ark Plan 使用 `anthropic-messages`。
+- 2026-07-26：任务 8 的 [真实插件安装审阅状态包](docs/release/real-plugin-install-review.md) 已形成 `blocked / not ready` 草案，记录原始 8 passed / 2 failed、成对注册表 6 passed / 4 pending、两个失败 evidence、十门禁重入条件、隔离状态差异及未来官方回滚边界。该草案尚待 qualified 的 Kimi K3 与 Ark Agent Plan 依次只读外审；当前不提出或接受真实安装许可，不执行任务 9。
 
 ## 架构与计划索引
 
