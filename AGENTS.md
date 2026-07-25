@@ -25,7 +25,7 @@
 - 当前 Ark 公开面为三项固定 Pi/direct 路线：`ark-coding-plan` 使用 provider `ark-coding-plan` 与模型 `ark-code-latest`，其两项历史真实门禁继续有效；`ark-agent-plan` 与 `ark-agent-deepseek-v4-flash` 共享 provider `ark-agent-plan` 和并发上限 1，分别固定使用 `ark-code-latest` 与 `deepseek-v4-flash`，两者的 review/delegate 精确门禁当前均为 pending。旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 证据只作为历史记录保留，不能用于晋级新路线，详见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
 - Ark Coding 凭据候选依次为 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING`；本机用户环境实际命中第三项。Agent Plan 使用 `OPENAI_API_KEY_DOUBAO`。MCP 只转发候选白名单，运行时再向 Pi 注入单个项目私有变量，doctor 只报告变量名而不报告值。
 - 真实 Pi smoke 的残留进程检查使用全机快照，因此不同 smoke 必须串行执行。并行执行会把其它仍在运行的 smoke 进程误判为泄漏；2026-07-20 的最终门禁只采用串行证据。
-- 历史实现包含 `install --replace-codex-cc-tools` 和 `restore --backup`，但这套应用内自检未能证明真实 Codex App 可正常启动。根据 2026-07-24 用户反馈，不得再对活动的 `~/.codex/config.toml` 执行这些命令；只能在显式测试副本上验证。
+- 历史实现曾包含 `install --replace-codex-cc-tools` 和 `restore --backup`，但这套应用内自检未能证明真实 Codex App 可正常启动。历史实现当前已禁用，不得用于活动配置；相关公开 CLI 与源代码已删除，不能再把显式测试副本当作当前运维路线。
 - 2026-07-25 官方插件实施任务 1 已由提交 `db60c67` 完成：公开 CLI 只保留只读 `doctor`，不再接受 `--config`，历史 install/uninstall/restore/cutover 源码与测试已删除，doctor 不再读取 Codex 配置或报告 MCP registration。该提交经独立规格与代码质量审阅通过，当前基线为 147 项测试和类型检查全绿。
 - 2026-07-20：157 项测试、类型检查、构建、release smoke 和真实 stdio MCP 验收全绿；验收摘要 SHA-256 为 `0e4aca2d35c4e124a5f3b6ca60e8df440bfad27253d3e710334ba0fe29169d04`。
 - 2026-07-20 的自动 cutover 当时通过文件级、MCP initialize/listTools 和 strict doctor 检查，但重启后的真实 Codex App 运行异常。用户已于 2026-07-24 恢复原始 `~/.codex/config.toml`。因此“新 MCP 已在活动配置中完全替代旧 MCP”的结论已撤销；当前真实配置内容以用户恢复结果为准，未经许可不读取或修改。
@@ -36,6 +36,7 @@
 - 2026-07-25：官方插件实施任务 4 已在 Codex CLI 0.135.0 和唯一临时 `CODEX_HOME` 中完成真实 marketplace add/list、plugin add/list、缓存副本 MCP 启动、plugin remove/list 与 marketplace remove/list，官方安装器接受直接 server map。实测缓存末级是 manifest 版本目录 `plugins/cache/<marketplace>/<plugin>/<version>/`，不是设计时预估的 `local/`；卸载后可保留空缓存父目录和官方状态文件，验收以官方列表语义回滚与残留可解释为准。脱敏、可重复取证见 [官方插件隔离状态报告](docs/release/plugin-isolated-state.md)；该报告明确不代表活动 Codex App 验收。
 - 2026-07-25：任务 4 的真实 fake Pi 门禁发现 `execa` 默认 `extendEnv: true` 会把 MCP 父进程的 `ALL_PROXY` 重新注入 Pi 子进程。提交 `e967947` 已在 Pi 启动处设置 `extendEnv: false`，使子进程只接收项目构造的白名单环境；回归同时验证显式 10808 HTTP(S) 代理与必要系统路径仍保留。隔离脚本还验证精确凭据哨兵、快照竞态失败传播和异常 MCP 进程树清理。最终任务 4 由 `eb81a51`、`e967947`、`0ad3d5e`、`f048b5c`、`91109c7` 完成，独立规格与质量复审均通过，主线程复验为 169 项测试、类型检查、构建和隔离生命周期全绿；活动 `~/.codex/config.toml` 未被读取或修改。
 - 2026-07-25：官方插件实施任务 5 由 `874db97` 把四个精确插件文件纳入 npm pack 与 release smoke，`8e59c3c`、`d235803` 将 bundle 的生产依赖检查从脆弱正则收敛为 release-only TypeScript AST 遍历。当前门禁识别静态 import/re-export、动态 import、任意位置的直接 `require` / `__require`，注释与字符串不误报，非字面量和解析错误 fail closed；TypeScript 不进入插件 runtime bundle。`npm pack --dry-run --json` 的插件面严格为 marketplace、plugin manifest、`.mcp.json` 与单文件 runtime 四项，不生成持久 `.tgz`；Codex plugin help 只在临时 `CODEX_HOME` 中运行，release smoke 不执行安装、卸载或发布。任务 5 最终独立规格与质量复审通过，主线程复验为 release assurance 24/24、全量 191/191、release smoke、类型检查和构建全绿。
+- 2026-07-25：官方插件实施任务 6 已把 README、运维、共存迁移、四层发布门禁和三份真实模型证据索引收敛到当前五模型面。当前运维只允许依次构建、隔离官方生命周期取证、准备权限包，并在逐动作明确许可后使用官方 add/remove；项目和维护者均不直接读写或手工恢复活动 `config.toml`。隔离 CLI 生命周期与真实 Codex App 宿主门禁被明确分层；当前第 1、2 层 passed，第 3 层为 6 passed / 4 pending，第 4 层尚未执行。旧 `codex_cc_tools` 本轮保持共存，移除旧工具属于后续独立变更与独立授权。
 
 ## 架构与计划索引
 
@@ -45,7 +46,7 @@
 - [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)
 - [Pi/Gemini 适配实施计划](docs/superpowers/plans/2026-07-18-pi-gemini-adapter.md)
 - [Ark 迁移与本机切换实施计划](docs/superpowers/plans/2026-07-18-ark-migration-and-cutover.md)
-- [0.1.0-alpha.1 本机替换验收记录](docs/release/checklist.md)
+- [官方插件四层发布验收清单](docs/release/checklist.md)
 
 ## 开发约定
 

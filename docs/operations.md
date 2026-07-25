@@ -1,130 +1,89 @@
-# 运维说明
+# 官方插件运维流程
 
-本文说明 `codex_external_agents` 的本机安装、诊断、升级、卸载和故障排查流程。
+本文只描述 `codex_external_agents` 的官方插件候选构建、隔离验收、逐动作授权安装与官方回滚。它不是当前真实安装授权；截至 2026-07-25，活动 Codex 尚未安装本插件。
 
-> 安全提示（2026-07-24）：不要对本机活动的 `~/.codex/config.toml` 运行本项目的 install、cutover 或 restore 命令。历史自动 cutover 在独立验证通过后仍导致 Codex App 重启异常，用户已恢复原始配置。以下写操作只允许用于显式指定的测试副本；活动配置默认只读。
+项目代码和维护者都不得直接读取、写入、备份、恢复或手工编辑活动 `~/.codex/config.toml`。Codex 官方插件命令可能由官方机制更新该状态文件，因此真实 add/remove 每次都必须先准备权限包并取得针对该次动作的明确许可。
 
-## 前置条件
+## 1. 安装依赖
 
-- Node.js 20 或更高版本。
-- 本机 Kimi Code 已安装，并完成其原生 OAuth 登录。
-- Codex 可以读取自己的 `~/.codex/config.toml`。
-
-本项目不会读取或修改 Claude Code 配置，也不会卸载 Claude Code。Kimi OAuth 文件仍由 Kimi Code 自己管理；工具桥只继承定位本机用户目录所需的最小环境变量。
-
-## 安装与重载
-
-全局安装后可运行只读诊断。安装命令只用于显式测试配置：
+在仓库根目录执行：
 
 ```powershell
-codex-agent-tools doctor
-codex-agent-tools install --config D:\path\to\test-config.toml
+npm ci
 ```
 
-历史 cutover 命令不得用于活动配置；若维护者需要回归测试，只能传入测试副本：
+要求 Node.js 20+。真实 Kimi 调用还要求本机 Kimi Code 已安装并完成其原生 OAuth 登录；本项目不复制 OAuth 数据。
+
+## 2. 构建候选产物
 
 ```powershell
-codex-agent-tools install --config D:\path\to\test-config.toml --replace-codex-cc-tools
-```
-
-完整映射、删除项和回滚说明见 [从 codex-cc-tools 迁移](migration-from-codex-cc-tools.md)。
-
-测试其它 Codex 配置文件时可显式指定路径：
-
-```powershell
-codex-agent-tools install --config D:\path\to\test-config.toml
-codex-agent-tools doctor --config D:\path\to\test-config.toml --json
-```
-
-安装器写入一个拥有标记和一个 MCP 表：
-
-```toml
-# managed-by: codex-agent-tools
-[mcp_servers.codex_external_agents]
-command = "<当前 Node 绝对路径>"
-args = ["<当前包 dist/mcp.js 的绝对路径>"]
-env_vars = ["ARK_API_KEY", "VOLCENGINE_API_KEY", "API_KEY_DOUBAO_CODING", "OPENAI_API_KEY_DOUBAO", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"]
-startup_timeout_sec = 20
-tool_timeout_sec = 900
-required = false
-enabled = true
-enabled_tools = ["external_review", "external_delegate"]
-```
-
-`env_vars` 是 Codex stdio MCP 的父环境转发白名单；只有父进程中实际存在的列出变量会进入 MCP 服务。服务随后再按所选逻辑 LLM 只把一个规范化凭据传给对应子进程，不会把所有列出凭据继续下发。安装器只应在测试副本中使用。测试副本的解析和独立 MCP 验证不代表真实 Codex App 集成通过，也不得据此自动写活动配置。
-
-## 诊断
-
-```powershell
-codex-agent-tools doctor
-codex-agent-tools doctor --json
-codex-agent-tools doctor --strict
-```
-
-诊断会检查：Kimi 可执行文件、版本与登录状态；Pi 可执行文件、版本、隔离配置哈希、Ark endpoint/模型清单以及 Gemini/Ark 凭据变量名；本包拥有的 MCP 注册；公开工具名；各逻辑 LLM 的真实模型、运行时、固定网络路由和 review/delegate 质量门禁。Gemini 固定使用 `proxy-10808`，凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 的顺序只选择第一个非空值；Ark Coding Plan 按 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING` 选择，Agent Plan 使用 `OPENAI_API_KEY_DOUBAO`。报告只显示命中的变量名和项目私有目标变量名，不显示凭据内容。
-
-普通模式即使存在警告也用于展示完整报告。`--strict` 只在出现错误级诊断时返回非零；质量门禁 pending 是警告，表示该能力尚未通过真实烟测。报告会对环境中的令牌、密钥和认证头脱敏。
-
-Kimi 的真实门禁证据见 [Kimi 真实能力门禁](smoke/kimi.md)，Pi/Gemini 的真实门禁证据见 [Pi / Gemini 真实能力门禁](smoke/pi-gemini.md)，Ark 的证据矩阵见 [Ark / Pi 真实能力门禁](smoke/ark.md)。
-
-## 升级
-
-升级包后不要自动改写活动配置。只更新包并执行只读诊断：
-
-```powershell
-npm update -g codex-agent-tools
-codex-agent-tools doctor
-```
-
-若包入口路径发生变化，先在测试副本生成候选配置与精确 diff，不直接修补活动配置。Pi 运行时使用应用缓存下的版本化隔离目录，`settings.json` 和 `models.json` 由本包生成，不读取或修改用户的 `~/.pi/agent`。
-
-## 卸载
-
-```powershell
-npm uninstall -g codex-agent-tools
-```
-
-不要让卸载器修改活动配置。只移除 npm 包；若未来需要清理 MCP 注册，先生成候选 diff 并取得用户明确许可。
-
-## 从 cutover 备份恢复
-
-```powershell
-codex-agent-tools restore --config D:\path\to\test-config.toml --backup "<测试备份路径>"
-```
-
-该命令只用于显式测试副本，不得覆盖用户已恢复的活动配置。
-
-## 故障处理
-
-### 找不到 Kimi
-
-先运行 `kimi --version` 和 `kimi doctor`。Windows 上本包依次检查测试专用覆盖、`PATH` 以及用户目录下 Kimi Code 的标准安装位置。不要把 OAuth 令牌手工复制到项目环境变量。
-
-### 能看到工具但模型能力被拒绝
-
-查看 `doctor` 对应逻辑 LLM 的 review/delegate 门禁。pending 表示该精确组合尚未获得真实烟测证据；系统不会替换成其它后端或模型。需由项目维护流程完成烟测并随新版本启用。
-
-Gemini 的当前固定路由为本机 `10808`，其 `proxy-10808` review/delegate 已于 2026-07-20 分别通过。Google 共享免费层返回配额错误时，review 只在服务明确给出不超过 60 秒的重试窗口时等待一次；delegate 不自动重试。
-
-### review 返回 workspace_changed
-
-这表示调用前后工作区证据不同。把当前工作区视为已发生变化，先检查返回的 `filesChanged` 和 Git 状态。应用层只读控制不等于操作系统沙箱；高风险审阅应在只读副本、容器或受限账户中运行。
-
-### delegate 超时或取消
-
-桥接层会请求协议取消并终止 Kimi 进程树。先检查返回的诊断和工作区真实状态，再决定是否重试；委派不会自动重试，因为重复执行可能造成二次写入。
-
-### 配置冲突
-
-若安装器报告同名表不归本包所有，请人工确认该表来源。只有确定旧表可被替换后，才由维护者移除或改名；安装器不会抢占未知配置。
-
-## 发布前维护验证
-
-```powershell
-npm run typecheck
-npm test
 npm run build
-npm run smoke:release
 ```
 
-发布烟测会检查两个 bin、真实 stdio MCP 工具契约、doctor JSON、`npm pack --dry-run --json` 文件白名单，以及包内开发机绝对路径和当前环境密钥泄漏。真实模型烟测是独立门禁，不包含在确定性的发布烟测中。
+构建会同时生成库产物与 `plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs` 自包含 bundle。不要手工编辑 bundle。
+
+## 3. 运行隔离官方生命周期验收
+
+```powershell
+npm run acceptance:plugin:isolated
+```
+
+脚本只在自动创建的临时 `CODEX_HOME` 中调用官方 marketplace/plugin add、list 与 remove，并从官方缓存副本启动 MCP。它不得使用活动 Codex home，也不构成真实 Codex App 宿主门禁。
+
+## 4. 查看隔离证据
+
+检查 [官方插件隔离状态报告](release/plugin-isolated-state.md)，确认：
+
+- 临时 `CODEX_HOME` 隔离边界成立；
+- 官方安装器接受插件 manifest、直接 server-map `.mcp.json` 与自包含 bundle；
+- 缓存副本只公开 `external_review` 与 `external_delegate`，且 `llm` 必填；
+- fake Pi 的固定模型、10808 路由、环境白名单与进程清理门禁通过；
+- 官方 remove 后列表语义回滚，残留状态可解释；
+- 报告结论没有被扩张成真实 Codex App 已通过。
+
+任一项失败即停止，不准备真实安装。
+
+## 5. 准备真实安装权限包
+
+权限包必须列出：
+
+- 为什么只有真实官方安装才能验证 Codex App 宿主；
+- 当前尚未执行真实安装；
+- 隔离取证支持的预计新增、修改和删除范围；
+- 官方安装后的验证步骤；
+- 官方 remove 回滚步骤；
+- 失败时不手工恢复或编辑活动 `config.toml`；
+- 旧 `codex_cc_tools` 保持原状，本轮不移除；
+- 本轮不执行 npm 或公共 marketplace 发布。
+
+权限包必须先交给用户审阅。过去关于采用官方插件机制的同意不能推定为本次 add/remove 的许可。
+
+## 6. 仅在明确许可后执行真实安装
+
+只有收到针对本次真实安装的明确许可后，才可在本仓库根目录逐条执行：
+
+```powershell
+$repoRoot = (Resolve-Path ".").Path
+codex plugin marketplace add $repoRoot
+codex plugin add codex-external-agents@codex-external-agents-local
+```
+
+执行后必须使用官方列表和真实 Codex App 完成工具发现、代表性调用、取消与进程清理门禁。不得直接打开、比较或修改活动 `config.toml`。命令结果若与权限包或隔离证据不一致，立即停止，不追加自定义配置修复。
+
+## 7. 失败时使用官方回滚
+
+本次权限包必须明确包含失败回滚授权。宿主门禁失败时只执行：
+
+```powershell
+codex plugin remove codex-external-agents@codex-external-agents-local
+codex plugin marketplace remove codex-external-agents-local
+```
+
+随后使用官方列表确认目标插件与 marketplace 已移除。若官方回滚也异常，停止并报告；不得手工恢复、重写或修补活动 `config.toml`。
+
+## 8. 长期维护边界
+
+- 每次真实安装、升级或独立卸载都是新的外部状态变更，必须重新逐动作授权。
+- 永远不以手工编辑活动 `config.toml` 代替官方插件机制。
+- 本轮不移除旧 `codex_cc_tools`，不调用或修改 Claude Code，不执行 `npm publish`。
+- 只有确定性检查、隔离生命周期、五项十门禁和真实 Codex App 宿主门禁全部通过后，才可说新插件具备替代旧工具的条件。

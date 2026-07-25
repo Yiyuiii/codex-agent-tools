@@ -1,78 +1,61 @@
 # 从 codex-cc-tools 迁移
 
-## 目标边界
+## 当前结论：先共存
 
-本项目目标是以 MCP 服务 `codex_external_agents`、工具 `external_review` 与 `external_delegate` 替代 `codex_cc_tools`。2026-07-20 的自动 `config.toml` cutover 在独立检查通过后仍导致重启后的 Codex App 无法正常运行；用户已于 2026-07-24 恢复原始配置。后续迁移不得默认修改活动的 `~/.codex/config.toml`，也不会运行旧包卸载器、修改 `D:\Codes\codex-cc-tools`，或调用、修改、卸载本机 Claude Code。
+`codex-agent-tools` 的目标是让 MCP 服务 `codex_external_agents` 通过 `external_review` 与 `external_delegate` 提供 Codex 外部 LLM 能力。当前阶段采用新旧工具共存：
 
-新工具每次都要求显式选择逻辑 `llm`。调用者不能指定 backend、provider、真实模型、代理、工具集或推理强度。
+- 新插件不调用 `codex_cc_tools`，也不调用、修改或卸载本机 Claude Code；
+- 本轮不卸载、禁用或修改旧 `codex_cc_tools`；
+- 当前尚未在活动 Codex 中真实安装新插件；
+- 项目代码不得直接读取或写入活动 `~/.codex/config.toml`；官方插件命令可能更新该状态文件，因此每次真实 add/remove 都必须先取得针对该动作的明确许可。
 
-## 来源映射
+“共存”不是“已经替代”。在全部替代门槛通过前，旧工具保持原状，用户已有工作流不在本轮改动范围内。
 
-| 旧来源或用途 | 新逻辑 LLM | 当前状态 |
-| --- | --- | --- |
-| Kimi Code 外部审阅/委派 | `kimi-k2.7`、`kimi-k2.7-highspeed`、`kimi-k3` | review/delegate 已通过真实门禁 |
-| Gemini direct review | `gemini-3.5-flash`（Pi/Google/`proxy-10808`） | review/delegate 已通过新路由真实门禁 |
-| Ark Coding Plan | `ark-coding-plan`（Pi/`ark-code-latest`） | review/delegate 已通过真实门禁 |
-| Ark Agent Plan GLM | `ark-agent-glm-5.2`（Pi/`glm-5.2`） | review/delegate 已通过真实门禁 |
-| Ark Agent Plan Doubao | `ark-agent-doubao-seed-2.0-pro`（Pi/同名模型） | review/delegate 已通过真实门禁 |
-| Anthropic Claude / Claude Code 后端 | 无 | 从新产品面删除；本机 Claude Code 安装保留 |
-| DeepSeek | 无 | 按维护者要求不迁移 |
-| OpenAI/Codex 模型家族 | 无 | 不作为外部来源引入，因为顶层已是 Codex |
+## 当前来源映射
 
-Ark 当前证据和复跑条件见 [Ark / Pi 真实能力门禁](smoke/ark.md)。禁用能力不会静默切换到其它 LLM。
+| 外部来源或用途 | 新逻辑 LLM | 固定路由 | 当前门禁 |
+| --- | --- | --- | --- |
+| Kimi Code 审阅/委派 | `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | review/delegate passed |
+| Gemini 审阅/委派 | `gemini-3.5-flash` | Pi / Google / 同名模型 / `proxy-10808` | review/delegate passed |
+| Ark Coding Plan | `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | review/delegate passed |
+| Ark Agent Plan 主档 | `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | review/delegate pending |
+| Ark Agent Plan 经济档 | `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | review/delegate pending |
+| Anthropic Claude / Claude Code 后端 | 无 | 不进入新产品面 | 不迁移 |
+| OpenAI/Codex 模型家族 | 无 | 顶层已经是 Codex | 不作为外部来源 |
 
-## 历史自动切换（禁止用于活动配置）
+当前 Kimi 只公开 K3；旧 Kimi 与旧 Agent Plan 模型记录只作为历史证据保留，不属于当前注册表。任一 pending 或失败能力都会明确拒绝，不会复用历史证据或静默切换到其它 LLM。
 
-以下命令仍存在于历史实现中，但不得对本机活动配置执行：
+## 具备替代条件的门槛
 
-```powershell
-# 历史命令，仅记录，不要对活动配置执行
-codex-agent-tools install --replace-codex-cc-tools
-```
+只有以下条件全部通过，才能说新插件“具备替代旧工具的条件”：
 
-流程为：
+1. 确定性单测、类型检查、构建和 release smoke 通过；
+2. 官方 marketplace/plugin 的 add、list、缓存副本 MCP 启动与 remove 在临时 `CODEX_HOME` 中通过；
+3. 五个当前逻辑 LLM 的 review/delegate 十项精确真实门禁全部 passed；
+4. 获得逐动作许可后完成真实官方安装；
+5. 真实 Codex App 只发现两个批准工具，且二者 `llm` 必填；
+6. 真实宿主代表性 review/delegate、长任务取消和 Windows 进程树清理通过；
+7. 新旧工具共存状态经过验证，旧工具未被意外修改。
 
-1. 运行 fail-closed readiness 检查；失败时配置零写入、零备份。
-2. 获取同配置文件锁。
-3. 在原目录创建带 UTC 时间戳的逐字节备份。
-4. 只删除 `[mcp_servers.codex_cc_tools]` 表，安装带拥有标记的 `[mcp_servers.codex_external_agents]`。
-5. 通过临时文件、文件同步和 rename 原子替换。
-6. 启动新 MCP 并验证 initialize/listTools 只暴露两个批准工具。
-7. 任一写后验证失败时从内存中的原始字节自动恢复；备份保留供审计。
+隔离 CLI 生命周期只能证明官方安装器和缓存副本可用，不能替代真实 Codex App 宿主门禁。四层状态和停止条件见 [发布验收清单](release/checklist.md)。
 
-2026-07-20 该命令曾通过文件级和独立 MCP 自检，但真实 Codex App 重启后异常，说明原 readiness 不足以授权活动配置写入。它只能配合 `--config <显式测试副本>` 做开发验证。
+## 真实安装与回滚边界
 
-## 历史显式回滚
+真实安装前必须先完成 [官方插件运维流程](operations.md) 中的隔离验收，并提交只覆盖本次 add 与失败 remove 的权限包。未收到本次明确许可前，不执行官方 add/remove，也不直接检查或修补活动配置。
 
-成功切换会输出备份绝对路径。需要回滚时执行：
+若获得许可后的真实宿主门禁失败，只使用权限包列出的官方 remove 命令回滚新插件和本地 marketplace。不得手工恢复 TOML，也不得在回滚中移除旧 `codex_cc_tools`。
 
-```powershell
-# 历史命令，仅记录，不要对活动配置执行
-codex-agent-tools restore --backup "<输出的备份绝对路径>"
-```
+## 旧工具移除是后续独立变更
 
-`restore` 同样不得对活动配置执行。用户已经自行恢复原始配置；未经明确请求，不读取、比较或覆盖恢复结果。测试时只能配合显式临时配置副本。
+即使新插件达到“具备替代条件”，移除旧 `codex_cc_tools` 仍是另一个独立阶段，必须重新：
 
-## 后续安全迁移原则
+1. 说明旧工具移除的必要性和精确影响；
+2. 验证新插件覆盖了用户实际依赖的调用路径；
+3. 提供独立验证与回滚方案；
+4. 取得针对旧工具移除的明确授权。
 
-1. 默认只读，不探测恢复后的活动配置内容。
-2. 在仓库或临时目录生成候选 TOML 和精确 diff。
-3. 对候选文件做 TOML 解析、MCP initialize/listTools 和与当前 Codex 版本相符的兼容性验证。
-4. 优先使用 Codex 官方插件安装机制；若当前机制不能满足目标，先改进打包与安装方案。
-5. 只有用户针对一次具体写入明确许可后，才可考虑活动配置变更；许可不能从过去的 cutover 授权推断。
+本轮真实安装许可不能绑定或隐含 npm 发布、公共 marketplace 发布、未来升级、独立卸载或旧工具移除权限。
 
-## 测试副本复核（非集成完成证据）
+## 历史事故边界
 
-```powershell
-codex-agent-tools doctor --json
-```
-
-只在显式测试副本上确认：
-
-- `codex_external_agents` 注册归本包所有；
-- 公开工具只有 `external_review` 与 `external_delegate`；
-- 候选配置中的旧表删除范围符合预期；
-- 本机 Claude Code 文件与旧项目源码没有变化；
-- 每个启用能力仍有真实门禁证据。
-
-这些检查不能证明真实 Codex App 重启后可用；在增加真实启动兼容性验证之前，不得恢复自动 cutover。
+2026-07-20 的应用内自动 cutover 曾通过候选文件、独立 MCP 与项目 doctor 检查，但重启后的 Codex App 无法正常运行；用户于 2026-07-24 恢复原始配置。历史实现中的配置写入命令当前已从公开 CLI 删除并禁用，不得用于活动配置。该事故证明候选 TOML 或独立 MCP 通过不能替代真实 App 验收，也是当前改用官方插件机制、隔离取证和逐动作授权的原因。

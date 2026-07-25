@@ -1,111 +1,124 @@
-# 0.1.0-alpha.1 本机替换验收记录
+# 官方插件四层发布验收清单
 
-日期：2026-07-20
+日期：2026-07-25
 
 分支：`codex/ark-cutover`
 
-验收前基线提交：`9ea404272bad`
-结论：**Kimi、Gemini、Ark 的 14 项真实能力门禁、确定性检查和独立 stdio MCP 验收已通过；活动 Codex 配置的自动 cutover 在重启后导致 Codex 无法正常运行，用户已于 2026-07-24 恢复原始配置。因此不能声称 `codex_external_agents` 已在真实 Codex App 中完全替代 `codex_cc_tools`。未获授权公开发布。**
+包版本：`0.1.0-alpha.1`
 
-## 环境
+当前结论：**第 1 层确定性检查与第 2 层隔离官方插件生命周期已通过；第 3 层五项十门禁尚有四项 pending；第 4 层真实 Codex App 宿主门禁尚未执行。当前不是已安装、已替代旧工具或可公开发布状态。**
 
-- Windows / PowerShell
-- Node.js `v24.14.1`
-- npm `11.11.0`
-- Pi `0.80.10`
-- Kimi Code `0.27.0`
-- 包版本 `0.1.0-alpha.1`
+每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 
-## 确定性验证
+## 状态总览
 
-以下命令在本轮工作树执行，退出码均为 0：
+| 层级 | 验收对象 | 当前状态 | 通过证据路径 |
+| --- | --- | --- | --- |
+| 1 | 确定性单测、类型检查、构建、release smoke | passed | `test/`、`test/release/assurance.test.ts`、`scripts/release-smoke.mjs`，任务 5 提交 `874db97`、`8e59c3c`、`d235803` |
+| 2 | 临时 `CODEX_HOME` 中的官方插件生命周期 | passed | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs` |
+| 3 | 五个逻辑 LLM 的十项真实模型门禁 | incomplete：6 passed / 4 pending | [Kimi](../smoke/kimi.md)、[Gemini](../smoke/pi-gemini.md)、[Ark](../smoke/ark.md)、`docs/smoke/evidence/` |
+| 4 | 活动 Codex 的真实 App 宿主门禁 | not run | 计划中的 `real-plugin-install-review.md` 与授权后生成的 `real-host-acceptance.md` |
+
+## 第 1 层：确定性单测与构建
+
+### 通过标准
 
 ```powershell
 npm run typecheck
-npm test -- --run
+npm test
 npm run build
 npm run smoke:release
 git diff --check
 ```
 
-结果：31 个测试文件、157 项测试通过；类型检查、构建、release smoke、stdio MCP 契约、doctor JSON、凭据脱敏和包内容检查通过。`npm pack --dry-run --json` 列出 80 个文件，packed 114,917 bytes，unpacked 443,259 bytes。
+`smoke:release` 还必须证明：
 
-## 真实能力矩阵
+- npm pack 精确包含 marketplace、plugin manifest、`.mcp.json` 与单文件 runtime；
+- runtime bundle 不依赖安装目录外生产模块，不泄漏开发机绝对路径或环境凭据值；
+- MCP initialize/listTools 只公开 `external_review` 与 `external_delegate`，且 `llm` 必填；
+- Codex plugin help 只在临时 `CODEX_HOME` 中运行；
+- 不执行真实 add/remove、`npm publish`，也不保留 `.tgz`。
+
+### 当前证据
+
+任务 5 主线程复验：release assurance 24/24、全量 191/191、类型检查、构建与 release smoke 全部通过。
+
+### 失败停止条件
+
+任一命令非零、包文件面超出白名单、bundle 解析失败或发现秘密/绝对路径时立即停止。不得进入隔离安装、真实模型或真实 App 门禁；先在行为改动处补失败测试并修复。
+
+## 第 2 层：隔离官方插件生命周期
+
+### 通过标准
+
+```powershell
+npm run acceptance:plugin:isolated
+```
+
+脚本必须在唯一临时 `CODEX_HOME` 中完成官方 marketplace add/list、plugin add/list、从官方缓存副本启动 MCP、plugin remove/list 与 marketplace remove/list。还必须验证固定凭据哨兵、Gemini 10808 代理、父代理清除、MCP 契约、异常进程清理和官方列表语义回滚。
+
+### 当前证据
+
+[官方插件隔离状态报告](plugin-isolated-state.md) 记录 Codex CLI 0.135.0 的通过结果、相对状态差异、官方缓存位置和脱敏边界。该报告明确只证明隔离 CLI 生命周期，**不证明真实 Codex App 已安装或通过**。
+
+### 失败停止条件
+
+临时 home 边界、官方 add/list/remove、缓存副本启动、固定路由、环境白名单、进程回收或列表语义回滚任一失败即停止。不得改用活动 Codex home 诊断，也不得直接读取或写入活动 `config.toml`。
+
+## 第 3 层：五项真实模型门禁
+
+### 当前矩阵
 
 | 逻辑 LLM | 固定路由 | review | delegate |
 | --- | --- | --- | --- |
-| `kimi-k2.7` | Kimi ACP / direct | passed | passed |
-| `kimi-k2.7-highspeed` | Kimi ACP / direct | passed | passed |
-| `kimi-k3` | Kimi ACP / direct | passed | passed |
-| `gemini-3.5-flash` | Pi / Google / `proxy-10808` | passed | passed |
-| `ark-coding-plan` | Pi / `ark-code-latest` / direct | passed | passed |
-| `ark-agent-glm-5.2` | Pi / `glm-5.2` / direct | passed | passed |
-| `ark-agent-doubao-seed-2.0-pro` | Pi / 同名模型 / direct | passed | passed |
+| `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | passed | passed |
+| `gemini-3.5-flash` | Pi / Google / 同名模型 / `proxy-10808` | passed | passed |
+| `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | passed | passed |
+| `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | pending | pending |
+| `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | pending | pending |
 
-Kimi 证据见 [Kimi 门禁](../smoke/kimi.md)，Gemini 证据见 [Gemini 门禁](../smoke/pi-gemini.md)，Ark 证据见 [Ark 门禁](../smoke/ark.md)。2026-07-20 新增的八份 Pi 证据均为串行运行；所有模型身份、固定路由、隔离环境、工作区边界和进程清理检查通过。
+### 通过标准
 
-## 凭据与 doctor
+- 五个逻辑 LLM 的 review/delegate 共十次调用必须按实施任务 7 串行执行；
+- 每次实际模型、provider 与路由必须和注册表精确一致；
+- review 必须找到预置缺陷且工作区零变化；
+- delegate 必须只产生预期变化并观测到验证命令；
+- 每次调用结束后不得有新增 Kimi/Pi 进程；
+- 新证据必须脱敏并写入 `docs/smoke/evidence/`，三个 smoke 索引同步更新。
 
-本机用户环境中的 Ark Coding key 命名为 `API_KEY_DOUBAO_CODING`。项目已把它作为 `ARK_API_KEY`、`VOLCENGINE_API_KEY` 之后的兼容候选，并加入 Codex MCP `env_vars` 白名单。doctor 只报告：
+### 当前证据
 
-- Gemini：`GEMINI_API_KEY`；
-- Ark Coding：`API_KEY_DOUBAO_CODING -> CODEX_AGENT_ARK_CODING_KEY`；
-- Ark Agent：`OPENAI_API_KEY_DOUBAO -> CODEX_AGENT_ARK_AGENT_KEY`。
+Kimi K3、Gemini 与 Ark Coding Plan 的六项 passed 证据分别见三个 smoke 索引；两个 Agent Plan 路线没有精确证据，保持 pending。任务 7 将重新串行执行全部十项并为当前路由建立精确索引。
 
-切换前后 `doctor --strict --json` 均返回 `ok: true`，七个逻辑 LLM 的 review/delegate 均报告 passed，未输出密钥值。
+### 失败停止条件
 
-## stdio MCP 本机验收
+任一精确门禁因模型、路由、额度、工作区、工具证据或残留进程失败时，该逻辑 LLM 的 review/delegate 都不得晋级。不得复用旧模型证据、自动 fallback、并行运行 Pi smoke 或把确定性测试当成真实模型证据。五项十门禁未全 passed 前，不准备真实 App 安装执行。
 
-`npm run acceptance:local` 退出码为 0：
+## 第 4 层：真实 Codex App 宿主门禁
 
-- 工具清单只有 `external_review`、`external_delegate`；
-- `kimi-k2.7-highspeed` review 命中 `kimi-code/kimi-for-coding-highspeed`；
-- `gemini-3.5-flash` review 命中同名模型和 `10808` 固定代理；
-- `kimi-k3` delegate 一次完成；
-- 取消传播观察到进度，结束后无新增 Kimi/Pi 进程。
+### 前置权限
 
-验收摘要 SHA-256：`0e4aca2d35c4e124a5f3b6ca60e8df440bfad27253d3e710334ba0fe29169d04`。
+当前尚未执行真实官方安装。项目代码不得直接读取或写入活动 `~/.codex/config.toml`；官方插件命令可能由官方机制触碰该文件，因此必须先提交 `real-plugin-install-review.md` 权限包并取得针对本次 add 与失败 remove 的明确许可。
 
-## 正式 cutover
+### 通过标准
 
-执行：
+获得许可后，才可使用 [官方插件运维流程](../operations.md) 中列出的官方命令，并从真实 Codex App 验证：
 
-```powershell
-# 历史事故命令，仅作证据记录
-codex-agent-tools install --replace-codex-cc-tools
-```
+- 只新增 `external_review` 与 `external_delegate`，二者 `llm` 必填；
+- 旧 `codex_cc_tools` 仍存在且未被修改；
+- Kimi 与至少一条 Pi 路线完成代表性 review；
+- delegate 只在隔离临时仓库执行；
+- 可取消长任务在结束后不残留 Kimi/Pi 进程；
+- 所有结果、诊断和宿主证据均脱敏。
 
-2026-07-20 当时观察到：
+通过证据必须写入授权后才创建的 `docs/release/real-host-acceptance.md`。隔离 CLI 报告不能填充这一层。
 
-- 切换前配置 SHA-256：`1595fc9fd379a9b011711666c21c0c2212adacf2d207707146c55b175249d5c2`；
-- 备份：`~/.codex/config.toml.codex-agent-tools-backup-2026-07-20T07-53-30.322Z`；
-- 备份 SHA-256 与切换前配置完全相同；
-- 切换后配置 SHA-256：`b6db369ee23184f4d31cfed45cd5ec24101d094f7b8fe52bf6d40dd26a79de54`；
-- `[mcp_servers.codex_cc_tools]` 已不存在；
-- `[mcp_servers.codex_external_agents]` 存在并包含 `API_KEY_DOUBAO_CODING` 白名单；
-- 内置 MCP initialize/listTools 自检通过；
-- 切换后 `doctor --strict --json` 全绿。
+### 失败停止条件
 
-这些检查只覆盖配置文件、独立 MCP 子进程和项目 doctor，未覆盖重启后的真实 Codex App 启动与完整运行。用户随后确认 Codex 无法正常运行，并于 2026-07-24 恢复原始配置。上述哈希和备份仅作为历史事故证据，不再代表当前活动配置，也不得据此重复 cutover。
+官方命令输出、工具发现、代表性调用、取消或进程清理任一异常时立即停止，且只使用权限包内的官方 remove 命令回滚。不得手工恢复、编辑或修补活动 `config.toml`。若官方回滚也异常，停止并报告，不执行旧工具移除或发布。
 
-显式回滚命令：
+## 替代与发布边界
 
-```powershell
-# 历史回滚命令，仅作证据记录
-codex-agent-tools restore --backup "$HOME\.codex\config.toml.codex-agent-tools-backup-2026-07-20T07-53-30.322Z"
-```
-
-本轮未修改 `D:\Codes\codex-cc-tools`，未调用、修改或卸载本机 Claude Code。
-
-## 2026-07-24 配置事故与当前约束
-
-- 用户已恢复 `~/.codex/config.toml` 原始配置；项目不读取或修改恢复后的文件。
-- 自动 cutover 的“成功”结论撤销。独立 MCP 验收通过不等于 Codex App 集成通过。
-- 后续默认只生成候选配置或操作显式测试副本，不对活动配置执行 `install`、`install --replace-codex-cc-tools` 或 `restore`。
-- 若未来确实需要写活动配置，必须先取得用户对该次写入的明确许可，并在写前提供精确 diff、离线解析结果、Codex 兼容性依据和回滚步骤。
-
-## 发布状态
-
-- 未生成需保留的 tarball。
-- 未执行 `npm publish`，未推送远端。
-- 公开发布必须等待用户明确授权，并在发布时重新检查 npm 名称与依赖公告。
+- 第四层通过只表示新插件具备替代条件，不会自动移除旧 `codex_cc_tools`。
+- 旧工具移除是后续独立变更，需要新的影响评估、验证、回滚方案与明确授权。
+- 本轮不调用或修改 Claude Code，不执行 `npm publish`，不发布公共 marketplace。

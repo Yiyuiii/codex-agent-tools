@@ -6,6 +6,8 @@
 
 本轮使用 Pi 0.80.10 和隔离配置 SHA-256 `ab12536cc03dd368115d71bab6eb65216506717fc63b33c4b8a077d82b3ebbf6`。凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 顺序只选第一个非空值。证据不记录凭据内容。
 
+2026-07-25 的官方插件实施任务 7 将按当前五模型矩阵重新串行执行 Gemini review/delegate，并生成新的精确证据。当前路由保持 `proxy-10808` 不变；若复跑遭遇 Google 共享免费层额度或其它失败，必须保留真实失败，不得切换模型、provider 或网络策略。
+
 <a id="gemini-review"></a>
 ## Gemini review
 

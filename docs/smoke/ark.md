@@ -12,6 +12,8 @@
 
 2026-07-20 历史 passed evidence 使用的旧隔离配置 SHA-256 为 `ab12536cc03dd368115d71bab6eb65216506717fc63b33c4b8a077d82b3ebbf6`。当前三模型 pending 配置包含 Agent Plan 的 `ark-code-latest`、`deepseek-v4-flash` 与 Coding Plan 的 `ark-code-latest`；按生成器实际输出重新计算的 SHA-256 为 `61ffbd4c6ea41adc6a8313f957b732da2b98b8b28b082c52a95226b2a6fb2fe9`。两代配置的 endpoint host 均固定为 `ark.cn-beijing.volces.com`，网络策略均为 direct。
 
+2026-07-25 的官方插件实施任务 7 将按当前三个逻辑 ID 串行执行六项精确门禁并生成新证据。Coding Plan 当前的 passed 状态在复跑前继续引用既有同模型、同 provider、同路由证据；两个 Agent Plan 路线保持 pending，只有各自 review/delegate 均通过后才可晋级。任何失败都不得用历史模型证据或其它 LLM fallback 掩盖。
+
 Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。注册表现按 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING` 的顺序选择第一个非空值，并只向 Pi 子进程注入项目私有变量 `CODEX_AGENT_ARK_CODING_KEY`。Ark Agent 使用 `OPENAI_API_KEY_DOUBAO`，规范化为 `CODEX_AGENT_ARK_AGENT_KEY`。
 
 上述 2026-07-20 passed evidence 中，所有 review 均找到预置正确性缺陷且工作区无修改；所有 delegate 仅生成指定文件、执行验证命令并返回一致证据；每次结束后均无新增 Pi RPC 进程。证据文件不含密钥、认证头、完整环境、开发机绝对路径或上游原始错误正文。
