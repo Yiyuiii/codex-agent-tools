@@ -39,6 +39,7 @@
 - 2026-07-25：官方插件实施任务 6 已把 README、运维、共存迁移、四层发布门禁和三份真实模型证据索引收敛到当前五模型面。当前运维只允许依次构建、隔离官方生命周期取证、准备权限包，并在逐动作明确许可后使用官方 add/remove；项目和维护者均不直接读写或手工恢复活动 `config.toml`。隔离 CLI 生命周期与真实 Codex App 宿主门禁被明确分层；当前第 1、2 层 passed，第 3 层为 6 passed / 4 pending，第 4 层尚未执行。旧 `codex_cc_tools` 本轮保持共存，移除旧工具属于后续独立变更与独立授权。
 - 2026-07-25：任务 6 最终由 `1786b91`、`4c9d9d4`、`1aceaa6` 完成。规格复审先发现两份旧实施计划仍可能被误作当前配置写入指引，质量复审再发现 doctor 测试副本描述漂移和 PowerShell 原生命令失败后可能继续执行；修复后两类复审均通过。官方 add/remove 示例现在逐命令检查退出码，主线程重新运行文档漂移 `rg`、`git diff --check` 与 release smoke 全绿。
 - 2026-07-25：任务 7 真实调用前的只读预飞审计发现证据链阻断：三个 `real-*-smoke.mjs` 只在核心 smoke 正常返回后落盘，基础设施异常可能没有 JSON；Kimi evidence 也缺少稳定失败类别。十项真实门禁暂不开始，先按实施计划 Step 0 用 TDD 实现“有效参数后的失败尽力落盘、原始异常不出现在 JSON/stderr、证据不可写时 fail closed、Kimi 失败分类”，完成独立规格与质量复审后再消耗真实额度。
+- 2026-07-25：任务 7 Step 0 由 `2bc2ba6`、`93a115f`、`b3a2df3`、`cdc24cc` 完成。实现了三入口共享的脱敏失败 evidence、Kimi 稳定失败分类、生产脚本真实接线与默认 runner 身份测试、clean checkout 自足的 `pretest`、固定安全 progress 标签，以及同目录临时文件加 `fs.link` 的原子排他发布。规格复审先后发现只测 helper、默认 runner 未证明和 clean checkout 缺 `dist`；质量复审发现 progress 泄漏与部分正式 JSON 风险；全部修复后规格与质量复审通过。主线程 fresh verification 为 35 文件/220 测试、类型检查、构建、release smoke 与 diff-check 全绿；截至该基线仍未调用任何真实模型。
 
 ## 架构与计划索引
 

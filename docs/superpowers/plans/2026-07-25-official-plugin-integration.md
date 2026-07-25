@@ -1139,7 +1139,7 @@ git commit -m "docs: document official plugin operations"
 - Create at runtime: `docs/smoke/evidence/` 下由现有 smoke runner 按 ISO 时间戳、逻辑 LLM 和任务类型命名的 JSON 证据
 - Modify: `AGENTS.md`
 
-- [ ] **Step 0：先堵住真实失败证据链缺口**
+- [x] **Step 0：先堵住真实失败证据链缺口**
 
 2026-07-25 只读预飞审计发现：三个 `real-*-smoke.mjs` 仅在 `run*Smoke()` 正常返回时写 evidence；版本探测、隔离配置建立、前后进程快照等基础设施异常只输出 stderr。Kimi evidence 也没有稳定 `failureReason`。在消耗任何真实模型额度前，必须先用 TDD 修复并独立复审：
 
@@ -1153,7 +1153,7 @@ git commit -m "docs: document official plugin operations"
 
 完成本步的目标测试、全量测试、类型检查、构建、规格复审与质量复审后，才能执行 Step 1 及后续十项真实调用。
 
-- [ ] **Step 1：建立门禁前基线**
+- [x] **Step 1：建立门禁前基线**
 
 Run:
 
