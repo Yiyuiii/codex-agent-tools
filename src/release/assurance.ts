@@ -43,10 +43,12 @@ function normalizeForSearch(value: string): string {
 
 function productionImportSpecifiers(content: string): string[] {
   const patterns = [
-    /^\s*import\s+(?:[^'";\r\n]+?\s+from\s+)?["']([^"']+)["']/gmu,
-    /^\s*export\s+[^'";\r\n]+?\s+from\s+["']([^"']+)["']/gmu,
+    /^\s*import\s+(?:(?:[$A-Z_a-z][$\w]*\s*,\s*)?(?:\{[^};]*\}|\*\s+as\s+[$A-Z_a-z][$\w]*)|[$A-Z_a-z][$\w]*)\s+from\s+["']([^"']+)["']/gmu,
+    /^\s*import\s+["']([^"']+)["']/gmu,
+    /^\s*export\s+(?:\{[^};]*\}|\*(?:\s+as\s+[$A-Z_a-z][$\w]*)?)\s+from\s+["']([^"']+)["']/gmu,
     /\bimport\(\s*["']([^"']+)["']\s*\)/gmu,
     /\b__require\(\s*["']([^"']+)["']\s*\)/gmu,
+    /^\s*(?:(?:const|let|var)\s+(?:[$A-Z_a-z][$\w]*|\{[^};\r\n]*\}|\[[^\];\r\n]*\])\s*=\s*)?require\(\s*["']([^"']+)["']\s*\)/gmu,
   ];
   return patterns.flatMap((pattern) =>
     [...content.matchAll(pattern)].map((match) => match[1]!),

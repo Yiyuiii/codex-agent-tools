@@ -90,6 +90,10 @@ describe("release assurance", () => {
       "const root = '/home/maintainer/codex-agent-tools';",
       "import '../dist/mcp.js';",
       'import { z } from "zod";',
+      'const zod = require("zod");',
+      'import {\n  z,\n} from "zod";',
+      'export {\n  z,\n} from "zod";',
+      'await import(\n  "zod"\n);',
       'import "package-that-is-not-installed";',
     ]) {
       expect(() =>
@@ -124,6 +128,10 @@ describe("release assurance", () => {
             content: [
               'import path from "node:path";',
               'import { readFile } from "fs/promises";',
+              'import {\n  createRequire,\n} from "node:module";',
+              'export {\n  readFile,\n} from "node:fs/promises";',
+              'await import(\n  "node:path"\n);',
+              'const os = require("node:os");',
               "// node_modules/zod is bundled below; this is not an import",
             ].join("\n"),
           },
