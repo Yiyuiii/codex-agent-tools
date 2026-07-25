@@ -173,6 +173,7 @@ describe("production real-smoke script entrypoints", () => {
         runSmoke: async (options) => {
           runnerCalls += 1;
           receivedOptions = options;
+          options.onProgress(secret);
           throw new Error(secret);
         },
         now: () => new Date("2026-07-25T01:02:03.000Z"),
@@ -208,7 +209,8 @@ describe("production real-smoke script entrypoints", () => {
       expect(json).not.toContain(secret);
       expect(stdout).not.toContain(secret);
       expect(stderr).toBe(
-        "Smoke failed; sanitized evidence was written.\n",
+        `[${module.productionConfig?.kind ?? "unknown"} smoke] activity\n` +
+          "Smoke failed; sanitized evidence was written.\n",
       );
       expect(stderr).not.toContain(secret);
     },

@@ -1,4 +1,10 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import {
+  link,
+  mkdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 
 import { resolveLlm } from "../llms/registry.js";
@@ -22,6 +28,32 @@ export interface SmokeInfrastructureCounts {
   processIdsBefore?: number;
   processIdsAfter?: number;
 }
+
+export interface SmokeEvidenceFileOperations {
+  ensureDirectory(directory: string): Promise<void>;
+  writeExclusive(filePath: string, contents: string): Promise<void>;
+  publishExclusive(source: string, destination: string): Promise<void>;
+  remove(filePath: string): Promise<void>;
+}
+
+export const defaultSmokeEvidenceFileOperations: SmokeEvidenceFileOperations =
+  Object.freeze({
+    ensureDirectory: async (directory: string) => {
+      await mkdir(directory, { recursive: true });
+    },
+    writeExclusive: async (filePath: string, contents: string) => {
+      await writeFile(filePath, contents, {
+        encoding: "utf8",
+        flag: "wx",
+      });
+    },
+    publishExclusive: async (source: string, destination: string) => {
+      await link(source, destination);
+    },
+    remove: async (filePath: string) => {
+      await rm(filePath, { force: true });
+    },
+  });
 
 export class SmokeInfrastructureError extends Error {
   readonly stage: SmokeInfrastructureStage;
@@ -77,6 +109,7 @@ export interface SmokeEntrypointOptions<
   now?: () => Date;
   writeStdout?: (text: string) => void;
   writeStderr?: (text: string) => void;
+  fileOperations?: SmokeEvidenceFileOperations;
 }
 
 function evidenceFileName(
@@ -86,6 +119,17 @@ function evidenceFileName(
 ): string {
   const suffix = kind === "kimi" ? "" : `-${kind}`;
   return `${timestamp.replaceAll(":", "-")}-${options.llm}-${options.task}${suffix}.json`;
+}
+
+function safeProgressLabel(message: string): string {
+  if (/^(?:kimi|pi) heartbeat \d+ms$/u.test(message)) return "heartbeat";
+  if (/^(?:kimi|pi) process started$/u.test(message)) {
+    return "process_started";
+  }
+  if (/^(?:kimi|pi) prompt started$/u.test(message)) {
+    return "prompt_started";
+  }
+  return "activity";
 }
 
 function infrastructureEvidence(
@@ -125,13 +169,23 @@ async function writeEvidence(
   evidenceDirectory: string,
   fileName: string,
   evidence: SmokeEvidence,
+  fileOperations: SmokeEvidenceFileOperations,
 ): Promise<void> {
-  await mkdir(evidenceDirectory, { recursive: true });
-  await writeFile(
-    path.join(evidenceDirectory, fileName),
-    `${JSON.stringify(evidence, null, 2)}\n`,
-    "utf8",
+  await fileOperations.ensureDirectory(evidenceDirectory);
+  const finalPath = path.join(evidenceDirectory, fileName);
+  const temporaryPath = path.join(
+    evidenceDirectory,
+    `.${fileName}.${randomUUID()}.tmp`,
   );
+  try {
+    await fileOperations.writeExclusive(
+      temporaryPath,
+      `${JSON.stringify(evidence, null, 2)}\n`,
+    );
+    await fileOperations.publishExclusive(temporaryPath, finalPath);
+  } finally {
+    await fileOperations.remove(temporaryPath);
+  }
 }
 
 export async function runSmokeEntrypoint<
@@ -157,7 +211,9 @@ export async function runSmokeEntrypoint<
     evidence = await config.runSmoke({
       ...options,
       onProgress: (message) =>
-        writeStderr(`[${config.kind} smoke] ${message}\n`),
+        writeStderr(
+          `[${config.kind} smoke] ${safeProgressLabel(message)}\n`,
+        ),
     });
   } catch (error) {
     infrastructureFailure = true;
@@ -174,7 +230,12 @@ export async function runSmokeEntrypoint<
     options,
   );
   try {
-    await writeEvidence(config.evidenceDirectory, fileName, evidence);
+    await writeEvidence(
+      config.evidenceDirectory,
+      fileName,
+      evidence,
+      config.fileOperations ?? defaultSmokeEvidenceFileOperations,
+    );
   } catch {
     writeStderr(
       "Smoke evidence could not be confirmed; no evidence path was reported.\n",

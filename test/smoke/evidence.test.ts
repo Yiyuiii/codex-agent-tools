@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  defaultSmokeEvidenceFileOperations,
   SmokeInfrastructureError,
   runSmokeEntrypoint,
 } from "../../src/smoke/evidence.js";
@@ -42,7 +43,9 @@ describe("real smoke evidence entrypoint", () => {
       kind: "kimi",
       args: ["--llm", "kimi-k3", "--task", "review"],
       parseArguments: parseKimiSmokeArguments,
-      runSmoke: async () => {
+      runSmoke: async (options) => {
+        options.onProgress(secret);
+        options.onProgress("kimi heartbeat 15000ms");
         throw new SmokeInfrastructureError(
           "version_probe",
           {},
@@ -85,7 +88,11 @@ describe("real smoke evidence entrypoint", () => {
     });
     expect(json).not.toContain(secret);
     expect(stdout).not.toContain(secret);
-    expect(stderr).toBe("Smoke failed; sanitized evidence was written.\n");
+    expect(stderr).toBe(
+      "[kimi smoke] activity\n" +
+        "[kimi smoke] heartbeat\n" +
+        "Smoke failed; sanitized evidence was written.\n",
+    );
     expect(stderr).not.toContain(secret);
   });
 
@@ -119,6 +126,173 @@ describe("real smoke evidence entrypoint", () => {
       "Smoke evidence could not be confirmed; no evidence path was reported.\n",
     );
     expect(stderr).not.toContain("SECRET_EVIDENCE_WRITE_SENTINEL");
+  });
+
+  it("removes a partially written temporary file without reporting evidence", async () => {
+    const root = await tempRoot();
+    const evidenceDirectory = path.join(root, "evidence");
+    const secret = "PARTIAL_WRITE_SECRET_SENTINEL";
+    let stdout = "";
+    let stderr = "";
+
+    const exitCode = await runSmokeEntrypoint({
+      kind: "kimi",
+      args: ["--llm", "kimi-k3", "--task", "review"],
+      parseArguments: parseKimiSmokeArguments,
+      runSmoke: async () => {
+        throw new Error("model failure");
+      },
+      evidenceDirectory,
+      now: () => new Date("2026-07-25T01:02:03.000Z"),
+      fileOperations: {
+        ...defaultSmokeEvidenceFileOperations,
+        writeExclusive: async (filePath, contents) => {
+          await writeFile(filePath, contents.slice(0, 7), "utf8");
+          throw new Error(secret);
+        },
+      },
+      writeStdout: (text) => {
+        stdout += text;
+      },
+      writeStderr: (text) => {
+        stderr += text;
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(await readdir(evidenceDirectory)).toEqual([]);
+    expect(stdout).toBe("");
+    expect(stderr).toBe(
+      "Smoke evidence could not be confirmed; no evidence path was reported.\n",
+    );
+    expect(stderr).not.toContain(secret);
+  });
+
+  it("removes the temporary file when exclusive publication fails", async () => {
+    const root = await tempRoot();
+    const evidenceDirectory = path.join(root, "evidence");
+    const secret = "RENAME_SECRET_SENTINEL";
+    let stdout = "";
+    let stderr = "";
+
+    const exitCode = await runSmokeEntrypoint({
+      kind: "ark",
+      args: ["--llm", "ark-agent-plan", "--task", "delegate"],
+      parseArguments: parseArkSmokeArguments,
+      runSmoke: async () => {
+        throw new Error("model failure");
+      },
+      evidenceDirectory,
+      now: () => new Date("2026-07-25T01:02:03.000Z"),
+      fileOperations: {
+        ...defaultSmokeEvidenceFileOperations,
+        publishExclusive: async () => {
+          throw new Error(secret);
+        },
+      },
+      writeStdout: (text) => {
+        stdout += text;
+      },
+      writeStderr: (text) => {
+        stderr += text;
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(await readdir(evidenceDirectory)).toEqual([]);
+    expect(stdout).toBe("");
+    expect(stderr).toBe(
+      "Smoke evidence could not be confirmed; no evidence path was reported.\n",
+    );
+    expect(stderr).not.toContain(secret);
+  });
+
+  it("preserves a final file that appears during exclusive publication", async () => {
+    const root = await tempRoot();
+    const evidenceDirectory = path.join(root, "evidence");
+    const fileName =
+      "2026-07-25T01-02-03.000Z-kimi-k3-review.json";
+    const finalPath = path.join(evidenceDirectory, fileName);
+    const competingEvidence = '{"competitor":true}\n';
+    let stdout = "";
+    let stderr = "";
+
+    const exitCode = await runSmokeEntrypoint({
+      kind: "kimi",
+      args: ["--llm", "kimi-k3", "--task", "review"],
+      parseArguments: parseKimiSmokeArguments,
+      runSmoke: async () => {
+        throw new Error("model failure");
+      },
+      evidenceDirectory,
+      now: () => new Date("2026-07-25T01:02:03.000Z"),
+      fileOperations: {
+        ...defaultSmokeEvidenceFileOperations,
+        publishExclusive: async (temporaryPath, destinationPath) => {
+          await writeFile(
+            destinationPath,
+            competingEvidence,
+            { encoding: "utf8", flag: "wx" },
+          );
+          await defaultSmokeEvidenceFileOperations.publishExclusive(
+            temporaryPath,
+            destinationPath,
+          );
+        },
+      },
+      writeStdout: (text) => {
+        stdout += text;
+      },
+      writeStderr: (text) => {
+        stderr += text;
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(await readdir(evidenceDirectory)).toEqual([fileName]);
+    expect(await readFile(finalPath, "utf8")).toBe(competingEvidence);
+    expect(stdout).toBe("");
+    expect(stderr).toBe(
+      "Smoke evidence could not be confirmed; no evidence path was reported.\n",
+    );
+  });
+
+  it("does not overwrite an existing final evidence file", async () => {
+    const root = await tempRoot();
+    const evidenceDirectory = path.join(root, "evidence");
+    await mkdir(evidenceDirectory, { recursive: true });
+    const fileName =
+      "2026-07-25T01-02-03.000Z-kimi-k3-review.json";
+    const finalPath = path.join(evidenceDirectory, fileName);
+    const original = '{"existing":true}\n';
+    await writeFile(finalPath, original, "utf8");
+    let stdout = "";
+    let stderr = "";
+
+    const exitCode = await runSmokeEntrypoint({
+      kind: "kimi",
+      args: ["--llm", "kimi-k3", "--task", "review"],
+      parseArguments: parseKimiSmokeArguments,
+      runSmoke: async () => {
+        throw new Error("model failure");
+      },
+      evidenceDirectory,
+      now: () => new Date("2026-07-25T01:02:03.000Z"),
+      writeStdout: (text) => {
+        stdout += text;
+      },
+      writeStderr: (text) => {
+        stderr += text;
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(await readdir(evidenceDirectory)).toEqual([fileName]);
+    expect(await readFile(finalPath, "utf8")).toBe(original);
+    expect(stdout).toBe("");
+    expect(stderr).toBe(
+      "Smoke evidence could not be confirmed; no evidence path was reported.\n",
+    );
   });
 
   it("writes structured model or acceptance failures returned by the harness", async () => {
