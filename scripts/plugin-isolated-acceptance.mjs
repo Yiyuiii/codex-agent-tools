@@ -50,7 +50,6 @@ const fakePiScript = path.join(
   "fakes",
   "fake-pi-rpc.mjs",
 );
-const expectedProxy = "http://127.0.0.1:10808";
 const inheritedProxy = "http://parent-proxy.invalid:9999";
 const inheritedAllProxy = "socks5://parent-proxy.invalid:9999";
 const credentialSentinel = "isolated-plugin-sentinel";
@@ -332,15 +331,18 @@ function quoteCmdArgument(value) {
 
 async function writeFakePiWrapper() {
   if (process.platform !== "win32") {
-    throw new Error("The isolated fake Pi proxy gate currently requires Windows");
+    throw new Error("The isolated fake Pi environment gate currently requires Windows");
   }
   const wrapper = [
     "@echo off",
-    `if not "%HTTPS_PROXY%"=="${expectedProxy}" exit /b 91`,
-    `if not "%HTTP_PROXY%"=="${expectedProxy}" exit /b 92`,
+    "if defined HTTPS_PROXY exit /b 91",
+    "if defined HTTP_PROXY exit /b 92",
     "if defined ALL_PROXY exit /b 93",
     "if defined all_proxy exit /b 94",
-    `if not "%GEMINI_API_KEY%"=="${credentialSentinel}" exit /b 95`,
+    "if defined https_proxy exit /b 95",
+    "if defined http_proxy exit /b 96",
+    `if not "%CODEX_AGENT_ARK_AGENT_KEY%"=="${credentialSentinel}" exit /b 97`,
+    "if defined OPENAI_API_KEY_DOUBAO exit /b 98",
     `${quoteCmdArgument(process.execPath)} ${quoteCmdArgument(fakePiScript)} %*`,
     "exit /b %ERRORLEVEL%",
     "",
@@ -413,8 +415,9 @@ ${configLines}
 - 已安装副本从上述缓存目录作为工作目录启动，MCP initialize/listTools 成功。
 - 工具严格为 \`external_review\` 与 \`external_delegate\`；二者输入均要求 \`llm\`。
 - \`external_review\` 为只读且非破坏性；\`external_delegate\` 为可写且具破坏性提示。
-- fake Pi 的 Gemini review 返回 \`completed\`，实际模型为 \`gemini-3.5-flash\`，且没有文件变化。
-- fake Pi 包装器确认 Gemini 子进程通过固定 proxy-10808 路由门禁，包括通用代理在内的父 MCP 代理值均未下传；包装器还确认目标凭据候选与本轮隔离 sentinel 精确一致，但报告不记录该值。
+- pending 的 Gemini review 被已安装 MCP 明确拒绝，没有启动 Pi，也没有返回伪造的结构化成功结果。
+- fake Pi 的 Ark Agent Plan DeepSeek V4 Flash review 返回 \`completed\`，实际模型为 \`deepseek-v4-flash\`，且没有文件变化。
+- fake Pi 包装器确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 Agent Plan 目标凭据，未收到原始候选变量。Gemini 固定 proxy-10808 的替换规则继续由确定性环境测试与真实 smoke evidence 覆盖。
 - 异常清理仅管理本脚本所启动 transport 的 PID，并在关闭 MCP client/transport 前终止其整个进程树。
 
 ## 语义回滚
@@ -504,7 +507,7 @@ try {
       LOCALAPPDATA: isolatedLocalAppData,
       APPDATA: isolatedAppData,
       PI_COMMAND: fakePiCommand,
-      GEMINI_API_KEY: credentialSentinel,
+      OPENAI_API_KEY_DOUBAO: credentialSentinel,
       HTTPS_PROXY: inheritedProxy,
       HTTP_PROXY: inheritedProxy,
       ALL_PROXY: inheritedAllProxy,
@@ -514,12 +517,34 @@ try {
   await client.connect(transport);
   const listed = await client.listTools();
   assertToolContract(listed.tools);
+  const pendingResult = await client.callTool({
+    name: "external_review",
+    arguments: {
+      llm: "gemini-3.5-flash",
+      task: "review_doc",
+      prompt: "Review README.md without modifying files.",
+      cwd: fixtureRoot,
+    },
+  });
+  if (
+    pendingResult.isError !== true ||
+    pendingResult.structuredContent !== undefined ||
+    !Array.isArray(pendingResult.content) ||
+    !pendingResult.content.some(
+      (entry) =>
+        entry.type === "text" &&
+        typeof entry.text === "string" &&
+        entry.text.includes("disabled pending real smoke"),
+    )
+  ) {
+    throw new Error("Installed MCP did not reject the pending Gemini review");
+  }
   const toolResult = structuredContent(
     await client.callTool(
       {
         name: "external_review",
         arguments: {
-          llm: "gemini-3.5-flash",
+          llm: "ark-agent-deepseek-v4-flash",
           task: "review_doc",
           prompt: "Review README.md without modifying files.",
           cwd: fixtureRoot,
@@ -535,7 +560,7 @@ try {
   );
   if (
     toolResult.status !== "completed" ||
-    toolResult.actualModel !== "gemini-3.5-flash" ||
+    toolResult.actualModel !== "deepseek-v4-flash" ||
     !Array.isArray(toolResult.filesChanged) ||
     toolResult.filesChanged.length !== 0
   ) {
@@ -619,7 +644,6 @@ try {
   for (const forbidden of [
     temporaryRoot,
     credentialSentinel,
-    expectedProxy,
     inheritedProxy,
     inheritedAllProxy,
   ]) {

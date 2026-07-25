@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "timestamp": "2026-07-25T15:51:44.134Z",
+  "piVersion": "0.80.10",
+  "llm": "ark-coding-plan",
+  "actualModel": "ark-code-latest",
+  "expectedModel": "ark-code-latest",
+  "runtime": "pi-rpc",
+  "provider": "ark-coding-plan",
+  "endpointHost": "ark.cn-beijing.volces.com",
+  "route": "direct",
+  "credentialEnv": "CODEX_AGENT_ARK_CODING_KEY",
+  "configSha256": "61ffbd4c6ea41adc6a8313f957b732da2b98b8b28b082c52a95226b2a6fb2fe9",
+  "task": "delegate",
+  "status": "completed",
+  "passed": false,
+  "failureReason": "acceptance_failed",
+  "elapsedMs": 75889,
+  "outputSha256": "e9c63935dee731cf35c24885a2a913e3f16a3e752db13a5b5d6ef3a296e67b21",
+  "filesChanged": [
+    "ark-coding-plan-smoke.txt"
+  ],
+  "commandCount": 4,
+  "diagnosticCount": 0,
+  "checks": {
+    "actualModelMatches": true,
+    "environmentIsolated": true,
+    "noNewPiRpcProcesses": true,
+    "resultFileValid": false,
+    "resultFileObserved": true,
+    "onlyExpectedFileChanged": true,
+    "commandObserved": true
+  }
+}

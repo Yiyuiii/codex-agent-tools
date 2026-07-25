@@ -7,6 +7,8 @@ const childPidPath = process.env.FAKE_PI_CHILD_PID_FILE;
 const argv = process.argv.slice(2);
 let buffer = Buffer.alloc(0);
 let grandchild;
+let selectedModel = "gemini-3.5-flash";
+let selectedProvider = "google";
 
 function log(value) {
   if (logPath) appendFileSync(logPath, `${JSON.stringify(value)}\n`, "utf8");
@@ -31,6 +33,8 @@ function spawnGrandchild() {
 function handle(command) {
   log({ kind: "command", value: command });
   if (command.type === "set_model") {
+    selectedModel = command.modelId;
+    selectedProvider = command.provider;
     emit({
       id: command.id,
       type: "response",
@@ -135,8 +139,8 @@ function handle(command) {
         type: "message_end",
         message: {
           role: "assistant",
-          model: "gemini-3.5-flash",
-          provider: "google",
+          model: selectedModel,
+          provider: selectedProvider,
           content: [{ type: "text", text: "Pi says hello." }],
         },
       });

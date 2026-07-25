@@ -16,10 +16,10 @@
 | 外部来源或用途 | 新逻辑 LLM | 固定路由 | 当前门禁 |
 | --- | --- | --- | --- |
 | Kimi Code 审阅/委派 | `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | review/delegate passed |
-| Gemini 审阅/委派 | `gemini-3.5-flash` | Pi / Google / 同名模型 / `proxy-10808` | review/delegate passed |
-| Ark Coding Plan | `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | review/delegate passed |
-| Ark Agent Plan 主档 | `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | review/delegate pending |
-| Ark Agent Plan 经济档 | `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | review/delegate pending |
+| Gemini 审阅/委派 | `gemini-3.5-flash` | Pi / Google / 同名模型 / `proxy-10808` | review/delegate pending（delegate 额度失败） |
+| Ark Coding Plan | `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | review/delegate pending（delegate 验收失败） |
+| Ark Agent Plan 主档 | `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | review/delegate passed |
+| Ark Agent Plan 经济档 | `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | review/delegate passed |
 | Anthropic Claude / Claude Code 后端 | 无 | 不进入新产品面 | 不迁移 |
 | OpenAI/Codex 模型家族 | 无 | 顶层已经是 Codex | 不作为外部来源 |
 

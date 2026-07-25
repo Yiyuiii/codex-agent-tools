@@ -72,10 +72,10 @@ npm run acceptance:plugin:isolated
 | 逻辑 LLM | 固定路由 | review | delegate |
 | --- | --- | --- | --- |
 | `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | passed | passed |
-| `gemini-3.5-flash` | Pi / Google / 同名模型 / `proxy-10808` | passed | passed |
-| `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | passed | passed |
-| `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | pending | pending |
-| `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | pending | pending |
+| `gemini-3.5-flash` | Pi / Google / 同名模型 / `proxy-10808` | pending | pending |
+| `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | pending | pending |
+| `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | passed | passed |
+| `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | passed | passed |
 
 ### 通过标准
 
@@ -88,7 +88,7 @@ npm run acceptance:plugin:isolated
 
 ### 当前证据
 
-Kimi K3、Gemini 与 Ark Coding Plan 的六项 passed 证据分别见三个 smoke 索引；两个 Agent Plan 路线没有精确证据，保持 pending。任务 7 将重新串行执行全部十项并为当前路由建立精确索引。
+2026-07-25 已严格串行执行十项精确门禁，原始结果为 8 passed / 2 failed；每次结束后的 evidence 与独立系统快照均确认无新增 Kimi/Pi RPC 进程。Kimi K3 与两个 Agent Plan profile 各自 review/delegate 均通过，共 6 项注册表能力为 passed；Gemini delegate 因免费层额度失败，Ark Coding delegate 因结果文件内容验收失败，因此这两个 profile 按成对策略共 4 项保持 pending。精确 evidence、SHA-256、模型、provider 与 route 见三个 smoke 索引。
 
 ### 失败停止条件
 

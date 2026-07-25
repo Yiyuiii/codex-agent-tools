@@ -50,7 +50,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-coding-plan",
-    ...qualifiedTasks("docs/smoke/ark.md", "ark-coding-plan"),
+    ...pendingTasks(),
   },
   {
     id: "ark-agent-plan",
@@ -64,7 +64,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-agent-plan",
-    ...pendingTasks(),
+    ...qualifiedTasks("docs/smoke/ark.md", "ark-agent-plan"),
   },
   {
     id: "ark-agent-deepseek-v4-flash",
@@ -78,7 +78,10 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-agent-plan",
-    ...pendingTasks(),
+    ...qualifiedTasks(
+      "docs/smoke/ark.md",
+      "ark-agent-deepseek-v4-flash",
+    ),
   },
   {
     id: "gemini-3.5-flash",
@@ -94,7 +97,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     ],
     timeoutMs: 600_000,
     maxConcurrency: 2,
-    ...qualifiedTasks("docs/smoke/pi-gemini.md", "gemini"),
+    ...pendingTasks(),
   },
   {
     id: "kimi-k3",

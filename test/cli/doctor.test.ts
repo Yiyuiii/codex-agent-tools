@@ -92,9 +92,14 @@ describe("doctor diagnostics", () => {
     expect(report.checks.find((check) => check.name === "Gemini authentication")?.detail).toBe(
       "credential environment: GEMINI_API_KEY",
     );
-    expect(report.checks.find((check) => check.name === "LLM gemini-3.5-flash")?.detail).toContain(
-      "gemini-3.5-flash via pi-rpc; route=proxy-10808; review=passed; delegate=passed",
-    );
+    expect(
+      report.checks.find((check) => check.name === "LLM gemini-3.5-flash"),
+    ).toMatchObject({
+      ok: false,
+      level: "warn",
+      detail:
+        "gemini-3.5-flash via pi-rpc; route=proxy-10808; review=pending; delegate=pending",
+    });
     expect(report.checks.find((check) => check.name === "Ark Coding authentication")?.detail).toBe(
       "credential environment: API_KEY_DOUBAO_CODING -> CODEX_AGENT_ARK_CODING_KEY",
     );
@@ -105,7 +110,7 @@ describe("doctor diagnostics", () => {
       report.checks.filter((check) => check.name.startsWith("LLM ")),
     ).toHaveLength(5);
     expect(
-      report.checks.find((check) => check.name === "LLM ark-agent-plan"),
+      report.checks.find((check) => check.name === "LLM ark-coding-plan"),
     ).toMatchObject({
       ok: false,
       level: "warn",
@@ -113,14 +118,22 @@ describe("doctor diagnostics", () => {
         "ark-code-latest via pi-rpc; route=direct; review=pending; delegate=pending",
     });
     expect(
+      report.checks.find((check) => check.name === "LLM ark-agent-plan"),
+    ).toMatchObject({
+      ok: true,
+      level: "ok",
+      detail:
+        "ark-code-latest via pi-rpc; route=direct; review=passed; delegate=passed",
+    });
+    expect(
       report.checks.find(
         (check) => check.name === "LLM ark-agent-deepseek-v4-flash",
       ),
     ).toMatchObject({
-      ok: false,
-      level: "warn",
+      ok: true,
+      level: "ok",
       detail:
-        "deepseek-v4-flash via pi-rpc; route=direct; review=pending; delegate=pending",
+        "deepseek-v4-flash via pi-rpc; route=direct; review=passed; delegate=passed",
     });
     expect(JSON.stringify(report)).not.toContain(secret);
   });

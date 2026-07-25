@@ -9,7 +9,7 @@ import {
 } from "../../src/llms/registry.js";
 
 describe("logical LLM registry", () => {
-  it("gives each default pending profile independent gate objects", () => {
+  it("gives each default Agent Plan profile independent gate objects", () => {
     const primary = resolveLlm("ark-agent-plan");
     const flash = resolveLlm("ark-agent-deepseek-v4-flash");
 
@@ -51,8 +51,16 @@ describe("logical LLM registry", () => {
     expect(flash).toMatchObject({
       model: "deepseek-v4-flash",
       qualityGates: {
-        review: { status: "pending" },
-        delegate: { status: "pending" },
+        review: {
+          status: "passed",
+          evidence:
+            "docs/smoke/ark.md#ark-agent-deepseek-v4-flash-review",
+        },
+        delegate: {
+          status: "passed",
+          evidence:
+            "docs/smoke/ark.md#ark-agent-deepseek-v4-flash-delegate",
+        },
       },
       credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
     });
@@ -142,15 +150,15 @@ describe("logical LLM registry", () => {
   it("continues to resolve valid passed and pending profiles", () => {
     const registry = createLlmRegistry([
       resolveLlm("kimi-k3"),
-      resolveLlm("ark-agent-plan"),
+      resolveLlm("gemini-3.5-flash"),
     ]);
 
     expect(registry.resolve("kimi-k3", "review").model).toBe("kimi-code/k3");
-    expect(registry.resolve("ark-agent-plan").qualityGates).toEqual({
+    expect(registry.resolve("gemini-3.5-flash").qualityGates).toEqual({
       review: { status: "pending" },
       delegate: { status: "pending" },
     });
-    expect(() => registry.resolve("ark-agent-plan", "review")).toThrow(
+    expect(() => registry.resolve("gemini-3.5-flash", "review")).toThrow(
       /disabled pending real smoke/u,
     );
   });
@@ -170,7 +178,7 @@ describe("logical LLM registry", () => {
     ]);
   });
 
-  it("keeps the qualified Ark Coding Plan route and evidence", () => {
+  it("keeps both Ark Coding Plan tasks pending after its delegate gate failed", () => {
     const profile = resolveLlm("ark-coding-plan");
     expect(profile).toMatchObject({
       runtime: "pi-rpc",
@@ -188,21 +196,15 @@ describe("logical LLM registry", () => {
       maxConcurrency: 1,
       capabilities: { review: true, delegate: true },
       qualityGates: {
-        review: {
-          status: "passed",
-          evidence: "docs/smoke/ark.md#ark-coding-plan-review",
-        },
-        delegate: {
-          status: "passed",
-          evidence: "docs/smoke/ark.md#ark-coding-plan-delegate",
-        },
+        review: { status: "pending" },
+        delegate: { status: "pending" },
       },
     });
-    expect(resolveLlm("ark-coding-plan", "review").model).toBe(
-      "ark-code-latest",
+    expect(() => resolveLlm("ark-coding-plan", "review")).toThrow(
+      /disabled pending real smoke/u,
     );
-    expect(resolveLlm("ark-coding-plan", "delegate").model).toBe(
-      "ark-code-latest",
+    expect(() => resolveLlm("ark-coding-plan", "delegate")).toThrow(
+      /disabled pending real smoke/u,
     );
   });
 
@@ -218,7 +220,7 @@ describe("logical LLM registry", () => {
       "deepseek-v4-flash",
     ],
   ] as const)(
-    "binds pending %s to the shared Agent Plan route without reusing old evidence",
+    "binds qualified %s to the shared Agent Plan route with exact evidence",
     (id, provider, model) => {
       const profile = resolveLlm(id);
       expect(profile).toMatchObject({
@@ -233,22 +235,22 @@ describe("logical LLM registry", () => {
         maxConcurrency: 1,
         capabilities: { review: true, delegate: true },
         qualityGates: {
-          review: { status: "pending" },
-          delegate: { status: "pending" },
+          review: {
+            status: "passed",
+            evidence: `docs/smoke/ark.md#${id}-review`,
+          },
+          delegate: {
+            status: "passed",
+            evidence: `docs/smoke/ark.md#${id}-delegate`,
+          },
         },
       });
-      expect("evidence" in profile.qualityGates.review).toBe(false);
-      expect("evidence" in profile.qualityGates.delegate).toBe(false);
-      expect(() => resolveLlm(id, "review")).toThrow(
-        /disabled pending real smoke/u,
-      );
-      expect(() => resolveLlm(id, "delegate")).toThrow(
-        /disabled pending real smoke/u,
-      );
+      expect(resolveLlm(id, "review").model).toBe(model);
+      expect(resolveLlm(id, "delegate").model).toBe(model);
     },
   );
 
-  it("binds qualified Gemini tasks to Pi Google, fixed 10808 routing, and ordered credentials", () => {
+  it("keeps both Gemini tasks pending after its delegate quota gate failed", () => {
     expect(resolveLlm("gemini-3.5-flash")).toMatchObject({
       runtime: "pi-rpc",
       provider: "google",
@@ -262,18 +264,16 @@ describe("logical LLM registry", () => {
       maxConcurrency: 2,
       capabilities: { review: true, delegate: true },
       qualityGates: {
-        review: {
-          status: "passed",
-          evidence: "docs/smoke/pi-gemini.md#gemini-review",
-        },
-        delegate: {
-          status: "passed",
-          evidence: "docs/smoke/pi-gemini.md#gemini-delegate",
-        },
+        review: { status: "pending" },
+        delegate: { status: "pending" },
       },
     });
-    expect(resolveLlm("gemini-3.5-flash", "review").model).toBe("gemini-3.5-flash");
-    expect(resolveLlm("gemini-3.5-flash", "delegate").model).toBe("gemini-3.5-flash");
+    expect(() => resolveLlm("gemini-3.5-flash", "review")).toThrow(
+      /disabled pending real smoke/u,
+    );
+    expect(() => resolveLlm("gemini-3.5-flash", "delegate")).toThrow(
+      /disabled pending real smoke/u,
+    );
   });
 
   it("derives the complete MCP credential allowlist from logical profiles", () => {

@@ -4,58 +4,65 @@
 
 当前 Ark 公开面共有三项固定 Pi/direct 路线：
 
-- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；2026-07-20 的 review/delegate 证据继续有效，两项均为 passed。
-- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；当前 review/delegate 均为 pending。
-- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；当前 review/delegate 均为 pending。
+- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；2026-07-25 复跑的 review passed、delegate 因结果文件内容不符而 failed，注册表两项均为 pending。
+- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；2026-07-25 review/delegate 均为 passed，注册表两项已晋级。
+- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；2026-07-25 review/delegate 均为 passed，注册表两项已晋级。
 
 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的 `ark-agent-plan` 配额池。2026-07-20 对旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 完成的四项 passed 证据现仅作为历史事实保留，不属于当前公开面，也不得用于晋级两个新 Agent Plan 路线。原始 evidence JSON 保持不变。
 
-2026-07-20 历史 passed evidence 使用的旧隔离配置 SHA-256 为 `ab12536cc03dd368115d71bab6eb65216506717fc63b33c4b8a077d82b3ebbf6`。当前三模型 pending 配置包含 Agent Plan 的 `ark-code-latest`、`deepseek-v4-flash` 与 Coding Plan 的 `ark-code-latest`；按生成器实际输出重新计算的 SHA-256 为 `61ffbd4c6ea41adc6a8313f957b732da2b98b8b28b082c52a95226b2a6fb2fe9`。两代配置的 endpoint host 均固定为 `ark.cn-beijing.volces.com`，网络策略均为 direct。
+2026-07-20 历史 passed evidence 使用的旧隔离配置 SHA-256 为 `ab12536cc03dd368115d71bab6eb65216506717fc63b33c4b8a077d82b3ebbf6`。2026-07-25 本轮三模型配置包含 Agent Plan 的 `ark-code-latest`、`deepseek-v4-flash` 与 Coding Plan 的 `ark-code-latest`；按生成器实际输出计算的 SHA-256 为 `61ffbd4c6ea41adc6a8313f957b732da2b98b8b28b082c52a95226b2a6fb2fe9`。两代配置的 endpoint host 均固定为 `ark.cn-beijing.volces.com`，网络策略均为 direct。
 
-2026-07-25 的官方插件实施任务 7 将按当前三个逻辑 ID 串行执行六项精确门禁并生成新证据。Coding Plan 当前的 passed 状态在复跑前继续引用既有同模型、同 provider、同路由证据；两个 Agent Plan 路线保持 pending，只有各自 review/delegate 均通过后才可晋级。任何失败都不得用历史模型证据或其它 LLM fallback 掩盖。
+2026-07-25 的六项 Ark 门禁严格串行执行，未重试或 fallback。每次 evidence 都确认环境隔离与无新增 Pi RPC 进程；每次 evidence 验收后的独立系统快照也确认 Kimi 与 Pi RPC 进程数均为 0。Coding Plan 的 delegate 失败被如实保留，因此 review 即使单独 passed 也不启用；两个 Agent profile 各自两项全部通过后才使用下方稳定 anchor 晋级。
 
 Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。注册表现按 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING` 的顺序选择第一个非空值，并只向 Pi 子进程注入项目私有变量 `CODEX_AGENT_ARK_CODING_KEY`。Ark Agent 使用 `OPENAI_API_KEY_DOUBAO`，规范化为 `CODEX_AGENT_ARK_AGENT_KEY`。
 
-上述 2026-07-20 passed evidence 中，所有 review 均找到预置正确性缺陷且工作区无修改；所有 delegate 仅生成指定文件、执行验证命令并返回一致证据；每次结束后均无新增 Pi RPC 进程。证据文件不含密钥、认证头、完整环境、开发机绝对路径或上游原始错误正文。
+本轮所有 review 都找到预置正确性缺陷且工作区无修改。两个通过的 Agent delegate 只生成指定文件并观测到验证命令；Coding Plan delegate 只变更预期文件且观测到命令，但文件内容检查失败。证据文件不含密钥、认证头、完整环境、开发机绝对路径或上游原始错误正文。
 
 ## 当前证据矩阵
 
 <a id="ark-coding-plan-review"></a>
 ### ark-coding-plan review
 
-- 结果：passed；实际模型：`ark-code-latest`；耗时：30.418 秒。
-- 证据：[JSON](evidence/2026-07-20T07-31-07.279Z-ark-coding-plan-review-ark.json)；SHA-256 `13cae8458142bfa917b2fc056db0ac28ead108ff054301d5445e9a4aac357ab5`。
+- 本次任务结果：passed；注册表状态：pending（同 profile 的 delegate 未通过）。
+- 实际/预期模型均为 `ark-code-latest`；provider 为 `ark-coding-plan`；route 为 `direct`；耗时 11.803 秒。
+- 缺陷识别、环境隔离、工作区零变更、evidence 清理检查与独立系统进程快照均通过。
+- 证据：[JSON](evidence/2026-07-25T15-49-40.932Z-ark-coding-plan-review-ark.json)；SHA-256 `a4c2b6ba19e8226f8c641426c5ad9c81826fcd32adb77200ad7c90731dbb3dd4`。
 
 <a id="ark-coding-plan-delegate"></a>
 ### ark-coding-plan delegate
 
-- 结果：passed；实际模型：`ark-code-latest`；耗时：84.960 秒。
-- 仅变更 `ark-coding-plan-smoke.txt`，并观测到验证命令。
-- 证据：[JSON](evidence/2026-07-20T07-35-16.748Z-ark-coding-plan-delegate-ark.json)；SHA-256 `f3083722dab245e96cdcb90d29d99e6a05bc3b917c78e1c4e7ac9a340263bb0c`。
+- 本次任务结果：failed；注册表状态：pending；稳定失败类别为 `acceptance_failed`。
+- 实际/预期模型均为 `ark-code-latest`；provider 为 `ark-coding-plan`；route 为 `direct`；耗时 75.889 秒。
+- 只变更 `ark-coding-plan-smoke.txt` 并观测到命令，但 `resultFileValid` 为 false；其它环境隔离、变更范围与进程清理检查均通过，独立系统进程快照也为零残留。
+- 证据：[JSON](evidence/2026-07-25T15-51-44.134Z-ark-coding-plan-delegate-ark.json)；SHA-256 `7d7af81493dd9e94a9669efb12eb90c83c1c7535959b81c385091aa3eef461eb`。
 
 <a id="ark-agent-plan-review"></a>
 ### ark-agent-plan review
 
-- 结果：pending；尚未执行该逻辑 ID 与 `ark-code-latest` 的精确真实门禁。
-- 不复用旧 `glm-5.2` 或 `doubao-seed-2.0-pro` 证据。
+- 结果：passed；实际/预期模型均为 `ark-code-latest`；provider 为 `ark-agent-plan`；route 为 `direct`；耗时 9.098 秒。
+- 缺陷识别、环境隔离、工作区零变更、evidence 清理检查与独立系统进程快照均通过。
+- 证据：[JSON](evidence/2026-07-25T15-52-57.715Z-ark-agent-plan-review-ark.json)；SHA-256 `c6ef0351080d9448c4bf65ad606349c219c3b51d1a2e3ff7a02127c0e6fb6871`。
 
 <a id="ark-agent-plan-delegate"></a>
 ### ark-agent-plan delegate
 
-- 结果：pending；尚未执行该逻辑 ID 与 `ark-code-latest` 的精确真实门禁。
-- 不复用旧 `glm-5.2` 或 `doubao-seed-2.0-pro` 证据。
+- 结果：passed；实际/预期模型均为 `ark-code-latest`；provider 为 `ark-agent-plan`；route 为 `direct`；耗时 859.946 秒。
+- 只变更 `ark-agent-plan-smoke.txt`，文件内容与命令证据正确；环境隔离、evidence 清理检查与独立系统进程快照均通过。
+- 证据：[JSON](evidence/2026-07-25T16-08-00.444Z-ark-agent-plan-delegate-ark.json)；SHA-256 `ef805b815ee95b58c2ce0e81ad8f2bff62efd9d49599571b7c8ff87f18b127df`。
 
 <a id="ark-agent-deepseek-v4-flash-review"></a>
 ### ark-agent-deepseek-v4-flash review
 
-- 结果：pending；尚未执行该逻辑 ID 与 `deepseek-v4-flash` 的精确真实门禁。
-- 不复用旧 `glm-5.2` 或 `doubao-seed-2.0-pro` 证据。
+- 结果：passed；实际/预期模型均为 `deepseek-v4-flash`；provider 为 `ark-agent-plan`；route 为 `direct`；耗时 16.000 秒。
+- 缺陷识别、环境隔离、工作区零变更、evidence 清理检查与独立系统进程快照均通过。
+- 证据：[JSON](evidence/2026-07-25T16-09-09.705Z-ark-agent-deepseek-v4-flash-review-ark.json)；SHA-256 `24fb03e09071666f33d5194a50cac2ccca492021249bf0adf466c7d3fde97545`。
 
 <a id="ark-agent-deepseek-v4-flash-delegate"></a>
 ### ark-agent-deepseek-v4-flash delegate
 
-- 结果：pending；尚未执行该逻辑 ID 与 `deepseek-v4-flash` 的精确真实门禁。
-- 不复用旧 `glm-5.2` 或 `doubao-seed-2.0-pro` 证据。
+- 结果：passed；实际/预期模型均为 `deepseek-v4-flash`；provider 为 `ark-agent-plan`；route 为 `direct`；耗时 32.243 秒。
+- 只变更 `ark-agent-deepseek-v4-flash-smoke.txt`，文件内容与命令证据正确；环境隔离、evidence 清理检查与独立系统进程快照均通过。
+- 证据：[JSON](evidence/2026-07-25T16-10-32.796Z-ark-agent-deepseek-v4-flash-delegate-ark.json)；SHA-256 `38869fd3844a2e5ab933cc438bcdbb364eaf16182dbc3c650452d04c3c3bbe92`。
 
 ## 历史证据（不属于当前公开面）
 

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "timestamp": "2026-07-25T16:09:09.705Z",
+  "piVersion": "0.80.10",
+  "llm": "ark-agent-deepseek-v4-flash",
+  "actualModel": "deepseek-v4-flash",
+  "expectedModel": "deepseek-v4-flash",
+  "runtime": "pi-rpc",
+  "provider": "ark-agent-plan",
+  "endpointHost": "ark.cn-beijing.volces.com",
+  "route": "direct",
+  "credentialEnv": "CODEX_AGENT_ARK_AGENT_KEY",
+  "configSha256": "61ffbd4c6ea41adc6a8313f957b732da2b98b8b28b082c52a95226b2a6fb2fe9",
+  "task": "review",
+  "status": "completed",
+  "passed": true,
+  "failureReason": null,
+  "elapsedMs": 16000,
+  "outputSha256": "b3552c8e8d0857f77867644cd086ce4c678a623cd05eac112faabc2b1d21910e",
+  "filesChanged": [],
+  "commandCount": 0,
+  "diagnosticCount": 0,
+  "checks": {
+    "actualModelMatches": true,
+    "environmentIsolated": true,
+    "noNewPiRpcProcesses": true,
+    "workspaceUnchanged": true,
+    "knownDefectFound": true
+  }
+}

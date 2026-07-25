@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "timestamp": "2026-07-25T15:52:57.715Z",
+  "piVersion": "0.80.10",
+  "llm": "ark-agent-plan",
+  "actualModel": "ark-code-latest",
+  "expectedModel": "ark-code-latest",
+  "runtime": "pi-rpc",
+  "provider": "ark-agent-plan",
+  "endpointHost": "ark.cn-beijing.volces.com",
+  "route": "direct",
+  "credentialEnv": "CODEX_AGENT_ARK_AGENT_KEY",
+  "configSha256": "61ffbd4c6ea41adc6a8313f957b732da2b98b8b28b082c52a95226b2a6fb2fe9",
+  "task": "review",
+  "status": "completed",
+  "passed": true,
+  "failureReason": null,
+  "elapsedMs": 9098,
+  "outputSha256": "8d4a8f59ba0ce9e1345a5eb27f255275419065230ab560847bb7fd0d92246db9",
+  "filesChanged": [],
+  "commandCount": 0,
+  "diagnosticCount": 0,
+  "checks": {
+    "actualModelMatches": true,
+    "environmentIsolated": true,
+    "noNewPiRpcProcesses": true,
+    "workspaceUnchanged": true,
+    "knownDefectFound": true
+  }
+}

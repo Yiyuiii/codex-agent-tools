@@ -2,9 +2,9 @@
 
 ## 当前结论
 
-自 2026-07-25 起，当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。其 review/delegate 两项门禁当前为 passed。
+当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。2026-07-25 串行复跑的 review/delegate 两项门禁均为 passed，注册表继续启用两项能力。
 
-实施任务 7 将按当前五模型矩阵重新串行执行 K3 review/delegate，并生成新的精确证据。在新证据产生前，注册表继续引用下方 2026-07-18 的 K3 passed 证据；任务 7 若失败，不得回退到其它 Kimi 模型或保留不符合实际的晋级结论。
+本轮没有回退到其它 Kimi 模型。两次 evidence 内的 `noNewKimiProcesses` 均为 true，且每次 evidence 验收后的独立系统快照也确认 Kimi 与 Pi RPC 进程数均为 0。
 
 ## 方法与通过标准
 
@@ -18,20 +18,22 @@ delegate 要求只创建内容为 `KIMI_SMOKE_OK` 的 `result.txt`，随后执�
 
 | 逻辑 LLM | 任务 | 实际模型 | 耗时 | 结果 | 证据文件 SHA-256 |
 | --- | --- | --- | ---: | --- | --- |
-| `kimi-k3` | review | `kimi-code/k3` | 63.864 s | 通过 | `e2c6ca97c082b06ee0cc552a2f8460af590f97e723817ab5e314ce1e3cc2d5c7` |
-| `kimi-k3` | delegate | `kimi-code/k3` | 74.447 s | 通过 | `b0cd61c86a1925e860e78b9477a7d928ec913e3025ec7db3bb1d103b35edee14` |
+| `kimi-k3` | review | `kimi-code/k3` | 28.145 s | 通过 | `1c9fcd3f5a005f4d1af0430a524906e72d58c9cf4e25da13c96871b8adb09408` |
+| `kimi-k3` | delegate | `kimi-code/k3` | 17.598 s | 通过 | `c7169b47b229621dc926f430fe87c4e22c811786d223eb5f11e81b0afe677136` |
 
 <a id="kimi-k3-review"></a>
 ## kimi-k3-review
 
-- 状态：通过，零工作区变更，已识别已知缺陷；15、30、45、60 秒心跳正常，无新增 Kimi PID，无诊断。
-- 证据：[2026-07-18T08-01-03.988Z-kimi-k3-review.json](evidence/2026-07-18T08-01-03.988Z-kimi-k3-review.json)
+- 状态：passed；实际/预期模型均为 `kimi-code/k3`；provider 不适用；route 为 `direct`。
+- 零工作区变更，已识别已知缺陷，无诊断；evidence 与独立系统快照均确认无新增 Kimi/Pi RPC 进程。
+- 证据：[2026-07-25T15-44-34.778Z-kimi-k3-review.json](evidence/2026-07-25T15-44-34.778Z-kimi-k3-review.json)；SHA-256 `1c9fcd3f5a005f4d1af0430a524906e72d58c9cf4e25da13c96871b8adb09408`。
 
 <a id="kimi-k3-delegate"></a>
 ## kimi-k3-delegate
 
-- 状态：通过，只变更 `result.txt`，文件内容正确，观测到 1 条命令事件；15、30、45、60 秒心跳正常，无新增 Kimi PID，无诊断。
-- 证据：[2026-07-18T08-02-21.349Z-kimi-k3-delegate.json](evidence/2026-07-18T08-02-21.349Z-kimi-k3-delegate.json)
+- 状态：passed；实际/预期模型均为 `kimi-code/k3`；provider 不适用；route 为 `direct`。
+- 只变更 `result.txt`，文件内容正确并观测到命令事件；evidence 与独立系统快照均确认无新增 Kimi/Pi RPC 进程。
+- 证据：[2026-07-25T15-46-04.482Z-kimi-k3-delegate.json](evidence/2026-07-25T15-46-04.482Z-kimi-k3-delegate.json)；SHA-256 `c7169b47b229621dc926f430fe87c4e22c811786d223eb5f11e81b0afe677136`。
 
 ## 历史 K2.7 证据（不属于当前公开面）
 
