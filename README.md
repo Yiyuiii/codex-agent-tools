@@ -10,7 +10,7 @@
 - `ark-agent-plan`：隔离 Pi RPC / Ark Agent Plan / `ark-code-latest`，直连；
 - `ark-agent-deepseek-v4-flash`：隔离 Pi RPC / Ark Agent Plan / `deepseek-v4-flash`，直连。
 
-Kimi K3、Gemini 与 Ark Coding Plan 的 review/delegate 六项精确门禁为 passed；两个新 Agent Plan 路线的四项门禁仍为 pending，将由实施任务 7 重新串行取证。pending 能力会明确拒绝，不会复用旧模型证据或静默切换到其它 LLM。
+2026-07-25 十项真实门禁的原始结果为 8 passed / 2 failed：Kimi K3 两项通过；Gemini review 通过、delegate 因额度失败；Ark Coding Plan review 通过、delegate 因验收内容失败；两个 Agent Plan profile 各两项通过。注册表采用 review/delegate 成对晋级，因此当前能力状态是 6 passed / 4 pending：`kimi-k3`、`ark-agent-plan` 与 `ark-agent-deepseek-v4-flash` 各两项 passed，`gemini-3.5-flash` 与 `ark-coding-plan` 各两项 pending。pending 能力会明确拒绝，不会复用单项通过或旧模型证据，也不会静默切换到其它 LLM。
 
 项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端。
 
@@ -43,15 +43,15 @@ Kimi K3、Gemini 与 Ark Coding Plan 的 review/delegate 六项精确门禁为 p
 
 仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。
 
-当前尚未执行真实官方安装。项目代码绝不直接读取或写入活动 `~/.codex/config.toml`；只有先完成隔离验收、准备精确权限包并取得针对本次动作的明确许可后，维护者才可使用官方 `codex plugin` 命令。任何真实安装、升级或回滚都必须逐次授权，且不得用手工编辑配置代替官方机制。
+当前尚未执行真实官方安装。项目代码绝不直接读取或写入活动 `~/.codex/config.toml`；只有五项十门禁全部 passed、隔离验收完成、阻断状态包重新收敛为 ready 权限包，并取得针对本次动作的明确许可后，维护者才可使用官方 `codex plugin` 命令。当前仍有四项注册表能力 pending，因此真实安装授权准备处于 blocked / not ready。任何真实安装、升级或回滚都必须逐次授权，且不得用手工编辑配置代替官方机制。
 
 完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](docs/release/checklist.md)。
 
 ## 模型证据
 
 - 当前 Kimi 只支持 K3；K2.7 记录仅作为历史证据保留，见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
-- Gemini 固定走 `proxy-10808`；当前 passed 证据与任务 7 的精确复跑计划见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。
-- 三条 Ark 路线全部固定直连；Coding Plan 为 passed，两个 Agent Plan 路线为 pending，见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
+- Gemini 固定走 `proxy-10808`；本轮 review 原始门禁通过但 delegate 因额度失败，成对策略使两项注册表能力均为 pending，见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。
+- 三条 Ark 路线全部固定直连；Coding Plan 的 review 原始门禁通过但 delegate 失败，成对策略使两项注册表能力均为 pending；两个 Agent Plan profile 各自的 review/delegate 均为 passed，见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
 
 终端用户不需要手工维护 Pi 模型配置；Pi 使用由本项目在应用缓存下生成的版本化隔离配置，不读取或修改用户日常 `~/.pi/agent`。
 

@@ -1273,64 +1273,63 @@ git add src/llms/registry.ts docs/smoke/evidence docs/smoke AGENTS.md
 git commit -m "test: qualify approved external llm routes"
 ```
 
-## Task 8：准备真实安装逐次权限包并停止
+## Task 8：在门禁未全通过时准备阻断状态包并停止
 
 **Files:**
 
 - Create: `docs/release/real-plugin-install-review.md`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1：从隔离报告提取最小充分证据**
+- [ ] **Step 1：先判定是否允许进入授权准备**
 
-权限包只包含：
+重新读取五项十门禁和注册表状态。只有十项全部 `passed`，才可把权限包标记为 `ready` 并进入真实安装授权准备。
+
+当前 2026-07-25 原始门禁为 8 passed / 2 failed，成对晋级后的注册表为 6 passed / 4 pending。因此本轮必须走阻断分支：仍创建状态包，但标记为 `blocked / not ready`，不得写入可被误解为当前有效的授权提问、固定授权语句或可立即执行的安装指示。
+
+- [ ] **Step 2：从隔离报告和门禁证据提取最小充分状态**
+
+阻断状态包只包含：
 
 - 为什么必须用官方安装才能完成真实 App 验收；
 - 当前尚未执行真实安装；
+- 当前十门禁的原始 8 passed / 2 failed 与注册表 6 passed / 4 pending；
+- 当前阻断项是 Gemini delegate 的额度失败与 Ark Coding Plan delegate 的验收失败；成对策略使这两个 profile 的 review/delegate 均保持 pending；
+- 重入授权准备的必要条件是五项十门禁全部 passed，且相关注册表、证据索引与文档重新收敛；
 - 官方文档确认插件开关状态存储在活动 `config.toml`；
 - 隔离安装实际新增/改变/移除的相对文件；
 - 活动 `config.toml` 的预计精确语义差异，使用脱敏 TOML 片段表达；
-- 官方安装后验证命令；
-- 官方 remove 回滚命令；
+- 未来进入 ready 状态后才可采用的官方安装后验证与官方 remove 回滚边界；
 - 失败时不手工恢复 TOML；
 - 旧 `codex_cc_tools` 保持原状；
 - 本轮不发布 npm、不移除旧工具。
 
-- [ ] **Step 2：写权限包**
+- [ ] **Step 3：写阻断状态包**
 
-`docs/release/real-plugin-install-review.md` 的“需要用户判断”只保留一个问题：
+创建 `docs/release/real-plugin-install-review.md`，标题和状态摘要必须明确包含 `blocked / not ready`。当前版本不设置“需要用户判断”、授权问题或授权回答方式，也不保留历史草案中的固定授权语句。这些内容只能在未来十项门禁全部 passed、状态包改为 `ready` 后重新评估并由当时会话生成；不得从本轮阻断状态推定任何安装、回滚、后续升级、卸载旧工具或发布权限。
 
-```text
-是否授权本次使用 Codex 官方命令，把本仓库 marketplace 加入当前 Codex、安装 codex-external-agents，并在验收失败时用权限包列出的官方 remove 命令回滚？
-```
-
-回答方式固定为：
-
-```text
-授权本次真实安装
-```
-
-不把后续升级、卸载旧工具或发布权限捆绑进来。
-
-- [ ] **Step 3：用现有外部 LLM 审阅权限包**
+- [ ] **Step 4：只用当前 qualified 外部 LLM 审阅阻断状态包**
 
 优先使用当前会话可用的 `codex_external_agents` MCP。若当前工具面尚未暴露它，则从已构建 bundle 启动临时 stdio MCP 客户端执行同样的只读调用；不得为审阅提前安装真实插件，也不得回退到 cc tools。
 
 按顺序调用：
 
 1. `external_review(llm: "kimi-k3", task: "adversarial_review")`
-2. `external_review(llm: "ark-coding-plan", task: "review_doc")`
+2. `external_review(llm: "ark-agent-plan", task: "review_doc")`
 
-审阅范围只包含设计、隔离取证报告和权限包。要求检查：
+当前不得选择 pending 的 `ark-coding-plan` 或 `gemini-3.5-flash`。未来重入时也只能选择执行时注册表中已 qualified 的 profile。
+
+审阅范围只包含设计、隔离取证报告、十门禁索引和阻断状态包。要求检查：
 
 - 是否越权；
 - 预计差异是否由隔离证据支持；
 - 回滚是否只用官方机制；
 - 是否混入旧工具移除或公共发布；
 - 是否泄漏路径外的秘密值。
+- 是否明确阻断真实安装、没有夹带当前有效授权提问。
 
 Codex 对反馈逐项核实，只采纳有证据的问题。
 
-- [ ] **Step 4：验证并提交权限包**
+- [ ] **Step 5：验证并提交阻断状态包**
 
 Run:
 
@@ -1340,18 +1339,18 @@ git diff --check
 npm run smoke:release
 ```
 
-Expected: 第一条只能命中环境变量名称或安全说明，不得出现任何值；其它检查通过。
+Expected: 第一条只能命中环境变量名称或安全说明，不得出现任何值；状态包明确为 `blocked / not ready`，不包含当前有效授权提问或固定授权语句；其它检查通过。
 
 Commit:
 
 ```powershell
 git add docs/release/real-plugin-install-review.md AGENTS.md
-git commit -m "docs: prepare real plugin install review"
+git commit -m "docs: record blocked real plugin install review"
 ```
 
-- [ ] **Step 5：向用户提交权限包并停止**
+- [ ] **Step 6：向用户报告阻断并停止**
 
-给用户提供可点击的权限包路径、最小结论和精确授权语句。没有收到新的明确授权前，不执行任务 9 的任何命令。
+给用户提供可点击的阻断状态包路径、最小结论、两项失败证据和重入条件。当前不索要或接受真实安装授权；即使用户主动提供旧草案中的固定语句，也必须先满足十门禁全部 passed 并把状态包重新审阅为 `ready`。本轮不执行任务 9 的任何命令。
 
 ## Task 9：仅在明确授权后执行真实官方安装与宿主门禁
 
@@ -1362,7 +1361,13 @@ git commit -m "docs: prepare real plugin install review"
 
 - [ ] **Step 1：重新核对权限**
 
-必须在当前对话中存在用户针对任务 8 的明确授权。历史“同意使用官方插件机制”不等于本次写入许可。没有精确授权就停止。
+必须同时满足三个前置条件：
+
+1. 五项逻辑 LLM 的 review/delegate 十项真实门禁全部 `passed`；
+2. `docs/release/real-plugin-install-review.md` 已从 `blocked / not ready` 重新收敛并审阅为 `ready`；
+3. 当前对话中存在用户针对该 ready 权限包和本次官方 add/remove 的精确授权。
+
+历史“同意使用官方插件机制”、阻断状态包或过去会话的授权都不等于本次写入许可。任一条件不满足就停止，不执行 Step 2 及后续步骤。
 
 - [ ] **Step 2：用官方命令执行真实安装**
 
@@ -1395,11 +1400,11 @@ codex plugin list --marketplace codex-external-agents-local
 至少从真实 Codex 宿主调用：
 
 1. `external_review(llm: "kimi-k3")`
-2. `external_review(llm: "ark-coding-plan")` 或 `external_review(llm: "gemini-3.5-flash")`
+2. 一个执行时仍为 qualified 的 Pi profile；示例优先 `external_review(llm: "ark-agent-plan")`
 3. 一个在隔离临时仓库中的 `external_delegate(llm: "kimi-k3")`
-4. 一个可取消的长任务，确认取消后无 Kimi/Pi 残留进程
+4. 一个使用执行时仍为 qualified profile 的可取消长任务，确认取消后无 Kimi/Pi 残留进程
 
-调用失败不切换模型；记录原始逻辑 LLM、实际模型、route、状态和脱敏诊断。
+不得调用执行时为 pending 的 profile。调用失败不切换模型；记录原始逻辑 LLM、实际模型、route、状态和脱敏诊断。
 
 - [ ] **Step 6：失败时只用官方回滚**
 
@@ -1487,9 +1492,9 @@ Expected:
 按顺序调用：
 
 1. Kimi K3：安全边界、MCP 契约、插件可移植性、Windows 进程与代理；
-2. Ark Coding Plan：模型注册表、Pi 配置、门禁证据、官方安装/回滚和文档一致性。
+2. Ark Agent Plan：模型注册表、Pi 配置、门禁证据、官方安装/回滚和文档一致性。
 
-每次都要求只读、给出文件/行证据、区分阻断项与建议项。Codex 逐项复核，不直接转发结论。
+只选择执行时仍为 qualified 的 profile；当前示例为 `kimi-k3` 与 `ark-agent-plan`，不得选择 pending 的 Ark Coding Plan 或 Gemini。每次都要求只读、给出文件/行证据、区分阻断项与建议项。Codex 逐项复核，不直接转发结论。
 
 - [ ] **Step 4：对有效发现按 TDD 修复**
 
@@ -1545,4 +1550,4 @@ git commit -m "chore: finalize official plugin integration"
 - 旧 cc tools 保持共存，Claude Code 未被调用或修改；
 - 未执行 npm 或公共插件发布。
 
-如果任务 8 后尚未获得真实安装授权，正确阶段结论是“实现、隔离取证与真实模型门禁完成，等待真实官方安装许可”，不能声称真实宿主集成完成。
+在当前 8 passed / 2 failed、注册表 6 passed / 4 pending 的状态下，正确阶段结论是“实现与隔离取证已完成，但真实模型面仍被 Gemini 和 Ark Coding Plan 的成对门禁阻断；真实安装授权暂缓”。只有十项门禁全部通过、阻断状态包重新审阅为 ready 且当前会话取得精确授权后，才能进入任务 9；在此之前不能声称真实模型面、真实宿主集成或官方插件集成完成。

@@ -9,6 +9,11 @@ let buffer = Buffer.alloc(0);
 let grandchild;
 let selectedModel = "gemini-3.5-flash";
 let selectedProvider = "google";
+const providerApis = {
+  google: "google-generative-ai",
+  "ark-coding-plan": "anthropic-messages",
+  "ark-agent-plan": "anthropic-messages",
+};
 
 function log(value) {
   if (logPath) appendFileSync(logPath, `${JSON.stringify(value)}\n`, "utf8");
@@ -43,7 +48,7 @@ function handle(command) {
       data: {
         id: command.modelId,
         provider: command.provider,
-        api: "google-generative-ai",
+        api: providerApis[command.provider],
       },
     });
     return;

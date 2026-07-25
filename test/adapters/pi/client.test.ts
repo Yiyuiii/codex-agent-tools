@@ -1,6 +1,9 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { afterEach, describe, expect, it } from "vitest";
@@ -77,7 +80,72 @@ async function readLog(logPath: string): Promise<Array<Record<string, unknown>>>
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
+async function readFakeSetModelMetadata(
+  provider: string,
+  modelId: string,
+): Promise<Record<string, unknown>> {
+  const child = spawn(process.execPath, [fakePath], {
+    stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true,
+  });
+  if (child.pid !== undefined) fallbackPids.push(child.pid);
+  const lines = createInterface({ input: child.stdout! });
+  try {
+    child.stdin!.write(
+      `${JSON.stringify({
+        id: "set-model-contract",
+        type: "set_model",
+        provider,
+        modelId,
+      })}\n`,
+    );
+    const [line] = await once(lines, "line", {
+      signal: AbortSignal.timeout(5_000),
+    });
+    return JSON.parse(String(line)) as Record<string, unknown>;
+  } finally {
+    lines.close();
+    if (child.pid !== undefined) {
+      await terminateProcessTree(child.pid).catch(() => undefined);
+      const index = fallbackPids.indexOf(child.pid);
+      if (index >= 0) fallbackPids.splice(index, 1);
+    }
+  }
+}
+
 describe("Pi RPC client", () => {
+  it("reports the configured API in fake set_model responses", async () => {
+    const google = await readFakeSetModelMetadata(
+      "google",
+      "gemini-3.5-flash",
+    );
+    const arkAgent = await readFakeSetModelMetadata(
+      "ark-agent-plan",
+      "ark-code-latest",
+    );
+
+    expect(google).toMatchObject({
+      type: "response",
+      command: "set_model",
+      success: true,
+      data: {
+        id: "gemini-3.5-flash",
+        provider: "google",
+        api: "google-generative-ai",
+      },
+    });
+    expect(arkAgent).toMatchObject({
+      type: "response",
+      command: "set_model",
+      success: true,
+      data: {
+        id: "ark-code-latest",
+        provider: "ark-agent-plan",
+        api: "anthropic-messages",
+      },
+    });
+  });
+
   it("spawns Pi with the explicit request environment without parent proxy reinjection", async () => {
     const cwd = await tempDirectory();
     const logPath = path.join(cwd, "rpc-log.jsonl");

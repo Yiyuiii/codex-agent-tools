@@ -37,13 +37,16 @@ npm run acceptance:plugin:isolated
 - 临时 `CODEX_HOME` 隔离边界成立；
 - 官方安装器接受插件 manifest、直接 server-map `.mcp.json` 与自包含 bundle；
 - 缓存副本只公开 `external_review` 与 `external_delegate`，且 `llm` 必填；
-- fake Pi 的固定模型、10808 路由、环境白名单与进程清理门禁通过；
+- 隔离验收先证明 pending 的 Gemini 会被已安装 MCP 明确拒绝，再用 qualified 的 Ark Agent profile 与 fake Pi 证明固定模型、direct 路由、父进程代理清除、Agent 凭据规范化和进程清理门禁通过；
+- Gemini 固定 `proxy-10808` 的环境替换由确定性环境测试与真实 smoke evidence 覆盖；当前隔离 fake Pi 验收不声称成功调用 pending Gemini；
 - 官方 remove 后列表语义回滚，残留状态可解释；
 - 报告结论没有被扩张成真实 Codex App 已通过。
 
 任一项失败即停止，不准备真实安装。
 
 ## 5. 准备真实安装权限包
+
+只有五项逻辑 LLM 的 review/delegate 十项真实门禁全部 passed，才能准备可供授权的 ready 权限包。当前原始门禁为 8 passed / 2 failed，成对注册表为 6 passed / 4 pending，因此本阶段只生成 `blocked / not ready` 状态包，记录失败证据和重入条件；不提出真实安装授权问题，也不接受固定授权语句作为越过门禁的依据。
 
 权限包必须列出：
 
