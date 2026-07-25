@@ -909,7 +909,7 @@ git commit -m "test: characterize isolated codex plugin lifecycle"
 - Modify: `package.json`
 - Modify: `package-lock.json`
 
-- [ ] **Step 1：先写包内容与敏感信息失败测试**
+- [x] **Step 1：先写包内容与敏感信息失败测试**
 
 在 `test/release/assurance.test.ts` 增加允许文件：
 
@@ -934,7 +934,7 @@ expect(() =>
 
 增加 bundle 内容检查用例，拒绝开发机绝对路径、真实 secret、`../dist/mcp.js` 和指向仓库 `node_modules` 的导入。
 
-- [ ] **Step 2：先把 release smoke 目标改成五项与无配置 doctor**
+- [x] **Step 2：先把 release smoke 目标改成五项与无配置 doctor**
 
 `scripts/release-smoke.mjs` 中 doctor 调用改为：
 
@@ -944,7 +944,7 @@ const output = run(process.execPath, [cliPath, "doctor", "--json"]);
 
 逻辑 LLM 数量断言改为 `5`；新增插件 manifest/version 一致、官方 marketplace 指向存在目录、构建 runtime 存在、安装副本 MCP 契约检查。
 
-- [ ] **Step 3：运行目标测试，确认先红**
+- [x] **Step 3：运行目标测试，确认先红**
 
 Run:
 
@@ -955,7 +955,7 @@ npm run smoke:release
 
 Expected: 新插件文件尚未在 package allowlist 中，release smoke 仍使用旧 doctor/七项断言或缺少插件检查。
 
-- [ ] **Step 4：扩展 release allowlist**
+- [x] **Step 4：扩展 release allowlist**
 
 `src/release/assurance.ts` 的允许规则增加：
 
@@ -970,7 +970,7 @@ const EXACT_PLUGIN_FILES = new Set([
 
 允许条件仅增加 `EXACT_PLUGIN_FILES.has(name)`，不允许整个 `plugins/` 或 `.agents/` 任意内容。
 
-- [ ] **Step 5：把插件文件加入 npm pack 范围**
+- [x] **Step 5：把插件文件加入 npm pack 范围**
 
 `package.json` 的 `files` 数组增加：
 
@@ -983,7 +983,7 @@ const EXACT_PLUGIN_FILES = new Set([
 
 这只让 `npm pack --dry-run` 验证交付闭包；本计划不执行发布。
 
-- [ ] **Step 6：实现 release smoke 插件保障**
+- [x] **Step 6：实现 release smoke 插件保障**
 
 `scripts/release-smoke.mjs` 额外断言：
 
@@ -997,7 +997,7 @@ const EXACT_PLUGIN_FILES = new Set([
 - `codex plugin --help` 与 `codex plugin marketplace --help` 可用；
 - 不执行 `plugin add`，安装生命周期仍只由隔离验收脚本负责。
 
-- [ ] **Step 7：验证并提交**
+- [x] **Step 7：验证并提交**
 
 Run:
 
