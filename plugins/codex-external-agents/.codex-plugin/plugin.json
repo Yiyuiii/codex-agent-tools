@@ -1,0 +1,25 @@
+{
+  "name": "codex-external-agents",
+  "version": "0.1.0-alpha.1",
+  "description": "Use explicitly selected external LLMs for review and delegated coding tasks.",
+  "author": {
+    "name": "codex-agent-tools maintainers"
+  },
+  "license": "MIT",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Codex External Agents",
+    "shortDescription": "Review and delegate with explicitly selected external LLMs",
+    "longDescription": "Use explicitly selected local Kimi and Pi-backed LLMs for Codex review and delegated coding tasks.",
+    "developerName": "codex-agent-tools maintainers",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Review my current changes with kimi-k3.",
+      "Delegate this coding task to ark-coding-plan."
+    ]
+  }
+}

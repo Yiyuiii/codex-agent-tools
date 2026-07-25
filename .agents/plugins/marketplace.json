@@ -1,0 +1,20 @@
+{
+  "name": "codex-external-agents-local",
+  "interface": {
+    "displayName": "Codex External Agents Local"
+  },
+  "plugins": [
+    {
+      "name": "codex-external-agents",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex-external-agents"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

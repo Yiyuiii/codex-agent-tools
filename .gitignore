@@ -1,5 +1,6 @@
 node_modules/
 dist/
+plugins/codex-external-agents/runtime/
 coverage/
 *.tgz
 .DS_Store

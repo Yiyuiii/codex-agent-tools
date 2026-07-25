@@ -1,0 +1,8 @@
+{
+  "codex_external_agents": {
+    "command": "node",
+    "args": [
+      "./runtime/codex-external-agents-mcp.mjs"
+    ]
+  }
+}

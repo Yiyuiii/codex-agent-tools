@@ -24,7 +24,9 @@
     "codex-external-agents-mcp": "dist/mcp.js"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "npm run build:library && npm run build:plugin",
+    "build:library": "tsup",
+    "build:plugin": "tsup --config tsup.plugin.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
