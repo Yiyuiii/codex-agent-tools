@@ -213,7 +213,7 @@ git commit -m "refactor: remove codex config mutation cli"
 - Modify: `docs/smoke/kimi.md`
 - Modify: `docs/smoke/ark.md`
 
-- [ ] **Step 1：先写目标注册表与网络失败测试**
+- [x] **Step 1：先写目标注册表与网络失败测试**
 
 在 `test/llms/registry.test.ts` 断言唯一 ID：
 
@@ -266,7 +266,7 @@ expect(() => resolveLlm("ark-agent-glm-5.2")).toThrow(/Unknown logical llm/u);
 
 时，`direct` 结果不含任何代理键，`proxy-10808` 结果的四个 HTTP(S) 大小写键都严格等于 `http://127.0.0.1:10808`，且不含 `ALL_PROXY`。
 
-- [ ] **Step 2：先写 Pi 配置和共享配额池测试**
+- [x] **Step 2：先写 Pi 配置和共享配额池测试**
 
 目标 fixture `test/fixtures/pi/expected-ark-models.json` 的 provider 模型集合固定为：
 
@@ -284,7 +284,7 @@ expect(() => resolveLlm("ark-agent-glm-5.2")).toThrow(/Unknown logical llm/u);
 
 在 `test/tasks/service.test.ts` 与 `test/runtime/limiter.test.ts` 中并发发起两个不同 Agent Plan LLM，使用可控 Promise 记录同时运行数，断言峰值为 `1`；Coding Plan 与 Agent Plan 各发一个时，断言两者可以同时进入执行器。
 
-- [ ] **Step 3：运行目标测试，确认先红**
+- [x] **Step 3：运行目标测试，确认先红**
 
 Run:
 
@@ -294,7 +294,7 @@ npx vitest run test/llms/registry.test.ts test/runtime/environment.test.ts test/
 
 Expected: 失败原因对应旧七模型枚举、11808 分支、旧 Agent Plan 模型和旧 smoke ID。
 
-- [ ] **Step 4：删除 11808 类型和实现分支**
+- [x] **Step 4：删除 11808 类型和实现分支**
 
 `src/domain/types.ts`：
 
@@ -314,7 +314,7 @@ if (policy.network === "proxy-10808") {
 }
 ```
 
-- [ ] **Step 5：实现五项注册表**
+- [x] **Step 5：实现五项注册表**
 
 增加 pending helper：
 
@@ -363,7 +363,7 @@ const pendingTasks = {
 
 不要为 pending profile 复用旧 GLM 或 Doubao evidence。
 
-- [ ] **Step 6：实现目标 Pi 模型配置与 doctor 诊断**
+- [x] **Step 6：实现目标 Pi 模型配置与 doctor 诊断**
 
 `src/adapters/pi/config.ts` 的 Agent Plan 模型数组改为：
 
@@ -397,7 +397,7 @@ const EXPECTED_ARK_MODELS = new Map([
 
 Ark Agent 凭据诊断使用 `resolveLlm("ark-agent-plan")`；模型总数显示为 3。doctor 的 LLM 检查应列出五项，其中两个新 Agent Plan 在晋级前为 warn/pending，而不是伪装为 enabled。
 
-- [ ] **Step 7：更新 smoke 与本地验收引用**
+- [x] **Step 7：更新 smoke 与本地验收引用**
 
 `src/smoke/ark.ts`：
 
@@ -422,7 +422,7 @@ const kimiReview = await callReview(
 
 同步替换所有测试中的旧 ID；历史 evidence JSON 不删除。
 
-- [ ] **Step 8：同步结构事实文档**
+- [x] **Step 8：同步结构事实文档**
 
 在同一提交中更新：
 
@@ -431,7 +431,7 @@ const kimiReview = await callReview(
 - `docs/smoke/ark.md`：旧 GLM/Doubao 证据标成历史，新 Agent Plan 两项显示 pending；
 - 不改写历史 JSON 内容。
 
-- [ ] **Step 9：验证并提交**
+- [x] **Step 9：验证并提交**
 
 Run:
 
