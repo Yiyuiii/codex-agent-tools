@@ -9,6 +9,7 @@ import {
   runKimiSmoke,
   type KimiSmokeService,
 } from "../../src/smoke/kimi.js";
+import { SmokeInfrastructureError } from "../../src/smoke/evidence.js";
 
 const roots: string[] = [];
 
@@ -85,6 +86,7 @@ describe("Kimi real-smoke harness", () => {
       kimiVersion: "0.27.0",
       status: "completed",
       passed: true,
+      failureReason: null,
       checks: {
         workspaceUnchanged: true,
         knownDefectFound: true,
@@ -170,6 +172,137 @@ describe("Kimi real-smoke harness", () => {
     );
     expect(evidence.passed).toBe(false);
     expect(evidence.checks.noNewKimiProcesses).toBe(false);
+    expect(evidence.failureReason).toBe("process_residual");
+  });
+
+  it("classifies adapter, authentication, or model failures without diagnostics", async () => {
+    const root = await tempRoot();
+    const secret = "KIMI_AUTH_SECRET_SENTINEL";
+    const service: KimiSmokeService = {
+      review: async () => ({
+        ok: false,
+        status: "failed",
+        llm: "kimi-k3",
+        actualModel: "kimi-code/k3",
+        elapsedMs: 12,
+        diagnostics: [`authentication failed for ${secret}`],
+        filesChanged: [],
+        review: "",
+      }),
+      delegate: async () => {
+        throw new Error("not used");
+      },
+    };
+
+    const evidence = await runKimiSmoke(
+      { llm: "kimi-k3", task: "review", tempRoot: root },
+      {
+        service,
+        readKimiVersion: async () => "0.27.0",
+        listKimiProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence.failureReason).toBe(
+      "adapter_auth_or_model_unavailable",
+    );
+    expect(evidence.diagnosticCount).toBe(1);
+    expect(JSON.stringify(evidence)).not.toContain(secret);
+  });
+
+  it("classifies a completed result that misses the acceptance checks", async () => {
+    const root = await tempRoot();
+    const service: KimiSmokeService = {
+      review: async () => ({
+        ok: true,
+        status: "completed",
+        llm: "kimi-k3",
+        actualModel: "kimi-code/k3",
+        elapsedMs: 12,
+        diagnostics: [],
+        filesChanged: [],
+        review: "No issue found.",
+      }),
+      delegate: async () => {
+        throw new Error("not used");
+      },
+    };
+
+    const evidence = await runKimiSmoke(
+      { llm: "kimi-k3", task: "review", tempRoot: root },
+      {
+        service,
+        readKimiVersion: async () => "0.27.0",
+        listKimiProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence.passed).toBe(false);
+    expect(evidence.failureReason).toBe("acceptance_failed");
+  });
+
+  it("labels a version-probe exception without exposing its original message", async () => {
+    const root = await tempRoot();
+    const secret = "KIMI_VERSION_SECRET_SENTINEL";
+
+    const failure = await runKimiSmoke(
+      { llm: "kimi-k3", task: "review", tempRoot: root },
+      {
+        readKimiVersion: async () => {
+          throw new Error(secret);
+        },
+      },
+    ).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SmokeInfrastructureError);
+    expect(failure).toMatchObject({
+      message: "Smoke infrastructure failure",
+      stage: "version_probe",
+    });
+    expect(String(failure)).not.toContain(secret);
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  it("labels a missing post-task process snapshot and records the baseline count", async () => {
+    const root = await tempRoot();
+    const secret = "KIMI_POST_SNAPSHOT_SECRET_SENTINEL";
+    let calls = 0;
+    const service: KimiSmokeService = {
+      review: async () => ({
+        ok: true,
+        status: "completed",
+        llm: "kimi-k3",
+        actualModel: "kimi-code/k3",
+        elapsedMs: 12,
+        diagnostics: [],
+        filesChanged: [],
+        review: "Empty input has length zero and produces NaN.",
+      }),
+      delegate: async () => {
+        throw new Error("not used");
+      },
+    };
+
+    const failure = await runKimiSmoke(
+      { llm: "kimi-k3", task: "review", tempRoot: root },
+      {
+        service,
+        readKimiVersion: async () => "0.27.0",
+        listKimiProcessIds: async () => {
+          if (calls++ === 0) return [100, 101];
+          throw new Error(secret);
+        },
+      },
+    ).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SmokeInfrastructureError);
+    expect(failure).toMatchObject({
+      message: "Smoke infrastructure failure",
+      stage: "post_process_snapshot",
+      counts: { processIdsBefore: 2 },
+    });
+    expect(String(failure)).not.toContain(secret);
+    expect(await readdir(root)).toEqual([]);
   });
 
   it("rejects non-Kimi logical IDs before creating a workspace", async () => {

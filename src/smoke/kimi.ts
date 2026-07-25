@@ -18,6 +18,7 @@ import type {
   ExternalDelegateInput,
   ExternalReviewInput,
 } from "../tasks/schemas.js";
+import { inSmokeInfrastructureStage } from "./evidence.js";
 
 export type KimiSmokeTask = "review" | "delegate";
 
@@ -52,6 +53,12 @@ export interface KimiSmokeEvidence {
   task: KimiSmokeTask;
   status: ExternalReviewResult["status"];
   passed: boolean;
+  failureReason:
+    | "adapter_auth_or_model_unavailable"
+    | "acceptance_failed"
+    | "process_residual"
+    | "infrastructure_failure"
+    | null;
   elapsedMs: number;
   outputSha256: string;
   filesChanged: string[];
@@ -266,6 +273,14 @@ function commonEvidence(
     task: options.task,
     status: result.status,
     passed,
+    failureReason:
+      !passed && checks.noNewKimiProcesses === false
+        ? "process_residual"
+        : !passed && result.status !== "completed"
+          ? "adapter_auth_or_model_unavailable"
+          : !passed
+            ? "acceptance_failed"
+            : null,
     elapsedMs: result.elapsedMs,
     outputSha256: sha256(output),
     filesChanged: [...result.filesChanged].sort(),
@@ -289,31 +304,55 @@ export async function runKimiSmoke(
     dependencies.listKimiProcessIds ?? defaultListKimiProcessIds;
   const now = dependencies.now ?? (() => new Date());
   const root = options.tempRoot ?? os.tmpdir();
-  const cwd = await mkdtemp(path.join(root, "codex-kimi-smoke-"));
+  const cwd = await inSmokeInfrastructureStage(
+    "workspace_setup",
+    () => mkdtemp(path.join(root, "codex-kimi-smoke-")),
+  );
 
   try {
-    await initializeFixture(cwd, options.task);
-    const kimiVersion = await readKimiVersion();
-    const processIdsBefore = await listKimiProcessIds();
+    await inSmokeInfrastructureStage(
+      "fixture_setup",
+      () => initializeFixture(cwd, options.task),
+    );
+    const kimiVersion = await inSmokeInfrastructureStage(
+      "version_probe",
+      readKimiVersion,
+    );
+    const processIdsBefore = await inSmokeInfrastructureStage(
+      "pre_process_snapshot",
+      listKimiProcessIds,
+    );
     const context: TaskExecutionContext = {};
     if (options.onProgress !== undefined) context.onProgress = options.onProgress;
     const timeoutMs = options.timeoutMs ?? profile.timeoutMs;
 
     if (options.task === "review") {
-      const result = await service.review(
-        {
-          llm: options.llm,
-          task: "review_diff",
-          prompt:
-            "Read average.js and average.test.js. Identify the concrete correctness defect that makes the test fail. Cite the relevant expression. Do not modify files and do not execute commands.",
-          cwd,
-          includeGitDiff: true,
-          timeoutMs,
-        },
-        context,
+      const result = await inSmokeInfrastructureStage(
+        "task_execution",
+        () =>
+          service.review(
+            {
+              llm: options.llm,
+              task: "review_diff",
+              prompt:
+                "Read average.js and average.test.js. Identify the concrete correctness defect that makes the test fail. Cite the relevant expression. Do not modify files and do not execute commands.",
+              cwd,
+              includeGitDiff: true,
+              timeoutMs,
+            },
+            context,
+          ),
       );
-      const gitClean = (await runGit(cwd, ["status", "--porcelain"])).trim() === "";
-      const processIdsAfter = await listKimiProcessIds();
+      const gitClean = await inSmokeInfrastructureStage(
+        "acceptance_check",
+        async () =>
+          (await runGit(cwd, ["status", "--porcelain"])).trim() === "",
+      );
+      const processIdsAfter = await inSmokeInfrastructureStage(
+        "post_process_snapshot",
+        listKimiProcessIds,
+        { processIdsBefore: processIdsBefore.length },
+      );
       const checks: KimiSmokeChecks = {
         actualModelMatches: result.actualModel === profile.model,
         noNewKimiProcesses: hasNoNewProcesses(
@@ -340,15 +379,19 @@ export async function runKimiSmoke(
       );
     }
 
-    const result = await service.delegate(
-      {
-        llm: options.llm,
-        prompt:
-          "Create result.txt in the working directory with exactly one line: KIMI_SMOKE_OK. Then run `git status --short` to verify the change and report what you did. Do not modify any other file.",
-        cwd,
-        timeoutMs,
-      },
-      context,
+    const result = await inSmokeInfrastructureStage(
+      "task_execution",
+      () =>
+        service.delegate(
+          {
+            llm: options.llm,
+            prompt:
+              "Create result.txt in the working directory with exactly one line: KIMI_SMOKE_OK. Then run `git status --short` to verify the change and report what you did. Do not modify any other file.",
+            cwd,
+            timeoutMs,
+          },
+          context,
+        ),
     );
     let resultText = "";
     try {
@@ -357,7 +400,11 @@ export async function runKimiSmoke(
       resultText = "";
     }
     const normalizedFiles = result.filesChanged.map((name) => name.replaceAll("\\", "/"));
-    const processIdsAfter = await listKimiProcessIds();
+    const processIdsAfter = await inSmokeInfrastructureStage(
+      "post_process_snapshot",
+      listKimiProcessIds,
+      { processIdsBefore: processIdsBefore.length },
+    );
     const checks: KimiSmokeChecks = {
       actualModelMatches: result.actualModel === profile.model,
       noNewKimiProcesses: hasNoNewProcesses(
@@ -388,6 +435,9 @@ export async function runKimiSmoke(
       passed,
     );
   } finally {
-    await rm(cwd, { recursive: true, force: true });
+    await inSmokeInfrastructureStage(
+      "workspace_cleanup",
+      () => rm(cwd, { recursive: true, force: true }),
+    );
   }
 }

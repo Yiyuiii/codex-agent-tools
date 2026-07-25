@@ -21,6 +21,7 @@ import type {
 } from "../tasks/schemas.js";
 import { ExternalAgentService, type TaskExecutionContext } from "../tasks/service.js";
 import { VERSION } from "../version.js";
+import { inSmokeInfrastructureStage } from "./evidence.js";
 
 export type PiSmokeTask = "review" | "delegate";
 
@@ -411,7 +412,10 @@ export async function runPiSmoke(
     if (service !== undefined || runtimeEvidence !== undefined) {
       throw new Error("Pi smoke service and runtimeEvidence must be injected together");
     }
-    const runtime = await createSmokeRuntime(options.llm, options.task);
+    const runtime = await inSmokeInfrastructureStage(
+      "runtime_setup",
+      () => createSmokeRuntime(options.llm, options.task),
+    );
     service = runtime.service;
     runtimeEvidence = runtime.evidence;
   }
@@ -419,33 +423,58 @@ export async function runPiSmoke(
   const listPiRpcProcessIds =
     dependencies.listPiRpcProcessIds ?? defaultListPiRpcProcessIds;
   const now = dependencies.now ?? (() => new Date());
-  const cwd = await mkdtemp(
-    path.join(options.tempRoot ?? os.tmpdir(), "codex-pi-smoke-"),
+  const cwd = await inSmokeInfrastructureStage(
+    "workspace_setup",
+    () =>
+      mkdtemp(
+        path.join(options.tempRoot ?? os.tmpdir(), "codex-pi-smoke-"),
+      ),
   );
 
   try {
-    await initializeFixture(cwd, options.task);
-    const piVersion = await readPiVersion();
-    const processIdsBefore = await listPiRpcProcessIds();
+    await inSmokeInfrastructureStage(
+      "fixture_setup",
+      () => initializeFixture(cwd, options.task),
+    );
+    const piVersion = await inSmokeInfrastructureStage(
+      "version_probe",
+      readPiVersion,
+    );
+    const processIdsBefore = await inSmokeInfrastructureStage(
+      "pre_process_snapshot",
+      listPiRpcProcessIds,
+    );
     const context: TaskExecutionContext = {};
     if (options.onProgress !== undefined) context.onProgress = options.onProgress;
     const timeoutMs = options.timeoutMs ?? profile.timeoutMs;
 
     if (options.task === "review") {
-      const result = await service.review(
-        {
-          llm: options.llm,
-          task: "review_diff",
-          prompt:
-            "Read average.js and average.test.js. Identify the concrete correctness defect that makes the test fail. Cite the relevant expression. Do not modify files and do not execute commands.",
-          cwd,
-          includeGitDiff: true,
-          timeoutMs,
-        },
-        context,
+      const result = await inSmokeInfrastructureStage(
+        "task_execution",
+        () =>
+          service.review(
+            {
+              llm: options.llm,
+              task: "review_diff",
+              prompt:
+                "Read average.js and average.test.js. Identify the concrete correctness defect that makes the test fail. Cite the relevant expression. Do not modify files and do not execute commands.",
+              cwd,
+              includeGitDiff: true,
+              timeoutMs,
+            },
+            context,
+          ),
       );
-      const gitClean = (await runGit(cwd, ["status", "--porcelain"])).trim() === "";
-      const processIdsAfter = await listPiRpcProcessIds();
+      const gitClean = await inSmokeInfrastructureStage(
+        "acceptance_check",
+        async () =>
+          (await runGit(cwd, ["status", "--porcelain"])).trim() === "",
+      );
+      const processIdsAfter = await inSmokeInfrastructureStage(
+        "post_process_snapshot",
+        listPiRpcProcessIds,
+        { processIdsBefore: processIdsBefore.length },
+      );
       const environment = inspectEnvironment(
         runtimeEvidence.childEnvironment,
         profile,
@@ -485,15 +514,19 @@ export async function runPiSmoke(
       profile.provider.startsWith("ark-")
         ? `ARK_SMOKE_OK:${options.llm}`
         : "PI_SMOKE_OK";
-    const result = await service.delegate(
-      {
-        llm: options.llm,
-        prompt:
-          `Both actions are mandatory before you finish: (1) create ${resultFileName} in the working directory with exactly one line: ${expectedLine}; (2) invoke the bash tool with the exact command \`git status --short\` to verify the change. Report both actions. Do not modify any other file, and do not substitute a prose claim for the bash invocation.`,
-        cwd,
-        timeoutMs,
-      },
-      context,
+    const result = await inSmokeInfrastructureStage(
+      "task_execution",
+      () =>
+        service.delegate(
+          {
+            llm: options.llm,
+            prompt:
+              `Both actions are mandatory before you finish: (1) create ${resultFileName} in the working directory with exactly one line: ${expectedLine}; (2) invoke the bash tool with the exact command \`git status --short\` to verify the change. Report both actions. Do not modify any other file, and do not substitute a prose claim for the bash invocation.`,
+            cwd,
+            timeoutMs,
+          },
+          context,
+        ),
     );
     let resultText = "";
     try {
@@ -501,7 +534,11 @@ export async function runPiSmoke(
     } catch {
       resultText = "";
     }
-    const processIdsAfter = await listPiRpcProcessIds();
+    const processIdsAfter = await inSmokeInfrastructureStage(
+      "post_process_snapshot",
+      listPiRpcProcessIds,
+      { processIdsBefore: processIdsBefore.length },
+    );
     const environment = inspectEnvironment(
       runtimeEvidence.childEnvironment,
       profile,
@@ -536,6 +573,9 @@ export async function runPiSmoke(
       passed,
     );
   } finally {
-    await rm(cwd, { recursive: true, force: true });
+    await inSmokeInfrastructureStage(
+      "workspace_cleanup",
+      () => rm(cwd, { recursive: true, force: true }),
+    );
   }
 }

@@ -5,6 +5,7 @@ export default defineConfig({
     index: "src/version.ts",
     cli: "src/cli/main.ts",
     "kimi-smoke": "src/smoke/kimi.ts",
+    "smoke-evidence": "src/smoke/evidence.ts",
     mcp: "src/mcp/main.ts",
     "pi-smoke": "src/smoke/pi.ts",
     "ark-smoke": "src/smoke/ark.ts",

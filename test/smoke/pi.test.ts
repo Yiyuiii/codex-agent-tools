@@ -9,6 +9,7 @@ import {
   runPiSmoke,
   type PiSmokeService,
 } from "../../src/smoke/pi.js";
+import { SmokeInfrastructureError } from "../../src/smoke/evidence.js";
 
 const roots: string[] = [];
 
@@ -231,5 +232,80 @@ describe("Pi/Gemini real-smoke harness", () => {
     );
     expect(evidence.passed).toBe(false);
     expect(evidence.checks.environmentIsolated).toBe(false);
+  });
+
+  it("labels a Pi version-probe exception without exposing its original message", async () => {
+    const root = await tempRoot();
+    const secret = "PI_VERSION_SECRET_SENTINEL";
+    const service: PiSmokeService = {
+      review: async () => {
+        throw new Error("not reached");
+      },
+      delegate: async () => {
+        throw new Error("not reached");
+      },
+    };
+
+    const failure = await runPiSmoke(
+      { llm: "gemini-3.5-flash", task: "review", tempRoot: root },
+      {
+        service,
+        runtimeEvidence: runtimeEvidence(),
+        readPiVersion: async () => {
+          throw new Error(secret);
+        },
+      },
+    ).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SmokeInfrastructureError);
+    expect(failure).toMatchObject({
+      message: "Smoke infrastructure failure",
+      stage: "version_probe",
+    });
+    expect(String(failure)).not.toContain(secret);
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  it("labels a missing post-task Pi snapshot and records the baseline count", async () => {
+    const root = await tempRoot();
+    const secret = "PI_POST_SNAPSHOT_SECRET_SENTINEL";
+    let calls = 0;
+    const service: PiSmokeService = {
+      review: async () => ({
+        ok: true,
+        status: "completed",
+        llm: "gemini-3.5-flash",
+        actualModel: "gemini-3.5-flash",
+        elapsedMs: 12,
+        diagnostics: [],
+        filesChanged: [],
+        review: "Empty input has length zero and produces NaN.",
+      }),
+      delegate: async () => {
+        throw new Error("not reached");
+      },
+    };
+
+    const failure = await runPiSmoke(
+      { llm: "gemini-3.5-flash", task: "review", tempRoot: root },
+      {
+        service,
+        runtimeEvidence: runtimeEvidence(),
+        readPiVersion: async () => "0.80.10",
+        listPiRpcProcessIds: async () => {
+          if (calls++ === 0) return [100, 101];
+          throw new Error(secret);
+        },
+      },
+    ).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SmokeInfrastructureError);
+    expect(failure).toMatchObject({
+      message: "Smoke infrastructure failure",
+      stage: "post_process_snapshot",
+      counts: { processIdsBefore: 2 },
+    });
+    expect(String(failure)).not.toContain(secret);
+    expect(await readdir(root)).toEqual([]);
   });
 });
