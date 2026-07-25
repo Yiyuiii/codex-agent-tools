@@ -74,7 +74,7 @@
 ## 外部只读审阅证据
 
 - Kimi K3 的 `adversarial_review` 未发现阻断项，只指出发布清单仍把本文件写成“计划中”的 Minor；该措辞已经修正。
-- Ark Agent Plan 的 `review_doc` 未发现 Critical 或 Important，只指出运维文档顶部硬编码日期会漂移的 Minor；该日期已经删除，活动 Codex 尚未安装且本轮被阻断的事实保留。
+- Ark Agent Plan 的 `review_doc` 未发现 Critical 或 Important，只指出运维文档顶部硬编码日期会漂移的 Minor；清单现已区分 2026-07-25 的建立日期与 2026-07-26 的最近复核日期，既保留历史也明确当前复核时间，活动 Codex 尚未安装且本轮被阻断的事实保留。
 - 两次完成审阅的 `filesChanged` 都是 `[]`。本状态包不保存原始长输出、会话 ID 或秘密值，只保留上述可复核结论。
 - 当前会话暴露的旧 MCP 状态拒绝 Ark Agent Plan 后，按实施计划从已构建的最新 bundle 启动临时 stdio 客户端并成功完成审阅；这不是插件安装，也没有改变活动 Codex 配置。
 - Kimi 首轮等待 300 秒后超时，未形成审阅结论、未改变文件且没有残留进程；随后用聚焦后的同一只读任务完成审阅。任务 7 真实模型门禁的“不重试”边界不适用于任务 8 的只读文档审阅。
@@ -83,10 +83,12 @@
 
 以下只描述未来 ready 后官方 add/remove 可能产生的相对状态；它不是当前执行指示。
 
+下述版本化缓存路径、预计新增项和预计删除项只来自 **Codex CLI 0.135.0 + 当前候选包 `0.1.0-alpha.1`** 在唯一临时 `CODEX_HOME` 中的实际观察，不是未来真实 Codex App 的路径或版本承诺。未来重入 ready 流程时，必须用当时的 CLI、候选包和全新临时 `CODEX_HOME` 重新完成隔离取证，并以新证据替换这里的缓存路径、预计文件差异和配置语义差异；若当时官方宿主产生可解释的合法差异，不得仅因它不匹配本轮旧路径而判定失败。
+
 ### 官方 add 的预计相对变化
 
 - marketplace add：活动 `config.toml` 的 marketplace 语义发生变化。
-- plugin add：活动 `config.toml` 的插件启用语义发生变化，并在 `plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/` 下新增：
+- plugin add：本轮隔离观察中，活动 `config.toml` 的插件启用语义发生变化，并在临时 `CODEX_HOME` 的 `plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/` 下新增：
   - `.codex-plugin/plugin.json`
   - `.mcp.json`
   - `runtime/codex-external-agents-mcp.mjs`
@@ -112,7 +114,7 @@ enabled = true
 
 ### 官方 remove 的预计相对变化
 
-- plugin remove：移除上述三个版本化缓存文件，并由官方机制撤销目标插件的启用状态。
+- plugin remove：本轮隔离观察中，移除上述临时 `CODEX_HOME` 内的三个版本化缓存文件，并由官方机制撤销目标插件的启用状态；未来重入时以重新取证得到的实际缓存文件面为准。
 - marketplace remove：由官方机制移除目标 marketplace 状态。
 - 隔离报告中 plugin remove 后配置回到 `H1`，marketplace remove 后进入 `H3`；官方 CLI 可能合法保留空缓存父目录和其它状态文件，因此只要求官方列表语义回滚与残留可解释，不声称字节级完全回滚。
 
@@ -121,8 +123,8 @@ enabled = true
 如果将来满足全部重入条件并另行取得当次许可，真实宿主验收才可以覆盖：
 
 - 官方 marketplace/plugin 列表确认目标来源和插件已安装；
-- 真实 Codex App 新会话只发现 `external_review` 与 `external_delegate`，且二者 `llm` 始终必填；
-- 旧 `codex_cc_tools` 仍存在且未修改；
+- 真实 Codex App 新会话确认新安装的 `codex_external_agents` 插件只新增并公开 `external_review` 与 `external_delegate`，且二者 `llm` 始终必填；这是该插件命名空间与插件归属下的发现范围，不表示 Codex 全局只有两个工具；
+- 旧 `codex_cc_tools` 仍存在、未修改并与新插件共存；
 - Kimi K3 与至少一条已通过的 Pi 路线完成代表性 review；
 - delegate 只在隔离临时仓库执行；
 - 取消与完成后均无新增 Kimi/Pi RPC 残留进程；
