@@ -51,6 +51,7 @@ const fakePiScript = path.join(
 );
 const expectedProxy = "http://127.0.0.1:10808";
 const inheritedProxy = "http://parent-proxy.invalid:9999";
+const inheritedAllProxy = "socks5://parent-proxy.invalid:9999";
 const credentialSentinel = "isolated-plugin-sentinel";
 const temporaryRoot = await mkdtemp(
   path.join(os.tmpdir(), "codex-plugin-isolated-acceptance-"),
@@ -336,6 +337,8 @@ async function writeFakePiWrapper() {
     "@echo off",
     `if not "%HTTPS_PROXY%"=="${expectedProxy}" exit /b 91`,
     `if not "%HTTP_PROXY%"=="${expectedProxy}" exit /b 92`,
+    "if defined ALL_PROXY exit /b 93",
+    "if defined all_proxy exit /b 94",
     `${quoteCmdArgument(process.execPath)} ${quoteCmdArgument(fakePiScript)} %*`,
     "exit /b %ERRORLEVEL%",
     "",
@@ -366,14 +369,6 @@ function renderReport({
   configStates,
 }) {
   const lifecycleSections = steps
-    .filter((step) =>
-      [
-        "marketplace add",
-        "plugin add",
-        "plugin remove",
-        "marketplace remove",
-      ].includes(step.name),
-    )
     .map(
       (step) => `### ${step.name}
 
@@ -417,7 +412,7 @@ ${configLines}
 - 工具严格为 \`external_review\` 与 \`external_delegate\`；二者输入均要求 \`llm\`。
 - \`external_review\` 为只读且非破坏性；\`external_delegate\` 为可写且具破坏性提示。
 - fake Pi 的 Gemini review 返回 \`completed\`，实际模型为 \`gemini-3.5-flash\`，且没有文件变化。
-- fake Pi 包装器确认 Gemini 子进程的 \`HTTP_PROXY\` 与 \`HTTPS_PROXY\` 均被固定为 \`http://127.0.0.1:10808\`，没有继承父 MCP 的代理值；成功调用同时证明目标凭据候选已传入已安装 MCP。
+- fake Pi 包装器确认 Gemini 子进程通过固定 proxy-10808 路由门禁，包括通用代理在内的父 MCP 代理值均未下传；成功调用同时证明目标凭据候选已传入已安装 MCP。
 
 ## 语义回滚
 
@@ -429,6 +424,14 @@ ${configLines}
 
 这不是活动 Codex home，也不构成真实 Codex App 验收。它只证明本机 Codex CLI 在隔离 \`CODEX_HOME\` 中接受、安装、启动并卸载当前插件产物。
 `;
+}
+
+function assertEveryStepRendered(report, steps) {
+  for (const step of steps) {
+    if (!report.includes(`### ${step.name}\n`)) {
+      throw new Error(`Generated report omitted lifecycle step: ${step.name}`);
+    }
+  }
 }
 
 try {
@@ -501,7 +504,7 @@ try {
       GEMINI_API_KEY: credentialSentinel,
       HTTPS_PROXY: inheritedProxy,
       HTTP_PROXY: inheritedProxy,
-      ALL_PROXY: "socks5://parent-proxy.invalid:9999",
+      ALL_PROXY: inheritedAllProxy,
     }),
     stderr: "pipe",
   });
@@ -533,7 +536,18 @@ try {
     !Array.isArray(toolResult.filesChanged) ||
     toolResult.filesChanged.length !== 0
   ) {
-    throw new Error("Installed MCP fake Pi review did not meet the acceptance gate");
+    const diagnostics = Array.isArray(toolResult.diagnostics)
+      ? toolResult.diagnostics
+          .filter((entry) => typeof entry === "string")
+          .slice(0, 2)
+          .join(" | ")
+          .slice(0, 512)
+      : "";
+    throw new Error(
+      `Installed MCP fake Pi review did not meet the acceptance gate: status=${String(
+        toolResult.status,
+      )} model=${String(toolResult.actualModel)} diagnostics=${diagnostics}`,
+    );
   }
   await client.close();
   client = undefined;
@@ -598,10 +612,13 @@ try {
     installedRelativePath: installed.relativePath,
     configStates,
   });
+  assertEveryStepRendered(report, steps);
   for (const forbidden of [
     temporaryRoot,
     credentialSentinel,
+    expectedProxy,
     inheritedProxy,
+    inheritedAllProxy,
   ]) {
     if (report.includes(forbidden)) {
       throw new Error("Generated report contains isolated runtime details");

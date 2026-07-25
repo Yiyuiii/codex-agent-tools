@@ -14,10 +14,22 @@
 - 变化：无
 - 删除：`tmp/arg0/<ephemeral>/.lock`、`tmp/arg0/<ephemeral>/apply_patch.bat`、`tmp/arg0/<ephemeral>/applypatch.bat`
 
+### plugin list before install
+
+- 新增：无
+- 变化：无
+- 删除：无
+
 ### plugin add
 
 - 新增：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/.codex-plugin/plugin.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/.mcp.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/runtime/codex-external-agents-mcp.mjs`
 - 变化：`config.toml`
+- 删除：无
+
+### plugin list after install
+
+- 新增：无
+- 变化：无
 - 删除：无
 
 ### plugin remove
@@ -26,10 +38,22 @@
 - 变化：`config.toml`
 - 删除：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/.codex-plugin/plugin.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/.mcp.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/runtime/codex-external-agents-mcp.mjs`
 
+### plugin list after remove
+
+- 新增：无
+- 变化：无
+- 删除：无
+
 ### marketplace remove
 
 - 新增：无
 - 变化：`config.toml`
+- 删除：无
+
+### marketplace list after remove
+
+- 新增：无
+- 变化：无
 - 删除：无
 
 ## config.toml 状态
@@ -53,7 +77,7 @@
 - 工具严格为 `external_review` 与 `external_delegate`；二者输入均要求 `llm`。
 - `external_review` 为只读且非破坏性；`external_delegate` 为可写且具破坏性提示。
 - fake Pi 的 Gemini review 返回 `completed`，实际模型为 `gemini-3.5-flash`，且没有文件变化。
-- fake Pi 包装器确认 Gemini 子进程的 `HTTP_PROXY` 与 `HTTPS_PROXY` 均被固定为 `http://127.0.0.1:10808`，没有继承父 MCP 的代理值；成功调用同时证明目标凭据候选已传入已安装 MCP。
+- fake Pi 包装器确认 Gemini 子进程通过固定 proxy-10808 路由门禁，包括通用代理在内的父 MCP 代理值均未下传；成功调用同时证明目标凭据候选已传入已安装 MCP。
 
 ## 语义回滚
 
