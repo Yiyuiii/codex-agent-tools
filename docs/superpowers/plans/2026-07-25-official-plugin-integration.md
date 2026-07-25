@@ -464,11 +464,11 @@ git commit -m "feat: define approved external llm routes"
 - Modify: `package.json`
 - Modify: `package-lock.json`
 
-- [ ] **Step 1：加载插件脚手架技能并限定写入范围**
+- [x] **Step 1：加载插件脚手架技能并限定写入范围**
 
 实施此任务时读取 `plugin-creator` skill。明确采用“仓库内 marketplace + 仓库内插件目录”，不创建或修改个人 marketplace，不安装插件，不触碰 `CODEX_HOME`。
 
-- [ ] **Step 2：先写插件静态契约测试**
+- [x] **Step 2：先写插件静态契约测试**
 
 `test/plugin/artifact.test.ts` 至少断言：
 
@@ -506,7 +506,7 @@ expect(mcpManifest).toEqual({
 
 并断言 marketplace 只有一个插件，插件 manifest 不声明 hooks、skills、apps，MCP manifest 只有一个服务且不含 `env`、绝对路径或真实凭据。
 
-- [ ] **Step 3：运行插件测试，确认先红**
+- [x] **Step 3：运行插件测试，确认先红**
 
 Run:
 
@@ -516,7 +516,7 @@ npx vitest run test/plugin/artifact.test.ts
 
 Expected: 因三个 manifest 尚不存在而失败。
 
-- [ ] **Step 4：创建仓库 marketplace**
+- [x] **Step 4：创建仓库 marketplace**
 
 `.agents/plugins/marketplace.json`：
 
@@ -543,7 +543,7 @@ Expected: 因三个 manifest 尚不存在而失败。
 }
 ```
 
-- [ ] **Step 5：创建插件 manifest**
+- [x] **Step 5：创建插件 manifest**
 
 `plugins/codex-external-agents/.codex-plugin/plugin.json`：
 
@@ -574,7 +574,7 @@ Expected: 因三个 manifest 尚不存在而失败。
 }
 ```
 
-- [ ] **Step 6：创建插件专用构建配置**
+- [x] **Step 6：创建插件专用构建配置**
 
 `tsup.plugin.config.ts`：
 
@@ -618,7 +618,7 @@ plugins/codex-external-agents/runtime/
 
 保留其它现有脚本不变。若 `noExternal` 对 Node 内置模块产生错误，只允许通过 `external: [/^node:/u]` 明确排除 Node 内置模块；不允许把生产 npm 依赖重新外置。
 
-- [ ] **Step 7：验证自包含产物**
+- [x] **Step 7：验证自包含产物**
 
 Run:
 
@@ -636,7 +636,7 @@ Expected:
 - 最后一条 `rg` 无匹配；
 - bundle 运行不依赖仓库 `node_modules` 的相对导入。
 
-- [ ] **Step 8：提交**
+- [x] **Step 8：提交**
 
 ```powershell
 git add .agents .gitignore package.json package-lock.json plugins tsup.plugin.config.ts test/plugin/artifact.test.ts

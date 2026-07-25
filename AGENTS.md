@@ -31,7 +31,8 @@
 - 2026-07-20 的自动 cutover 当时通过文件级、MCP initialize/listTools 和 strict doctor 检查，但重启后的真实 Codex App 运行异常。用户已于 2026-07-24 恢复原始 `~/.codex/config.toml`。因此“新 MCP 已在活动配置中完全替代旧 MCP”的结论已撤销；当前真实配置内容以用户恢复结果为准，未经许可不读取或修改。
 - 当前代码公开五个固定逻辑 LLM：`ark-agent-deepseek-v4-flash`、`ark-agent-plan`、`ark-coding-plan`、`gemini-3.5-flash`、`kimi-k3`。共 10 个任务组合，其中 Kimi K3、Gemini 与 Ark Coding Plan 的 6 项保留 passed，两个新 Agent Plan 路线的 4 项为 pending；pending 能力不会复用旧证据或回退到其它 LLM。网络策略只保留 `direct` 与 `proxy-10808`，仅 Gemini 使用后者。
 - `codex-agent-tools` 在设计时没有同名 npm 包；发布前必须重新检查。当前不执行 `npm publish`。
-- 2026-07-25：官方插件集成目标设计已经 Kimi K3 与 Ark Coding Plan 外部审阅收敛并由用户书面复核通过，见 [官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)；逐任务方案见 [官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)。任务 1 的只读 CLI 基线保持不变；任务 2 由 `c1ed473` 完成五项模型面，并由 `9c14d4e` 加固独立、不可变且强制 evidence 的质量门禁。两次独立规格审阅与代码质量审阅最终均通过，当前为 153 项测试和类型检查全绿；插件清单、隔离官方安装与真实 Codex App 集成仍未实现。
+- 2026-07-25：官方插件集成目标设计已经 Kimi K3 与 Ark Coding Plan 外部审阅收敛并由用户书面复核通过，见 [官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)；逐任务方案见 [官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)。任务 1 的只读 CLI 基线保持不变；任务 2 由 `c1ed473` 完成五项模型面，并由 `9c14d4e` 加固独立、不可变且强制 evidence 的质量门禁；任务 3 由 `74d3bc7` 创建仓库内 marketplace、官方插件 manifest 与自包含 MCP bundle，`a47c993` 把无 `node_modules` 临时目录内的 MCP initialize/listTools 固化为回归测试，`f8090bb` 隔离了测试所用 tsup 配置。各任务的独立规格审阅与代码质量审阅最终均通过，当前为 159 项测试、类型检查和构建全绿；隔离官方安装与真实 Codex App 集成仍未实现。
+- 2026-07-25：本机 `plugin-creator` 自带校验脚本仍只接受旧式顶层 `mcpServers` 包装，但当前 Codex 官方插件文档明确允许 `.mcp.json` 使用直接 server map 或 `mcp_servers` 包装。仓库按官方文档采用直接 server map；任务 3 已证明 bundle 自包含和 MCP 契约，任务 4 必须继续用临时 `CODEX_HOME` 下的真实 Codex `plugin` CLI 证明官方安装器实际接受该格式，不能把旧校验器报错误写成官方宿主验收通过或失败。
 
 ## 架构与计划索引
 
