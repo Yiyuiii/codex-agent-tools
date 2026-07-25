@@ -1,10 +1,17 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { isBuiltin } from "node:module";
+import { tmpdir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { build, type Options } from "tsup";
 import { describe, expect, it } from "vitest";
+
+import pluginBuildConfig from "../../tsup.plugin.config.js";
 
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -88,15 +95,16 @@ describe("Codex plugin artifact", () => {
     const defaultPrompt = (
       pluginManifest.interface as Record<string, unknown>
     ).defaultPrompt;
-    if (Array.isArray(defaultPrompt)) {
-      expect(defaultPrompt.length).toBeLessThanOrEqual(3);
-      for (const prompt of defaultPrompt) {
-        expect(typeof prompt).toBe("string");
-        expect((prompt as string).length).toBeLessThanOrEqual(128);
-      }
-    } else {
-      expect(typeof defaultPrompt).toBe("string");
-      expect((defaultPrompt as string).length).toBeLessThanOrEqual(128);
+
+    expect(Array.isArray(defaultPrompt)).toBe(true);
+    if (!Array.isArray(defaultPrompt)) return;
+    expect(defaultPrompt.length).toBeGreaterThanOrEqual(1);
+    expect(defaultPrompt.length).toBeLessThanOrEqual(3);
+    for (const prompt of defaultPrompt) {
+      expect(typeof prompt).toBe("string");
+      if (typeof prompt !== "string") continue;
+      expect(prompt.trim().length).toBeGreaterThan(0);
+      expect(prompt.length).toBeLessThanOrEqual(128);
     }
   });
 
@@ -167,32 +175,82 @@ describe("Codex plugin artifact", () => {
     );
   });
 
-  it("runs the bundled MCP entry without repository dependencies", () => {
-    const bundlePath = resolve(
-      pluginRoot,
-      "runtime/codex-external-agents-mcp.mjs",
+  it("builds and runs the bundled MCP entry without repository dependencies", async () => {
+    const temporaryRoot = await mkdtemp(
+      resolve(tmpdir(), "codex-plugin-artifact-"),
     );
-    const output = execFileSync(
-      process.execPath,
-      [bundlePath, "--help"],
-      { encoding: "utf8" },
+    const buildRoot = resolve(temporaryRoot, "build");
+    const isolatedRoot = resolve(temporaryRoot, "isolated");
+    const isolatedBundle = resolve(
+      isolatedRoot,
+      "codex-external-agents-mcp.mjs",
     );
-    const bundle = readFileSync(bundlePath, "utf8");
-    const staticImports = [
-      ...bundle.matchAll(
-        /^import\s+(?:[^;]+?\s+from\s+)?["']([^"']+)["'];/gmu,
-      ),
-    ].map((match) => match[1]!);
+    const client = new Client({
+      name: "plugin-artifact-test",
+      version: "1.0.0",
+    });
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [isolatedBundle],
+      cwd: isolatedRoot,
+      stderr: "pipe",
+    });
 
-    expect(output).toContain(
-      "codex-external-agents-mcp - codex_external_agents stdio MCP server",
-    );
-    expect(output).toContain("Tools: external_review, external_delegate");
-    expect(staticImports.length).toBeGreaterThan(0);
-    expect(
-      [...new Set(staticImports)].filter(
-        (specifier) => !isBuiltin(specifier),
-      ),
-    ).toEqual([]);
+    try {
+      const config = pluginBuildConfig;
+      if (typeof config === "function" || Array.isArray(config)) {
+        throw new TypeError(
+          "Expected a single static plugin build configuration.",
+        );
+      }
+      await build({
+        ...(config as Options),
+        outDir: buildRoot,
+      });
+
+      const builtBundle = resolve(
+        buildRoot,
+        "codex-external-agents-mcp.mjs",
+      );
+      await mkdir(isolatedRoot, { recursive: true });
+      await copyFile(builtBundle, isolatedBundle);
+      expect(existsSync(resolve(temporaryRoot, "node_modules"))).toBe(false);
+
+      await client.connect(transport);
+      const listed = await client.listTools();
+      expect(listed.tools.map((tool) => tool.name).sort()).toEqual([
+        "external_delegate",
+        "external_review",
+      ]);
+
+      const output = execFileSync(
+        process.execPath,
+        [isolatedBundle, "--help"],
+        { cwd: isolatedRoot, encoding: "utf8" },
+      );
+      const bundle = readFileSync(isolatedBundle, "utf8");
+      const staticImports = [
+        ...bundle.matchAll(
+          /^import\s+(?:[^;]+?\s+from\s+)?["']([^"']+)["'];/gmu,
+        ),
+      ].map((match) => match[1]!);
+
+      expect(output).toContain(
+        "codex-external-agents-mcp - codex_external_agents stdio MCP server",
+      );
+      expect(output).toContain(
+        "Tools: external_review, external_delegate",
+      );
+      expect(staticImports.length).toBeGreaterThan(0);
+      expect(
+        [...new Set(staticImports)].filter(
+          (specifier) => !isBuiltin(specifier),
+        ),
+      ).toEqual([]);
+    } finally {
+      await client.close().catch(() => undefined);
+      await transport.close().catch(() => undefined);
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
   });
 });
