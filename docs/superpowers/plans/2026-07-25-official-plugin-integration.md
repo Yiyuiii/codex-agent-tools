@@ -1032,7 +1032,7 @@ git commit -m "test: assure codex plugin release artifact"
 - Modify: `docs/superpowers/specs/2026-07-18-codex-external-agents-design.md`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1：删除所有旧配置写入指引**
+- [x] **Step 1：删除所有旧配置写入指引**
 
 Run:
 
@@ -1042,7 +1042,7 @@ rg -n "install --replace-codex-cc-tools|restore --backup|codex-agent-tools insta
 
 逐项修改所有面向当前用户的指引。历史设计中的旧命令可以保留，但必须在同一段明确标注“历史实现，当前已禁用，不得用于活动配置”。
 
-- [ ] **Step 2：写官方插件运维流程**
+- [x] **Step 2：写官方插件运维流程**
 
 `docs/operations.md` 只描述：
 
@@ -1069,7 +1069,7 @@ codex plugin remove codex-external-agents@codex-external-agents-local
 codex plugin marketplace remove codex-external-agents-local
 ```
 
-- [ ] **Step 3：写共存迁移边界**
+- [x] **Step 3：写共存迁移边界**
 
 `docs/migration-from-codex-cc-tools.md` 明确：
 
@@ -1079,7 +1079,7 @@ codex plugin marketplace remove codex-external-agents-local
 - 只有真实 Codex App、五项十门禁、取消/清理全通过后才“具备替代条件”；
 - 移除旧工具是后续独立变更和独立授权。
 
-- [ ] **Step 4：写四层验收清单**
+- [x] **Step 4：写四层验收清单**
 
 `docs/release/checklist.md` 分成：
 
@@ -1090,7 +1090,7 @@ codex plugin marketplace remove codex-external-agents-local
 
 每一层都有通过证据路径和失败后的停止条件。不得把隔离 CLI 验收写成真实 App 已通过。
 
-- [ ] **Step 5：同步模型与历史证据说明**
+- [x] **Step 5：同步模型与历史证据说明**
 
 - `docs/smoke/kimi.md`：当前只支持 K3，K2.7 仅历史；
 - `docs/smoke/pi-gemini.md`：当前 Gemini 路由不变，但任务 7 将产生新的精确证据；
@@ -1098,7 +1098,7 @@ codex plugin marketplace remove codex-external-agents-local
 - 原始 2026-07-18 设计增加“由 2026-07-25 官方插件设计覆盖安装、网络和模型面”的链接；
 - `AGENTS.md` 更新真实进度和本计划索引。
 
-- [ ] **Step 6：验证文档无漂移并提交**
+- [x] **Step 6：验证文档无漂移并提交**
 
 Run:
 
@@ -1127,11 +1127,31 @@ git commit -m "docs: document official plugin operations"
 **Files:**
 
 - Modify: `src/llms/registry.ts`
+- Modify: `src/smoke/kimi.ts`
+- Modify: `src/smoke/pi.ts`
+- Modify: `scripts/real-kimi-smoke.mjs`
+- Modify: `scripts/real-pi-smoke.mjs`
+- Modify: `scripts/real-ark-smoke.mjs`
+- Test: `test/smoke/`
 - Modify: `docs/smoke/kimi.md`
 - Modify: `docs/smoke/pi-gemini.md`
 - Modify: `docs/smoke/ark.md`
 - Create at runtime: `docs/smoke/evidence/` 下由现有 smoke runner 按 ISO 时间戳、逻辑 LLM 和任务类型命名的 JSON 证据
 - Modify: `AGENTS.md`
+
+- [ ] **Step 0：先堵住真实失败证据链缺口**
+
+2026-07-25 只读预飞审计发现：三个 `real-*-smoke.mjs` 仅在 `run*Smoke()` 正常返回时写 evidence；版本探测、隔离配置建立、前后进程快照等基础设施异常只输出 stderr。Kimi evidence 也没有稳定 `failureReason`。在消耗任何真实模型额度前，必须先用 TDD 修复并独立复审：
+
+- 参数已成功解析后，无论模型结果、验收失败还是基础设施异常，都尽力写入按原命名规则生成的脱敏 JSON；
+- 基础设施失败只记录稳定类别、阶段、计数、非秘密模型/路由元数据和必要检查状态，不保存任意原始错误正文；
+- stderr 不直接回显可能含凭据或认证头的原始异常；
+- evidence 文件本身不可写时 fail closed、返回非零并输出固定非秘密提示；不能伪称已有证据；
+- Kimi 结构化失败增加稳定 `failureReason`，至少能区分适配器/认证或模型不可用、验收失败、进程残留与基础设施失败；
+- 失败测试使用秘密哨兵证明 JSON 与 stderr 都不泄漏值，并覆盖 Kimi、Gemini/Pi 与 Ark 三个入口；
+- 后置进程快照缺失或清理状态未知时立即停止后续真实门禁。
+
+完成本步的目标测试、全量测试、类型检查、构建、规格复审与质量复审后，才能执行 Step 1 及后续十项真实调用。
 
 - [ ] **Step 1：建立门禁前基线**
 

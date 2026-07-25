@@ -37,6 +37,8 @@
 - 2026-07-25：任务 4 的真实 fake Pi 门禁发现 `execa` 默认 `extendEnv: true` 会把 MCP 父进程的 `ALL_PROXY` 重新注入 Pi 子进程。提交 `e967947` 已在 Pi 启动处设置 `extendEnv: false`，使子进程只接收项目构造的白名单环境；回归同时验证显式 10808 HTTP(S) 代理与必要系统路径仍保留。隔离脚本还验证精确凭据哨兵、快照竞态失败传播和异常 MCP 进程树清理。最终任务 4 由 `eb81a51`、`e967947`、`0ad3d5e`、`f048b5c`、`91109c7` 完成，独立规格与质量复审均通过，主线程复验为 169 项测试、类型检查、构建和隔离生命周期全绿；活动 `~/.codex/config.toml` 未被读取或修改。
 - 2026-07-25：官方插件实施任务 5 由 `874db97` 把四个精确插件文件纳入 npm pack 与 release smoke，`8e59c3c`、`d235803` 将 bundle 的生产依赖检查从脆弱正则收敛为 release-only TypeScript AST 遍历。当前门禁识别静态 import/re-export、动态 import、任意位置的直接 `require` / `__require`，注释与字符串不误报，非字面量和解析错误 fail closed；TypeScript 不进入插件 runtime bundle。`npm pack --dry-run --json` 的插件面严格为 marketplace、plugin manifest、`.mcp.json` 与单文件 runtime 四项，不生成持久 `.tgz`；Codex plugin help 只在临时 `CODEX_HOME` 中运行，release smoke 不执行安装、卸载或发布。任务 5 最终独立规格与质量复审通过，主线程复验为 release assurance 24/24、全量 191/191、release smoke、类型检查和构建全绿。
 - 2026-07-25：官方插件实施任务 6 已把 README、运维、共存迁移、四层发布门禁和三份真实模型证据索引收敛到当前五模型面。当前运维只允许依次构建、隔离官方生命周期取证、准备权限包，并在逐动作明确许可后使用官方 add/remove；项目和维护者均不直接读写或手工恢复活动 `config.toml`。隔离 CLI 生命周期与真实 Codex App 宿主门禁被明确分层；当前第 1、2 层 passed，第 3 层为 6 passed / 4 pending，第 4 层尚未执行。旧 `codex_cc_tools` 本轮保持共存，移除旧工具属于后续独立变更与独立授权。
+- 2026-07-25：任务 6 最终由 `1786b91`、`4c9d9d4`、`1aceaa6` 完成。规格复审先发现两份旧实施计划仍可能被误作当前配置写入指引，质量复审再发现 doctor 测试副本描述漂移和 PowerShell 原生命令失败后可能继续执行；修复后两类复审均通过。官方 add/remove 示例现在逐命令检查退出码，主线程重新运行文档漂移 `rg`、`git diff --check` 与 release smoke 全绿。
+- 2026-07-25：任务 7 真实调用前的只读预飞审计发现证据链阻断：三个 `real-*-smoke.mjs` 只在核心 smoke 正常返回后落盘，基础设施异常可能没有 JSON；Kimi evidence 也缺少稳定失败类别。十项真实门禁暂不开始，先按实施计划 Step 0 用 TDD 实现“有效参数后的失败尽力落盘、原始异常不出现在 JSON/stderr、证据不可写时 fail closed、Kimi 失败分类”，完成独立规格与质量复审后再消耗真实额度。
 
 ## 架构与计划索引
 
