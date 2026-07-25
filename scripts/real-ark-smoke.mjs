@@ -2,22 +2,27 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseArkSmokeArguments, runArkSmoke } from "../dist/ark-smoke.js";
-import { runSmokeEntrypoint } from "../dist/smoke-evidence.js";
+import {
+  isDirectExecution,
+  runRealSmokeMain,
+} from "./real-smoke-main.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const args = process.argv.slice(2);
 
-if (args.includes("--help") || args.includes("-h")) {
-  process.stdout.write(
-    "Usage: npm run smoke:ark -- --llm <ark-logical-id> --task review|delegate\n",
+export function main(options = {}) {
+  return runRealSmokeMain(
+    {
+      kind: "ark",
+      usage:
+        "Usage: npm run smoke:ark -- --llm <ark-logical-id> --task review|delegate\n",
+      parseArguments: parseArkSmokeArguments,
+      runSmoke: runArkSmoke,
+      evidenceDirectory: path.join(root, "docs", "smoke", "evidence"),
+    },
+    options,
   );
-  process.exit(0);
 }
 
-process.exitCode = await runSmokeEntrypoint({
-  kind: "ark",
-  args,
-  parseArguments: parseArkSmokeArguments,
-  runSmoke: runArkSmoke,
-  evidenceDirectory: path.join(root, "docs", "smoke", "evidence"),
-});
+if (isDirectExecution(import.meta.url)) {
+  process.exitCode = await main();
+}
