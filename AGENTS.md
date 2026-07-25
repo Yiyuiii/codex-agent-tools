@@ -12,7 +12,7 @@
 - 终端用户不手工维护插件或 Pi 配置，由 Codex 随项目版本维护。
 - 当前迁移不需要额外外部审阅，由 Codex 自主推进；未经明确授权不公开发布 npm。
 - 2026-07-24：用户反馈自动修改 `~/.codex/config.toml` 后 Codex 无法正常运行，并已恢复原始配置。后续默认不得写入、替换或恢复该文件；优先使用只读检查、独立测试配置和生成候选配置。若未来确实无法绕开，必须先说明必要性、精确差异、验证与回滚方案，并取得用户针对该次写入的明确许可。
-- 2026-07-25：用户同意改用 Codex 官方插件机制管理插件状态，但项目代码仍不得直接读写活动 `~/.codex/config.toml`。真实官方安装或升级前先在隔离 `CODEX_HOME` 取证；若官方操作会触碰活动配置，仍需展示预计精确差异、验证与回滚并取得针对该次操作的明确许可。
+- 2026-07-25：用户同意改用 Codex 官方插件机制管理插件状态，但项目代码仍不得直接读写活动 `~/.codex/config.toml`。官方文档明确说明插件开关状态存储在该文件中，因此真实官方安装或升级属于可能触碰活动配置的操作；执行前必须先在隔离 `CODEX_HOME` 取证，再展示预计精确差异、验证与回滚，并取得针对该次操作的明确许可。
 - 2026-07-25：目标模型面调整为 `kimi-k3`、`gemini-3.5-flash`、两个固定使用 `ark-code-latest` 的 Ark Plan 路线，以及 Ark Agent Plan 内的 `deepseek-v4-flash` 快速经济档。
 
 ## 当前事实状态
@@ -30,12 +30,13 @@
 - 2026-07-20 的自动 cutover 当时通过文件级、MCP initialize/listTools 和 strict doctor 检查，但重启后的真实 Codex App 运行异常。用户已于 2026-07-24 恢复原始 `~/.codex/config.toml`。因此“新 MCP 已在活动配置中完全替代旧 MCP”的结论已撤销；当前真实配置内容以用户恢复结果为准，未经许可不读取或修改。
 - Kimi、Gemini、Ark 共七个逻辑 LLM、14 个任务组合现均有独立 passed 证据。禁用或未来 pending 能力不会回退到其它 LLM。
 - `codex-agent-tools` 在设计时没有同名 npm 包；发布前必须重新检查。当前不执行 `npm publish`。
-- 2026-07-25：官方插件集成目标设计已经 Kimi K3 与 Ark Coding Plan 外部审阅收敛，见 [官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)。该文档是目标状态，不代表插件清单、五项模型面或真实 Codex App 集成已经实现；当前代码和历史门禁仍是七项逻辑 LLM。
+- 2026-07-25：官方插件集成目标设计已经 Kimi K3 与 Ark Coding Plan 外部审阅收敛并由用户书面复核通过，见 [官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)；逐任务方案见 [官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)。这些文档是目标与执行基线，不代表插件清单、五项模型面或真实 Codex App 集成已经实现；当前代码和历史门禁仍是七项逻辑 LLM。
 
 ## 架构与计划索引
 
 - [产品设计历史基线](docs/superpowers/specs/2026-07-18-codex-external-agents-design.md)
 - [当前官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)
+- [官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)
 - [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)
 - [Pi/Gemini 适配实施计划](docs/superpowers/plans/2026-07-18-pi-gemini-adapter.md)
 - [Ark 迁移与本机切换实施计划](docs/superpowers/plans/2026-07-18-ark-migration-and-cutover.md)
