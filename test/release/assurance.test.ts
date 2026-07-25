@@ -5,6 +5,17 @@ import {
   assertNoSensitiveContent,
 } from "../../src/release/assurance.js";
 
+const PLUGIN_BUNDLE_NAME =
+  "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs";
+const RELEASE_SCAN_OPTIONS = { forbiddenPaths: [], secrets: [] } as const;
+
+function assertBundleContent(content: string): void {
+  assertNoSensitiveContent(
+    [{ name: PLUGIN_BUNDLE_NAME, content }],
+    RELEASE_SCAN_OPTIONS,
+  );
+}
+
 describe("release assurance", () => {
   it("accepts only the documented runtime package surface", () => {
     expect(() =>
@@ -139,5 +150,86 @@ describe("release assurance", () => {
         options,
       ),
     ).not.toThrow();
+  });
+
+  it.each([
+    ["module export", 'module.exports = require("zod");'],
+    ["conditional require", 'condition ? require("zod") : null;'],
+    [
+      "import options",
+      'import("zod", { with: { type: "json" } });',
+    ],
+    ["commented import clause", 'import /*comment*/ z from "zod";'],
+    ["commented export clause", 'export * /*comment*/ from "zod";'],
+    ["template require", "require(`zod`);"],
+  ])("rejects a real non-builtin dependency through %s", (_label, content) => {
+    expect(() => assertBundleContent(content)).toThrow(
+      /Non-builtin production import/u,
+    );
+  });
+
+  it.each([
+    ["block comment", '/*\nimport z from "zod";\n*/'],
+    ["line comment", '// import z from "zod";'],
+    [
+      "ordinary string",
+      "const text = '\\\nimport z from \"zod\"';",
+    ],
+    ["template literal", 'const text = `\nimport z from "zod";\n`;'],
+  ])("ignores dependency-like text inside a %s", (_label, content) => {
+    expect(() => assertBundleContent(content)).not.toThrow();
+  });
+
+  it.each([
+    ["dynamic import", "import(selectModule());"],
+    ["require", "condition ? require(selectModule()) : null;"],
+    ["esbuild require", "__require(selectModule());"],
+    ["template expression", "require(`package/${variant}`);"],
+  ])("fails closed for a non-literal %s specifier", (_label, content) => {
+    expect(() => assertBundleContent(content)).toThrow(
+      /Non-literal production import/u,
+    );
+  });
+
+  it.each([
+    ["module export", 'module.exports = require("node:path");'],
+    [
+      "conditional require",
+      'condition ? require("node:path") : null;',
+    ],
+    [
+      "import options",
+      'import("node:fs", { with: { type: "json" } });',
+    ],
+    [
+      "commented import clause",
+      'import /*comment*/ path from "node:path";',
+    ],
+    [
+      "commented export clause",
+      'export * /*comment*/ from "node:fs";',
+    ],
+    ["template require", "require(`node:path`);"],
+  ])("allows a Node builtin dependency through %s", (_label, content) => {
+    expect(() => assertBundleContent(content)).not.toThrow();
+  });
+
+  it("fails closed on invalid JavaScript without echoing source text", () => {
+    const secretSource = "const broken = ; // parse-secret-sentinel";
+
+    let failure: unknown;
+    try {
+      assertBundleContent(secretSource);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(
+      /Unable to parse plugin bundle/u,
+    );
+    expect((failure as Error).message).not.toContain(
+      "parse-secret-sentinel",
+    );
   });
 });

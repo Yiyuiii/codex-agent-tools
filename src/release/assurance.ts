@@ -1,5 +1,11 @@
-import { isBuiltin } from "node:module";
+import { createRequire, isBuiltin } from "node:module";
 import path from "node:path";
+
+import type * as TypeScript from "typescript";
+
+const ts = createRequire(import.meta.url)(
+  "typescript",
+) as typeof TypeScript;
 
 export interface ReleaseTextEntry {
   name: string;
@@ -41,18 +47,75 @@ function normalizeForSearch(value: string): string {
     .toLocaleLowerCase("en-US");
 }
 
-function productionImportSpecifiers(content: string): string[] {
-  const patterns = [
-    /^\s*import\s+(?:(?:[$A-Z_a-z][$\w]*\s*,\s*)?(?:\{[^};]*\}|\*\s+as\s+[$A-Z_a-z][$\w]*)|[$A-Z_a-z][$\w]*)\s+from\s+["']([^"']+)["']/gmu,
-    /^\s*import\s+["']([^"']+)["']/gmu,
-    /^\s*export\s+(?:\{[^};]*\}|\*(?:\s+as\s+[$A-Z_a-z][$\w]*)?)\s+from\s+["']([^"']+)["']/gmu,
-    /\bimport\(\s*["']([^"']+)["']\s*\)/gmu,
-    /\b__require\(\s*["']([^"']+)["']\s*\)/gmu,
-    /^\s*(?:(?:const|let|var)\s+(?:[$A-Z_a-z][$\w]*|\{[^};\r\n]*\}|\[[^\];\r\n]*\])\s*=\s*)?require\(\s*["']([^"']+)["']\s*\)/gmu,
-  ];
-  return patterns.flatMap((pattern) =>
-    [...content.matchAll(pattern)].map((match) => match[1]!),
+interface ParsedSourceFile extends TypeScript.SourceFile {
+  readonly parseDiagnostics?: readonly TypeScript.Diagnostic[];
+}
+
+function literalModuleSpecifier(
+  node: TypeScript.Expression | undefined,
+  entryName: string,
+): string {
+  if (
+    node !== undefined &&
+    (ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node))
+  ) {
+    return node.text;
+  }
+  throw new Error(
+    `Non-literal production import found in ${entryName}`,
   );
+}
+
+// This compiler-AST check is release-only and is not reachable from the
+// plugin MCP entrypoint, so TypeScript is never added to the plugin runtime.
+function productionImportSpecifiers(entry: ReleaseTextEntry): string[] {
+  let sourceFile: ParsedSourceFile;
+  try {
+    sourceFile = ts.createSourceFile(
+      entry.name,
+      entry.content,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.JS,
+    ) as ParsedSourceFile;
+  } catch {
+    throw new Error(`Unable to parse plugin bundle ${entry.name}`);
+  }
+  if ((sourceFile.parseDiagnostics?.length ?? 0) > 0) {
+    throw new Error(`Unable to parse plugin bundle ${entry.name}`);
+  }
+
+  const specifiers: string[] = [];
+  const visit = (node: TypeScript.Node): void => {
+    if (ts.isImportDeclaration(node)) {
+      specifiers.push(
+        literalModuleSpecifier(node.moduleSpecifier, entry.name),
+      );
+    } else if (
+      ts.isExportDeclaration(node) &&
+      node.moduleSpecifier !== undefined
+    ) {
+      specifiers.push(
+        literalModuleSpecifier(node.moduleSpecifier, entry.name),
+      );
+    } else if (ts.isCallExpression(node)) {
+      const isDynamicImport =
+        node.expression.kind === ts.SyntaxKind.ImportKeyword;
+      const isRequire =
+        ts.isIdentifier(node.expression) &&
+        (node.expression.text === "require" ||
+          node.expression.text === "__require");
+      if (isDynamicImport || isRequire) {
+        specifiers.push(
+          literalModuleSpecifier(node.arguments[0], entry.name),
+        );
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return specifiers;
 }
 
 function assertPluginBundleContent(entry: ReleaseTextEntry): void {
@@ -62,7 +125,7 @@ function assertPluginBundleContent(entry: ReleaseTextEntry): void {
     throw new Error(`Development entrypoint reference found in ${entry.name}`);
   }
   if (
-    productionImportSpecifiers(entry.content).some(
+    productionImportSpecifiers(entry).some(
       (specifier) => !isBuiltin(specifier),
     )
   ) {
