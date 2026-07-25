@@ -1280,13 +1280,13 @@ git commit -m "test: qualify approved external llm routes"
 - Create: `docs/release/real-plugin-install-review.md`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1：先判定是否允许进入授权准备**
+- [x] **Step 1：先判定是否允许进入授权准备**
 
 重新读取五项十门禁和注册表状态。只有十项全部 `passed`，才可把权限包标记为 `ready` 并进入真实安装授权准备。
 
 当前 2026-07-25 原始门禁为 8 passed / 2 failed，成对晋级后的注册表为 6 passed / 4 pending。因此本轮必须走阻断分支：仍创建状态包，但标记为 `blocked / not ready`，不得写入可被误解为当前有效的授权提问、固定授权语句或可立即执行的安装指示。
 
-- [ ] **Step 2：从隔离报告和门禁证据提取最小充分状态**
+- [x] **Step 2：从隔离报告和门禁证据提取最小充分状态**
 
 阻断状态包只包含：
 
@@ -1303,11 +1303,11 @@ git commit -m "test: qualify approved external llm routes"
 - 旧 `codex_cc_tools` 保持原状；
 - 本轮不发布 npm、不移除旧工具。
 
-- [ ] **Step 3：写阻断状态包**
+- [x] **Step 3：写阻断状态包**
 
 创建 `docs/release/real-plugin-install-review.md`，标题和状态摘要必须明确包含 `blocked / not ready`。当前版本不设置“需要用户判断”、授权问题或授权回答方式，也不保留历史草案中的固定授权语句。这些内容只能在未来十项门禁全部 passed、状态包改为 `ready` 后重新评估并由当时会话生成；不得从本轮阻断状态推定任何安装、回滚、后续升级、卸载旧工具或发布权限。
 
-- [ ] **Step 4：只用当前 qualified 外部 LLM 审阅阻断状态包**
+- [x] **Step 4：只用当前 qualified 外部 LLM 审阅阻断状态包**
 
 优先使用当前会话可用的 `codex_external_agents` MCP。若当前工具面尚未暴露它，则从已构建 bundle 启动临时 stdio MCP 客户端执行同样的只读调用；不得为审阅提前安装真实插件，也不得回退到 cc tools。
 

@@ -17,7 +17,7 @@
 | 1 | 确定性单测、类型检查、构建、release smoke | passed | `test/`、`test/release/assurance.test.ts`、`scripts/release-smoke.mjs`，任务 5 提交 `874db97`、`8e59c3c`、`d235803` |
 | 2 | 临时 `CODEX_HOME` 中的官方插件生命周期 | passed | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs` |
 | 3 | 五个逻辑 LLM 的十项真实模型门禁 | incomplete：6 passed / 4 pending | [Kimi](../smoke/kimi.md)、[Gemini](../smoke/pi-gemini.md)、[Ark](../smoke/ark.md)、`docs/smoke/evidence/` |
-| 4 | 活动 Codex 的真实 App 宿主门禁 | not run | 计划中的 `real-plugin-install-review.md` 与授权后生成的 `real-host-acceptance.md` |
+| 4 | 活动 Codex 的真实 App 宿主门禁 | not run / blocked | [real-plugin-install-review.md](real-plugin-install-review.md) 当前已存在，但只是 `blocked / not ready` 草案；只有十项真实模型门禁全部 passed 后才能重新审阅并改为 `ready`，授权后才可生成 `real-host-acceptance.md` |
 
 ## 第 1 层：确定性单测与构建
 
