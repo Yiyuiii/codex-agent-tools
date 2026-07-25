@@ -65,7 +65,7 @@ D:\Codes\codex-agent-tools
 - Delete: `test/cli/config.test.ts`
 - Delete: `test/cli/cutover.test.ts`
 
-- [ ] **Step 1：先把 CLI 契约测试改成只允许 `doctor`**
+- [x] **Step 1：先把 CLI 契约测试改成只允许 `doctor`**
 
 在 `test/cli/main.test.ts` 中把公开命令断言改为：
 
@@ -88,7 +88,7 @@ expect(doctor).toHaveBeenCalledWith({
 });
 ```
 
-- [ ] **Step 2：先把 doctor 测试改成“不接受配置路径、不报告 MCP 注册”**
+- [x] **Step 2：先把 doctor 测试改成“不接受配置路径、不报告 MCP 注册”**
 
 在 `test/cli/doctor.test.ts` 中：
 
@@ -106,7 +106,7 @@ expect(report.checks).toContainEqual(
 
 删除所有 `configPath`、临时 `config.toml`、`hasManagedCodexConfig` 相关测试安排。新增一项防回归测试：传入的依赖环境中即使有 `CODEX_HOME`，`collectDoctorReport` 也不调用任何配置读取依赖。
 
-- [ ] **Step 3：运行测试，确认先红**
+- [x] **Step 3：运行测试，确认先红**
 
 Run:
 
@@ -116,7 +116,7 @@ npx vitest run test/cli/main.test.ts test/cli/doctor.test.ts
 
 Expected: 失败原因包含仍存在 `install` / `uninstall` / `restore`、仍有 `--config` 或仍报告 `MCP registration`。
 
-- [ ] **Step 4：把 `src/cli/main.ts` 收敛为只读 CLI**
+- [x] **Step 4：把 `src/cli/main.ts` 收敛为只读 CLI**
 
 保留的公开类型与依赖应为：
 
@@ -147,7 +147,7 @@ program
   });
 ```
 
-- [ ] **Step 5：让 doctor 完全脱离 Codex 配置**
+- [x] **Step 5：让 doctor 完全脱离 Codex 配置**
 
 在 `src/cli/doctor.ts`：
 
@@ -157,7 +157,7 @@ program
 - 从 `collectDoctorReport` 删除配置路径解析和 `MCP registration` 检查；
 - 保留 Kimi、Pi、凭据、代理、模型、产物与公开工具诊断。
 
-- [ ] **Step 6：删除不再可达的配置写入实现和测试**
+- [x] **Step 6：删除不再可达的配置写入实现和测试**
 
 删除四个文件后运行：
 
@@ -167,7 +167,7 @@ rg -n "getDefaultCodexConfigPath|installCodexConfig|uninstallCodexConfig|cutover
 
 Expected: 不再出现 Codex 配置写入函数；若 `configPath` 仍出现，只能是与 Pi 或测试夹具无关的通用局部变量，逐项核实后保留。
 
-- [ ] **Step 7：验证并提交**
+- [x] **Step 7：验证并提交**
 
 Run:
 
