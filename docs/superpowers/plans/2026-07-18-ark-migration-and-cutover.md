@@ -1,5 +1,7 @@
 # Ark Pi Migration and Local Cutover Implementation Plan
 
+> **历史计划，已被取代，禁止继续执行：** 本计划记录 2026-07-18 至 2026-07-24 的旧 cutover 实现与事故。当前安装、网络与模型面以 [2026-07-25 官方插件集成设计](../specs/2026-07-25-official-plugin-integration-design.md) 为准；下文所有 install/uninstall/restore、cutover、`--config` 和配置写入描述均为“历史实现，当前已禁用，不得用于活动配置”，测试副本路线也已删除。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 把 Ark Coding Plan 与 Ark Agent Plan 的目标模型迁移到隔离 Pi 后端，通过真实门禁后在本机 Codex 中用 `codex_external_agents` 完整替代 `codex_cc_tools`。
@@ -252,9 +254,9 @@ Run: `npm test -- --run test/cli/cutover.test.ts`
 
 Expected: FAIL，cutover 尚不存在。
 
-- [x] **Step 3: 实现 `install --replace-codex-cc-tools`**
+- [x] **Step 3（历史实现，当前已禁用，不得用于活动配置）: 实现 `install --replace-codex-cc-tools`**
 
-流程固定为：运行 doctor 并确认所有目标 enabled → 锁定 config → 同目录写备份 → 在内存中删除旧表/安装新 owned block → 写临时文件并 fsync → rename → 启动新 MCP 做 initialize/listTools → 成功后释放锁。任何错误恢复备份并返回非 0。命令输出中文摘要和备份路径；不会调用或卸载 Claude Code。迁移文档列出旧到新映射、明确删除 Anthropic/DeepSeek/Codex 来源、保留本机 Claude Code 安装以及 `restore --backup <path>` 回滚命令。
+**历史实现，当前已禁用，不得用于活动配置：** 当时流程固定为运行 doctor 并确认所有目标 enabled → 锁定 config → 同目录写备份 → 在内存中删除旧表/安装新 owned block → 写临时文件并 fsync → rename → 启动新 MCP 做 initialize/listTools → 成功后释放锁。任何错误恢复备份并返回非 0。命令输出中文摘要和备份路径；不会调用或卸载 Claude Code。迁移文档曾列出旧到新映射、删除 Anthropic/DeepSeek/Codex 来源、保留本机 Claude Code 安装以及 `restore --backup <path>` 回滚命令；当前这些命令与配置写入实现已删除。
 
 - [x] **Step 4: 验证**
 
@@ -262,7 +264,7 @@ Run: `npm test -- --run test/cli/cutover.test.ts && npm run typecheck`
 
 Expected: 全部通过，失败注入均恢复原始 config。
 
-Actual: 临时配置测试覆盖 readiness 零写入、成功备份/替换、MCP 自检失败逐字节回滚、幂等与显式 restore；对真实配置副本运行默认 readiness 时退出 1、SHA-256 不变且未创建备份。
+Historical actual（历史实现，当前已禁用，不得用于活动配置）：临时配置测试曾覆盖 readiness 零写入、成功备份/替换、MCP 自检失败逐字节回滚、幂等与显式 restore；对真实配置副本运行默认 readiness 时退出 1、SHA-256 不变且未创建备份。测试副本路线现已删除，不得再执行。
 
 - [x] **Step 5: 提交**
 
@@ -298,9 +300,9 @@ Run: `npm link && codex-agent-tools doctor --json && node scripts/local-acceptan
 
 Expected: doctor 无阻断项；MCP 仅列两个工具；Kimi/Pi review、临时 delegate 和取消清理均通过。
 
-- [x] **Step 4: 执行本机 cutover 并复核**
+- [x] **Step 4（历史事故记录，当前已禁用，不得用于活动配置）: 执行本机 cutover 并复核**
 
-Run: `codex-agent-tools install --replace-codex-cc-tools`
+Historical run（历史实现，当前已禁用，不得用于活动配置）：`codex-agent-tools install --replace-codex-cc-tools`
 
 Run: `codex-agent-tools doctor --json`
 
@@ -329,7 +331,7 @@ git commit -m "chore: complete local replacement acceptance"
 - Ark Coding 真实凭据来源确认是用户环境变量 `API_KEY_DOUBAO_CODING`；注册表、安装白名单、运行时规范化和 doctor 已用 TDD 增加兼容。
 - Gemini `proxy-10808`、Ark Coding direct、Ark Agent GLM direct、Ark Agent Doubao direct 的 review/delegate 八项真实门禁全部 passed；对应注册表能力已启用。
 - 31 个测试文件、157 项测试、类型检查、构建、release smoke、stdio MCP local acceptance 全部退出 0。
-- `install --replace-codex-cc-tools` 已对真实配置成功执行，切换前备份与原配置哈希一致；旧 MCP 表已删除，新 MCP 表保留，切换后 strict doctor 全绿。
+- 历史事故事实（历史实现，当前已禁用，不得用于活动配置）：`install --replace-codex-cc-tools` 曾对真实配置返回成功，切换前备份与原配置哈希一致；旧 MCP 表已删除，新 MCP 表保留，切换后 strict doctor 全绿。该结果不代表真实 Codex App 集成成功，也不得据此复跑。
 - 未修改旧仓库或 Claude Code，未公开发布 npm。Codex App 需要在切换后重启以刷新本会话已启动的 MCP 进程。
 
 ## 2026-07-24 事故复核
@@ -339,6 +341,6 @@ git commit -m "chore: complete local replacement acceptance"
 后续实施约束：
 
 - 不读取、写入、替换或恢复用户已还原的活动配置。
-- `install`、`install --replace-codex-cc-tools` 与 `restore` 只能在显式测试副本上使用。
+- 历史 `install`、`install --replace-codex-cc-tools`、`restore` 命令及其测试副本路线均已从当前代码删除；历史实现当前已禁用，不得用于活动配置，也不得再对测试副本执行。
 - 先设计不修改活动配置的官方插件安装路径，并增加真实 Codex App 启动兼容性验证；独立 MCP initialize/listTools 与 doctor 不再作为充分完成条件。
 - 任何无法绕开的活动配置写入都需要用户针对该次操作重新明确授权。
