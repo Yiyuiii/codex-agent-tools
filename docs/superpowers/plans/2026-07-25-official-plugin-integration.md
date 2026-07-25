@@ -1329,7 +1329,7 @@ git commit -m "test: qualify approved external llm routes"
 
 Codex 对反馈逐项核实，只采纳有证据的问题。
 
-- [ ] **Step 5：验证并提交阻断状态包**
+- [x] **Step 5：验证并提交阻断状态包**
 
 Run:
 
@@ -1348,7 +1348,7 @@ git add docs/release/real-plugin-install-review.md AGENTS.md
 git commit -m "docs: record blocked real plugin install review"
 ```
 
-- [ ] **Step 6：向用户报告阻断并停止**
+- [x] **Step 6：向用户报告阻断并停止**
 
 给用户提供可点击的阻断状态包路径、最小结论、两项失败证据和重入条件。当前不索要或接受真实安装授权；即使用户主动提供旧草案中的固定语句，也必须先满足十门禁全部 passed 并把状态包重新审阅为 `ready`。本轮不执行任务 9 的任何命令。
 
