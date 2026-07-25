@@ -18,6 +18,10 @@ describe("release assurance", () => {
         "dist/cli.js",
         "dist/mcp.js",
         "dist/index.d.ts",
+        ".agents/plugins/marketplace.json",
+        "plugins/codex-external-agents/.codex-plugin/plugin.json",
+        "plugins/codex-external-agents/.mcp.json",
+        "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
       ]),
     ).not.toThrow();
 
@@ -27,6 +31,24 @@ describe("release assurance", () => {
     expect(() =>
       assertAllowedPackFiles(["package.json", "AGENTS.md"]),
     ).toThrow(/AGENTS\.md/);
+    expect(() =>
+      assertAllowedPackFiles([
+        "plugins/codex-external-agents/node_modules/zod/index.js",
+      ]),
+    ).toThrow(/Unexpected file/u);
+    expect(() =>
+      assertAllowedPackFiles(["dist/node_modules/zod/index.js"]),
+    ).toThrow(/Unexpected file/u);
+    expect(() =>
+      assertAllowedPackFiles([
+        "plugins/codex-external-agents/runtime/unexpected.js",
+      ]),
+    ).toThrow(/Unexpected file/u);
+    expect(() =>
+      assertAllowedPackFiles([
+        ".agents/plugins/another-marketplace.json",
+      ]),
+    ).toThrow(/Unexpected file/u);
   });
 
   it("rejects development-machine paths and supplied secret values", () => {
@@ -48,6 +70,65 @@ describe("release assurance", () => {
       assertNoSensitiveContent(
         [{ name: "dist/mcp.js", content: "relative source paths only" }],
         { forbiddenPaths: ["D:\\Codes\\codex-agent-tools"], secrets: [] },
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects unsafe paths, credentials, and production imports in the plugin bundle", () => {
+    const bundleName =
+      "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs";
+    const options = {
+      forbiddenPaths: [
+        "D:\\Codes\\codex-agent-tools",
+        "/home/maintainer/codex-agent-tools",
+      ],
+      secrets: ["real-secret-sentinel"],
+    };
+
+    for (const content of [
+      "const root = 'D:\\\\Codes\\\\codex-agent-tools';",
+      "const root = '/home/maintainer/codex-agent-tools';",
+      "import '../dist/mcp.js';",
+      'import { z } from "zod";',
+      'import "package-that-is-not-installed";',
+    ]) {
+      expect(() =>
+        assertNoSensitiveContent([{ name: bundleName, content }], options),
+      ).toThrow();
+    }
+
+    let secretFailure: unknown;
+    try {
+      assertNoSensitiveContent(
+        [
+          {
+            name: bundleName,
+            content: "const credential = 'real-secret-sentinel';",
+          },
+        ],
+        options,
+      );
+    } catch (error) {
+      secretFailure = error;
+    }
+    expect(secretFailure).toBeInstanceOf(Error);
+    expect((secretFailure as Error).message).not.toContain(
+      "real-secret-sentinel",
+    );
+
+    expect(() =>
+      assertNoSensitiveContent(
+        [
+          {
+            name: bundleName,
+            content: [
+              'import path from "node:path";',
+              'import { readFile } from "fs/promises";',
+              "// node_modules/zod is bundled below; this is not an import",
+            ].join("\n"),
+          },
+        ],
+        options,
       ),
     ).not.toThrow();
   });

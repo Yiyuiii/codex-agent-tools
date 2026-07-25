@@ -1,11 +1,19 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { execa } from "execa";
 
 import {
   assertAllowedPackFiles,
@@ -16,6 +24,30 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = path.join(root, "dist");
 const cliPath = path.join(dist, "cli.js");
 const mcpPath = path.join(dist, "mcp.js");
+const marketplacePath = path.join(
+  root,
+  ".agents",
+  "plugins",
+  "marketplace.json",
+);
+const pluginRoot = path.join(root, "plugins", "codex-external-agents");
+const pluginManifestPath = path.join(
+  pluginRoot,
+  ".codex-plugin",
+  "plugin.json",
+);
+const pluginMcpPath = path.join(pluginRoot, ".mcp.json");
+const pluginBundlePath = path.join(
+  pluginRoot,
+  "runtime",
+  "codex-external-agents-mcp.mjs",
+);
+const exactPluginFiles = [
+  ".agents/plugins/marketplace.json",
+  "plugins/codex-external-agents/.codex-plugin/plugin.json",
+  "plugins/codex-external-agents/.mcp.json",
+  "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+];
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -65,12 +97,48 @@ function releaseSecrets(environment) {
     .map(([, value]) => value);
 }
 
-async function checkMcpContract() {
+function requireObject(value, label) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  return value;
+}
+
+function samePath(left, right) {
+  return path.resolve(left).localeCompare(path.resolve(right), undefined, {
+    sensitivity: process.platform === "win32" ? "accent" : "variant",
+  }) === 0;
+}
+
+function isInside(parent, candidate) {
+  const relative = path.relative(parent, candidate);
+  return (
+    relative !== "" &&
+    relative !== ".." &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
+function childEnvironment(overrides) {
+  return Object.fromEntries(
+    Object.entries({
+      ...process.env,
+      ...overrides,
+    }).filter(([, value]) => typeof value === "string"),
+  );
+}
+
+async function readJson(filePath) {
+  return JSON.parse(await readFile(filePath, "utf8"));
+}
+
+async function checkMcpContract(serverPath, cwd) {
   const client = new Client({ name: "release-smoke", version: "1.0.0" });
   const transport = new StdioClientTransport({
     command: process.execPath,
-    args: [mcpPath],
-    cwd: root,
+    args: [serverPath],
+    cwd,
     stderr: "pipe",
   });
   try {
@@ -99,26 +167,164 @@ async function checkMcpContract() {
 }
 
 async function checkDoctorJson() {
-  const temp = await mkdtemp(path.join(os.tmpdir(), "codex-agent-tools-release-"));
-  try {
-    const output = run(process.execPath, [
-      cliPath,
-      "doctor",
-      "--json",
-      "--config",
-      path.join(temp, "config.toml"),
+  const output = run(process.execPath, [cliPath, "doctor", "--json"]);
+  const report = JSON.parse(output);
+  const publicTools = report.checks?.find((check) => check.name === "Public MCP tools");
+  if (publicTools?.detail !== "external_review, external_delegate") {
+    throw new Error("doctor JSON does not report the public tool contract");
+  }
+  const logicalLlms = report.checks?.filter((check) => check.name.startsWith("LLM ")) ?? [];
+  if (logicalLlms.length !== 5) {
+    throw new Error(`doctor JSON reported ${logicalLlms.length} logical LLMs, expected 5`);
+  }
+
+  const deprecatedConfig = spawnSync(
+    process.execPath,
+    [cliPath, "doctor", "--config", "forbidden-config.toml"],
+    {
+      cwd: root,
+      encoding: "utf8",
+      windowsHide: true,
+    },
+  );
+  if (
+    deprecatedConfig.status === 0 ||
+    !/unknown option ['"]--config['"]/iu.test(
+      `${deprecatedConfig.stdout ?? ""}\n${deprecatedConfig.stderr ?? ""}`,
+    )
+  ) {
+    throw new Error("doctor unexpectedly accepts the removed --config option");
+  }
+}
+
+async function checkPluginArtifact() {
+  const [packageManifest, pluginManifest, marketplace, mcpManifest] =
+    await Promise.all([
+      readJson(path.join(root, "package.json")),
+      readJson(pluginManifestPath),
+      readJson(marketplacePath),
+      readJson(pluginMcpPath),
     ]);
-    const report = JSON.parse(output);
-    const publicTools = report.checks?.find((check) => check.name === "Public MCP tools");
-    if (publicTools?.detail !== "external_review, external_delegate") {
-      throw new Error("doctor JSON does not report the public tool contract");
+
+  if (packageManifest.version !== pluginManifest.version) {
+    throw new Error("package and plugin versions differ");
+  }
+
+  if (
+    marketplace.name !== "codex-external-agents-local" ||
+    !Array.isArray(marketplace.plugins) ||
+    marketplace.plugins.length !== 1
+  ) {
+    throw new Error("marketplace must contain exactly the target plugin");
+  }
+  const marketplacePlugin = requireObject(
+    marketplace.plugins[0],
+    "marketplace plugin",
+  );
+  const marketplaceSource = requireObject(
+    marketplacePlugin.source,
+    "marketplace plugin source",
+  );
+  if (
+    marketplacePlugin.name !== "codex-external-agents" ||
+    marketplaceSource.source !== "local" ||
+    marketplaceSource.path !== "./plugins/codex-external-agents"
+  ) {
+    throw new Error("marketplace does not reference the target local plugin");
+  }
+  const resolvedMarketplaceSource = path.resolve(
+    root,
+    marketplaceSource.path,
+  );
+  if (
+    !samePath(resolvedMarketplaceSource, pluginRoot) ||
+    !(await stat(resolvedMarketplaceSource)).isDirectory()
+  ) {
+    throw new Error("marketplace plugin source is not the expected directory");
+  }
+
+  const serverNames = Object.keys(requireObject(mcpManifest, "MCP manifest"));
+  if (
+    serverNames.length !== 1 ||
+    serverNames[0] !== "codex_external_agents"
+  ) {
+    throw new Error("plugin MCP manifest must contain one target server");
+  }
+  const server = requireObject(
+    mcpManifest.codex_external_agents,
+    "codex_external_agents",
+  );
+  if (
+    server.command !== "node" ||
+    !Array.isArray(server.args) ||
+    server.args.length !== 1 ||
+    server.args[0] !== "./runtime/codex-external-agents-mcp.mjs" ||
+    path.isAbsolute(server.args[0]) ||
+    path.win32.isAbsolute(server.args[0]) ||
+    path.posix.isAbsolute(server.args[0])
+  ) {
+    throw new Error("plugin MCP server must use the one relative bundle path");
+  }
+  if (!samePath(path.resolve(pluginRoot, server.args[0]), pluginBundlePath)) {
+    throw new Error("plugin MCP server resolves outside the expected bundle");
+  }
+  await access(pluginBundlePath);
+
+  assertNoSensitiveContent(
+    [{ name: exactPluginFiles[3], content: await readFile(pluginBundlePath, "utf8") }],
+    {
+      forbiddenPaths: [root, os.homedir()],
+      secrets: releaseSecrets(process.env),
+    },
+  );
+}
+
+async function checkCodexPluginHelp() {
+  const temporaryRoot = await mkdtemp(
+    path.join(os.tmpdir(), "codex-agent-tools-release-codex-"),
+  );
+  const isolatedCodexHome = path.join(temporaryRoot, "codex-home");
+  const activeCodexHome = path.resolve(os.homedir(), ".codex");
+  const inheritedCodexHome =
+    typeof process.env.CODEX_HOME === "string" &&
+    process.env.CODEX_HOME.trim() !== ""
+      ? path.resolve(process.env.CODEX_HOME)
+      : undefined;
+  try {
+    if (
+      !isInside(temporaryRoot, isolatedCodexHome) ||
+      samePath(isolatedCodexHome, activeCodexHome) ||
+      (inheritedCodexHome !== undefined &&
+        samePath(isolatedCodexHome, inheritedCodexHome))
+    ) {
+      throw new Error("Refusing to run Codex help outside an isolated home");
     }
-    const logicalLlms = report.checks?.filter((check) => check.name.startsWith("LLM ")) ?? [];
-    if (logicalLlms.length !== 7) {
-      throw new Error(`doctor JSON reported ${logicalLlms.length} logical LLMs, expected 7`);
+    await mkdir(isolatedCodexHome, { recursive: true });
+    const environment = childEnvironment({ CODEX_HOME: isolatedCodexHome });
+    const pluginHelp = await execa("codex", ["plugin", "--help"], {
+      cwd: root,
+      env: environment,
+      reject: true,
+      windowsHide: true,
+    });
+    const marketplaceHelp = await execa(
+      "codex",
+      ["plugin", "marketplace", "--help"],
+      {
+        cwd: root,
+        env: environment,
+        reject: true,
+        windowsHide: true,
+      },
+    );
+    if (
+      !/Manage Codex plugins/iu.test(pluginHelp.stdout) ||
+      !/plugin marketplaces/iu.test(marketplaceHelp.stdout)
+    ) {
+      throw new Error("Codex plugin help surface is unavailable");
     }
   } finally {
-    await rm(temp, { recursive: true, force: true });
+    await rm(temporaryRoot, { recursive: true, force: true });
   }
 }
 
@@ -139,10 +345,23 @@ async function checkPackage() {
     "docs/migration-from-codex-cc-tools.md",
     "dist/cli.js",
     "dist/mcp.js",
+    ...exactPluginFiles,
   ]) {
     if (!fileNames.includes(required)) {
       throw new Error(`Required npm package file is missing: ${required}`);
     }
+  }
+  const actualPluginFiles = fileNames
+    .filter(
+      (name) =>
+        name.startsWith("plugins/") || name.startsWith(".agents/"),
+    )
+    .sort();
+  if (
+    JSON.stringify(actualPluginFiles) !==
+    JSON.stringify([...exactPluginFiles].sort())
+  ) {
+    throw new Error("npm package plugin file set is not exact");
   }
 
   const textEntries = [];
@@ -157,12 +376,19 @@ async function checkPackage() {
   });
 }
 
-await Promise.all([access(cliPath), access(mcpPath)]);
+await Promise.all([
+  access(cliPath),
+  access(mcpPath),
+  access(pluginBundlePath),
+]);
 run(process.execPath, [cliPath, "--version"]);
 run(process.execPath, [cliPath, "--help"]);
 run(process.execPath, [mcpPath, "--help"]);
-await checkMcpContract();
+run(process.execPath, [pluginBundlePath, "--help"], { cwd: pluginRoot });
+await checkMcpContract(pluginBundlePath, pluginRoot);
 await checkDoctorJson();
+await checkPluginArtifact();
+await checkCodexPluginHelp();
 await checkPackage();
 checkNpmNameAvailability();
 
