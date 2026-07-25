@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { Stats } from "node:fs";
 import { lstat, readdir, readFile } from "node:fs/promises";
 import { relative, resolve, sep } from "node:path";
 
@@ -26,8 +27,11 @@ export async function snapshotDirectory(root: string): Promise<StateSnapshot> {
   const absoluteRoot = resolve(root);
   const files: StateFile[] = [];
 
-  async function visit(path: string): Promise<void> {
-    const metadata = await lstat(path);
+  async function visit(
+    path: string,
+    knownMetadata?: Stats,
+  ): Promise<void> {
+    const metadata = knownMetadata ?? await lstat(path);
     const statePath = relativeStatePath(absoluteRoot, path);
 
     if (metadata.isSymbolicLink()) {
@@ -55,19 +59,20 @@ export async function snapshotDirectory(root: string): Promise<StateSnapshot> {
     });
   }
 
+  let rootMetadata: Stats;
   try {
-    await visit(absoluteRoot);
+    rootMetadata = await lstat(absoluteRoot);
   } catch (error) {
     if (
       error instanceof Error &&
       "code" in error &&
-      error.code === "ENOENT" &&
-      files.length === 0
+      error.code === "ENOENT"
     ) {
       return { files: [] };
     }
     throw error;
   }
+  await visit(absoluteRoot, rootMetadata);
 
   files.sort((left, right) => left.path.localeCompare(right.path));
   return { files };
