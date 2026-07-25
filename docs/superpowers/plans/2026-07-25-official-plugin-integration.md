@@ -1139,6 +1139,8 @@ git commit -m "docs: document official plugin operations"
 - Create at runtime: `docs/smoke/evidence/` 下由现有 smoke runner 按 ISO 时间戳、逻辑 LLM 和任务类型命名的 JSON 证据
 - Modify: `AGENTS.md`
 
+执行记录（2026-07-25）：十项真实门禁的原始结果为 8 passed / 2 failed。`gemini-3.5-flash` delegate 因 `google_free_tier_quota` 失败，`ark-coding-plan` delegate 因 `acceptance_failed` 失败；两项均未重试，也未 fallback。按 review/delegate 成对晋级规则，最终注册表状态为 6 passed / 4 pending：Kimi K3 与两个 Ark Agent Plan profile 成对通过，Gemini 与 Ark Coding Plan 成对保持 pending。
+
 - [x] **Step 0：先堵住真实失败证据链缺口**
 
 2026-07-25 只读预飞审计发现：三个 `real-*-smoke.mjs` 仅在 `run*Smoke()` 正常返回时写 evidence；版本探测、隔离配置建立、前后进程快照等基础设施异常只输出 stderr。Kimi evidence 也没有稳定 `failureReason`。在消耗任何真实模型额度前，必须先用 TDD 修复并独立复审：
@@ -1166,7 +1168,7 @@ git status --short
 
 Expected: 确定性检查全绿；工作树只有计划内尚未提交内容时才继续。
 
-- [ ] **Step 2：串行执行 Kimi K3**
+- [x] **Step 2：串行执行 Kimi K3**
 
 ```powershell
 npm run smoke:kimi -- --llm kimi-k3 --task review
@@ -1175,7 +1177,7 @@ npm run smoke:kimi -- --llm kimi-k3 --task delegate
 
 两项都必须 `passed: true`、`actualModel: "kimi-code/k3"`、无新增 Kimi 进程。
 
-- [ ] **Step 3：串行执行 Gemini**
+- [x] **Step 3：串行执行 Gemini**
 
 ```powershell
 npm run smoke:pi -- --llm gemini-3.5-flash --task review
@@ -1184,7 +1186,7 @@ npm run smoke:pi -- --llm gemini-3.5-flash --task delegate
 
 两项都必须 `passed: true`、`actualModel: "gemini-3.5-flash"`、route 为 10808、无新增 Pi 进程。429 额度失败保持失败，不切换其它模型。
 
-- [ ] **Step 4：串行执行 Ark Coding Plan**
+- [x] **Step 4：串行执行 Ark Coding Plan**
 
 ```powershell
 npm run smoke:ark -- --llm ark-coding-plan --task review
@@ -1193,7 +1195,7 @@ npm run smoke:ark -- --llm ark-coding-plan --task delegate
 
 两项都必须 `passed: true`、`actualModel: "ark-code-latest"`、provider 为 `ark-coding-plan`、route 为 direct。
 
-- [ ] **Step 5：串行执行 Ark Agent Plan 主档**
+- [x] **Step 5：串行执行 Ark Agent Plan 主档**
 
 ```powershell
 npm run smoke:ark -- --llm ark-agent-plan --task review
@@ -1202,7 +1204,7 @@ npm run smoke:ark -- --llm ark-agent-plan --task delegate
 
 两项都必须 `passed: true`、`actualModel: "ark-code-latest"`、provider 为 `ark-agent-plan`、route 为 direct。
 
-- [ ] **Step 6：串行执行 Ark Agent Plan 经济档**
+- [x] **Step 6：串行执行 Ark Agent Plan 经济档**
 
 ```powershell
 npm run smoke:ark -- --llm ark-agent-deepseek-v4-flash --task review
@@ -1211,7 +1213,7 @@ npm run smoke:ark -- --llm ark-agent-deepseek-v4-flash --task delegate
 
 两项都必须 `passed: true`、`actualModel: "deepseek-v4-flash"`、provider 为 `ark-agent-plan`、route 为 direct。
 
-- [ ] **Step 7：严格晋级**
+- [x] **Step 7：严格晋级**
 
 只有某个逻辑 LLM 的 review 与 delegate 都通过时，才把该 profile 改为：
 
@@ -1230,7 +1232,7 @@ npm run smoke:ark -- --llm ark-agent-deepseek-v4-flash --task delegate
 
 若任一门禁失败，该逻辑 LLM 两项都保留 pending，文档记录失败类别和脱敏证据；不复用旧模型证据，不自动 fallback。
 
-- [ ] **Step 8：更新证据索引**
+- [x] **Step 8：更新证据索引**
 
 三个 smoke 文档为每个当前逻辑 LLM 建立稳定 anchor：
 
@@ -1249,7 +1251,7 @@ npm run smoke:ark -- --llm ark-agent-deepseek-v4-flash --task delegate
 
 每个 anchor 链接脚本实际生成的 evidence JSON，并记录实际模型、provider、route、passed、无残留进程。`AGENTS.md` 同步 passed/pending 事实。
 
-- [ ] **Step 9：最终验证并提交**
+- [x] **Step 9：最终验证并提交**
 
 Run:
 

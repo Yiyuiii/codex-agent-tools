@@ -55,7 +55,7 @@ git diff --check
 npm run acceptance:plugin:isolated
 ```
 
-脚本必须在唯一临时 `CODEX_HOME` 中完成官方 marketplace add/list、plugin add/list、从官方缓存副本启动 MCP、plugin remove/list 与 marketplace remove/list。还必须验证固定凭据哨兵、Gemini 10808 代理、父代理清除、MCP 契约、异常进程清理和官方列表语义回滚。
+脚本必须在唯一临时 `CODEX_HOME` 中完成官方 marketplace add/list、plugin add/list、从官方缓存副本启动 MCP、plugin remove/list 与 marketplace remove/list。调用门禁明确拒绝 pending 的 `gemini-3.5-flash`，改用 qualified 的 `ark-agent-deepseek-v4-flash` 验证从官方缓存副本调用、direct 路由、父代理清除和凭据规范化；Gemini 10808 仅由确定性环境测试与本轮真实 evidence 覆盖，不把它冒充为第 2 层成功调用。脚本还必须验证 MCP 契约、异常进程清理和官方列表语义回滚。
 
 ### 当前证据
 
