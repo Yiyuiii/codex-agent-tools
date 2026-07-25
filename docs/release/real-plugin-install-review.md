@@ -74,7 +74,8 @@
 ## 外部只读审阅证据
 
 - Kimi K3 的 `adversarial_review` 未发现阻断项，只指出发布清单仍把本文件写成“计划中”的 Minor；该措辞已经修正。
-- Ark Agent Plan 的 `review_doc` 未发现 Critical 或 Important，只指出运维文档顶部硬编码日期会漂移的 Minor；清单现已区分 2026-07-25 的建立日期与 2026-07-26 的最近复核日期，既保留历史也明确当前复核时间，活动 Codex 尚未安装且本轮被阻断的事实保留。
+- Ark Agent Plan 的 `review_doc` 未发现 Critical 或 Important，只指出 `docs/operations.md` 顶部硬编码的 as-of 日期会漂移这一项 Minor；该硬编码日期已经从运维文档删除，活动 Codex 尚未安装且本轮被阻断的事实保留。
+- 随后的独立质量复审另行发现发布清单顶部没有区分建立日期与最近复核日期；`docs/release/checklist.md` 现已分别标注建立日期 2026-07-25 与最近复核日期 2026-07-26。该修复不归因于 Ark Agent Plan 外审。
 - 两次完成审阅的 `filesChanged` 都是 `[]`。本状态包不保存原始长输出、会话 ID 或秘密值，只保留上述可复核结论。
 - 当前会话暴露的旧 MCP 状态拒绝 Ark Agent Plan 后，按实施计划从已构建的最新 bundle 启动临时 stdio 客户端并成功完成审阅；这不是插件安装，也没有改变活动 Codex 配置。
 - Kimi 首轮等待 300 秒后超时，未形成审阅结论、未改变文件且没有残留进程；随后用聚焦后的同一只读任务完成审阅。任务 7 真实模型门禁的“不重试”边界不适用于任务 8 的只读文档审阅。
@@ -87,8 +88,8 @@
 
 ### 官方 add 的预计相对变化
 
-- marketplace add：活动 `config.toml` 的 marketplace 语义发生变化。
-- plugin add：本轮隔离观察中，活动 `config.toml` 的插件启用语义发生变化，并在临时 `CODEX_HOME` 的 `plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/` 下新增：
+- marketplace add：本轮隔离观察中，临时 `CODEX_HOME` 内的 `config.toml` marketplace 语义发生变化。
+- plugin add：本轮隔离观察中，临时 `CODEX_HOME` 内的 `config.toml` 插件启用语义发生变化，并在同一临时 `CODEX_HOME` 的 `plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/` 下新增：
   - `.codex-plugin/plugin.json`
   - `.mcp.json`
   - `runtime/codex-external-agents-mcp.mjs`
