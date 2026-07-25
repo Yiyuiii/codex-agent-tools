@@ -2,6 +2,8 @@
 
 2026-07-18 在本机 Kimi Code 0.27.0 上完成了三个逻辑 Kimi LLM 的独立 review/delegate 门禁。六次调用均使用 `kimi acp`、固定真实模型和 `direct` 网络策略；每次均在新建的临时 Git 仓库中执行，结束后清理仓库与 Kimi 进程树。
 
+自 2026-07-25 起，当前公开面只保留 `kimi-k3`。`kimi-k2.7` 与 `kimi-k2.7-highspeed` 已从注册表删除；下方四项 K2.7 passed 证据仅用于保存历史事实，不再证明任何当前公开逻辑 LLM，也不会被当前门禁复用。原始 evidence JSON 保持不变。
+
 ## 方法与通过标准
 
 review 仓库包含一个可复现缺陷：`average([])` 因除以数组长度 0 而返回 `NaN`，与测试要求的 0 不符。通过要求为：ACP 报告的实际模型与注册表一致、结果状态为 `completed`、指出该缺陷，并且调用前后文件证据和 Git 状态均无变化。
@@ -19,22 +21,22 @@ delegate 要求只创建内容为 `KIMI_SMOKE_OK` 的 `result.txt`，随后执�
 | `kimi-k3` | review | `kimi-code/k3` | 63.864 s | 通过 | `e2c6ca97c082b06ee0cc552a2f8460af590f97e723817ab5e314ce1e3cc2d5c7` |
 | `kimi-k3` | delegate | `kimi-code/k3` | 74.447 s | 通过 | `b0cd61c86a1925e860e78b9477a7d928ec913e3025ec7db3bb1d103b35edee14` |
 
-## kimi-k27-review
+## 历史：kimi-k27-review
 
 - 状态：通过，零工作区变更，已识别已知缺陷，无新增 Kimi PID，无诊断。
 - 证据：[2026-07-18T07-59-25.150Z-kimi-k2.7-review.json](evidence/2026-07-18T07-59-25.150Z-kimi-k2.7-review.json)
 
-## kimi-k27-delegate
+## 历史：kimi-k27-delegate
 
 - 状态：通过，只变更 `result.txt`，文件内容正确，观测到 1 条命令事件，无新增 Kimi PID，无诊断。
 - 证据：[2026-07-18T07-59-37.579Z-kimi-k2.7-delegate.json](evidence/2026-07-18T07-59-37.579Z-kimi-k2.7-delegate.json)
 
-## kimi-k27-highspeed-review
+## 历史：kimi-k27-highspeed-review
 
 - 状态：通过，零工作区变更，已识别已知缺陷，无新增 Kimi PID，无诊断。
 - 证据：[2026-07-18T07-59-47.269Z-kimi-k2.7-highspeed-review.json](evidence/2026-07-18T07-59-47.269Z-kimi-k2.7-highspeed-review.json)
 
-## kimi-k27-highspeed-delegate
+## 历史：kimi-k27-highspeed-delegate
 
 - 状态：通过，只变更 `result.txt`，文件内容正确，观测到 1 条命令事件，无新增 Kimi PID，无诊断。
 - 证据：[2026-07-18T07-59-56.939Z-kimi-k2.7-highspeed-delegate.json](evidence/2026-07-18T07-59-56.939Z-kimi-k2.7-highspeed-delegate.json)
@@ -51,4 +53,4 @@ delegate 要求只创建内容为 `KIMI_SMOKE_OK` 的 `result.txt`，随后执�
 
 ## 结论
 
-以上六个精确能力组合均已在内置注册表中启用。该结论只覆盖本页记录的 Kimi Code 版本、逻辑 ID、实际模型和 review/delegate 任务，不自动推广到未来 Kimi 版本、Pi 运行时或其它模型来源。
+当前内置注册表只启用 `kimi-k3` 的 review/delegate 两个精确能力组合。K2.7 的四项记录是已退出公开面的历史证据，不构成当前支持承诺。该结论只覆盖本页记录的 Kimi Code 版本、逻辑 ID、实际模型和 review/delegate 任务，不自动推广到未来 Kimi 版本、Pi 运行时或其它模型来源。

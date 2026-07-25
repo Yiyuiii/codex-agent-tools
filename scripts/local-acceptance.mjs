@@ -246,8 +246,8 @@ try {
   assertLocalToolContract(listed.tools);
   const kimiReview = await callReview(
     client,
-    "kimi-k2.7-highspeed",
-    "kimi-code/kimi-for-coding-highspeed",
+    "kimi-k3",
+    "kimi-code/k3",
     await createFixture("kimi-review"),
   );
   const delegate = await callDelegate(client);

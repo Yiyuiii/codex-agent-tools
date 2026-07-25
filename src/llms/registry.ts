@@ -20,6 +20,14 @@ const qualifiedTasks = (evidenceDocument: string, anchorPrefix: string) =>
     },
   }) as const;
 
+const pendingTasks = {
+  capabilities: { review: true, delegate: true },
+  qualityGates: {
+    review: { status: "pending" },
+    delegate: { status: "pending" },
+  },
+} as const;
+
 const DEFAULT_PROFILES: readonly LlmProfile[] = [
   {
     id: "ark-coding-plan",
@@ -40,35 +48,32 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     ...qualifiedTasks("docs/smoke/ark.md", "ark-coding-plan"),
   },
   {
-    id: "ark-agent-glm-5.2",
-    displayName: "Ark Agent Plan GLM 5.2",
+    id: "ark-agent-plan",
+    displayName: "Ark Agent Plan",
     runtime: "pi-rpc",
     provider: "ark-agent-plan",
-    model: "glm-5.2",
+    model: "ark-code-latest",
     network: "direct",
     credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
     credentialTargetEnv: "CODEX_AGENT_ARK_AGENT_KEY",
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-agent-plan",
-    ...qualifiedTasks("docs/smoke/ark.md", "ark-agent-glm-5.2"),
+    ...pendingTasks,
   },
   {
-    id: "ark-agent-doubao-seed-2.0-pro",
-    displayName: "Ark Agent Plan Doubao Seed 2.0 Pro",
+    id: "ark-agent-deepseek-v4-flash",
+    displayName: "Ark Agent Plan DeepSeek V4 Flash",
     runtime: "pi-rpc",
     provider: "ark-agent-plan",
-    model: "doubao-seed-2.0-pro",
+    model: "deepseek-v4-flash",
     network: "direct",
     credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
     credentialTargetEnv: "CODEX_AGENT_ARK_AGENT_KEY",
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-agent-plan",
-    ...qualifiedTasks(
-      "docs/smoke/ark.md",
-      "ark-agent-doubao-seed-2.0-pro",
-    ),
+    ...pendingTasks,
   },
   {
     id: "gemini-3.5-flash",
@@ -85,28 +90,6 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 600_000,
     maxConcurrency: 2,
     ...qualifiedTasks("docs/smoke/pi-gemini.md", "gemini"),
-  },
-  {
-    id: "kimi-k2.7",
-    displayName: "Kimi K2.7 Coding",
-    runtime: "kimi-acp",
-    model: "kimi-code/kimi-for-coding",
-    network: "direct",
-    credentialEnv: [],
-    timeoutMs: 600_000,
-    maxConcurrency: 1,
-    ...qualifiedTasks("docs/smoke/kimi.md", "kimi-k27"),
-  },
-  {
-    id: "kimi-k2.7-highspeed",
-    displayName: "Kimi K2.7 Coding Highspeed",
-    runtime: "kimi-acp",
-    model: "kimi-code/kimi-for-coding-highspeed",
-    network: "direct",
-    credentialEnv: [],
-    timeoutMs: 600_000,
-    maxConcurrency: 1,
-    ...qualifiedTasks("docs/smoke/kimi.md", "kimi-k27-highspeed"),
   },
   {
     id: "kimi-k3",

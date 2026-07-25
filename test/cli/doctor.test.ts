@@ -36,8 +36,8 @@ describe("doctor diagnostics", () => {
           return {
             ok: true,
             output: [
-              "ark-agent-plan doubao-seed-2.0-pro 200K 32K yes no",
-              "ark-agent-plan glm-5.2 200K 32K yes no",
+              "ark-agent-plan ark-code-latest 200K 32K yes no",
+              "ark-agent-plan deepseek-v4-flash 200K 32K yes no",
               "ark-coding-plan ark-code-latest 200K 32K yes no",
             ].join("\n"),
           };
@@ -99,9 +99,27 @@ describe("doctor diagnostics", () => {
     expect(report.checks.find((check) => check.name === "Ark Agent authentication")?.detail).toBe(
       "credential environment: OPENAI_API_KEY_DOUBAO -> CODEX_AGENT_ARK_AGENT_KEY",
     );
-    expect(report.checks.find((check) => check.name === "LLM ark-agent-glm-5.2")?.detail).toContain(
-      "glm-5.2 via pi-rpc; route=direct; review=passed; delegate=passed",
-    );
+    expect(
+      report.checks.filter((check) => check.name.startsWith("LLM ")),
+    ).toHaveLength(5);
+    expect(
+      report.checks.find((check) => check.name === "LLM ark-agent-plan"),
+    ).toMatchObject({
+      ok: false,
+      level: "warn",
+      detail:
+        "ark-code-latest via pi-rpc; route=direct; review=pending; delegate=pending",
+    });
+    expect(
+      report.checks.find(
+        (check) => check.name === "LLM ark-agent-deepseek-v4-flash",
+      ),
+    ).toMatchObject({
+      ok: false,
+      level: "warn",
+      detail:
+        "deepseek-v4-flash via pi-rpc; route=direct; review=pending; delegate=pending",
+    });
     expect(JSON.stringify(report)).not.toContain(secret);
   });
 

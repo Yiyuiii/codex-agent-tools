@@ -38,15 +38,15 @@ const ARK_PROVIDERS = {
     apiKey: "$CODEX_AGENT_ARK_AGENT_KEY",
     models: [
       {
-        id: "glm-5.2",
-        name: "GLM 5.2 Agent Plan",
+        id: "ark-code-latest",
+        name: "Ark Agent Plan",
         reasoning: true,
         contextWindow: 200_000,
         maxTokens: 32_000,
       },
       {
-        id: "doubao-seed-2.0-pro",
-        name: "Doubao Seed 2.0 Pro Agent Plan",
+        id: "deepseek-v4-flash",
+        name: "DeepSeek V4 Flash Agent Plan",
         reasoning: true,
         contextWindow: 200_000,
         maxTokens: 32_000,

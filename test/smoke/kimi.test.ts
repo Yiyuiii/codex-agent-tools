@@ -39,6 +39,14 @@ describe("Kimi real-smoke harness", () => {
     expect(() =>
       parseKimiSmokeArguments(["--llm", "kimi-k3", "--task", "other"]),
     ).toThrow(/--task/u);
+    expect(() =>
+      parseKimiSmokeArguments([
+        "--llm",
+        "ark-coding-plan",
+        "--task",
+        "review",
+      ]),
+    ).toThrow(/Kimi ACP profile/u);
   });
 
   it("validates a read-only review against the known empty-array defect", async () => {
@@ -98,8 +106,8 @@ describe("Kimi real-smoke harness", () => {
         return {
           ok: true,
           status: "completed",
-          llm: "kimi-k2.7",
-          actualModel: "kimi-code/kimi-for-coding",
+          llm: "kimi-k3",
+          actualModel: "kimi-code/k3",
           elapsedMs: 15,
           diagnostics: [],
           filesChanged: ["result.txt"],
@@ -112,7 +120,7 @@ describe("Kimi real-smoke harness", () => {
     };
 
     const evidence = await runKimiSmoke(
-      { llm: "kimi-k2.7", task: "delegate", tempRoot: root },
+      { llm: "kimi-k3", task: "delegate", tempRoot: root },
       {
         service,
         readKimiVersion: async () => "0.27.0",

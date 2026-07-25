@@ -39,18 +39,25 @@ describe("isolated Pi configuration", () => {
 
     expect(actual).toBe(expected);
     expect(actual).not.toContain("/v3");
-    const configuredModels = Object.values(
-      JSON.parse(actual).providers as Record<
-        string,
-        { models: Array<{ id: string }> }
-      >,
-    ).flatMap((provider) => provider.models.map((model) => model.id));
-    expect(configuredModels).toEqual([
-      "glm-5.2",
-      "doubao-seed-2.0-pro",
-      "ark-code-latest",
-    ]);
-    expect(configuredModels.join(" ")).not.toMatch(/claude|codex|deepseek/iu);
+    const configuredModels = Object.fromEntries(
+      Object.entries(
+        JSON.parse(actual).providers as Record<
+          string,
+          { models: Array<{ id: string }> }
+        >,
+      ).map(([provider, config]) => [
+        provider,
+        config.models.map((model) => model.id),
+      ]),
+    );
+    expect(configuredModels).toEqual({
+      "ark-agent-plan": ["ark-code-latest", "deepseek-v4-flash"],
+      "ark-coding-plan": ["ark-code-latest"],
+    });
+    expect(JSON.stringify(configuredModels)).not.toMatch(/claude|codex/iu);
+    expect(JSON.stringify(configuredModels)).not.toMatch(
+      /glm-5\.2|doubao-seed-2\.0-pro/iu,
+    );
     expect(actual).not.toContain("literal-secret");
   });
 

@@ -7,16 +7,16 @@
       "models": [
         {
           "contextWindow": 200000,
-          "id": "glm-5.2",
+          "id": "ark-code-latest",
           "maxTokens": 32000,
-          "name": "GLM 5.2 Agent Plan",
+          "name": "Ark Agent Plan",
           "reasoning": true
         },
         {
           "contextWindow": 200000,
-          "id": "doubao-seed-2.0-pro",
+          "id": "deepseek-v4-flash",
           "maxTokens": 32000,
-          "name": "Doubao Seed 2.0 Pro Agent Plan",
+          "name": "DeepSeek V4 Flash Agent Plan",
           "reasoning": true
         }
       ]

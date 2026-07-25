@@ -93,12 +93,12 @@ describe("local MCP acceptance assertions", () => {
       assertCompletedReview(
         {
           status: "failed",
-          actualModel: "kimi-code/kimi-for-coding-highspeed",
+          actualModel: "kimi-code/k3",
           filesChanged: [],
           review: "",
           diagnostics: ["ACP session ended before prompt completion"],
         },
-        "kimi-code/kimi-for-coding-highspeed",
+        "kimi-code/k3",
       ),
     ).toThrow(/ACP session ended before prompt completion/u);
   });

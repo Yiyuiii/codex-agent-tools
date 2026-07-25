@@ -8,83 +8,96 @@ import {
 } from "../../src/llms/registry.js";
 
 describe("logical LLM registry", () => {
-  it("binds each public Kimi id to one backend and direct route", () => {
+  it("exposes exactly the five approved logical LLMs", () => {
     expect(resolveLlm("kimi-k3")).toMatchObject({
       runtime: "kimi-acp",
       model: "kimi-code/k3",
       network: "direct",
     });
-    expect(resolveLlm("kimi-k2.7")).toMatchObject({
-      runtime: "kimi-acp",
-      model: "kimi-code/kimi-for-coding",
-      network: "direct",
-    });
-    expect(resolveLlm("kimi-k2.7-highspeed")).toMatchObject({
-      runtime: "kimi-acp",
-      model: "kimi-code/kimi-for-coding-highspeed",
-      network: "direct",
-    });
     expect(supportedLlmIds()).toEqual([
-      "ark-agent-doubao-seed-2.0-pro",
-      "ark-agent-glm-5.2",
+      "ark-agent-deepseek-v4-flash",
+      "ark-agent-plan",
       "ark-coding-plan",
       "gemini-3.5-flash",
-      "kimi-k2.7",
-      "kimi-k2.7-highspeed",
       "kimi-k3",
     ]);
   });
 
+  it("keeps the qualified Ark Coding Plan route and evidence", () => {
+    const profile = resolveLlm("ark-coding-plan");
+    expect(profile).toMatchObject({
+      runtime: "pi-rpc",
+      provider: "ark-coding-plan",
+      model: "ark-code-latest",
+      network: "direct",
+      credentialEnv: [
+        "ARK_API_KEY",
+        "VOLCENGINE_API_KEY",
+        "API_KEY_DOUBAO_CODING",
+      ],
+      credentialTargetEnv: "CODEX_AGENT_ARK_CODING_KEY",
+      concurrencyKey: "ark-coding-plan",
+      timeoutMs: 900_000,
+      maxConcurrency: 1,
+      capabilities: { review: true, delegate: true },
+      qualityGates: {
+        review: {
+          status: "passed",
+          evidence: "docs/smoke/ark.md#ark-coding-plan-review",
+        },
+        delegate: {
+          status: "passed",
+          evidence: "docs/smoke/ark.md#ark-coding-plan-delegate",
+        },
+      },
+    });
+    expect(resolveLlm("ark-coding-plan", "review").model).toBe(
+      "ark-code-latest",
+    );
+    expect(resolveLlm("ark-coding-plan", "delegate").model).toBe(
+      "ark-code-latest",
+    );
+  });
+
   it.each([
     [
-      "ark-coding-plan",
-      "ark-coding-plan",
+      "ark-agent-plan",
+      "ark-agent-plan",
       "ark-code-latest",
-      ["ARK_API_KEY", "VOLCENGINE_API_KEY", "API_KEY_DOUBAO_CODING"],
-      "CODEX_AGENT_ARK_CODING_KEY",
     ],
     [
-      "ark-agent-glm-5.2",
+      "ark-agent-deepseek-v4-flash",
       "ark-agent-plan",
-      "glm-5.2",
-      ["OPENAI_API_KEY_DOUBAO"],
-      "CODEX_AGENT_ARK_AGENT_KEY",
-    ],
-    [
-      "ark-agent-doubao-seed-2.0-pro",
-      "ark-agent-plan",
-      "doubao-seed-2.0-pro",
-      ["OPENAI_API_KEY_DOUBAO"],
-      "CODEX_AGENT_ARK_AGENT_KEY",
+      "deepseek-v4-flash",
     ],
   ] as const)(
-    "binds %s to one qualified Pi provider/model and provider concurrency pool",
-    (id, provider, model, credentialEnv, credentialTargetEnv) => {
+    "binds pending %s to the shared Agent Plan route without reusing old evidence",
+    (id, provider, model) => {
       const profile = resolveLlm(id);
       expect(profile).toMatchObject({
         runtime: "pi-rpc",
         provider,
         model,
         network: "direct",
-        credentialEnv,
-        credentialTargetEnv,
-        concurrencyKey: provider,
+        credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
+        credentialTargetEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+        concurrencyKey: "ark-agent-plan",
         timeoutMs: 900_000,
         maxConcurrency: 1,
         capabilities: { review: true, delegate: true },
         qualityGates: {
-          review: {
-            status: "passed",
-            evidence: `docs/smoke/ark.md#${id}-review`,
-          },
-          delegate: {
-            status: "passed",
-            evidence: `docs/smoke/ark.md#${id}-delegate`,
-          },
+          review: { status: "pending" },
+          delegate: { status: "pending" },
         },
       });
-      expect(resolveLlm(id, "review").model).toBe(model);
-      expect(resolveLlm(id, "delegate").model).toBe(model);
+      expect(profile.qualityGates.review.evidence).toBeUndefined();
+      expect(profile.qualityGates.delegate.evidence).toBeUndefined();
+      expect(() => resolveLlm(id, "review")).toThrow(
+        /disabled pending real smoke/u,
+      );
+      expect(() => resolveLlm(id, "delegate")).toThrow(
+        /disabled pending real smoke/u,
+      );
     },
   );
 
@@ -132,16 +145,21 @@ describe("logical LLM registry", () => {
     "does not register excluded source %s",
     (id) => {
       expect(() => resolveLlm(id)).toThrow(
-        /Supported llms: ark-agent-doubao-seed-2\.0-pro, ark-agent-glm-5\.2, ark-coding-plan, gemini-3\.5-flash/,
+        /Supported llms: ark-agent-deepseek-v4-flash, ark-agent-plan, ark-coding-plan, gemini-3\.5-flash, kimi-k3/u,
       );
     },
   );
 
   it.each([
-    ["kimi-k2.7", "review", "kimi-k27-review"],
-    ["kimi-k2.7", "delegate", "kimi-k27-delegate"],
-    ["kimi-k2.7-highspeed", "review", "kimi-k27-highspeed-review"],
-    ["kimi-k2.7-highspeed", "delegate", "kimi-k27-highspeed-delegate"],
+    "kimi-k2.7",
+    "kimi-k2.7-highspeed",
+    "ark-agent-glm-5.2",
+    "ark-agent-doubao-seed-2.0-pro",
+  ])("rejects removed public id %s", (id) => {
+    expect(() => resolveLlm(id)).toThrow(/Unknown logical llm/u);
+  });
+
+  it.each([
     ["kimi-k3", "review", "kimi-k3-review"],
     ["kimi-k3", "delegate", "kimi-k3-delegate"],
   ] as const)(

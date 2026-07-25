@@ -92,7 +92,7 @@ function limitedDetail(value: string, secrets: readonly string[]): string {
 }
 
 const EXPECTED_ARK_MODELS = new Map([
-  ["ark-agent-plan", ["doubao-seed-2.0-pro", "glm-5.2"]],
+  ["ark-agent-plan", ["ark-code-latest", "deepseek-v4-flash"]],
   ["ark-coding-plan", ["ark-code-latest"]],
 ]);
 
@@ -330,7 +330,7 @@ export async function collectDoctorReport(
 
   for (const [name, id] of [
     ["Ark Coding authentication", "ark-coding-plan"],
-    ["Ark Agent authentication", "ark-agent-glm-5.2"],
+    ["Ark Agent authentication", "ark-agent-plan"],
   ] as const) {
     const profile = resolveLlm(id);
     const sourceName = selectedCredentialName(profile.credentialEnv, environment);

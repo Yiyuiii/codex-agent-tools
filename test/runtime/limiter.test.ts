@@ -44,19 +44,19 @@ describe("KeyedLimiter", () => {
     expect(order).toEqual(["first-start", "first-end", "second-start"]);
   });
 
-  it("does not share capacity across logical llms", async () => {
+  it("does not share capacity across Coding Plan and Agent Plan pools", async () => {
     const limiter = new KeyedLimiter(() => 1);
     const started: string[] = [];
     let release!: () => void;
-    const first = limiter.run("kimi-k3", undefined, async () => {
-      started.push("k3");
+    const first = limiter.run("ark-agent-plan", undefined, async () => {
+      started.push("agent");
       await new Promise<void>((resolve) => (release = resolve));
     });
-    const second = limiter.run("kimi-k2.7", undefined, async () => {
-      started.push("k2.7");
+    const second = limiter.run("ark-coding-plan", undefined, async () => {
+      started.push("coding");
     });
 
-    await vi.waitFor(() => expect(started.sort()).toEqual(["k2.7", "k3"]));
+    await vi.waitFor(() => expect(started.sort()).toEqual(["agent", "coding"]));
     release();
     await Promise.all([first, second]);
   });

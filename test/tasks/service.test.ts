@@ -77,8 +77,8 @@ function createService(
 describe("ExternalAgentService", () => {
   it("shares one concurrency slot between logical LLMs in the same provider pool", async () => {
     const profiles = [
-      enabledProfile("ark-agent-glm-5.2"),
-      enabledProfile("ark-agent-doubao-seed-2.0-pro"),
+      enabledProfile("ark-agent-plan"),
+      enabledProfile("ark-agent-deepseek-v4-flash"),
     ];
     let releaseFirst!: () => void;
     let signalFirstStarted!: () => void;
@@ -106,13 +106,13 @@ describe("ExternalAgentService", () => {
     });
 
     const first = service.delegate({
-      llm: "ark-agent-glm-5.2",
+      llm: "ark-agent-plan",
       prompt: "first",
       cwd,
     });
     await firstStarted;
     const second = service.delegate({
-      llm: "ark-agent-doubao-seed-2.0-pro",
+      llm: "ark-agent-deepseek-v4-flash",
       prompt: "second",
       cwd,
     });
@@ -123,6 +123,44 @@ describe("ExternalAgentService", () => {
     await Promise.all([first, second]);
     expect(run).toHaveBeenCalledTimes(2);
     expect(maximumActive).toBe(1);
+  });
+
+  it("lets Coding Plan and Agent Plan enter their independent pools together", async () => {
+    const profiles = [
+      enabledProfile("ark-coding-plan"),
+      enabledProfile("ark-agent-plan"),
+    ];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started: string[] = [];
+    const run = vi.fn(async (request: AdapterRunRequest) => {
+      started.push(request.profile.id);
+      await gate;
+      return completed({ actualModel: request.profile.model });
+    });
+    const service = new ExternalAgentService({
+      registry: createLlmRegistry(profiles),
+      adapters: new Map([["pi-rpc", { runtime: "pi-rpc", run }]]),
+    });
+
+    const coding = service.delegate({
+      llm: "ark-coding-plan",
+      prompt: "coding",
+      cwd,
+    });
+    const agent = service.delegate({
+      llm: "ark-agent-plan",
+      prompt: "agent",
+      cwd,
+    });
+
+    await vi.waitFor(() =>
+      expect(started.sort()).toEqual(["ark-agent-plan", "ark-coding-plan"]),
+    );
+    release();
+    await Promise.all([coding, agent]);
   });
 
   it("routes Pi and Kimi profiles only to their bound runtime adapters", async () => {

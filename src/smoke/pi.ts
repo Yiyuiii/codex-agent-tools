@@ -300,7 +300,7 @@ function inspectEnvironment(
   const expectedProxy =
     profile.network === "direct"
       ? undefined
-      : `http://127.0.0.1:${profile.network === "proxy-10808" ? 10808 : 11808}`;
+      : "http://127.0.0.1:10808";
   const proxyIsolated =
     expectedProxy === undefined
       ? proxyEntries.length === 0

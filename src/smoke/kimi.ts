@@ -99,7 +99,10 @@ export function parseKimiSmokeArguments(args: readonly string[]): {
   if (llm === undefined || llm.trim() === "") {
     throw new Error("Kimi smoke requires --llm <logical-id>");
   }
-  resolveLlm(llm);
+  const profile = resolveLlm(llm);
+  if (profile.runtime !== "kimi-acp") {
+    throw new Error(`Logical llm ${llm} is not a Kimi ACP profile`);
+  }
   if (task !== "review" && task !== "delegate") {
     throw new Error("Kimi smoke requires --task review|delegate");
   }

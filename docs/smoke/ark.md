@@ -2,13 +2,21 @@
 
 ## 当前结论
 
-2026-07-20 在本机 Pi 0.80.10 上串行完成三个逻辑 LLM × `review` / `delegate` 的六项真实调用，六项全部通过并已启用。隔离配置 SHA-256 为 `ab12536cc03dd368115d71bab6eb65216506717fc63b33c4b8a077d82b3ebbf6`，endpoint host 固定为 `ark.cn-beijing.volces.com`，网络策略固定为 direct。
+当前 Ark 公开面共有三项固定 Pi/direct 路线：
+
+- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；2026-07-20 的 review/delegate 证据继续有效，两项均为 passed。
+- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；当前 review/delegate 均为 pending。
+- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；当前 review/delegate 均为 pending。
+
+两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的 `ark-agent-plan` 配额池。2026-07-20 对旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 完成的四项 passed 证据现仅作为历史事实保留，不属于当前公开面，也不得用于晋级两个新 Agent Plan 路线。原始 evidence JSON 保持不变。
+
+2026-07-20 的隔离配置 SHA-256 为 `ab12536cc03dd368115d71bab6eb65216506717fc63b33c4b8a077d82b3ebbf6`，endpoint host 固定为 `ark.cn-beijing.volces.com`，网络策略固定为 direct。
 
 Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。注册表现按 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING` 的顺序选择第一个非空值，并只向 Pi 子进程注入项目私有变量 `CODEX_AGENT_ARK_CODING_KEY`。Ark Agent 使用 `OPENAI_API_KEY_DOUBAO`，规范化为 `CODEX_AGENT_ARK_AGENT_KEY`。
 
-所有 review 均找到预置正确性缺陷且工作区无修改；所有 delegate 仅生成指定文件、执行验证命令并返回一致证据；每次结束后均无新增 Pi RPC 进程。证据文件不含密钥、认证头、完整环境、开发机绝对路径或上游原始错误正文。
+上述 2026-07-20 passed evidence 中，所有 review 均找到预置正确性缺陷且工作区无修改；所有 delegate 仅生成指定文件、执行验证命令并返回一致证据；每次结束后均无新增 Pi RPC 进程。证据文件不含密钥、认证头、完整环境、开发机绝对路径或上游原始错误正文。
 
-## 最终证据矩阵
+## 当前证据矩阵
 
 <a id="ark-coding-plan-review"></a>
 ### ark-coding-plan review
@@ -22,6 +30,32 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 - 结果：passed；实际模型：`ark-code-latest`；耗时：84.960 秒。
 - 仅变更 `ark-coding-plan-smoke.txt`，并观测到验证命令。
 - 证据：[JSON](evidence/2026-07-20T07-35-16.748Z-ark-coding-plan-delegate-ark.json)；SHA-256 `f3083722dab245e96cdcb90d29d99e6a05bc3b917c78e1c4e7ac9a340263bb0c`。
+
+<a id="ark-agent-plan-review"></a>
+### ark-agent-plan review
+
+- 结果：pending；尚未执行该逻辑 ID 与 `ark-code-latest` 的精确真实门禁。
+- 不复用旧 `glm-5.2` 或 `doubao-seed-2.0-pro` 证据。
+
+<a id="ark-agent-plan-delegate"></a>
+### ark-agent-plan delegate
+
+- 结果：pending；尚未执行该逻辑 ID 与 `ark-code-latest` 的精确真实门禁。
+- 不复用旧 `glm-5.2` 或 `doubao-seed-2.0-pro` 证据。
+
+<a id="ark-agent-deepseek-v4-flash-review"></a>
+### ark-agent-deepseek-v4-flash review
+
+- 结果：pending；尚未执行该逻辑 ID 与 `deepseek-v4-flash` 的精确真实门禁。
+- 不复用旧 `glm-5.2` 或 `doubao-seed-2.0-pro` 证据。
+
+<a id="ark-agent-deepseek-v4-flash-delegate"></a>
+### ark-agent-deepseek-v4-flash delegate
+
+- 结果：pending；尚未执行该逻辑 ID 与 `deepseek-v4-flash` 的精确真实门禁。
+- 不复用旧 `glm-5.2` 或 `doubao-seed-2.0-pro` 证据。
+
+## 历史证据（不属于当前公开面）
 
 <a id="ark-agent-glm-5.2-review"></a>
 ### ark-agent-glm-5.2 review
@@ -64,8 +98,8 @@ Pi RPC 桥还覆盖 assistant `errorMessage` 与空内容同时出现的失败�
 ```powershell
 npm run smoke:ark -- --llm ark-coding-plan --task review
 npm run smoke:ark -- --llm ark-coding-plan --task delegate
-npm run smoke:ark -- --llm ark-agent-glm-5.2 --task review
-npm run smoke:ark -- --llm ark-agent-glm-5.2 --task delegate
-npm run smoke:ark -- --llm ark-agent-doubao-seed-2.0-pro --task review
-npm run smoke:ark -- --llm ark-agent-doubao-seed-2.0-pro --task delegate
+npm run smoke:ark -- --llm ark-agent-plan --task review
+npm run smoke:ark -- --llm ark-agent-plan --task delegate
+npm run smoke:ark -- --llm ark-agent-deepseek-v4-flash --task review
+npm run smoke:ark -- --llm ark-agent-deepseek-v4-flash --task delegate
 ```

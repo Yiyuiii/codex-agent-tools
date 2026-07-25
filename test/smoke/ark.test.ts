@@ -31,8 +31,8 @@ afterEach(async () => {
 describe("Ark real-smoke harness", () => {
   it.each([
     "ark-coding-plan",
-    "ark-agent-glm-5.2",
-    "ark-agent-doubao-seed-2.0-pro",
+    "ark-agent-plan",
+    "ark-agent-deepseek-v4-flash",
   ])("accepts registered Ark Pi profile %s", (llm) => {
     expect(
       parseArkSmokeArguments(["--llm", llm, "--task", "review"]),
@@ -59,8 +59,8 @@ describe("Ark real-smoke harness", () => {
       review: async () => ({
         ok: true,
         status: "completed",
-        llm: "ark-agent-glm-5.2",
-        actualModel: "glm-5.2",
+        llm: "ark-agent-plan",
+        actualModel: "ark-code-latest",
         elapsedMs: 10,
         diagnostics: [],
         filesChanged: [],
@@ -72,7 +72,7 @@ describe("Ark real-smoke harness", () => {
     };
 
     const evidence = await runArkSmoke(
-      { llm: "ark-agent-glm-5.2", task: "review", tempRoot: root },
+      { llm: "ark-agent-plan", task: "review", tempRoot: root },
       {
         service,
         runtimeEvidence: {
@@ -89,10 +89,10 @@ describe("Ark real-smoke harness", () => {
     );
 
     expect(evidence).toMatchObject({
-      llm: "ark-agent-glm-5.2",
+      llm: "ark-agent-plan",
       provider: "ark-agent-plan",
-      actualModel: "glm-5.2",
-      expectedModel: "glm-5.2",
+      actualModel: "ark-code-latest",
+      expectedModel: "ark-code-latest",
       endpointHost: "ark.cn-beijing.volces.com",
       credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
       passed: true,
@@ -117,14 +117,14 @@ describe("Ark real-smoke harness", () => {
         requestedFile = /create ([^ ]+\.txt)/u.exec(input.prompt)?.[1] ?? "";
         await writeFile(
           path.join(input.cwd, requestedFile),
-          "ARK_SMOKE_OK:ark-agent-doubao-seed-2.0-pro\n",
+          "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash\n",
           "utf8",
         );
         return {
           ok: true,
           status: "completed",
-          llm: "ark-agent-doubao-seed-2.0-pro",
-          actualModel: "doubao-seed-2.0-pro",
+          llm: "ark-agent-deepseek-v4-flash",
+          actualModel: "deepseek-v4-flash",
           elapsedMs: 10,
           diagnostics: [],
           filesChanged: [requestedFile],
@@ -138,7 +138,7 @@ describe("Ark real-smoke harness", () => {
 
     const evidence = await runArkSmoke(
       {
-        llm: "ark-agent-doubao-seed-2.0-pro",
+        llm: "ark-agent-deepseek-v4-flash",
         task: "delegate",
         tempRoot: root,
       },
@@ -156,7 +156,7 @@ describe("Ark real-smoke harness", () => {
       },
     );
 
-    expect(requestedFile).toBe("ark-agent-doubao-seed-2.0-pro-smoke.txt");
+    expect(requestedFile).toBe("ark-agent-deepseek-v4-flash-smoke.txt");
     expect(evidence.passed).toBe(true);
     expect(evidence.checks.commandObserved).toBe(true);
     expect(evidence.filesChanged).toEqual([requestedFile]);
@@ -168,8 +168,8 @@ describe("Ark real-smoke harness", () => {
       review: async () => ({
         ok: false,
         status: "failed",
-        llm: "ark-agent-glm-5.2",
-        actualModel: "glm-5.2",
+        llm: "ark-agent-plan",
+        actualModel: "ark-code-latest",
         elapsedMs: 10,
         diagnostics: ["429 AccountQuotaExceeded: weekly usage quota"],
         filesChanged: [],
@@ -181,7 +181,7 @@ describe("Ark real-smoke harness", () => {
     };
 
     const evidence = await runArkSmoke(
-      { llm: "ark-agent-glm-5.2", task: "review", tempRoot: root },
+      { llm: "ark-agent-plan", task: "review", tempRoot: root },
       {
         service,
         runtimeEvidence: {

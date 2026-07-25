@@ -8,38 +8,47 @@ describe("child environment", () => {
       { network: "direct", credentialEnv: [] },
       {
         PATH: "C:\\Windows",
-        HTTPS_PROXY: "http://secret-proxy",
-        http_proxy: "http://secret-proxy",
-        ALL_PROXY: "socks5://secret-proxy",
-        all_proxy: "socks5://secret-proxy",
+        HTTP_PROXY: "http://parent:1",
+        HTTPS_PROXY: "http://parent:2",
+        ALL_PROXY: "socks5://parent:3",
+        http_proxy: "http://parent:4",
+        https_proxy: "http://parent:5",
+        all_proxy: "socks5://parent:6",
         ANTHROPIC_API_KEY: "secret",
         OPENAI_API_KEY: "secret",
       },
     );
 
     expect(env.PATH).toBe("C:\\Windows");
+    expect(env.HTTP_PROXY).toBeUndefined();
     expect(env.HTTPS_PROXY).toBeUndefined();
     expect(env.http_proxy).toBeUndefined();
+    expect(env.https_proxy).toBeUndefined();
     expect(env.ALL_PROXY).toBeUndefined();
     expect(env.all_proxy).toBeUndefined();
     expect(env.ANTHROPIC_API_KEY).toBeUndefined();
     expect(env.OPENAI_API_KEY).toBeUndefined();
   });
 
-  it.each([
-    ["proxy-10808", "http://127.0.0.1:10808"],
-    ["proxy-11808", "http://127.0.0.1:11808"],
-  ] as const)("injects only the fixed %s route", (network, expectedProxy) => {
+  it("replaces inherited proxies with only the fixed proxy-10808 route", () => {
     const env = buildChildEnvironment(
-      { network, credentialEnv: [] },
-      { Path: "C:\\bin", HTTPS_PROXY: "http://parent:9999" },
+      { network: "proxy-10808", credentialEnv: [] },
+      {
+        Path: "C:\\bin",
+        HTTP_PROXY: "http://parent:1",
+        HTTPS_PROXY: "http://parent:2",
+        ALL_PROXY: "socks5://parent:3",
+        http_proxy: "http://parent:4",
+        https_proxy: "http://parent:5",
+        all_proxy: "socks5://parent:6",
+      },
     );
 
     expect(env.PATH).toBe("C:\\bin");
-    expect(env.HTTP_PROXY).toBe(expectedProxy);
-    expect(env.HTTPS_PROXY).toBe(expectedProxy);
-    expect(env.http_proxy).toBe(expectedProxy);
-    expect(env.https_proxy).toBe(expectedProxy);
+    expect(env.HTTP_PROXY).toBe("http://127.0.0.1:10808");
+    expect(env.HTTPS_PROXY).toBe("http://127.0.0.1:10808");
+    expect(env.http_proxy).toBe("http://127.0.0.1:10808");
+    expect(env.https_proxy).toBe("http://127.0.0.1:10808");
     expect(env.ALL_PROXY).toBeUndefined();
     expect(env.all_proxy).toBeUndefined();
   });

@@ -9,8 +9,8 @@ import {
 
 const ARK_LLM_IDS = new Set([
   "ark-coding-plan",
-  "ark-agent-glm-5.2",
-  "ark-agent-doubao-seed-2.0-pro",
+  "ark-agent-plan",
+  "ark-agent-deepseek-v4-flash",
 ]);
 
 export function parseArkSmokeArguments(args: readonly string[]): {
