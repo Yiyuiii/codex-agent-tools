@@ -32,6 +32,7 @@
     "build:library": "tsup",
     "build:plugin": "tsup --config tsup.plugin.config.ts",
     "typecheck": "tsc --noEmit",
+    "pretest": "npm run build:library",
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:release": "npm run build && node scripts/release-smoke.mjs",

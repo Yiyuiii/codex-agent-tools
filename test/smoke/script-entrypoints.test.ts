@@ -23,6 +23,11 @@ interface ScriptMainOptions {
 
 interface SmokeScriptModule {
   main?: (options: ScriptMainOptions) => Promise<number>;
+  productionConfig?: {
+    kind: string;
+    parseArguments: unknown;
+    runSmoke: unknown;
+  };
 }
 
 const roots: string[] = [];
@@ -66,6 +71,10 @@ const scripts = [
     expectedFile: "2026-07-25T01-02-03.000Z-kimi-k3-review.json",
     expectedRuntime: "kimi-acp",
     expectedRoute: "direct",
+    expectedKind: "kimi",
+    distModule: "dist/kimi-smoke.js",
+    parserExport: "parseKimiSmokeArguments",
+    runnerExport: "runKimiSmoke",
     usage:
       "Usage: npm run smoke:kimi -- --llm <logical-id> --task review|delegate\n",
   },
@@ -78,6 +87,10 @@ const scripts = [
       "2026-07-25T01-02-03.000Z-gemini-3.5-flash-delegate-pi.json",
     expectedRuntime: "pi-rpc",
     expectedRoute: "proxy-10808",
+    expectedKind: "pi",
+    distModule: "dist/pi-smoke.js",
+    parserExport: "parsePiSmokeArguments",
+    runnerExport: "runPiSmoke",
     usage:
       "Usage: npm run smoke:pi -- --llm gemini-3.5-flash --task review|delegate\n",
   },
@@ -90,12 +103,48 @@ const scripts = [
       "2026-07-25T01-02-03.000Z-ark-agent-plan-review-ark.json",
     expectedRuntime: "pi-rpc",
     expectedRoute: "direct",
+    expectedKind: "ark",
+    distModule: "dist/ark-smoke.js",
+    parserExport: "parseArkSmokeArguments",
+    runnerExport: "runArkSmoke",
     usage:
       "Usage: npm run smoke:ark -- --llm <ark-logical-id> --task review|delegate\n",
   },
 ] as const;
 
 describe("production real-smoke script entrypoints", () => {
+  it("builds the library before npm test loads production scripts", async () => {
+    const packageJson = JSON.parse(
+      await readFile("package.json", "utf8"),
+    ) as { scripts?: Record<string, string> };
+
+    expect(packageJson.scripts?.pretest).toBe("npm run build:library");
+  });
+
+  it.each(scripts)(
+    "$name freezes the exact production parser and runner binding",
+    async ({
+      script,
+      expectedKind,
+      distModule,
+      parserExport,
+      runnerExport,
+    }) => {
+      const module = await importSmokeScript(script);
+      expect(module.productionConfig).toBeDefined();
+      if (module.productionConfig === undefined) return;
+
+      const distUrl = pathToFileURL(path.resolve(distModule));
+      const dist = (await import(distUrl.href)) as Record<string, unknown>;
+      expect(Object.isFrozen(module.productionConfig)).toBe(true);
+      expect(module.productionConfig.kind).toBe(expectedKind);
+      expect(module.productionConfig.parseArguments).toBe(
+        dist[parserExport],
+      );
+      expect(module.productionConfig.runSmoke).toBe(dist[runnerExport]);
+    },
+  );
+
   it.each(scripts)(
     "$name uses the injected runner and writes sanitized failure evidence",
     async ({
