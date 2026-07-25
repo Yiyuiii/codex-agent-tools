@@ -206,6 +206,7 @@ describe("Codex plugin artifact", () => {
       await build({
         ...(config as Options),
         outDir: buildRoot,
+        config: false,
       });
 
       const builtBundle = resolve(
