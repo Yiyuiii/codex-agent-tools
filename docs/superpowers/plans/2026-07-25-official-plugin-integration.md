@@ -657,7 +657,7 @@ git commit -m "feat: package external agents as codex plugin"
 - Modify: `package.json`
 - Modify: `package-lock.json`
 
-- [ ] **Step 1：先写状态快照失败测试**
+- [x] **Step 1：先写状态快照失败测试**
 
 `test/plugin/state-snapshot.test.ts` 使用临时目录创建嵌套文件，断言：
 
@@ -690,7 +690,7 @@ expect(diffSnapshots(before, after)).toEqual({
 
 路径一律使用 `/`，结果按路径排序；快照只记录相对路径、字节数和 SHA-256，不记录文件正文。
 
-- [ ] **Step 2：运行快照测试，确认先红**
+- [x] **Step 2：运行快照测试，确认先红**
 
 Run:
 
@@ -700,7 +700,7 @@ npx vitest run test/plugin/state-snapshot.test.ts
 
 Expected: 因模块尚不存在而失败。
 
-- [ ] **Step 3：实现纯快照与差异函数**
+- [x] **Step 3：实现纯快照与差异函数**
 
 `src/plugin/state-snapshot.ts` 导出：
 
@@ -737,7 +737,7 @@ export function diffSnapshots(
 - 差异比较路径、size 和 sha256；
 - 不读取或引用默认 Codex home。
 
-- [ ] **Step 4：验证纯函数**
+- [x] **Step 4：验证纯函数**
 
 Run:
 
@@ -747,7 +747,7 @@ npx vitest run test/plugin/state-snapshot.test.ts
 
 Expected: 通过。
 
-- [ ] **Step 5：编写隔离官方安装脚本**
+- [x] **Step 5：编写隔离官方安装脚本**
 
 先在 `tsup.config.ts` 的 entry 中加入：
 
@@ -788,7 +788,7 @@ const selector = `${plugin}@${marketplace}`;
 
 脚本必须拒绝 `isolatedHome === process.env.CODEX_HOME` 且拒绝 `isolatedHome` 解析到 `os.homedir()` 下的 `.codex`；这是防止测试误触活动配置的硬门禁。
 
-- [ ] **Step 6：从官方缓存副本启动 MCP**
+- [x] **Step 6：从官方缓存副本启动 MCP**
 
 安装后固定从：
 
@@ -811,7 +811,7 @@ const installedPluginRoot = path.join(
 
 并断言两个 schema 都要求 `llm`、review 只读、delegate 可写。
 
-- [ ] **Step 7：用 fake Pi 证明环境继承与 10808 隔离**
+- [x] **Step 7：用 fake Pi 证明环境继承与 10808 隔离**
 
 脚本在临时根目录生成一个 Windows `.cmd` 包装器。包装器先断言自身收到：
 
@@ -857,7 +857,7 @@ await client.callTool({
 
 Ark direct 的父代理清理继续由 `test/runtime/environment.test.ts` 覆盖；真实 Ark route 在任务 7 验证。
 
-- [ ] **Step 8：生成稳定取证报告**
+- [x] **Step 8：生成稳定取证报告**
 
 `docs/release/plugin-isolated-state.md` 正文固定包含：
 
@@ -873,7 +873,7 @@ Ark direct 的父代理清理继续由 `test/runtime/environment.test.ts` 覆盖
 
 若官方卸载保留合法缓存或空状态文件，报告如实列出；验收依据是官方列表已移除目标状态且残留差异可解释，不伪造字节级完全回滚。
 
-- [ ] **Step 9：加入脚本并运行**
+- [x] **Step 9：加入脚本并运行**
 
 `package.json` 增加：
 
@@ -892,7 +892,7 @@ git diff --check
 
 Expected: 全部通过；活动 `CODEX_HOME` 未被使用。
 
-- [ ] **Step 10：提交**
+- [x] **Step 10：提交**
 
 ```powershell
 git add src/plugin test/plugin scripts/plugin-isolated-acceptance.mjs docs/release/plugin-isolated-state.md package.json package-lock.json
