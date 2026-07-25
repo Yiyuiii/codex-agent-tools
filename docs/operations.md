@@ -63,9 +63,11 @@ npm run acceptance:plugin:isolated
 只有收到针对本次真实安装的明确许可后，才可在本仓库根目录逐条执行：
 
 ```powershell
-$repoRoot = (Resolve-Path ".").Path
+$repoRoot = (Resolve-Path "." -ErrorAction Stop).Path
 codex plugin marketplace add $repoRoot
+if ($LASTEXITCODE -ne 0) { throw "Codex marketplace add 失败，停止安装。" }
 codex plugin add codex-external-agents@codex-external-agents-local
+if ($LASTEXITCODE -ne 0) { throw "Codex plugin add 失败，停止安装。" }
 ```
 
 执行后必须使用官方列表和真实 Codex App 完成工具发现、代表性调用、取消与进程清理门禁。不得直接打开、比较或修改活动 `config.toml`。命令结果若与权限包或隔离证据不一致，立即停止，不追加自定义配置修复。
@@ -76,7 +78,9 @@ codex plugin add codex-external-agents@codex-external-agents-local
 
 ```powershell
 codex plugin remove codex-external-agents@codex-external-agents-local
+if ($LASTEXITCODE -ne 0) { throw "Codex plugin remove 失败，停止回滚。" }
 codex plugin marketplace remove codex-external-agents-local
+if ($LASTEXITCODE -ne 0) { throw "Codex marketplace remove 失败，停止回滚。" }
 ```
 
 随后使用官方列表确认目标插件与 marketplace 已移除。若官方回滚也异常，停止并报告；不得手工恢复、重写或修补活动 `config.toml`。
