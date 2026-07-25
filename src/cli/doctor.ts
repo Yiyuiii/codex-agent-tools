@@ -13,7 +13,6 @@ import { resolveLlm, supportedLlmIds } from "../llms/registry.js";
 import { buildChildEnvironment } from "../runtime/environment.js";
 import { redactText } from "../runtime/redaction.js";
 import { VERSION } from "../version.js";
-import { getDefaultCodexConfigPath, hasManagedCodexConfig } from "./config.js";
 
 export interface DoctorCheck {
   name: string;
@@ -33,7 +32,6 @@ export interface CommandResult {
 }
 
 export interface CollectDoctorOptions {
-  configPath?: string;
   environment?: NodeJS.ProcessEnv;
   locateKimiExecutable?: () => Promise<string>;
   locatePiExecutable?: () => Promise<string>;
@@ -62,15 +60,6 @@ async function defaultRunCommand(
       .filter((value) => value.trim() !== "")
       .join("\n"),
   };
-}
-
-async function readConfig(configPath: string): Promise<string> {
-  try {
-    return await readFile(configPath, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
-    throw error;
-  }
 }
 
 function secretValues(environment: NodeJS.ProcessEnv): string[] {
@@ -183,7 +172,6 @@ export async function collectDoctorReport(
   options: CollectDoctorOptions = {},
 ): Promise<DoctorReport> {
   const environment = options.environment ?? process.env;
-  const configPath = options.configPath ?? getDefaultCodexConfigPath();
   const locateKimiExecutable = options.locateKimiExecutable ?? (() => locateKimi());
   const locatePiExecutable = options.locatePiExecutable ?? (() => locatePi());
   const buildPiConfig =
@@ -359,16 +347,6 @@ export async function collectDoctorReport(
     });
   }
 
-  const configText = await readConfig(configPath);
-  const registered = hasManagedCodexConfig(configText);
-  checks.push({
-    name: "MCP registration",
-    ok: registered,
-    level: registered ? "ok" : "warn",
-    detail: registered
-      ? `managed codex_external_agents registration at ${configPath}`
-      : `not installed at ${configPath}; run codex-agent-tools install`,
-  });
   checks.push({
     name: "Public MCP tools",
     ok: true,
