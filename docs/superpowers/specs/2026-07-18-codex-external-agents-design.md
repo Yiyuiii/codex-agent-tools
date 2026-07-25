@@ -1,6 +1,6 @@
 # Codex External Agents 产品设计
 
-状态：已批准  
+状态：历史基线；安装、目标模型面与真实切换部分由 [2026-07-25 官方插件集成设计](2026-07-25-official-plugin-integration-design.md) 取代
 日期：2026-07-18  
 目标仓库：`D:\Codes\codex-agent-tools`
 
