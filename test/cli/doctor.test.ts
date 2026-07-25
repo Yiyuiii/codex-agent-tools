@@ -36,6 +36,8 @@ describe("doctor diagnostics", () => {
           return {
             ok: true,
             output: [
+              "pi 0.80.10",
+              "provider model context max-output reasoning images",
               "ark-agent-plan ark-code-latest 200K 32K yes no",
               "ark-agent-plan deepseek-v4-flash 200K 32K yes no",
               "ark-coding-plan ark-code-latest 200K 32K yes no",
@@ -121,6 +123,45 @@ describe("doctor diagnostics", () => {
         "deepseek-v4-flash via pi-rpc; route=direct; review=pending; delegate=pending",
     });
     expect(JSON.stringify(report)).not.toContain(secret);
+  });
+
+  it("rejects an Ark model listing that contains an extra provider/model", async () => {
+    const report = await collectDoctorReport({
+      environment: {
+        GEMINI_API_KEY: "gemini",
+        ARK_API_KEY: "coding",
+        OPENAI_API_KEY_DOUBAO: "agent",
+      },
+      locateKimiExecutable: async () => "kimi.exe",
+      locatePiExecutable: async () => "pi.cmd",
+      buildPiConfig: () =>
+        buildIsolatedPiConfig({
+          root: tempDirectory,
+          version: "rogue-listing",
+          providers: ["ark"],
+        }),
+      runCommand: async (_command, args) => ({
+        ok: true,
+        output: args.includes("--list-models")
+          ? [
+              "pi 0.80.10",
+              "provider model context max-output reasoning images",
+              "ark-agent-plan ark-code-latest 200K 32K yes no",
+              "ark-agent-plan deepseek-v4-flash 200K 32K yes no",
+              "ark-coding-plan ark-code-latest 200K 32K yes no",
+              "ark-rogue rogue-model 200K 32K yes no",
+            ].join("\n")
+          : "0.80.10",
+      }),
+    });
+
+    expect(
+      report.checks.find((check) => check.name === "Ark Pi models"),
+    ).toMatchObject({
+      ok: false,
+      level: "error",
+      detail: "Pi model listing does not match the approved Ark model set",
+    });
   });
 
   it("returns an error check instead of throwing when Kimi is missing", async () => {

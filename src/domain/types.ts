@@ -4,23 +4,27 @@ export type RuntimeKind = "kimi-acp" | "pi-rpc";
 
 export type NetworkPolicy = "direct" | "proxy-10808";
 
-export interface QualityGate {
-  status: "pending" | "passed";
-  evidence?: string;
-}
+export type QualityGate =
+  | {
+      readonly status: "pending";
+    }
+  | {
+      readonly status: "passed";
+      readonly evidence: string;
+    };
 
 export interface LlmProfile {
-  id: string;
-  displayName: string;
-  runtime: RuntimeKind;
-  provider?: string;
-  model: string;
-  network: NetworkPolicy;
-  capabilities: Readonly<Record<TaskKind, boolean>>;
-  qualityGates: Readonly<Record<TaskKind, QualityGate>>;
-  credentialEnv: readonly string[];
-  credentialTargetEnv?: string;
-  timeoutMs: number;
-  maxConcurrency: number;
-  concurrencyKey?: string;
+  readonly id: string;
+  readonly displayName: string;
+  readonly runtime: RuntimeKind;
+  readonly provider?: string;
+  readonly model: string;
+  readonly network: NetworkPolicy;
+  readonly capabilities: Readonly<Record<TaskKind, boolean>>;
+  readonly qualityGates: Readonly<Record<TaskKind, QualityGate>>;
+  readonly credentialEnv: readonly string[];
+  readonly credentialTargetEnv?: string;
+  readonly timeoutMs: number;
+  readonly maxConcurrency: number;
+  readonly concurrencyKey?: string;
 }

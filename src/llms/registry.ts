@@ -1,4 +1,8 @@
-import type { LlmProfile, TaskKind } from "../domain/types.js";
+import type {
+  LlmProfile,
+  QualityGate,
+  TaskKind,
+} from "../domain/types.js";
 
 export interface LlmRegistry {
   ids(): string[];
@@ -20,13 +24,14 @@ const qualifiedTasks = (evidenceDocument: string, anchorPrefix: string) =>
     },
   }) as const;
 
-const pendingTasks = {
-  capabilities: { review: true, delegate: true },
-  qualityGates: {
-    review: { status: "pending" },
-    delegate: { status: "pending" },
-  },
-} as const;
+const pendingTasks = () =>
+  ({
+    capabilities: { review: true, delegate: true },
+    qualityGates: {
+      review: { status: "pending" },
+      delegate: { status: "pending" },
+    },
+  }) as const;
 
 const DEFAULT_PROFILES: readonly LlmProfile[] = [
   {
@@ -59,7 +64,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-agent-plan",
-    ...pendingTasks,
+    ...pendingTasks(),
   },
   {
     id: "ark-agent-deepseek-v4-flash",
@@ -73,7 +78,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-agent-plan",
-    ...pendingTasks,
+    ...pendingTasks(),
   },
   {
     id: "gemini-3.5-flash",
@@ -111,7 +116,7 @@ export function createLlmRegistry(profiles: readonly LlmProfile[]): LlmRegistry 
     if (byId.has(profile.id)) {
       throw new Error(`Duplicate logical llm id: ${profile.id}`);
     }
-    byId.set(profile.id, profile);
+    byId.set(profile.id, immutableProfile(profile));
   }
 
   const ids = [...byId.keys()].sort();
@@ -139,6 +144,70 @@ export function createLlmRegistry(profiles: readonly LlmProfile[]): LlmRegistry 
       return profile;
     },
   };
+}
+
+function immutableQualityGate(
+  profileId: string,
+  task: TaskKind,
+  gate: QualityGate,
+): QualityGate {
+  if (typeof gate !== "object" || gate === null) {
+    throw new Error(`Logical llm "${profileId}" ${task} quality gate is invalid`);
+  }
+  const record = gate as {
+    status?: unknown;
+    evidence?: unknown;
+  };
+  if (record.status === "passed") {
+    if (
+      typeof record.evidence !== "string" ||
+      record.evidence.trim() === ""
+    ) {
+      throw new Error(
+        `Logical llm "${profileId}" ${task} passed quality gate requires non-empty evidence`,
+      );
+    }
+    return Object.freeze({
+      status: "passed",
+      evidence: record.evidence,
+    });
+  }
+  if (record.status === "pending") {
+    if ("evidence" in record) {
+      throw new Error(
+        `Logical llm "${profileId}" ${task} pending quality gate must not include evidence`,
+      );
+    }
+    return Object.freeze({ status: "pending" });
+  }
+  throw new Error(`Logical llm "${profileId}" ${task} quality gate is invalid`);
+}
+
+function immutableProfile(profile: LlmProfile): LlmProfile {
+  const capabilities = Object.freeze({
+    review: profile.capabilities.review,
+    delegate: profile.capabilities.delegate,
+  });
+  const qualityGates = Object.freeze({
+    review: immutableQualityGate(
+      profile.id,
+      "review",
+      profile.qualityGates.review,
+    ),
+    delegate: immutableQualityGate(
+      profile.id,
+      "delegate",
+      profile.qualityGates.delegate,
+    ),
+  });
+  const credentialEnv = Object.freeze([...profile.credentialEnv]);
+
+  return Object.freeze({
+    ...profile,
+    capabilities,
+    qualityGates,
+    credentialEnv,
+  });
 }
 
 const registry = createLlmRegistry(DEFAULT_PROFILES);

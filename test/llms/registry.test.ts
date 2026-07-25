@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { LlmProfile } from "../../src/domain/types.js";
 import {
   credentialEnvironmentNames,
   createLlmRegistry,
@@ -8,6 +9,152 @@ import {
 } from "../../src/llms/registry.js";
 
 describe("logical LLM registry", () => {
+  it("gives each default pending profile independent gate objects", () => {
+    const primary = resolveLlm("ark-agent-plan");
+    const flash = resolveLlm("ark-agent-deepseek-v4-flash");
+
+    expect(primary.capabilities).not.toBe(flash.capabilities);
+    expect(primary.qualityGates).not.toBe(flash.qualityGates);
+    expect(primary.qualityGates.review).not.toBe(
+      flash.qualityGates.review,
+    );
+    expect(primary.qualityGates.delegate).not.toBe(
+      flash.qualityGates.delegate,
+    );
+  });
+
+  it("returns deeply frozen default profiles that cannot affect another route", () => {
+    const primary = resolveLlm("ark-agent-plan");
+    const flash = resolveLlm("ark-agent-deepseek-v4-flash");
+
+    expect(Object.isFrozen(primary)).toBe(true);
+    expect(Object.isFrozen(primary.capabilities)).toBe(true);
+    expect(Object.isFrozen(primary.qualityGates)).toBe(true);
+    expect(Object.isFrozen(primary.qualityGates.review)).toBe(true);
+    expect(Object.isFrozen(primary.qualityGates.delegate)).toBe(true);
+    expect(Object.isFrozen(primary.credentialEnv)).toBe(true);
+
+    expect(() => {
+      (primary as { model: string }).model = "tampered";
+    }).toThrow(TypeError);
+    expect(() => {
+      (
+        primary.qualityGates.review as {
+          status: "pending" | "passed";
+        }
+      ).status = "passed";
+    }).toThrow(TypeError);
+    expect(() => {
+      (primary.credentialEnv as string[]).push("TAMPERED_KEY");
+    }).toThrow(TypeError);
+
+    expect(flash).toMatchObject({
+      model: "deepseek-v4-flash",
+      qualityGates: {
+        review: { status: "pending" },
+        delegate: { status: "pending" },
+      },
+      credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
+    });
+  });
+
+  it("defensively copies caller profiles before freezing registry state", () => {
+    const base = resolveLlm("kimi-k3");
+    const source = {
+      ...base,
+      id: "copy-test",
+      capabilities: { review: true, delegate: true },
+      qualityGates: {
+        review: { status: "passed" as const, evidence: "review-evidence" },
+        delegate: {
+          status: "passed" as const,
+          evidence: "delegate-evidence",
+        },
+      },
+      credentialEnv: ["SOURCE_KEY"],
+    } satisfies LlmProfile;
+    const registry = createLlmRegistry([source]);
+
+    source.model = "tampered-model";
+    source.qualityGates.review.evidence = "tampered-evidence";
+    source.credentialEnv.push("TAMPERED_KEY");
+
+    expect(registry.resolve("copy-test")).toMatchObject({
+      model: "kimi-code/k3",
+      qualityGates: {
+        review: { status: "passed", evidence: "review-evidence" },
+      },
+      credentialEnv: ["SOURCE_KEY"],
+    });
+    const resolved = registry.resolve("copy-test");
+    expect(() => {
+      (resolved.capabilities as Record<string, boolean>).review = false;
+    }).toThrow(TypeError);
+  });
+
+  it("rejects runtime quality-gate states that violate evidence invariants", () => {
+    const base = resolveLlm("kimi-k3");
+    const invalidProfiles = [
+      {
+        id: "passed-without-evidence",
+        qualityGates: {
+          review: { status: "passed" },
+          delegate: {
+            status: "passed",
+            evidence: "delegate-evidence",
+          },
+        },
+        expected: /passed.*non-empty evidence/iu,
+      },
+      {
+        id: "passed-with-blank-evidence",
+        qualityGates: {
+          review: { status: "passed", evidence: "   " },
+          delegate: {
+            status: "passed",
+            evidence: "delegate-evidence",
+          },
+        },
+        expected: /passed.*non-empty evidence/iu,
+      },
+      {
+        id: "pending-with-evidence",
+        qualityGates: {
+          review: { status: "pending", evidence: "stale-evidence" },
+          delegate: { status: "pending" },
+        },
+        expected: /pending.*must not include evidence/iu,
+      },
+    ];
+
+    for (const invalid of invalidProfiles) {
+      const profile = {
+        ...base,
+        id: invalid.id,
+        capabilities: { review: true, delegate: true },
+        qualityGates: invalid.qualityGates,
+        credentialEnv: [...base.credentialEnv],
+      } as unknown as LlmProfile;
+      expect(() => createLlmRegistry([profile])).toThrow(invalid.expected);
+    }
+  });
+
+  it("continues to resolve valid passed and pending profiles", () => {
+    const registry = createLlmRegistry([
+      resolveLlm("kimi-k3"),
+      resolveLlm("ark-agent-plan"),
+    ]);
+
+    expect(registry.resolve("kimi-k3", "review").model).toBe("kimi-code/k3");
+    expect(registry.resolve("ark-agent-plan").qualityGates).toEqual({
+      review: { status: "pending" },
+      delegate: { status: "pending" },
+    });
+    expect(() => registry.resolve("ark-agent-plan", "review")).toThrow(
+      /disabled pending real smoke/u,
+    );
+  });
+
   it("exposes exactly the five approved logical LLMs", () => {
     expect(resolveLlm("kimi-k3")).toMatchObject({
       runtime: "kimi-acp",
@@ -90,8 +237,8 @@ describe("logical LLM registry", () => {
           delegate: { status: "pending" },
         },
       });
-      expect(profile.qualityGates.review.evidence).toBeUndefined();
-      expect(profile.qualityGates.delegate.evidence).toBeUndefined();
+      expect("evidence" in profile.qualityGates.review).toBe(false);
+      expect("evidence" in profile.qualityGates.delegate).toBe(false);
       expect(() => resolveLlm(id, "review")).toThrow(
         /disabled pending real smoke/u,
       );

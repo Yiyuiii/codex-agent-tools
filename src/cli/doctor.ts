@@ -157,8 +157,8 @@ function validateArkModelListing(output: string): void {
   const listed = output
     .split(/\r?\n/u)
     .map((line) => line.trim().split(/\s+/u))
-    .filter(([provider]) => EXPECTED_ARK_MODELS.has(provider ?? ""))
-    .map(([provider, model]) => `${provider}/${model}`)
+    .filter(([provider]) => provider?.startsWith("ark-") === true)
+    .map(([provider, model]) => `${provider}/${model ?? ""}`)
     .sort();
   const expected = [...EXPECTED_ARK_MODELS.entries()]
     .flatMap(([provider, models]) => models.map((model) => `${provider}/${model}`))
