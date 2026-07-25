@@ -19,6 +19,7 @@ import {
   diffSnapshots,
   snapshotDirectory,
 } from "../dist/plugin-state-snapshot.js";
+import { cleanupOwnedMcpTransport } from "../dist/plugin-mcp-cleanup.js";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -339,6 +340,7 @@ async function writeFakePiWrapper() {
     `if not "%HTTP_PROXY%"=="${expectedProxy}" exit /b 92`,
     "if defined ALL_PROXY exit /b 93",
     "if defined all_proxy exit /b 94",
+    `if not "%GEMINI_API_KEY%"=="${credentialSentinel}" exit /b 95`,
     `${quoteCmdArgument(process.execPath)} ${quoteCmdArgument(fakePiScript)} %*`,
     "exit /b %ERRORLEVEL%",
     "",
@@ -412,7 +414,8 @@ ${configLines}
 - 工具严格为 \`external_review\` 与 \`external_delegate\`；二者输入均要求 \`llm\`。
 - \`external_review\` 为只读且非破坏性；\`external_delegate\` 为可写且具破坏性提示。
 - fake Pi 的 Gemini review 返回 \`completed\`，实际模型为 \`gemini-3.5-flash\`，且没有文件变化。
-- fake Pi 包装器确认 Gemini 子进程通过固定 proxy-10808 路由门禁，包括通用代理在内的父 MCP 代理值均未下传；成功调用同时证明目标凭据候选已传入已安装 MCP。
+- fake Pi 包装器确认 Gemini 子进程通过固定 proxy-10808 路由门禁，包括通用代理在内的父 MCP 代理值均未下传；包装器还确认目标凭据候选与本轮隔离 sentinel 精确一致，但报告不记录该值。
+- 异常清理仅管理本脚本所启动 transport 的 PID，并在关闭 MCP client/transport 前终止其整个进程树。
 
 ## 语义回滚
 
@@ -631,7 +634,9 @@ try {
 } catch (error) {
   throw new Error(redactFailure(error instanceof Error ? error.message : error));
 } finally {
-  await client?.close().catch(() => undefined);
-  await transport?.close().catch(() => undefined);
-  await rm(temporaryRoot, { recursive: true, force: true });
+  try {
+    await cleanupOwnedMcpTransport(client, transport);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
 }

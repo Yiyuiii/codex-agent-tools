@@ -9,6 +9,7 @@ export default defineConfig({
     "pi-smoke": "src/smoke/pi.ts",
     "ark-smoke": "src/smoke/ark.ts",
     "local-acceptance": "src/acceptance/local.ts",
+    "plugin-mcp-cleanup": "src/plugin/mcp-cleanup.ts",
     "plugin-state-snapshot": "src/plugin/state-snapshot.ts",
     "release-assurance": "src/release/assurance.ts",
   },
