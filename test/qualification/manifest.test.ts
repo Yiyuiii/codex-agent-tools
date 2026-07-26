@@ -9,6 +9,7 @@ import {
 } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
@@ -35,16 +36,13 @@ import type {
 } from "../../src/qualification/types.js";
 
 const roots: string[] = [];
+const repositoryRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 const batchId = "batch-2026-07-26";
 const historicalBatchId =
   "2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f";
-const historicalBatchFiles = [
-  "cases/2026-07-26T09-01-07.689Z-gemini-3.5-flash-delegate-pi.json",
-  "checkpoints/000000.json",
-  "checkpoints/000001.json",
-  "checkpoints/000002.json",
-  "manifest.json",
-] as const;
 const authHash = "a".repeat(64);
 const commit = "b".repeat(40);
 const artifacts = [
@@ -85,34 +83,6 @@ async function tempRepository(): Promise<string> {
   await mkdir(root, { recursive: true });
   roots.push(root);
   return root;
-}
-
-async function copyHistoricalBatch(repositoryRoot: string): Promise<void> {
-  const source = path.join(
-    process.cwd(),
-    "docs",
-    "smoke",
-    "evidence",
-    "batches",
-    historicalBatchId,
-  );
-  const destination = path.join(
-    repositoryRoot,
-    "docs",
-    "smoke",
-    "evidence",
-    "batches",
-    historicalBatchId,
-  );
-  for (const relativePath of historicalBatchFiles) {
-    const target = path.join(destination, ...relativePath.split("/"));
-    await mkdir(path.dirname(target), { recursive: true });
-    const text = await readFile(
-      path.join(source, ...relativePath.split("/")),
-      "utf8",
-    );
-    await writeFile(target, text.replaceAll("\r\n", "\n"), "utf8");
-  }
 }
 
 afterEach(async () => {
@@ -343,7 +313,7 @@ describe("frozen qualification preflight", () => {
     const checkpoint = JSON.parse(
       await readFile(
         path.join(
-          process.cwd(),
+          repositoryRoot,
           "docs",
           "smoke",
           "evidence",
@@ -363,9 +333,7 @@ describe("frozen qualification preflight", () => {
     );
   });
 
-  it("validates the real historical blocked terminal manifest", async () => {
-    const repositoryRoot = await tempRepository();
-    await copyHistoricalBatch(repositoryRoot);
+  it("validates the checked-out historical blocked terminal in place", async () => {
     const manifest = JSON.parse(
       await readFile(
         path.join(

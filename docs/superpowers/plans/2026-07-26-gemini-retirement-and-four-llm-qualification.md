@@ -443,11 +443,11 @@ git diff --cached --check
 git commit -m "chore: preserve qualification evidence bytes"
 ```
 
-- [ ] **Step 3: Recreate the clean isolated worktree**
+- [x] **Step 3: Recreate the clean isolated worktree**
 
 From the primary repository, first prove the isolated path resolves under `D:\Codes\codex-agent-tools\.worktrees`, the branch is committed and clean, and no subagent is using it. Then use `git worktree remove --force` only for that exact isolated path and immediately re-add `codex/gemini-retirement` at the same path. Run `npm ci`.
 
-- [ ] **Step 4: Verify actual checked-out bytes and terminal**
+- [x] **Step 4: Verify actual checked-out bytes and terminal**
 
 Require all of the following on the recreated worktree:
 
@@ -467,7 +467,7 @@ npm run typecheck
 git diff --check
 ```
 
-- [ ] **Step 5: Commit the direct-path regression**
+- [x] **Step 5: Commit the direct-path regression**
 
 ```powershell
 git add -- test/qualification/manifest.test.ts docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md
