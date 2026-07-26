@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -12,6 +13,10 @@ import {
 import { SmokeInfrastructureError } from "../../src/smoke/evidence.js";
 
 const roots: string[] = [];
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 async function tempRoot(): Promise<string> {
   const root = path.join(
@@ -186,11 +191,18 @@ describe("Pi/Gemini real-smoke harness", () => {
       passed: true,
       filesChanged: ["result.txt"],
       commandCount: 1,
+      resultFileReadStatus: "read",
+      resultFileByteLength: Buffer.byteLength("PI_SMOKE_OK\n"),
+      resultFileRawSha256: sha256("PI_SMOKE_OK\n"),
+      resultFileNormalizedSha256: sha256("PI_SMOKE_OK"),
+      expectedResultNormalizedSha256: sha256("PI_SMOKE_OK"),
+      resultFileNormalizedLineCount: 1,
+      resultFileContainsExpectedLine: true,
       checks: {
         resultFileValid: true,
         resultFileObserved: true,
         onlyExpectedFileChanged: true,
-        commandObserved: true,
+        requiredCommandObserved: true,
         noNewPiRpcProcesses: true,
       },
     });
@@ -198,6 +210,57 @@ describe("Pi/Gemini real-smoke harness", () => {
     expect(receivedPrompt).toContain("bash tool with the exact command `git status --short`");
     expect(await readdir(root)).toEqual([]);
   });
+
+  it.each([
+    [["pwd"], "unrelated command"],
+    [["echo x && git status --short"], "compound command"],
+    [["bash"], "tool title only"],
+  ])(
+    "rejects %s as %s rather than exact command evidence",
+    async (commandsRun) => {
+      const root = await tempRoot();
+      const service: PiSmokeService = {
+        review: async () => {
+          throw new Error("not used");
+        },
+        delegate: async (input) => {
+          await writeFile(
+            path.join(input.cwd, "result.txt"),
+            "PI_SMOKE_OK\n",
+            "utf8",
+          );
+          return {
+            ok: true,
+            status: "completed",
+            llm: "gemini-3.5-flash",
+            actualModel: "gemini-3.5-flash",
+            elapsedMs: 15,
+            diagnostics: [],
+            filesChanged: ["result.txt"],
+            summary: "Tool event claimed git status --short.",
+            commandsRun,
+            verification: [],
+            risks: [],
+          };
+        },
+      };
+
+      const evidence = await runPiSmoke(
+        { llm: "gemini-3.5-flash", task: "delegate", tempRoot: root },
+        {
+          service,
+          runtimeEvidence: runtimeEvidence(),
+          readPiVersion: async () => "0.80.10",
+          listPiRpcProcessIds: async () => [100],
+        },
+      );
+
+      expect(evidence.passed).toBe(false);
+      expect(evidence.checks.requiredCommandObserved).toBe(false);
+      expect(evidence).not.toHaveProperty("commandsRun");
+      expect(JSON.stringify(evidence)).not.toContain(commandsRun[0]);
+    },
+  );
 
   it("fails when a forbidden credential or proxy reaches the Pi child", async () => {
     const root = await tempRoot();

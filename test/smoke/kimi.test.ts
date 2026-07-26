@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -12,6 +13,10 @@ import {
 import { SmokeInfrastructureError } from "../../src/smoke/evidence.js";
 
 const roots: string[] = [];
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 async function tempRoot(): Promise<string> {
   const root = path.join(
@@ -132,16 +137,67 @@ describe("Kimi real-smoke harness", () => {
 
     expect(evidence).toMatchObject({
       passed: true,
+      resultFileReadStatus: "read",
+      resultFileByteLength: Buffer.byteLength("KIMI_SMOKE_OK\n"),
+      resultFileRawSha256: sha256("KIMI_SMOKE_OK\n"),
+      resultFileNormalizedSha256: sha256("KIMI_SMOKE_OK"),
+      expectedResultNormalizedSha256: sha256("KIMI_SMOKE_OK"),
+      resultFileNormalizedLineCount: 1,
+      resultFileContainsExpectedLine: true,
       checks: {
         resultFileValid: true,
         resultFileObserved: true,
-        commandObserved: true,
+        requiredCommandObserved: true,
         noNewKimiProcesses: true,
       },
       filesChanged: ["result.txt"],
       commandCount: 1,
     });
     expect(await readdir(root)).toEqual([]);
+  });
+
+  it("requires the exact git status command and does not persist command text", async () => {
+    const root = await tempRoot();
+    const command = "echo x && git status --short";
+    const service: KimiSmokeService = {
+      review: async () => {
+        throw new Error("not used");
+      },
+      delegate: async (input) => {
+        await writeFile(
+          path.join(input.cwd, "result.txt"),
+          "KIMI_SMOKE_OK\n",
+          "utf8",
+        );
+        return {
+          ok: true,
+          status: "completed",
+          llm: "kimi-k3",
+          actualModel: "kimi-code/k3",
+          elapsedMs: 15,
+          diagnostics: [],
+          filesChanged: ["result.txt"],
+          summary: "Created the expected result.",
+          commandsRun: [command],
+          verification: [],
+          risks: [],
+        };
+      },
+    };
+
+    const evidence = await runKimiSmoke(
+      { llm: "kimi-k3", task: "delegate", tempRoot: root },
+      {
+        service,
+        readKimiVersion: async () => "0.27.0",
+        listKimiProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence.passed).toBe(false);
+    expect(evidence.checks.requiredCommandObserved).toBe(false);
+    expect(evidence).not.toHaveProperty("commandsRun");
+    expect(JSON.stringify(evidence)).not.toContain(command);
   });
 
   it("fails the gate when a new Kimi process remains after the task", async () => {

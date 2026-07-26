@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -22,6 +22,11 @@ import type {
 import { ExternalAgentService, type TaskExecutionContext } from "../tasks/service.js";
 import { VERSION } from "../version.js";
 import { inSmokeInfrastructureStage } from "./evidence.js";
+import {
+  inspectResultFile,
+  type ResultFileEvidence,
+  type ResultFileReadStatus,
+} from "./result-file-evidence.js";
 
 export type PiSmokeTask = "review" | "delegate";
 
@@ -47,7 +52,7 @@ export interface PiSmokeChecks {
   resultFileValid?: boolean;
   resultFileObserved?: boolean;
   onlyExpectedFileChanged?: boolean;
-  commandObserved?: boolean;
+  requiredCommandObserved?: boolean;
 }
 
 export interface PiSmokeEvidence {
@@ -79,6 +84,13 @@ export interface PiSmokeEvidence {
   commandCount: number;
   diagnosticCount: number;
   checks: PiSmokeChecks;
+  resultFileReadStatus?: ResultFileReadStatus;
+  resultFileByteLength?: number;
+  resultFileRawSha256?: string;
+  resultFileNormalizedSha256?: string;
+  expectedResultNormalizedSha256?: string;
+  resultFileNormalizedLineCount?: number;
+  resultFileContainsExpectedLine?: boolean;
 }
 
 export interface PiSmokeService {
@@ -333,6 +345,39 @@ function endpointHost(profile: LlmProfile): string {
     : "generativelanguage.googleapis.com";
 }
 
+function resultFileArtifactFields(
+  evidence: ResultFileEvidence,
+): Pick<
+  PiSmokeEvidence,
+  | "resultFileReadStatus"
+  | "resultFileByteLength"
+  | "resultFileRawSha256"
+  | "resultFileNormalizedSha256"
+  | "expectedResultNormalizedSha256"
+  | "resultFileNormalizedLineCount"
+  | "resultFileContainsExpectedLine"
+> {
+  return {
+    resultFileReadStatus: evidence.readStatus,
+    expectedResultNormalizedSha256: evidence.expectedNormalizedSha256,
+    ...(evidence.byteLength === undefined
+      ? {}
+      : { resultFileByteLength: evidence.byteLength }),
+    ...(evidence.rawSha256 === undefined
+      ? {}
+      : { resultFileRawSha256: evidence.rawSha256 }),
+    ...(evidence.normalizedSha256 === undefined
+      ? {}
+      : { resultFileNormalizedSha256: evidence.normalizedSha256 }),
+    ...(evidence.normalizedLineCount === undefined
+      ? {}
+      : { resultFileNormalizedLineCount: evidence.normalizedLineCount }),
+    ...(evidence.containsExpectedLine === undefined
+      ? {}
+      : { resultFileContainsExpectedLine: evidence.containsExpectedLine }),
+  };
+}
+
 function commonEvidence(
   options: PiSmokeOptions,
   result: ExternalReviewResult | ExternalDelegateResult,
@@ -528,12 +573,11 @@ export async function runPiSmoke(
           context,
         ),
     );
-    let resultText = "";
-    try {
-      resultText = await readFile(path.join(cwd, resultFileName), "utf8");
-    } catch {
-      resultText = "";
-    }
+    const resultFile = await inspectResultFile({
+      filePath: path.join(cwd, resultFileName),
+      expectedLine,
+      maximumBytes: 65_536,
+    });
     const processIdsAfter = await inSmokeInfrastructureStage(
       "post_process_snapshot",
       listPiRpcProcessIds,
@@ -551,27 +595,32 @@ export async function runPiSmoke(
         processIdsBefore,
         processIdsAfter,
       ),
-      resultFileValid: resultText.trim() === expectedLine,
+      resultFileValid: resultFile.valid,
       resultFileObserved: normalizedFiles.includes(resultFileName),
       onlyExpectedFileChanged:
         normalizedFiles.length === 1 && normalizedFiles[0] === resultFileName,
-      commandObserved: result.commandsRun.length > 0,
+      requiredCommandObserved: result.commandsRun.includes(
+        "git status --short",
+      ),
     };
     const passed =
       result.status === "completed" &&
       Object.values(checks).every((value) => value === true);
-    return commonEvidence(
-      options,
-      result,
-      piVersion,
-      runtimeEvidence,
-      processIdsBefore,
-      processIdsAfter,
-      now(),
-      profile,
-      checks,
-      passed,
-    );
+    return {
+      ...commonEvidence(
+        options,
+        result,
+        piVersion,
+        runtimeEvidence,
+        processIdsBefore,
+        processIdsAfter,
+        now(),
+        profile,
+        checks,
+        passed,
+      ),
+      ...resultFileArtifactFields(resultFile),
+    };
   } finally {
     await inSmokeInfrastructureStage(
       "workspace_cleanup",

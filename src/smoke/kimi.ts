@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -19,6 +19,11 @@ import type {
   ExternalReviewInput,
 } from "../tasks/schemas.js";
 import { inSmokeInfrastructureStage } from "./evidence.js";
+import {
+  inspectResultFile,
+  type ResultFileEvidence,
+  type ResultFileReadStatus,
+} from "./result-file-evidence.js";
 
 export type KimiSmokeTask = "review" | "delegate";
 
@@ -38,7 +43,7 @@ export interface KimiSmokeChecks {
   resultFileValid?: boolean;
   resultFileObserved?: boolean;
   onlyExpectedFileChanged?: boolean;
-  commandObserved?: boolean;
+  requiredCommandObserved?: boolean;
 }
 
 export interface KimiSmokeEvidence {
@@ -65,6 +70,13 @@ export interface KimiSmokeEvidence {
   commandCount: number;
   diagnosticCount: number;
   checks: KimiSmokeChecks;
+  resultFileReadStatus?: ResultFileReadStatus;
+  resultFileByteLength?: number;
+  resultFileRawSha256?: string;
+  resultFileNormalizedSha256?: string;
+  expectedResultNormalizedSha256?: string;
+  resultFileNormalizedLineCount?: number;
+  resultFileContainsExpectedLine?: boolean;
 }
 
 export interface KimiSmokeService {
@@ -251,6 +263,39 @@ function reviewFoundKnownDefect(review: string): boolean {
   );
 }
 
+function resultFileArtifactFields(
+  evidence: ResultFileEvidence,
+): Pick<
+  KimiSmokeEvidence,
+  | "resultFileReadStatus"
+  | "resultFileByteLength"
+  | "resultFileRawSha256"
+  | "resultFileNormalizedSha256"
+  | "expectedResultNormalizedSha256"
+  | "resultFileNormalizedLineCount"
+  | "resultFileContainsExpectedLine"
+> {
+  return {
+    resultFileReadStatus: evidence.readStatus,
+    expectedResultNormalizedSha256: evidence.expectedNormalizedSha256,
+    ...(evidence.byteLength === undefined
+      ? {}
+      : { resultFileByteLength: evidence.byteLength }),
+    ...(evidence.rawSha256 === undefined
+      ? {}
+      : { resultFileRawSha256: evidence.rawSha256 }),
+    ...(evidence.normalizedSha256 === undefined
+      ? {}
+      : { resultFileNormalizedSha256: evidence.normalizedSha256 }),
+    ...(evidence.normalizedLineCount === undefined
+      ? {}
+      : { resultFileNormalizedLineCount: evidence.normalizedLineCount }),
+    ...(evidence.containsExpectedLine === undefined
+      ? {}
+      : { resultFileContainsExpectedLine: evidence.containsExpectedLine }),
+  };
+}
+
 function commonEvidence(
   options: KimiSmokeOptions,
   result: ExternalReviewResult | ExternalDelegateResult,
@@ -393,12 +438,11 @@ export async function runKimiSmoke(
           context,
         ),
     );
-    let resultText = "";
-    try {
-      resultText = await readFile(path.join(cwd, "result.txt"), "utf8");
-    } catch {
-      resultText = "";
-    }
+    const resultFile = await inspectResultFile({
+      filePath: path.join(cwd, "result.txt"),
+      expectedLine: "KIMI_SMOKE_OK",
+      maximumBytes: 65_536,
+    });
     const normalizedFiles = result.filesChanged.map((name) => name.replaceAll("\\", "/"));
     const processIdsAfter = await inSmokeInfrastructureStage(
       "post_process_snapshot",
@@ -411,11 +455,13 @@ export async function runKimiSmoke(
         processIdsBefore,
         processIdsAfter,
       ),
-      resultFileValid: resultText.trim() === "KIMI_SMOKE_OK",
+      resultFileValid: resultFile.valid,
       resultFileObserved: normalizedFiles.includes("result.txt"),
       onlyExpectedFileChanged:
         normalizedFiles.length === 1 && normalizedFiles[0] === "result.txt",
-      commandObserved: result.commandsRun.length > 0,
+      requiredCommandObserved: result.commandsRun.includes(
+        "git status --short",
+      ),
     };
     const passed =
       result.status === "completed" &&
@@ -424,16 +470,19 @@ export async function runKimiSmoke(
       checks.resultFileValid === true &&
       checks.resultFileObserved === true &&
       checks.onlyExpectedFileChanged === true &&
-      checks.commandObserved === true;
-    return commonEvidence(
-      options,
-      result,
-      profile.model,
-      kimiVersion,
-      now(),
-      checks,
-      passed,
-    );
+      checks.requiredCommandObserved === true;
+    return {
+      ...commonEvidence(
+        options,
+        result,
+        profile.model,
+        kimiVersion,
+        now(),
+        checks,
+        passed,
+      ),
+      ...resultFileArtifactFields(resultFile),
+    };
   } finally {
     await inSmokeInfrastructureStage(
       "workspace_cleanup",

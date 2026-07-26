@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -11,6 +12,10 @@ import {
 import type { PiSmokeService } from "../../src/smoke/pi.js";
 
 const roots: string[] = [];
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 async function tempRoot(): Promise<string> {
   const root = path.join(
@@ -158,7 +163,27 @@ describe("Ark real-smoke harness", () => {
 
     expect(requestedFile).toBe("ark-agent-deepseek-v4-flash-smoke.txt");
     expect(evidence.passed).toBe(true);
-    expect(evidence.checks.commandObserved).toBe(true);
+    expect(evidence).toMatchObject({
+      resultFileReadStatus: "read",
+      resultFileByteLength: Buffer.byteLength(
+        "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash\n",
+      ),
+      resultFileRawSha256: sha256(
+        "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash\n",
+      ),
+      resultFileNormalizedSha256: sha256(
+        "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash",
+      ),
+      expectedResultNormalizedSha256: sha256(
+        "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash",
+      ),
+      resultFileNormalizedLineCount: 1,
+      resultFileContainsExpectedLine: true,
+      checks: {
+        resultFileValid: true,
+        requiredCommandObserved: true,
+      },
+    });
     expect(evidence.filesChanged).toEqual([requestedFile]);
   });
 
