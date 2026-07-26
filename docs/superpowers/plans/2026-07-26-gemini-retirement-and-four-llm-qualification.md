@@ -409,6 +409,72 @@ git add src/qualification/types.ts src/qualification/preflight.ts src/qualificat
 git commit -m "feat: version qualification preflight records"
 ```
 
+## Task 2A: Preserve Immutable Evidence Bytes in Windows Worktrees
+
+**Files:**
+
+- Create: `.gitattributes`
+- Modify: `test/qualification/manifest.test.ts`
+
+- [x] **Step 1: Record the Windows checkout RED**
+
+On the fresh isolated worktree with system `core.autocrlf=true`, verify:
+
+```powershell
+git ls-files --eol docs/smoke/evidence
+Get-FileHash -Algorithm SHA256 docs/smoke/evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json
+```
+
+Observed: Git reports `i/lf w/crlf`; the worktree manifest SHA-256 is `01db7dc3f75db40aa0df4a5446aaf161f8955122ba6b79a9ad35bc1da2af2c7e`, not the published baseline `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`. Direct terminal inspection therefore fails even though Git shows no content diff.
+
+- [x] **Step 2: Pin qualification evidence to LF**
+
+Add:
+
+```gitattributes
+docs/smoke/evidence/** text eol=lf
+```
+
+Commit the policy before refreshing the worktree:
+
+```powershell
+git add -- .gitattributes docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md
+git diff --cached --check
+git commit -m "chore: preserve qualification evidence bytes"
+```
+
+- [ ] **Step 3: Recreate the clean isolated worktree**
+
+From the primary repository, first prove the isolated path resolves under `D:\Codes\codex-agent-tools\.worktrees`, the branch is committed and clean, and no subagent is using it. Then use `git worktree remove --force` only for that exact isolated path and immediately re-add `codex/gemini-retirement` at the same path. Run `npm ci`.
+
+- [ ] **Step 4: Verify actual checked-out bytes and terminal**
+
+Require all of the following on the recreated worktree:
+
+```powershell
+git ls-files --eol docs/smoke/evidence
+```
+
+- all 14 immutable files report `i/lf w/lf`;
+- every SHA-256 matches the complete baseline table at the top of this plan;
+- `inspectQualificationTerminal()` succeeds directly against the real checked-out blocked batch, without copying or normalizing files.
+
+Replace the temporary LF-copy test helper with direct actual-path inspection and run:
+
+```powershell
+npm exec -- vitest run test/qualification/manifest.test.ts
+npm run typecheck
+git diff --check
+```
+
+- [ ] **Step 5: Commit the direct-path regression**
+
+```powershell
+git add -- test/qualification/manifest.test.ts docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md
+git diff --cached --check
+git commit -m "test: verify historical evidence in place"
+```
+
 ## Task 3: Emit Schema v3 Evidence for New Qualification Cases
 
 **Files:**
