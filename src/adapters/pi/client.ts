@@ -30,6 +30,8 @@ export interface PiRpcRunRequest {
   secretValues?: readonly string[];
   signal?: AbortSignal;
   onProgress?: (message: string) => void;
+  autoRetry?: boolean;
+  autoCompaction?: boolean;
 }
 
 interface RpcResponse extends Record<string, unknown> {
@@ -94,6 +96,26 @@ function modelIdFromResponse(response: RpcResponse): string | undefined {
   return typeof model?.id === "string" ? model.id : undefined;
 }
 
+function providerIdFromResponse(response: RpcResponse): string | undefined {
+  const data = recordOf(response.data);
+  if (typeof data?.provider === "string") return data.provider;
+  const model = recordOf(data?.model);
+  return typeof model?.provider === "string" ? model.provider : undefined;
+}
+
+function retryAttemptKey(
+  event: Record<string, unknown>,
+): string | undefined {
+  const attempt = event.attempt;
+  if (typeof attempt === "number" && Number.isFinite(attempt)) {
+    return `number:${attempt}`;
+  }
+  if (typeof attempt === "string" && attempt !== "") {
+    return `string:${attempt}`;
+  }
+  return undefined;
+}
+
 function sanitizedEvent(
   event: Record<string, unknown>,
   secrets: readonly string[],
@@ -133,6 +155,17 @@ export async function runPiRpc(
   let stdoutEnded = false;
   let completionFinished = false;
   let killTimer: NodeJS.Timeout | undefined;
+  let adapterClientInvocationCount = 0;
+  let adapterReportedFallbackUsed = false;
+  const explicitRetryAttempts = new Set<string>();
+  let anonymousExplicitRetryCount = 0;
+  let activeRetryAttempt: string | "anonymous" | undefined;
+  let agentWillRetryCount = 0;
+  let compactionWillRetryCount = 0;
+  let retryEventsUnbalanced = false;
+  let assistantIdentityObserved = false;
+  let assistantIdentityUnknown = false;
+  let assistantIdentityMismatch = false;
 
   const appendDiagnostic = (value: string): void => {
     if (diagnosticBytes >= 65_536) return;
@@ -148,6 +181,24 @@ export async function runPiRpc(
       request.onProgress?.(message);
     } catch (error) {
       appendDiagnostic(`Progress callback failed: ${String(error)}`);
+    }
+  };
+  const observeAssistantIdentity = (message: unknown): void => {
+    const record = recordOf(message);
+    if (record?.role !== "assistant") return;
+    assistantIdentityObserved = true;
+    if (
+      typeof record.model !== "string" ||
+      typeof record.provider !== "string"
+    ) {
+      assistantIdentityUnknown = true;
+      return;
+    }
+    if (
+      record.model !== request.model ||
+      record.provider !== request.provider
+    ) {
+      assistantIdentityMismatch = true;
     }
   };
 
@@ -227,7 +278,42 @@ export async function runPiRpc(
       );
       return;
     }
+    if (record.type === "agent_end" && record.willRetry === true) {
+      agentWillRetryCount += 1;
+    }
+    if (record.type === "compaction_end" && record.willRetry === true) {
+      compactionWillRetryCount += 1;
+    }
+    if (record.type === "auto_retry_start") {
+      const attempt = retryAttemptKey(record);
+      if (attempt === undefined) {
+        anonymousExplicitRetryCount += 1;
+        activeRetryAttempt = "anonymous";
+      } else {
+        explicitRetryAttempts.add(attempt);
+        activeRetryAttempt = attempt;
+      }
+      return;
+    }
+    if (record.type === "auto_retry_end") {
+      const attempt = retryAttemptKey(record);
+      if (attempt === undefined) {
+        if (activeRetryAttempt === undefined) {
+          anonymousExplicitRetryCount += 1;
+          retryEventsUnbalanced = true;
+        } else {
+          activeRetryAttempt = undefined;
+        }
+      } else if (!explicitRetryAttempts.has(attempt)) {
+        explicitRetryAttempts.add(attempt);
+        retryEventsUnbalanced = true;
+      } else if (activeRetryAttempt === attempt) {
+        activeRetryAttempt = undefined;
+      }
+      return;
+    }
     if (record.type === "message_end") {
+      observeAssistantIdentity(record.message);
       const text = assistantText(record.message);
       if (text !== "") textChunks.push(text);
       const message = recordOf(record.message);
@@ -242,11 +328,15 @@ export async function runPiRpc(
       }
       return;
     }
-    if (record.type === "agent_end" && textChunks.length === 0) {
+    if (record.type === "agent_end") {
       const messages = Array.isArray(record.messages) ? record.messages : [];
+      const collectText = textChunks.length === 0;
       for (const message of messages) {
-        const text = assistantText(message);
-        if (text !== "") textChunks.push(text);
+        observeAssistantIdentity(message);
+        if (collectText) {
+          const text = assistantText(message);
+          if (text !== "") textChunks.push(text);
+        }
       }
       return;
     }
@@ -338,7 +428,24 @@ export async function runPiRpc(
       modelId: request.model,
     });
     actualModel = modelIdFromResponse(modelResponse);
+    const actualProvider = providerIdFromResponse(modelResponse);
+    if (
+      actualModel !== request.model ||
+      actualProvider !== request.provider
+    ) {
+      adapterReportedFallbackUsed = true;
+      throw new Error("Pi model binding response mismatch");
+    }
     await sendCommand("set_thinking_level", { level: request.thinkingLevel });
+    if (request.autoRetry !== undefined) {
+      await sendCommand("set_auto_retry", { enabled: request.autoRetry });
+    }
+    if (request.autoCompaction !== undefined) {
+      await sendCommand("set_auto_compaction", {
+        enabled: request.autoCompaction,
+      });
+    }
+    adapterClientInvocationCount = 1;
     await sendCommand("prompt", { message: request.prompt });
     emitProgress("pi prompt started");
     await completion;
@@ -370,12 +477,46 @@ export async function runPiRpc(
     if (stderr.trim() !== "") appendDiagnostic(stderr.trim());
   }
 
+  if (activeRetryAttempt !== undefined) retryEventsUnbalanced = true;
+  if (retryEventsUnbalanced) {
+    appendDiagnostic("pi_runtime_retry_events_unbalanced");
+  }
+  const runtimeReportedAutoRetryCount =
+    compactionWillRetryCount +
+    Math.max(
+      explicitRetryAttempts.size + anonymousExplicitRetryCount,
+      agentWillRetryCount,
+    );
+  let executionTelemetry: AdapterRunResult["executionTelemetry"];
+  if (
+    adapterClientInvocationCount > 0 &&
+    (!assistantIdentityObserved || assistantIdentityUnknown)
+  ) {
+    appendDiagnostic("pi_runtime_identity_unknown");
+    if (status === "completed") status = "failed";
+    executionTelemetry = null;
+  } else {
+    if (assistantIdentityMismatch) {
+      adapterReportedFallbackUsed = true;
+      appendDiagnostic("pi_runtime_identity_mismatch");
+      if (status === "completed") status = "failed";
+    }
+    executionTelemetry = {
+      adapterClientInvocationCount,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount,
+      adapterReportedFallbackUsed,
+      source: "pi-rpc-observable",
+    };
+  }
+
   const result: AdapterRunResult = {
     status,
     text: redactText(textChunks.join("\n"), secrets),
     elapsedMs: Date.now() - startedAt,
     events,
     diagnostics,
+    executionTelemetry,
   };
   if (actualModel !== undefined) result.actualModel = actualModel;
   if (stopReason !== undefined) result.stopReason = stopReason;

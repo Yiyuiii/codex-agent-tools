@@ -40,6 +40,8 @@ function handle(command) {
   if (command.type === "set_model") {
     selectedModel = command.modelId;
     selectedProvider = command.provider;
+    const responseProvider =
+      scenario === "provider-mismatch" ? "unexpected-provider" : command.provider;
     emit({
       id: command.id,
       type: "response",
@@ -47,7 +49,7 @@ function handle(command) {
       success: true,
       data: {
         id: command.modelId,
-        provider: command.provider,
+        provider: responseProvider,
         api: providerApis[command.provider],
       },
     });
@@ -58,6 +60,18 @@ function handle(command) {
       id: command.id,
       type: "response",
       command: "set_thinking_level",
+      success: true,
+    });
+    return;
+  }
+  if (
+    command.type === "set_auto_retry" ||
+    command.type === "set_auto_compaction"
+  ) {
+    emit({
+      id: command.id,
+      type: "response",
+      command: command.type,
       success: true,
     });
     return;
@@ -95,6 +109,65 @@ function handle(command) {
       }, 5);
       return;
     }
+    if (
+      scenario === "runtime-identity-mismatch" ||
+      scenario === "runtime-identity-mismatch-failed" ||
+      scenario === "runtime-identity-mismatch-cancelled"
+    ) {
+      const failed = scenario === "runtime-identity-mismatch-failed";
+      emit({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          model: "runtime-model-fake-secret",
+          provider: "runtime-provider-fake-secret",
+          content: failed
+            ? []
+            : [{ type: "text", text: "Runtime identity mismatch." }],
+          stopReason: failed ? "error" : "stop",
+          ...(failed
+            ? { errorMessage: "runtime failed with fake-secret" }
+            : {}),
+        },
+      });
+      if (scenario === "runtime-identity-mismatch-cancelled") {
+        spawnGrandchild();
+        return;
+      }
+      emit({ type: "agent_end", messages: [], willRetry: false });
+      emit({ type: "agent_settled" });
+      return;
+    }
+    if (scenario === "runtime-identity-missing") {
+      emit({
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Runtime identity missing." }],
+          stopReason: "stop",
+        },
+      });
+      emit({ type: "agent_end", messages: [], willRetry: false });
+      emit({ type: "agent_settled" });
+      return;
+    }
+    if (scenario === "runtime-identity-agent-end-only") {
+      emit({
+        type: "agent_end",
+        messages: [
+          {
+            role: "assistant",
+            model: "agent-end-model-fake-secret",
+            provider: "agent-end-provider-fake-secret",
+            content: [{ type: "text", text: "Agent-end-only result." }],
+            stopReason: "stop",
+          },
+        ],
+        willRetry: false,
+      });
+      emit({ type: "agent_settled" });
+      return;
+    }
     if (scenario === "retry-success") {
       setTimeout(() => {
         emit({
@@ -128,6 +201,225 @@ function handle(command) {
         });
         emit({ type: "auto_retry_end", success: true, attempt: 1 });
         emit({ type: "agent_end", messages: [], willRetry: false });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
+    if (scenario === "retry-final-identity-mismatch") {
+      setTimeout(() => {
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: selectedModel,
+            provider: selectedProvider,
+            content: [],
+            stopReason: "error",
+            errorMessage: "temporary quota fake-secret",
+          },
+        });
+        emit({ type: "agent_end", messages: [], willRetry: true });
+        emit({ type: "auto_retry_start", attempt: 1 });
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: "retry-model-fake-secret",
+            provider: "retry-provider-fake-secret",
+            content: [{ type: "text", text: "Retry fallback result." }],
+            stopReason: "stop",
+          },
+        });
+        emit({ type: "auto_retry_end", success: true, attempt: 1 });
+        emit({ type: "agent_end", messages: [], willRetry: false });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
+    if (scenario === "retry-two") {
+      setTimeout(() => {
+        for (const attempt of [1, 2]) {
+          emit({ type: "agent_end", messages: [], willRetry: true });
+          emit({
+            type: "auto_retry_start",
+            attempt,
+            maxAttempts: 4,
+            delayMs: 1,
+            errorMessage: `temporary quota fake-secret attempt ${attempt}`,
+          });
+          emit({ type: "auto_retry_end", success: true, attempt });
+        }
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: selectedModel,
+            provider: selectedProvider,
+            content: [{ type: "text", text: "Recovered after two retries." }],
+            stopReason: "stop",
+          },
+        });
+        emit({ type: "agent_end", messages: [], willRetry: false });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
+    if (scenario === "retry-two-will-only") {
+      setTimeout(() => {
+        emit({ type: "agent_end", messages: [], willRetry: true });
+        emit({ type: "compaction_end", willRetry: true });
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: selectedModel,
+            provider: selectedProvider,
+            content: [{ type: "text", text: "Two willRetry signals." }],
+            stopReason: "stop",
+          },
+        });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
+    if (scenario === "retry-signal-after") {
+      setTimeout(() => {
+        emit({ type: "auto_retry_start", attempt: 1 });
+        emit({ type: "auto_retry_end", success: true, attempt: 1 });
+        emit({ type: "agent_end", messages: [], willRetry: true });
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: selectedModel,
+            provider: selectedProvider,
+            content: [{ type: "text", text: "Signal followed explicit retry." }],
+            stopReason: "stop",
+          },
+        });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
+    if (scenario === "retry-duplicates") {
+      setTimeout(() => {
+        emit({ type: "auto_retry_start", attempt: 1 });
+        emit({ type: "auto_retry_start", attempt: 1 });
+        emit({ type: "auto_retry_end", success: true, attempt: 1 });
+        emit({ type: "auto_retry_end", success: true, attempt: 1 });
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: selectedModel,
+            provider: selectedProvider,
+            content: [{ type: "text", text: "Duplicate retry events." }],
+            stopReason: "stop",
+          },
+        });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
+    if (scenario === "retry-overlapping") {
+      setTimeout(() => {
+        emit({ type: "auto_retry_start", attempt: 1 });
+        emit({ type: "auto_retry_start", attempt: 2 });
+        emit({ type: "auto_retry_end", success: true, attempt: 2 });
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: selectedModel,
+            provider: selectedProvider,
+            content: [{ type: "text", text: "Overlapping retry attempts." }],
+            stopReason: "stop",
+          },
+        });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
+    if (scenario === "retry-unbalanced") {
+      setTimeout(() => {
+        emit({
+          type: "auto_retry_start",
+          attempt: 1,
+          errorMessage: "unbalanced retry fake-secret",
+        });
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: selectedModel,
+            provider: selectedProvider,
+            content: [{ type: "text", text: "Unbalanced retry result." }],
+            stopReason: "stop",
+          },
+        });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
+    if (scenario === "compaction-retry") {
+      setTimeout(() => {
+        emit({
+          type: "compaction_end",
+          willRetry: true,
+          errorMessage: "compaction retry fake-secret",
+        });
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: selectedModel,
+            provider: selectedProvider,
+            content: [{ type: "text", text: "Compaction retry result." }],
+            stopReason: "stop",
+          },
+        });
+        emit({ type: "agent_settled" });
+      }, 5);
+      return;
+    }
+    if (
+      scenario === "compaction-and-explicit" ||
+      scenario === "agent-explicit-compaction"
+    ) {
+      setTimeout(() => {
+        if (scenario === "agent-explicit-compaction") {
+          emit({ type: "agent_end", messages: [], willRetry: true });
+        }
+        if (scenario === "compaction-and-explicit") {
+          emit({
+            type: "compaction_end",
+            willRetry: true,
+            errorMessage: "independent compaction retry fake-secret",
+          });
+        }
+        emit({
+          type: "auto_retry_start",
+          attempt: 1,
+          errorMessage: "explicit retry fake-secret",
+        });
+        emit({ type: "auto_retry_end", success: true, attempt: 1 });
+        if (scenario === "agent-explicit-compaction") {
+          emit({
+            type: "compaction_end",
+            willRetry: true,
+            errorMessage: "independent compaction retry fake-secret",
+          });
+        }
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: selectedModel,
+            provider: selectedProvider,
+            content: [{ type: "text", text: "Independent retry sources." }],
+            stopReason: "stop",
+          },
+        });
         emit({ type: "agent_settled" });
       }, 5);
       return;

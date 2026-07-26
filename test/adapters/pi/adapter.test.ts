@@ -50,6 +50,13 @@ describe("PiAdapter", () => {
         },
       ],
       diagnostics: [],
+      executionTelemetry: {
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "pi-rpc-observable" as const,
+      },
     }));
     const adapter = new PiAdapter({
       locateExecutable: async () => "C:\\npm\\pi.cmd",
@@ -140,6 +147,13 @@ describe("PiAdapter", () => {
         elapsedMs: 10,
         events: [],
         diagnostics: [],
+        executionTelemetry: {
+          adapterClientInvocationCount: 1,
+          adapterRetryCount: 0,
+          runtimeReportedAutoRetryCount: 0,
+          adapterReportedFallbackUsed: false,
+          source: "pi-rpc-observable",
+        },
       }),
     });
     const result = await adapter.run({
@@ -150,9 +164,96 @@ describe("PiAdapter", () => {
       parentEnvironment: { PATH: "x" },
     });
     expect(result.status).toBe("failed");
+    expect(result.executionTelemetry).toMatchObject({
+      adapterReportedFallbackUsed: true,
+    });
     expect(result.diagnostics.join("\n")).toContain(
       "expected gemini-3.5-flash but Pi reported other-model",
     );
+  });
+
+  it.each(["failed", "cancelled"] as const)(
+    "marks an observed model fallback even when the child status is %s",
+    async (status) => {
+      const adapter = new PiAdapter({
+        locateExecutable: async () => "pi.cmd",
+        buildConfig: async () => ({
+          agentDir: "C:\\cache\\pi",
+          settingsPath: "C:\\cache\\pi\\settings.json",
+          modelsPath: "C:\\cache\\pi\\models.json",
+          environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
+          contentSha256: "a".repeat(64),
+        }),
+        runClient: async () => ({
+          status,
+          text: "",
+          actualModel: "other-model",
+          elapsedMs: 10,
+          events: [],
+          diagnostics: [],
+          executionTelemetry: {
+            adapterClientInvocationCount: 1,
+            adapterRetryCount: 0,
+            runtimeReportedAutoRetryCount: 0,
+            adapterReportedFallbackUsed: false,
+            source: "pi-rpc-observable",
+          },
+        }),
+      });
+
+      const result = await adapter.run({
+        profile: profile(),
+        task: "delegate",
+        cwd: process.cwd(),
+        prompt: "Run",
+        parentEnvironment: { PATH: "x" },
+      });
+
+      expect(result.status).toBe("failed");
+      expect(result.executionTelemetry).toMatchObject({
+        adapterReportedFallbackUsed: true,
+      });
+    },
+  );
+
+  it("fails a completed result with missing model without inventing fallback", async () => {
+    const adapter = new PiAdapter({
+      locateExecutable: async () => "pi.cmd",
+      buildConfig: async () => ({
+        agentDir: "C:\\cache\\pi",
+        settingsPath: "C:\\cache\\pi\\settings.json",
+        modelsPath: "C:\\cache\\pi\\models.json",
+        environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
+        contentSha256: "a".repeat(64),
+      }),
+      runClient: async () => ({
+        status: "completed",
+        text: "",
+        elapsedMs: 10,
+        events: [],
+        diagnostics: [],
+        executionTelemetry: {
+          adapterClientInvocationCount: 1,
+          adapterRetryCount: 0,
+          runtimeReportedAutoRetryCount: 0,
+          adapterReportedFallbackUsed: false,
+          source: "pi-rpc-observable",
+        },
+      }),
+    });
+
+    const result = await adapter.run({
+      profile: profile(),
+      task: "delegate",
+      cwd: process.cwd(),
+      prompt: "Run",
+      parentEnvironment: { PATH: "x" },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.executionTelemetry).toMatchObject({
+      adapterReportedFallbackUsed: false,
+    });
   });
 
   it("retries only bounded Gemini free-tier throttles after the requested delay", async () => {
@@ -189,6 +290,13 @@ describe("PiAdapter", () => {
             diagnostics: [
               "generate_content_free_tier_requests; Please retry in 15.25s.",
             ],
+            executionTelemetry: {
+              adapterClientInvocationCount: 1,
+              adapterRetryCount: 0,
+              runtimeReportedAutoRetryCount: 1,
+              adapterReportedFallbackUsed: false,
+              source: "pi-rpc-observable",
+            },
           };
         }
         return {
@@ -205,6 +313,13 @@ describe("PiAdapter", () => {
             },
           ],
           diagnostics: [],
+          executionTelemetry: {
+            adapterClientInvocationCount: 1,
+            adapterRetryCount: 0,
+            runtimeReportedAutoRetryCount: 0,
+            adapterReportedFallbackUsed: false,
+            source: "pi-rpc-observable",
+          },
         };
       },
     });
@@ -220,6 +335,13 @@ describe("PiAdapter", () => {
     expect(calls).toBe(2);
     expect(waits).toEqual([60_000]);
     expect(result).toMatchObject({ status: "completed", text: "recovered" });
+    expect(result.executionTelemetry).toEqual({
+      adapterClientInvocationCount: 2,
+      adapterRetryCount: 1,
+      runtimeReportedAutoRetryCount: 1,
+      adapterReportedFallbackUsed: false,
+      source: "pi-rpc-observable",
+    });
     expect(result.events).toEqual([
       expect.objectContaining({ type: "tool_call", toolCallId: "first" }),
       expect.objectContaining({ type: "tool_call", toolCallId: "second" }),
@@ -255,6 +377,13 @@ describe("PiAdapter", () => {
           diagnostics: [
             "generate_content_free_tier_requests; Please retry in 10s.",
           ],
+          executionTelemetry: {
+            adapterClientInvocationCount: 1,
+            adapterRetryCount: 0,
+            runtimeReportedAutoRetryCount: 0,
+            adapterReportedFallbackUsed: false,
+            source: "pi-rpc-observable",
+          },
         };
       },
     });
@@ -298,6 +427,13 @@ describe("PiAdapter", () => {
           diagnostics: [
             "generate_content_free_tier_requests; Please retry in 10s.",
           ],
+          executionTelemetry: {
+            adapterClientInvocationCount: 1,
+            adapterRetryCount: 0,
+            runtimeReportedAutoRetryCount: 0,
+            adapterReportedFallbackUsed: false,
+            source: "pi-rpc-observable",
+          },
         };
       },
     });
@@ -313,5 +449,118 @@ describe("PiAdapter", () => {
     expect(result.status).toBe("failed");
     expect(calls).toBe(1);
     expect(waits).toBe(0);
+  });
+
+  it("uses one client attempt with Pi retries disabled in qualification mode", async () => {
+    const runClient = vi.fn(async (_request: PiRpcRunRequest) => ({
+      status: "failed" as const,
+      text: "",
+      actualModel: "gemini-3.5-flash",
+      elapsedMs: 1,
+      events: [],
+      diagnostics: [
+        "generate_content_free_tier_requests; Please retry in 10s.",
+      ],
+      executionTelemetry: {
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "pi-rpc-observable" as const,
+      },
+    }));
+    const waitForRetry = vi.fn(async () => undefined);
+    const adapter = new PiAdapter({
+      retryMode: "qualification-single-attempt",
+      locateExecutable: async () => "pi.cmd",
+      buildConfig: async () => ({
+        agentDir: "C:\\cache\\pi",
+        settingsPath: "C:\\cache\\pi\\settings.json",
+        modelsPath: "C:\\cache\\pi\\models.json",
+        environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
+        contentSha256: "a".repeat(64),
+      }),
+      runClient,
+      waitForRetry,
+    });
+
+    const result = await adapter.run({
+      profile: profile(),
+      task: "review",
+      cwd: process.cwd(),
+      prompt: "Review",
+      parentEnvironment: { PATH: "x", GEMINI_API_KEY: "secret" },
+    });
+
+    expect(runClient).toHaveBeenCalledOnce();
+    expect(waitForRetry).not.toHaveBeenCalled();
+    expect(runClient.mock.calls[0]![0]).toMatchObject({
+      autoRetry: false,
+      autoCompaction: false,
+    });
+    expect(result.executionTelemetry).toEqual({
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      source: "pi-rpc-observable",
+    });
+  });
+
+  it("keeps aggregate telemetry unknown when any retry attempt reports null", async () => {
+    let calls = 0;
+    const adapter = new PiAdapter({
+      locateExecutable: async () => "pi.cmd",
+      buildConfig: async () => ({
+        agentDir: "C:\\cache\\pi",
+        settingsPath: "C:\\cache\\pi\\settings.json",
+        modelsPath: "C:\\cache\\pi\\models.json",
+        environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
+        contentSha256: "a".repeat(64),
+      }),
+      waitForRetry: async () => undefined,
+      runClient: async () => {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            status: "failed",
+            text: "",
+            actualModel: "gemini-3.5-flash",
+            elapsedMs: 1,
+            events: [],
+            diagnostics: [
+              "generate_content_free_tier_requests; Please retry in 10s.",
+            ],
+            executionTelemetry: null,
+          };
+        }
+        return {
+          status: "completed",
+          text: "recovered",
+          actualModel: "gemini-3.5-flash",
+          elapsedMs: 1,
+          events: [],
+          diagnostics: [],
+          executionTelemetry: {
+            adapterClientInvocationCount: 1,
+            adapterRetryCount: 0,
+            runtimeReportedAutoRetryCount: 0,
+            adapterReportedFallbackUsed: false,
+            source: "pi-rpc-observable",
+          },
+        };
+      },
+    });
+
+    const result = await adapter.run({
+      profile: profile(),
+      task: "review",
+      cwd: process.cwd(),
+      prompt: "Review",
+      parentEnvironment: { PATH: "x", GEMINI_API_KEY: "secret" },
+    });
+
+    expect(calls).toBe(2);
+    expect(result.executionTelemetry).toBeNull();
   });
 });

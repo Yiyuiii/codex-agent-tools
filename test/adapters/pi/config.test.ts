@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -73,9 +74,26 @@ describe("isolated Pi configuration", () => {
       version: "0.1.0-alpha.1",
       providers: ["ark"],
     });
+    const qualificationFirst = await buildIsolatedPiConfig({
+      root,
+      version: "0.1.0-alpha.1",
+      providers: ["ark"],
+      qualification: true,
+    });
+    const qualificationSecond = await buildIsolatedPiConfig({
+      root,
+      version: "0.1.0-alpha.1",
+      providers: ["ark"],
+      qualification: true,
+    });
 
     expect(first).toEqual(second);
+    expect(qualificationFirst).toEqual(qualificationSecond);
+    expect(qualificationFirst.agentDir).not.toBe(first.agentDir);
     expect(first.agentDir.startsWith(path.resolve(root))).toBe(true);
+    expect(qualificationFirst.agentDir.startsWith(path.resolve(root))).toBe(
+      true,
+    );
     expect(first.agentDir).not.toContain(`${path.sep}.pi${path.sep}agent`);
     expect(first.environment).toEqual({ PI_CODING_AGENT_DIR: first.agentDir });
     expect(JSON.parse(await readFile(first.settingsPath, "utf8"))).toEqual({
@@ -89,6 +107,25 @@ describe("isolated Pi configuration", () => {
       skills: [],
       themes: [],
     });
+    expect(
+      JSON.parse(await readFile(qualificationFirst.settingsPath, "utf8")),
+    ).toEqual({
+      defaultProjectTrust: "never",
+      enableAnalytics: false,
+      enableInstallTelemetry: false,
+      extensions: [],
+      packages: [],
+      prompts: [],
+      quietStartup: true,
+      retry: {
+        provider: {
+          maxRetries: 0,
+        },
+      },
+      skills: [],
+      themes: [],
+    });
+    const settingsText = await readFile(first.settingsPath, "utf8");
     const modelsText = await readFile(first.modelsPath, "utf8");
     const expectedModels = await readFile(
       path.resolve("test/fixtures/pi/expected-ark-models.json"),
@@ -103,7 +140,14 @@ describe("isolated Pi configuration", () => {
       "models.json",
       "settings.json",
     ]);
-    expect(first.contentSha256).toMatch(/^[a-f0-9]{64}$/u);
+    expect(first.contentSha256).toBe(
+      createHash("sha256")
+        .update(settingsText)
+        .update("\0")
+        .update(modelsText)
+        .digest("hex"),
+    );
+    expect(qualificationFirst.contentSha256).not.toBe(first.contentSha256);
   });
 
   it("uses an application-owned cache root", () => {

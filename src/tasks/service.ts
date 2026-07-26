@@ -1,4 +1,5 @@
 import type {
+  AdapterExecutionTelemetry,
   AdapterRunRequest,
   AdapterRunResult,
   ExternalAgentAdapter,
@@ -36,6 +37,9 @@ export interface ExternalAgentServiceDependencies {
 export interface TaskExecutionContext {
   signal?: AbortSignal;
   onProgress?: (message: string) => void;
+  onExecutionTelemetry?: (
+    telemetry: AdapterExecutionTelemetry | null,
+  ) => void;
 }
 
 function buildReviewPacket(
@@ -70,6 +74,7 @@ function failedAdapterResult(error: unknown): AdapterRunResult {
     elapsedMs: 0,
     events: [],
     diagnostics: [error instanceof Error ? error.message : String(error)],
+    executionTelemetry: null,
   };
 }
 
@@ -215,6 +220,7 @@ export class ExternalAgentService {
       } catch (error) {
         adapterResult = failedAdapterResult(error);
       }
+      context.onExecutionTelemetry?.(adapterResult.executionTelemetry);
       const after = await captureWorkspace(input.cwd);
       const comparison = compareWorkspace(before, after);
       const policyViolations = reviewPolicyViolations(adapterResult.events);
@@ -270,6 +276,7 @@ export class ExternalAgentService {
       } catch (error) {
         adapterResult = failedAdapterResult(error);
       }
+      context.onExecutionTelemetry?.(adapterResult.executionTelemetry);
       const after = await captureWorkspace(input.cwd);
       const comparison = compareWorkspace(before, after);
       const status = adapterStatus(adapterResult.status);

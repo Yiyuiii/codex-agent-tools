@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { execa } from "execa";
 
+import type { AdapterExecutionTelemetry } from "../adapters/adapter.js";
 import { PiAdapter } from "../adapters/pi/adapter.js";
 import { runPiRpc } from "../adapters/pi/client.js";
 import { buildIsolatedPiConfig } from "../adapters/pi/config.js";
@@ -53,6 +54,7 @@ export interface PiSmokeChecks {
   resultFileObserved?: boolean;
   onlyExpectedFileChanged?: boolean;
   requiredCommandObserved?: boolean;
+  executionTelemetryValid: boolean;
 }
 
 export interface PiSmokeEvidence {
@@ -83,6 +85,11 @@ export interface PiSmokeEvidence {
   filesChanged: string[];
   commandCount: number;
   diagnosticCount: number;
+  adapterClientInvocationCount: number | null;
+  adapterRetryCount: number | null;
+  runtimeReportedAutoRetryCount: number | null;
+  adapterReportedFallbackUsed: boolean | null;
+  executionTelemetrySource: AdapterExecutionTelemetry["source"] | null;
   checks: PiSmokeChecks;
   resultFileReadStatus?: ResultFileReadStatus;
   resultFileByteLength?: number;
@@ -159,12 +166,14 @@ async function createSmokeRuntime(
   const config = await buildIsolatedPiConfig({
     version: VERSION,
     providers: ["ark"],
+    qualification: true,
   });
   const evidence: PiSmokeRuntimeEvidence = {
     configSha256: config.contentSha256,
     childEnvironment: {},
   };
   const pi = new PiAdapter({
+    retryMode: "qualification-single-attempt",
     buildConfig: async () => config,
     runClient: async (request) => {
       evidence.childEnvironment = { ...request.environment };
@@ -345,6 +354,22 @@ function endpointHost(profile: LlmProfile): string {
     : "generativelanguage.googleapis.com";
 }
 
+function telemetryIsValid(
+  telemetry: AdapterExecutionTelemetry | null | undefined,
+  reportCount: number,
+): telemetry is AdapterExecutionTelemetry {
+  return (
+    reportCount === 1 &&
+    telemetry !== null &&
+    telemetry !== undefined &&
+    telemetry.source === "pi-rpc-observable" &&
+    telemetry.adapterClientInvocationCount === 1 &&
+    telemetry.adapterRetryCount === 0 &&
+    telemetry.runtimeReportedAutoRetryCount === 0 &&
+    telemetry.adapterReportedFallbackUsed === false
+  );
+}
+
 function resultFileArtifactFields(
   evidence: ResultFileEvidence,
 ): Pick<
@@ -389,6 +414,7 @@ function commonEvidence(
   profile: LlmProfile,
   checks: PiSmokeChecks,
   passed: boolean,
+  telemetry: AdapterExecutionTelemetry | null | undefined,
 ): PiSmokeEvidence {
   const environment = inspectEnvironment(
     runtimeEvidence.childEnvironment,
@@ -429,6 +455,14 @@ function commonEvidence(
     filesChanged: [...result.filesChanged].sort(),
     commandCount: "commandsRun" in result ? result.commandsRun.length : 0,
     diagnosticCount: result.diagnostics.length,
+    adapterClientInvocationCount:
+      telemetry?.adapterClientInvocationCount ?? null,
+    adapterRetryCount: telemetry?.adapterRetryCount ?? null,
+    runtimeReportedAutoRetryCount:
+      telemetry?.runtimeReportedAutoRetryCount ?? null,
+    adapterReportedFallbackUsed:
+      telemetry?.adapterReportedFallbackUsed ?? null,
+    executionTelemetrySource: telemetry?.source ?? null,
     checks: {
       ...checks,
       environmentIsolated: environment.isolated,
@@ -489,8 +523,14 @@ export async function runPiSmoke(
       "pre_process_snapshot",
       listPiRpcProcessIds,
     );
+    let executionTelemetry: AdapterExecutionTelemetry | null | undefined;
+    let executionTelemetryReportCount = 0;
     const context: TaskExecutionContext = {};
     if (options.onProgress !== undefined) context.onProgress = options.onProgress;
+    context.onExecutionTelemetry = (telemetry) => {
+      executionTelemetryReportCount += 1;
+      executionTelemetry = telemetry;
+    };
     const timeoutMs = options.timeoutMs ?? profile.timeoutMs;
 
     if (options.task === "review") {
@@ -533,6 +573,10 @@ export async function runPiSmoke(
         ),
         workspaceUnchanged: result.filesChanged.length === 0 && gitClean,
         knownDefectFound: knownDefectFound(result.review),
+        executionTelemetryValid: telemetryIsValid(
+          executionTelemetry,
+          executionTelemetryReportCount,
+        ),
       };
       const passed =
         result.status === "completed" &&
@@ -548,6 +592,7 @@ export async function runPiSmoke(
         profile,
         checks,
         passed,
+        executionTelemetry,
       );
     }
 
@@ -602,6 +647,10 @@ export async function runPiSmoke(
       requiredCommandObserved: result.commandsRun.includes(
         "git status --short",
       ),
+      executionTelemetryValid: telemetryIsValid(
+        executionTelemetry,
+        executionTelemetryReportCount,
+      ),
     };
     const passed =
       result.status === "completed" &&
@@ -618,6 +667,7 @@ export async function runPiSmoke(
         profile,
         checks,
         passed,
+        executionTelemetry,
       ),
       ...resultFileArtifactFields(resultFile),
     };

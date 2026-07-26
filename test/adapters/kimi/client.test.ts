@@ -56,6 +56,13 @@ describe("runKimiAcp", () => {
       status: "completed",
       sessionId: "fake-session-1",
       actualModel: "kimi-code/k3",
+      executionTelemetry: {
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "kimi-acp-observable",
+      },
     });
     expect(result.text).toContain(
       "model=kimi-code/k3;read=fixture-content;permission=reject;writeDenied=true",
@@ -156,6 +163,13 @@ describe("runKimiAcp", () => {
       }),
     );
     expect(result.status).toBe("failed");
+    expect(result.executionTelemetry).toEqual({
+      adapterClientInvocationCount: 0,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      source: "kimi-acp-observable",
+    });
     expect(result.diagnostics.join("\n")).toMatch(/model configuration.*not available/i);
   });
 });

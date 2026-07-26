@@ -204,6 +204,13 @@ describe("Pi RPC client", () => {
       status: "completed",
       text: "Pi says hello.",
       actualModel: "gemini-3.5-flash",
+      executionTelemetry: {
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "pi-rpc-observable",
+      },
     });
     expect(result.events).toEqual(
       expect.arrayContaining([
@@ -389,8 +396,322 @@ describe("Pi RPC client", () => {
     expect(result.status).toBe("completed");
     expect(result.text).toBe("Recovered after retry.");
     expect(result.stopReason).toBe("stop");
+    expect(result.executionTelemetry).toMatchObject({
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 1,
+      adapterReportedFallbackUsed: false,
+      source: "pi-rpc-observable",
+    });
     expect(result.diagnostics.join("\n")).toContain(
       "Pi assistant error: temporary quota [REDACTED]",
     );
+  });
+
+  it("counts two explicit runtime retry groups without double-counting willRetry", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "retry-two",
+      }),
+    );
+
+    expect(result.status).toBe("completed");
+    expect(result.executionTelemetry).toMatchObject({
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 2,
+      adapterReportedFallbackUsed: false,
+    });
+  });
+
+  it("conservatively counts unbalanced retry events with only a fixed redacted label", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "retry-unbalanced",
+      }),
+    );
+
+    expect(result.executionTelemetry).toMatchObject({
+      runtimeReportedAutoRetryCount: 1,
+    });
+    expect(result.diagnostics).toContain("pi_runtime_retry_events_unbalanced");
+    expect(JSON.stringify(result)).not.toContain("unbalanced retry fake-secret");
+    expect(result.events).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "auto_retry_start" }),
+      ]),
+    );
+  });
+
+  it("counts compaction willRetry as one observable runtime retry", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "compaction-retry",
+      }),
+    );
+
+    expect(result.executionTelemetry).toMatchObject({
+      runtimeReportedAutoRetryCount: 1,
+    });
+    expect(JSON.stringify(result)).not.toContain("compaction retry fake-secret");
+  });
+
+  it.each([
+    "compaction-and-explicit",
+    "agent-explicit-compaction",
+  ] as const)(
+    "counts compaction retry independently from correlated auto/agent retries in %s",
+    async (scenario) => {
+      const cwd = await tempDirectory();
+      const result = await runPiRpc(
+        baseRequest(cwd, {
+          PATH: process.env.PATH,
+          SYSTEMROOT: process.env.SYSTEMROOT,
+          FAKE_PI_SCENARIO: scenario,
+        }),
+      );
+
+      expect(result.executionTelemetry).toMatchObject({
+        runtimeReportedAutoRetryCount: 2,
+      });
+      expect(JSON.stringify(result)).not.toContain(
+        "independent compaction retry fake-secret",
+      );
+      expect(JSON.stringify(result)).not.toContain(
+        "explicit retry fake-secret",
+      );
+    },
+  );
+
+  it("conservatively counts two unmatched willRetry signals", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "retry-two-will-only",
+      }),
+    );
+
+    expect(result.executionTelemetry).toMatchObject({
+      runtimeReportedAutoRetryCount: 2,
+    });
+  });
+
+  it("correlates a willRetry signal reported after its explicit retry group", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "retry-signal-after",
+      }),
+    );
+
+    expect(result.executionTelemetry).toMatchObject({
+      runtimeReportedAutoRetryCount: 1,
+    });
+    expect(result.diagnostics).not.toContain(
+      "pi_runtime_retry_events_unbalanced",
+    );
+  });
+
+  it("deduplicates repeated start/end records for the same attempt", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "retry-duplicates",
+      }),
+    );
+
+    expect(result.executionTelemetry).toMatchObject({
+      runtimeReportedAutoRetryCount: 1,
+    });
+    expect(result.diagnostics).not.toContain(
+      "pi_runtime_retry_events_unbalanced",
+    );
+  });
+
+  it("accepts consecutive starts followed by the latest matching end", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "retry-overlapping",
+      }),
+    );
+
+    expect(result.executionTelemetry).toMatchObject({
+      runtimeReportedAutoRetryCount: 2,
+    });
+    expect(result.diagnostics).not.toContain(
+      "pi_runtime_retry_events_unbalanced",
+    );
+  });
+
+  it("sends qualification retry and compaction disables before the prompt", async () => {
+    const cwd = await tempDirectory();
+    const logPath = path.join(cwd, "rpc-log.jsonl");
+    const result = await runPiRpc({
+      ...baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_LOG: logPath,
+      }),
+      autoRetry: false,
+      autoCompaction: false,
+    });
+
+    expect(result.status).toBe("completed");
+    const commands = (await readLog(logPath))
+      .filter((entry) => entry.kind === "command")
+      .map((entry) => entry.value as Record<string, unknown>);
+    expect(commands.map((command) => command.type)).toEqual([
+      "set_model",
+      "set_thinking_level",
+      "set_auto_retry",
+      "set_auto_compaction",
+      "prompt",
+    ]);
+    expect(commands[2]).toMatchObject({ enabled: false });
+    expect(commands[3]).toMatchObject({ enabled: false });
+  });
+
+  it("fails closed and marks fallback when Pi reports a different provider", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "provider-mismatch",
+      }),
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.executionTelemetry).toMatchObject({
+      adapterClientInvocationCount: 0,
+      adapterReportedFallbackUsed: true,
+    });
+    expect(result.diagnostics.join("\n")).toContain(
+      "Pi model binding response mismatch",
+    );
+  });
+
+  it.each([
+    ["runtime-identity-mismatch", "failed"],
+    ["runtime-identity-mismatch-failed", "failed"],
+  ] as const)(
+    "fails closed for assistant runtime identity mismatch in %s",
+    async (scenario, expectedStatus) => {
+      const cwd = await tempDirectory();
+      const result = await runPiRpc(
+        baseRequest(cwd, {
+          PATH: process.env.PATH,
+          SYSTEMROOT: process.env.SYSTEMROOT,
+          FAKE_PI_SCENARIO: scenario,
+        }),
+      );
+
+      expect(result.status).toBe(expectedStatus);
+      expect(result.executionTelemetry).toMatchObject({
+        adapterClientInvocationCount: 1,
+        adapterReportedFallbackUsed: true,
+      });
+      expect(result.diagnostics).toContain("pi_runtime_identity_mismatch");
+      expect(JSON.stringify(result)).not.toContain(
+        "runtime-model-fake-secret",
+      );
+      expect(JSON.stringify(result)).not.toContain(
+        "runtime-provider-fake-secret",
+      );
+    },
+  );
+
+  it("keeps cancelled status while marking an observed runtime fallback", async () => {
+    const cwd = await tempDirectory();
+    const controller = new AbortController();
+    const result = await runPiRpc({
+      ...baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "runtime-identity-mismatch-cancelled",
+      }),
+      signal: controller.signal,
+      onProgress: (message) => {
+        if (message === "pi prompt started") controller.abort();
+      },
+    });
+
+    expect(result.status).toBe("cancelled");
+    expect(result.executionTelemetry).toMatchObject({
+      adapterReportedFallbackUsed: true,
+    });
+    expect(result.diagnostics).toContain("pi_runtime_identity_mismatch");
+  });
+
+  it("marks a retry whose final assistant changes runtime identity", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "retry-final-identity-mismatch",
+      }),
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.executionTelemetry).toMatchObject({
+      runtimeReportedAutoRetryCount: 1,
+      adapterReportedFallbackUsed: true,
+    });
+    expect(result.diagnostics).toContain("pi_runtime_identity_mismatch");
+  });
+
+  it("checks assistant identity found only in agent_end.messages", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "runtime-identity-agent-end-only",
+      }),
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.text).toBe("Agent-end-only result.");
+    expect(result.executionTelemetry).toMatchObject({
+      adapterReportedFallbackUsed: true,
+    });
+    expect(result.diagnostics).toContain("pi_runtime_identity_mismatch");
+    expect(JSON.stringify(result)).not.toContain(
+      "agent-end-model-fake-secret",
+    );
+  });
+
+  it("returns unknown telemetry when an assistant runtime identity is missing", async () => {
+    const cwd = await tempDirectory();
+    const result = await runPiRpc(
+      baseRequest(cwd, {
+        PATH: process.env.PATH,
+        SYSTEMROOT: process.env.SYSTEMROOT,
+        FAKE_PI_SCENARIO: "runtime-identity-missing",
+      }),
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.executionTelemetry).toBeNull();
+    expect(result.diagnostics).toContain("pi_runtime_identity_unknown");
   });
 });

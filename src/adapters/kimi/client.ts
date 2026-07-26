@@ -6,6 +6,7 @@ import { Readable, Writable } from "node:stream";
 import * as acp from "@agentclientprotocol/sdk";
 
 import type { TaskKind } from "../../domain/types.js";
+import type { AdapterExecutionTelemetry } from "../adapter.js";
 import { redactText } from "../../runtime/redaction.js";
 import { terminateProcessTree } from "../../runtime/process-tree.js";
 import {
@@ -64,6 +65,7 @@ export interface KimiAcpRunResult {
   elapsedMs: number;
   events: KimiAcpEvent[];
   diagnostics: string[];
+  executionTelemetry: AdapterExecutionTelemetry | null;
 }
 
 interface ModelSelection {
@@ -241,6 +243,7 @@ export async function runKimiAcp(
   let clientContext: acp.ClientContext | undefined;
   const requestCancellation = new AbortController();
   let killTimer: NodeJS.Timeout | undefined;
+  let promptSubmitted = false;
 
   const emitProgress = (message: string): void => {
     try {
@@ -374,6 +377,7 @@ export async function runKimiAcp(
             await ctx.notify(acp.methods.agent.session.cancel, { sessionId });
             return { stopReason: "cancelled" } as acp.PromptResponse;
           }
+          promptSubmitted = true;
           return ctx.request(
             acp.methods.agent.session.prompt,
             {
@@ -402,6 +406,7 @@ export async function runKimiAcp(
             return { stopReason: "cancelled" } as acp.PromptResponse;
           }
 
+          promptSubmitted = true;
           void session
             .prompt(request.prompt, {
               cancellationSignal: requestCancellation.signal,
@@ -451,6 +456,13 @@ export async function runKimiAcp(
     elapsedMs: Date.now() - startedAt,
     events,
     diagnostics: diagnostics.map((entry) => redactText(entry, secrets)),
+    executionTelemetry: {
+      adapterClientInvocationCount: promptSubmitted ? 1 : 0,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      source: "kimi-acp-observable",
+    },
   };
   if (actualModel !== undefined) result.actualModel = actualModel;
   if (sessionId !== undefined) result.sessionId = sessionId;

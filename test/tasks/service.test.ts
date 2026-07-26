@@ -6,6 +6,7 @@ import { execa } from "execa";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
+  AdapterExecutionTelemetry,
   AdapterRunRequest,
   AdapterRunResult,
   ExternalAgentAdapter,
@@ -58,6 +59,13 @@ function completed(overrides: Partial<AdapterRunResult> = {}): AdapterRunResult 
     elapsedMs: 10,
     events: [],
     diagnostics: [],
+    executionTelemetry: {
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      source: "kimi-acp-observable",
+    },
     ...overrides,
   };
 }
@@ -75,6 +83,76 @@ function createService(
 }
 
 describe("ExternalAgentService", () => {
+  it.each(["review", "delegate"] as const)(
+    "reports %s adapter telemetry only through the internal observer",
+    async (task) => {
+      const telemetry: AdapterExecutionTelemetry = {
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "kimi-acp-observable",
+      };
+      const observed: Array<AdapterExecutionTelemetry | null> = [];
+      const service = createService(async () =>
+        completed({ executionTelemetry: telemetry }),
+      );
+
+      const result =
+        task === "review"
+          ? await service.review(
+              {
+                llm: "kimi-k3",
+                task: "review_diff",
+                prompt: "Review",
+                cwd,
+              },
+              { onExecutionTelemetry: (value) => observed.push(value) },
+            )
+          : await service.delegate(
+              {
+                llm: "kimi-k3",
+                prompt: "Delegate",
+                cwd,
+              },
+              { onExecutionTelemetry: (value) => observed.push(value) },
+            );
+
+      expect(observed).toEqual([telemetry]);
+      expect(result).not.toHaveProperty("executionTelemetry");
+      expect(JSON.stringify(result)).not.toContain("adapterClientInvocationCount");
+    },
+  );
+
+  it.each(["review", "delegate"] as const)(
+    "reports null telemetry when the %s adapter throws",
+    async (task) => {
+      const observed: Array<AdapterExecutionTelemetry | null> = [];
+      const service = createService(async () => {
+        throw new Error("adapter failed");
+      });
+
+      if (task === "review") {
+        await service.review(
+          {
+            llm: "kimi-k3",
+            task: "review_diff",
+            prompt: "Review",
+            cwd,
+          },
+          { onExecutionTelemetry: (value) => observed.push(value) },
+        );
+      } else {
+        await service.delegate(
+          { llm: "kimi-k3", prompt: "Delegate", cwd },
+          { onExecutionTelemetry: (value) => observed.push(value) },
+        );
+      }
+
+      expect(observed).toEqual([null]);
+    },
+  );
+
   it("shares one concurrency slot between logical LLMs in the same provider pool", async () => {
     const profiles = [
       enabledProfile("ark-agent-plan"),

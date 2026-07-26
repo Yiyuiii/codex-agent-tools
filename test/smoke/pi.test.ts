@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { AdapterExecutionTelemetry } from "../../src/adapters/adapter.js";
 import {
   parsePiSmokeArguments,
   runPiSmoke,
@@ -48,6 +49,14 @@ function runtimeEvidence(environment: NodeJS.ProcessEnv = {
   };
 }
 
+const validPiTelemetry: AdapterExecutionTelemetry = {
+  adapterClientInvocationCount: 1,
+  adapterRetryCount: 0,
+  runtimeReportedAutoRetryCount: 0,
+  adapterReportedFallbackUsed: false,
+  source: "pi-rpc-observable",
+};
+
 describe("Pi/Gemini real-smoke harness", () => {
   it("requires the fixed Gemini logical id and one task", () => {
     expect(
@@ -74,16 +83,19 @@ describe("Pi/Gemini real-smoke harness", () => {
   it("validates review, fixed 10808 environment isolation, and process cleanup", async () => {
     const root = await tempRoot();
     const service: PiSmokeService = {
-      review: async () => ({
-        ok: true,
-        status: "completed",
-        llm: "gemini-3.5-flash",
-        actualModel: "gemini-3.5-flash",
-        elapsedMs: 12,
-        diagnostics: [],
-        filesChanged: [],
-        review: "Empty input has length zero, so division returns NaN.",
-      }),
+      review: async (_input, context) => {
+        context?.onExecutionTelemetry?.(validPiTelemetry);
+        return {
+          ok: true,
+          status: "completed",
+          llm: "gemini-3.5-flash",
+          actualModel: "gemini-3.5-flash",
+          elapsedMs: 12,
+          diagnostics: [],
+          filesChanged: [],
+          review: "Empty input has length zero, so division returns NaN.",
+        };
+      },
       delegate: async () => {
         throw new Error("not used");
       },
@@ -106,6 +118,11 @@ describe("Pi/Gemini real-smoke harness", () => {
       route: "proxy-10808",
       credentialEnv: "GEMINI_API_KEY",
       passed: true,
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      executionTelemetrySource: "pi-rpc-observable",
       checks: {
         actualModelMatches: true,
         environmentIsolated: true,
@@ -160,7 +177,8 @@ describe("Pi/Gemini real-smoke harness", () => {
       review: async () => {
         throw new Error("not used");
       },
-      delegate: async (input) => {
+      delegate: async (input, context) => {
+        context?.onExecutionTelemetry?.(validPiTelemetry);
         receivedPrompt = input.prompt;
         await writeFile(path.join(input.cwd, "result.txt"), "PI_SMOKE_OK\n", "utf8");
         return {
@@ -189,6 +207,11 @@ describe("Pi/Gemini real-smoke harness", () => {
     );
     expect(evidence).toMatchObject({
       passed: true,
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      executionTelemetrySource: "pi-rpc-observable",
       filesChanged: ["result.txt"],
       commandCount: 1,
       resultFileReadStatus: "read",
@@ -295,6 +318,59 @@ describe("Pi/Gemini real-smoke harness", () => {
     );
     expect(evidence.passed).toBe(false);
     expect(evidence.checks.environmentIsolated).toBe(false);
+  });
+
+  it.each([
+    ["missing observer", undefined],
+    ["null telemetry", null],
+    [
+      "multiple client invocations",
+      { ...validPiTelemetry, adapterClientInvocationCount: 2 },
+    ],
+    ["adapter retry", { ...validPiTelemetry, adapterRetryCount: 1 }],
+    [
+      "runtime retry",
+      { ...validPiTelemetry, runtimeReportedAutoRetryCount: 1 },
+    ],
+    [
+      "reported fallback",
+      { ...validPiTelemetry, adapterReportedFallbackUsed: true },
+    ],
+  ] as const)("fails qualification telemetry gate for %s", async (_name, telemetry) => {
+    const root = await tempRoot();
+    const service: PiSmokeService = {
+      review: async (_input, context) => {
+        if (telemetry !== undefined) {
+          context?.onExecutionTelemetry?.(telemetry);
+        }
+        return {
+          ok: true,
+          status: "completed",
+          llm: "gemini-3.5-flash",
+          actualModel: "gemini-3.5-flash",
+          elapsedMs: 12,
+          diagnostics: [],
+          filesChanged: [],
+          review: "Empty input has length zero and produces NaN.",
+        };
+      },
+      delegate: async () => {
+        throw new Error("not used");
+      },
+    };
+
+    const evidence = await runPiSmoke(
+      { llm: "gemini-3.5-flash", task: "review", tempRoot: root },
+      {
+        service,
+        runtimeEvidence: runtimeEvidence(),
+        readPiVersion: async () => "0.80.10",
+        listPiRpcProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence.passed).toBe(false);
+    expect(evidence.checks.executionTelemetryValid).toBe(false);
   });
 
   it("labels a Pi version-probe exception without exposing its original message", async () => {

@@ -14,6 +14,13 @@ describe("KimiAdapter", () => {
       elapsedMs: 10,
       events: [],
       diagnostics: [],
+      executionTelemetry: {
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "kimi-acp-observable" as const,
+      },
     }));
     const adapter = new KimiAdapter({
       locateExecutable: async () => "C:\\Users\\test\\.kimi-code\\bin\\kimi.exe",
@@ -35,6 +42,13 @@ describe("KimiAdapter", () => {
     });
 
     expect(result.status).toBe("completed");
+    expect(result.executionTelemetry).toEqual({
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      source: "kimi-acp-observable",
+    });
     expect(runClient).toHaveBeenCalledOnce();
     const clientRequest = runClient.mock.calls[0]![0];
     expect(clientRequest).toMatchObject({
@@ -58,6 +72,13 @@ describe("KimiAdapter", () => {
       elapsedMs: 10,
       events: [],
       diagnostics: [],
+      executionTelemetry: {
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "kimi-acp-observable" as const,
+      },
     }));
     const adapter = new KimiAdapter({
       locateExecutable: async () => "kimi.exe",

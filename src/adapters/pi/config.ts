@@ -7,6 +7,7 @@ export interface BuildIsolatedPiConfigOptions {
   root?: string;
   version: string;
   providers?: readonly "ark"[];
+  qualification?: boolean;
 }
 
 export interface IsolatedPiConfig {
@@ -117,7 +118,11 @@ export async function buildIsolatedPiConfig(
     throw new Error('Pi config providers must be exactly ["ark"]');
   }
   const root = path.resolve(options.root ?? getDefaultPiConfigRoot());
-  const agentDir = path.join(root, "pi", options.version);
+  const agentDir = path.join(
+    root,
+    options.qualification === true ? "pi-qualification" : "pi",
+    options.version,
+  );
   const settingsPath = path.join(agentDir, "settings.json");
   const modelsPath = path.join(agentDir, "models.json");
   const settings = jsonText({
@@ -128,6 +133,15 @@ export async function buildIsolatedPiConfig(
     packages: [],
     prompts: [],
     quietStartup: true,
+    ...(options.qualification === true
+      ? {
+          retry: {
+            provider: {
+              maxRetries: 0,
+            },
+          },
+        }
+      : {}),
     skills: [],
     themes: [],
   });

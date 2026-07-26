@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { AdapterExecutionTelemetry } from "../../src/adapters/adapter.js";
 import {
   parseKimiSmokeArguments,
   runKimiSmoke,
@@ -34,6 +35,14 @@ afterEach(async () => {
   );
 });
 
+const validKimiTelemetry: AdapterExecutionTelemetry = {
+  adapterClientInvocationCount: 1,
+  adapterRetryCount: 0,
+  runtimeReportedAutoRetryCount: 0,
+  adapterReportedFallbackUsed: false,
+  source: "kimi-acp-observable",
+};
+
 describe("Kimi real-smoke harness", () => {
   it("requires an explicit supported llm and one task", () => {
     expect(
@@ -58,16 +67,19 @@ describe("Kimi real-smoke harness", () => {
   it("validates a read-only review against the known empty-array defect", async () => {
     const root = await tempRoot();
     const service: KimiSmokeService = {
-      review: async () => ({
-        ok: true,
-        status: "completed",
-        llm: "kimi-k3",
-        actualModel: "kimi-code/k3",
-        elapsedMs: 12,
-        diagnostics: [],
-        filesChanged: [],
-        review: "The empty array has length zero, so division returns NaN.",
-      }),
+      review: async (_input, context) => {
+        context?.onExecutionTelemetry?.(validKimiTelemetry);
+        return {
+          ok: true,
+          status: "completed",
+          llm: "kimi-k3",
+          actualModel: "kimi-code/k3",
+          elapsedMs: 12,
+          diagnostics: [],
+          filesChanged: [],
+          review: "The empty array has length zero, so division returns NaN.",
+        };
+      },
       delegate: async () => {
         throw new Error("not used");
       },
@@ -92,6 +104,11 @@ describe("Kimi real-smoke harness", () => {
       status: "completed",
       passed: true,
       failureReason: null,
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      executionTelemetrySource: "kimi-acp-observable",
       checks: {
         workspaceUnchanged: true,
         knownDefectFound: true,
@@ -108,7 +125,8 @@ describe("Kimi real-smoke harness", () => {
       review: async () => {
         throw new Error("not used");
       },
-      delegate: async (input) => {
+      delegate: async (input, context) => {
+        context?.onExecutionTelemetry?.(validKimiTelemetry);
         await writeFile(path.join(input.cwd, "result.txt"), "KIMI_SMOKE_OK\n", "utf8");
         return {
           ok: true,
@@ -137,6 +155,11 @@ describe("Kimi real-smoke harness", () => {
 
     expect(evidence).toMatchObject({
       passed: true,
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      executionTelemetrySource: "kimi-acp-observable",
       resultFileReadStatus: "read",
       resultFileByteLength: Buffer.byteLength("KIMI_SMOKE_OK\n"),
       resultFileRawSha256: sha256("KIMI_SMOKE_OK\n"),
@@ -229,6 +252,40 @@ describe("Kimi real-smoke harness", () => {
     expect(evidence.passed).toBe(false);
     expect(evidence.checks.noNewKimiProcesses).toBe(false);
     expect(evidence.failureReason).toBe("process_residual");
+  });
+
+  it("fails when the Kimi ACP observer reports null telemetry", async () => {
+    const root = await tempRoot();
+    const service: KimiSmokeService = {
+      review: async (_input, context) => {
+        context?.onExecutionTelemetry?.(null);
+        return {
+          ok: true,
+          status: "completed",
+          llm: "kimi-k3",
+          actualModel: "kimi-code/k3",
+          elapsedMs: 12,
+          diagnostics: [],
+          filesChanged: [],
+          review: "Empty input has length zero and produces NaN.",
+        };
+      },
+      delegate: async () => {
+        throw new Error("not used");
+      },
+    };
+
+    const evidence = await runKimiSmoke(
+      { llm: "kimi-k3", task: "review", tempRoot: root },
+      {
+        service,
+        readKimiVersion: async () => "0.27.0",
+        listKimiProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence.passed).toBe(false);
+    expect(evidence.checks.executionTelemetryValid).toBe(false);
   });
 
   it("classifies adapter, authentication, or model failures without diagnostics", async () => {

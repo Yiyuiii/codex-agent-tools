@@ -1,4 +1,5 @@
 import type {
+  AdapterExecutionTelemetry,
   AdapterRunRequest,
   AdapterRunResult,
   ExternalAgentAdapter,
@@ -17,6 +18,7 @@ export interface PiAdapterDependencies {
   buildConfig?: () => Promise<IsolatedPiConfig>;
   runClient?: (request: PiRpcRunRequest) => Promise<AdapterRunResult>;
   waitForRetry?: (delayMs: number, signal?: AbortSignal) => Promise<void>;
+  retryMode?: "default" | "qualification-single-attempt";
 }
 
 const MAX_GEMINI_FREE_TIER_RETRIES = 1;
@@ -116,6 +118,7 @@ export class PiAdapter implements ExternalAgentAdapter {
     delayMs: number,
     signal?: AbortSignal,
   ) => Promise<void>;
+  readonly #retryMode: "default" | "qualification-single-attempt";
 
   public constructor(dependencies: PiAdapterDependencies = {}) {
     this.#locateExecutable =
@@ -130,6 +133,7 @@ export class PiAdapter implements ExternalAgentAdapter {
         }));
     this.#runClient = dependencies.runClient ?? runPiRpc;
     this.#waitForRetry = dependencies.waitForRetry ?? waitForRetry;
+    this.#retryMode = dependencies.retryMode ?? "default";
   }
 
   public async run(request: AdapterRunRequest): Promise<AdapterRunResult> {
@@ -169,13 +173,47 @@ export class PiAdapter implements ExternalAgentAdapter {
     if (request.onProgress !== undefined) {
       clientRequest.onProgress = request.onProgress;
     }
+    if (this.#retryMode === "qualification-single-attempt") {
+      clientRequest.autoRetry = false;
+      clientRequest.autoCompaction = false;
+    }
     const events: unknown[] = [];
     const diagnostics: string[] = [];
     let elapsedMs = 0;
     let retryCount = 0;
+    let aggregateTelemetry: AdapterExecutionTelemetry | null = {
+      adapterClientInvocationCount: 0,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      source: "pi-rpc-observable",
+    };
 
     for (;;) {
       const result = await this.#runClient(clientRequest);
+      if (
+        aggregateTelemetry !== null &&
+        result.executionTelemetry !== null &&
+        result.executionTelemetry.source === "pi-rpc-observable"
+      ) {
+        aggregateTelemetry = {
+          adapterClientInvocationCount:
+            aggregateTelemetry.adapterClientInvocationCount +
+            result.executionTelemetry.adapterClientInvocationCount,
+          adapterRetryCount:
+            aggregateTelemetry.adapterRetryCount +
+            result.executionTelemetry.adapterRetryCount,
+          runtimeReportedAutoRetryCount:
+            aggregateTelemetry.runtimeReportedAutoRetryCount +
+            result.executionTelemetry.runtimeReportedAutoRetryCount,
+          adapterReportedFallbackUsed:
+            aggregateTelemetry.adapterReportedFallbackUsed ||
+            result.executionTelemetry.adapterReportedFallbackUsed,
+          source: "pi-rpc-observable",
+        };
+      } else {
+        aggregateTelemetry = null;
+      }
       elapsedMs += result.elapsedMs;
       diagnostics.push(...result.diagnostics);
       events.push(
@@ -189,9 +227,22 @@ export class PiAdapter implements ExternalAgentAdapter {
           )
           .map(mapToolEvent),
       );
-      const combined = { ...result, elapsedMs, events, diagnostics };
+      const combined = {
+        ...result,
+        elapsedMs,
+        events,
+        diagnostics,
+        executionTelemetry:
+          aggregateTelemetry === null
+            ? null
+            : {
+                ...aggregateTelemetry,
+                adapterRetryCount:
+                  aggregateTelemetry.adapterRetryCount + retryCount,
+              },
+      };
       if (
-        result.status === "completed" &&
+        result.actualModel !== undefined &&
         result.actualModel !== request.profile.model
       ) {
         return {
@@ -201,15 +252,35 @@ export class PiAdapter implements ExternalAgentAdapter {
             ...diagnostics,
             `Model binding violation: expected ${request.profile.model} but Pi reported ${result.actualModel ?? "no model"}`,
           ],
+          executionTelemetry:
+            combined.executionTelemetry === null
+              ? null
+              : {
+                  ...combined.executionTelemetry,
+                  adapterReportedFallbackUsed: true,
+                },
         };
       }
-
+      if (
+        result.status === "completed" &&
+        result.actualModel === undefined
+      ) {
+        return {
+          ...combined,
+          status: "failed",
+          diagnostics: [
+            ...diagnostics,
+            `Model binding violation: expected ${request.profile.model} but Pi reported no model`,
+          ],
+        };
+      }
       const delayMs =
         request.task === "review"
           ? geminiFreeTierRetryDelay(request.profile, result)
           : undefined;
       if (
         delayMs === undefined ||
+        this.#retryMode === "qualification-single-attempt" ||
         retryCount >= MAX_GEMINI_FREE_TIER_RETRIES
       ) {
         return combined;

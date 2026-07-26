@@ -121,9 +121,16 @@ describe("codex_external_agents MCP server", () => {
       },
     ]);
     expect(result.structuredContent.review).toBe("No findings.");
+    expect(result.structuredContent).not.toHaveProperty("executionTelemetry");
+    expect(JSON.stringify(result.structuredContent)).not.toContain(
+      "adapterClientInvocationCount",
+    );
     expect(JSON.parse(result.content[0]!.text)).toMatchObject({
       status: "completed",
       llm: "kimi-k3",
     });
+    expect(JSON.parse(result.content[0]!.text)).not.toHaveProperty(
+      "executionTelemetry",
+    );
   });
 });

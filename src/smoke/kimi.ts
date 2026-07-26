@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { execa } from "execa";
 
+import type { AdapterExecutionTelemetry } from "../adapters/adapter.js";
 import { KimiAdapter } from "../adapters/kimi/adapter.js";
 import { locateKimi } from "../adapters/kimi/locator.js";
 import type { RuntimeKind } from "../domain/types.js";
@@ -44,6 +45,7 @@ export interface KimiSmokeChecks {
   resultFileObserved?: boolean;
   onlyExpectedFileChanged?: boolean;
   requiredCommandObserved?: boolean;
+  executionTelemetryValid: boolean;
 }
 
 export interface KimiSmokeEvidence {
@@ -69,6 +71,11 @@ export interface KimiSmokeEvidence {
   filesChanged: string[];
   commandCount: number;
   diagnosticCount: number;
+  adapterClientInvocationCount: number | null;
+  adapterRetryCount: number | null;
+  runtimeReportedAutoRetryCount: number | null;
+  adapterReportedFallbackUsed: boolean | null;
+  executionTelemetrySource: AdapterExecutionTelemetry["source"] | null;
   checks: KimiSmokeChecks;
   resultFileReadStatus?: ResultFileReadStatus;
   resultFileByteLength?: number;
@@ -263,6 +270,22 @@ function reviewFoundKnownDefect(review: string): boolean {
   );
 }
 
+function telemetryIsValid(
+  telemetry: AdapterExecutionTelemetry | null | undefined,
+  reportCount: number,
+): telemetry is AdapterExecutionTelemetry {
+  return (
+    reportCount === 1 &&
+    telemetry !== null &&
+    telemetry !== undefined &&
+    telemetry.source === "kimi-acp-observable" &&
+    telemetry.adapterClientInvocationCount === 1 &&
+    telemetry.adapterRetryCount === 0 &&
+    telemetry.runtimeReportedAutoRetryCount === 0 &&
+    telemetry.adapterReportedFallbackUsed === false
+  );
+}
+
 function resultFileArtifactFields(
   evidence: ResultFileEvidence,
 ): Pick<
@@ -304,6 +327,7 @@ function commonEvidence(
   now: Date,
   checks: KimiSmokeChecks,
   passed: boolean,
+  telemetry: AdapterExecutionTelemetry | null | undefined,
 ): KimiSmokeEvidence {
   const output = "review" in result ? result.review : result.summary;
   return {
@@ -331,6 +355,14 @@ function commonEvidence(
     filesChanged: [...result.filesChanged].sort(),
     commandCount: "commandsRun" in result ? result.commandsRun.length : 0,
     diagnosticCount: result.diagnostics.length,
+    adapterClientInvocationCount:
+      telemetry?.adapterClientInvocationCount ?? null,
+    adapterRetryCount: telemetry?.adapterRetryCount ?? null,
+    runtimeReportedAutoRetryCount:
+      telemetry?.runtimeReportedAutoRetryCount ?? null,
+    adapterReportedFallbackUsed:
+      telemetry?.adapterReportedFallbackUsed ?? null,
+    executionTelemetrySource: telemetry?.source ?? null,
     checks,
   };
 }
@@ -367,8 +399,14 @@ export async function runKimiSmoke(
       "pre_process_snapshot",
       listKimiProcessIds,
     );
+    let executionTelemetry: AdapterExecutionTelemetry | null | undefined;
+    let executionTelemetryReportCount = 0;
     const context: TaskExecutionContext = {};
     if (options.onProgress !== undefined) context.onProgress = options.onProgress;
+    context.onExecutionTelemetry = (telemetry) => {
+      executionTelemetryReportCount += 1;
+      executionTelemetry = telemetry;
+    };
     const timeoutMs = options.timeoutMs ?? profile.timeoutMs;
 
     if (options.task === "review") {
@@ -406,13 +444,18 @@ export async function runKimiSmoke(
         ),
         workspaceUnchanged: result.filesChanged.length === 0 && gitClean,
         knownDefectFound: reviewFoundKnownDefect(result.review),
+        executionTelemetryValid: telemetryIsValid(
+          executionTelemetry,
+          executionTelemetryReportCount,
+        ),
       };
       const passed =
         result.status === "completed" &&
         checks.actualModelMatches &&
         checks.noNewKimiProcesses &&
         checks.workspaceUnchanged === true &&
-        checks.knownDefectFound === true;
+        checks.knownDefectFound === true &&
+        checks.executionTelemetryValid === true;
       return commonEvidence(
         options,
         result,
@@ -421,6 +464,7 @@ export async function runKimiSmoke(
         now(),
         checks,
         passed,
+        executionTelemetry,
       );
     }
 
@@ -462,6 +506,10 @@ export async function runKimiSmoke(
       requiredCommandObserved: result.commandsRun.includes(
         "git status --short",
       ),
+      executionTelemetryValid: telemetryIsValid(
+        executionTelemetry,
+        executionTelemetryReportCount,
+      ),
     };
     const passed =
       result.status === "completed" &&
@@ -470,7 +518,8 @@ export async function runKimiSmoke(
       checks.resultFileValid === true &&
       checks.resultFileObserved === true &&
       checks.onlyExpectedFileChanged === true &&
-      checks.requiredCommandObserved === true;
+      checks.requiredCommandObserved === true &&
+      checks.executionTelemetryValid === true;
     return {
       ...commonEvidence(
         options,
@@ -480,6 +529,7 @@ export async function runKimiSmoke(
         now(),
         checks,
         passed,
+        executionTelemetry,
       ),
       ...resultFileArtifactFields(resultFile),
     };

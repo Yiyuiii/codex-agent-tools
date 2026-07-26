@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { AdapterExecutionTelemetry } from "../../src/adapters/adapter.js";
 import {
   parseArkSmokeArguments,
   runArkSmoke,
@@ -32,6 +33,14 @@ afterEach(async () => {
     roots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
   );
 });
+
+const validPiTelemetry: AdapterExecutionTelemetry = {
+  adapterClientInvocationCount: 1,
+  adapterRetryCount: 0,
+  runtimeReportedAutoRetryCount: 0,
+  adapterReportedFallbackUsed: false,
+  source: "pi-rpc-observable",
+};
 
 describe("Ark real-smoke harness", () => {
   it.each([
@@ -61,16 +70,19 @@ describe("Ark real-smoke harness", () => {
   it("records fixed Agent Plan identity, endpoint, isolation, and review evidence", async () => {
     const root = await tempRoot();
     const service: PiSmokeService = {
-      review: async () => ({
-        ok: true,
-        status: "completed",
-        llm: "ark-agent-plan",
-        actualModel: "ark-code-latest",
-        elapsedMs: 10,
-        diagnostics: [],
-        filesChanged: [],
-        review: "Empty input has length zero, so division returns NaN at average.js:2.",
-      }),
+      review: async (_input, context) => {
+        context?.onExecutionTelemetry?.(validPiTelemetry);
+        return {
+          ok: true,
+          status: "completed",
+          llm: "ark-agent-plan",
+          actualModel: "ark-code-latest",
+          elapsedMs: 10,
+          diagnostics: [],
+          filesChanged: [],
+          review: "Empty input has length zero, so division returns NaN at average.js:2.",
+        };
+      },
       delegate: async () => {
         throw new Error("not used");
       },
@@ -101,6 +113,11 @@ describe("Ark real-smoke harness", () => {
       endpointHost: "ark.cn-beijing.volces.com",
       credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
       passed: true,
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      executionTelemetrySource: "pi-rpc-observable",
       failureReason: null,
       checks: {
         environmentIsolated: true,
@@ -118,7 +135,8 @@ describe("Ark real-smoke harness", () => {
       review: async () => {
         throw new Error("not used");
       },
-      delegate: async (input) => {
+      delegate: async (input, context) => {
+        context?.onExecutionTelemetry?.(validPiTelemetry);
         requestedFile = /create ([^ ]+\.txt)/u.exec(input.prompt)?.[1] ?? "";
         await writeFile(
           path.join(input.cwd, requestedFile),
@@ -223,5 +241,49 @@ describe("Ark real-smoke harness", () => {
 
     expect(evidence.failureReason).toBe("account_quota_exceeded");
     expect(JSON.stringify(evidence)).not.toContain("weekly usage quota");
+  });
+
+  it("rejects an Ark case when the adapter reports fallback", async () => {
+    const root = await tempRoot();
+    const service: PiSmokeService = {
+      review: async (_input, context) => {
+        context?.onExecutionTelemetry?.({
+          ...validPiTelemetry,
+          adapterReportedFallbackUsed: true,
+        });
+        return {
+          ok: true,
+          status: "completed",
+          llm: "ark-agent-plan",
+          actualModel: "ark-code-latest",
+          elapsedMs: 10,
+          diagnostics: [],
+          filesChanged: [],
+          review: "Empty input has length zero and produces NaN.",
+        };
+      },
+      delegate: async () => {
+        throw new Error("not used");
+      },
+    };
+
+    const evidence = await runArkSmoke(
+      { llm: "ark-agent-plan", task: "review", tempRoot: root },
+      {
+        service,
+        runtimeEvidence: {
+          configSha256: "f".repeat(64),
+          childEnvironment: {
+            CODEX_AGENT_ARK_AGENT_KEY: "secret",
+            PI_CODING_AGENT_DIR: "C:\\cache\\pi",
+          },
+        },
+        readPiVersion: async () => "0.80.10",
+        listPiRpcProcessIds: async () => [],
+      },
+    );
+
+    expect(evidence.passed).toBe(false);
+    expect(evidence.checks.executionTelemetryValid).toBe(false);
   });
 });
