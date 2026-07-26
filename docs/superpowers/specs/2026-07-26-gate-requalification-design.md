@@ -2,7 +2,7 @@
 
 日期：2026-07-26
 
-状态：已获用户批准，待外部审阅与实施
+状态：已获用户批准，已完成设计审阅收敛，待实施
 
 ## 1. 目标
 
@@ -46,7 +46,7 @@ Pi adapter 当前对 Gemini review 的特定免费层限流可做一次延迟重
 优点：
 
 - 下一次失败能够落到可复核的非敏感事实，而不是再次只得到一个布尔值；
-- 能机器证明每项只有一次外部调用，没有 adapter 重试或替代模型；
+- 能机器证明本项目 adapter、运行时明示事件和协调器可观测层内只有一次 client 调用，没有可见重试或替代模型；
 - 同一批次固定代码、构建产物和运行条件，避免拼接证据；
 - 不改变产品模型面或验收标准。
 
@@ -74,7 +74,7 @@ Pi adapter 当前对 Gemini review 的特定免费层限流可做一次延迟重
 - `resultFileNormalizedLineCount`；
 - `resultFileContainsExpectedLine`。
 
-规范化只用于诊断和明确记录，严格验收语义保持为当前期望文本比较，不因新增字段而放宽。哈希计算原始字节和规范化文本；无法读取时用明确状态并省略不成立的派生值。
+检查器先用 `lstat` 拒绝符号链接、目录和其它非普通文件，并在读取前执行 64 KiB 上限；随后读取原始字节、计算原始哈希，再用 fatal UTF-8 decoder 解码。非法 UTF-8 仍可记录原始长度与哈希，但不生成规范化字段。规范化只用于诊断和明确记录，严格验收语义保持为当前 `decoded.trim() === expectedLine`，不因新增字段而放宽。无法读取时用明确状态并省略不成立的派生值。
 
 不得保存：
 
@@ -89,19 +89,27 @@ Pi adapter 当前对 Gemini review 的特定免费层限流可做一次延迟重
 
 ### 4.3 单次调用证据
 
-每项 evidence 增加：
+每项 evidence 增加以下可观测统计：
 
-- `attemptCount`；
-- `retryCount`；
-- `fallbackUsed`。
+- `adapterClientInvocationCount`；
+- `adapterRetryCount`；
+- `runtimeReportedAutoRetryCount`；
+- `orchestratorFallbackUsed`；
+- `executionTelemetrySource`，固定说明该 runtime 的可观测来源与边界。
 
-资格认证 smoke 必须得到 `1 / 0 / false`，否则该项失败。Pi 资格认证入口显式禁用 Gemini review 的 adapter 重试；生产环境是否保留现有有界只读重试不由本设计改变。
+资格认证 smoke 必须得到 `1 / 0 / 0 / false`，否则该项失败。该结论只覆盖本项目 adapter client 调度、Kimi ACP 可见的 session/prompt 路径、Pi RPC 明示重试事件和协调器 profile 选择；它不声称能观察 provider 服务端或底层 SDK 未上报的内部 HTTP 重试。
 
-如果 Pi RPC 自身报告自动重试事件，必须计入 `retryCount` 并使资格认证失败。不能只统计 adapter 顶层循环。
+Pi 资格认证入口在 prompt 前显式发送 `set_auto_retry=false` 与 `set_auto_compaction=false`，并在隔离 settings 中把 provider retry 上限钉死为 0；同时禁用 Gemini review 的 adapter 外层重试。生产环境是否保留现有有界只读重试不由本设计改变。
+
+Pi RPC 报告的 `auto_retry_start/end`、`agent_end.willRetry` 和 `compaction_end.willRetry` 必须被交叉核对并聚合为整数，不能重复计数同一次重试，也不能把可能含上游错误正文的原始事件写入 evidence。Kimi 记录已提交的 ACP prompt 调用；当前 ACP 没有可依赖的重试事件，因此 evidence 必须明确该可观测边界。
+
+适配器在调用是否已经触达外部模型不确定时，统计必须为 `null` 并使资格认证失败，不能伪造 `0 / 0 / false`。这些统计只通过内部 observer 传给 smoke，不改变公开 MCP 结果 schema。
 
 ## 5. 原子资格认证批次
 
-新增一个批次协调器和原子写入的脱敏批次 manifest。manifest 至少固定：
+“原子”不表示十次真实调用可事务回滚；已经发生的调用和额度消耗不可撤销。本设计保证的是同一批次身份、不可变证据、失败即停，以及注册表/发布状态的 all-or-none 晋升。
+
+新增一个批次协调器、不可变递增 checkpoint 和只发布一次的脱敏终态 manifest。manifest 至少固定：
 
 - 新生成的 `batchId`；
 - Git commit、dirty 状态；
@@ -111,26 +119,37 @@ Pi adapter 当前对 Gemini review 的特定免费层限流可做一次延迟重
 - Pi 隔离配置 SHA-256；
 - 五条固定逻辑 LLM 身份；
 - 仅凭据变量名的命中结果，不保存值；
-- 每项 evidence 路径、SHA-256、结果、调用次数；
+- 每项 evidence 路径、SHA-256、结果和四项可观测调用统计；
 - 批次最终状态、停止原因和未执行项目。
+
+批次目录位于 `docs/smoke/evidence/batches/<batchId>/`：每个 checkpoint 和 case evidence 都通过既有的“同目录排他临时文件 + hard link”机制发布，不能覆盖；终态 `manifest.json` 也只能发布一次。运行中不持续替换同一个文件，从而避免 Windows 覆盖语义和崩溃窗口。
 
 批次开始前必须：
 
-1. 锁定仓库级排他文件；已有活动批次时 fail closed。
-2. 要求工作树干净并冻结 commit。
+1. 在系统临时目录以仓库 realpath 的 SHA-256 为身份取得排他锁目录；锁记录 PID、进程启动时间、owner nonce、batchId 和取得时间。
+2. 要求源码工作树干净并冻结 commit。
 3. 重新通过类型检查、全量测试、构建、release smoke、diff check 和隔离插件生命周期。
-4. 验证 10808 本地监听和固定路由配置；这不等价于证明 Gemini 额度可用。
-5. 对 Kimi Code、Pi RPC 和本项目真实 smoke 进程取得全机快照，并要求目标进程基线为零。
-6. 记录本次由当前会话用户“继续”授权的一次不确定额度资格认证动作；只记录脱敏授权种类与时间，不保存对话原文。
+4. 再次确认工作树干净、commit 未变，并冻结构建 identity；此后工作树只允许新增当前批次目录。
+5. 验证 10808 本地监听和固定路由配置；这不等价于证明 Gemini 额度可用。
+6. 对 Kimi Code、Pi RPC 和本项目真实 smoke 进程取得边界快照，并要求目标分类基线为零。只持久化分类计数和布尔结论，不保存全机命令行、PID 清单或无关进程信息。
+7. 记录本次由当前会话用户“继续”授权的一次不确定额度资格认证动作；只记录脱敏授权种类、唯一引用与时间，不保存对话原文。相同授权引用不能启动第二批。
+
+锁只能排除遵守本协调器协议的并发批次，边界快照也不能证明两个采样点之间绝无极短进程；文档和 manifest 不得夸大为全系统互斥证明。遇到已有锁时：
+
+- owner 仍存活：fail closed；
+- owner 已死亡：不得继续旧批次；
+- 只有显式恢复入口在确认目标进程分类均为零后，才可根据不可变 checkpoint/evidence 把旧批次发布为 `interrupted` 并释放 stale 锁；
+- 新批次仍需新的授权引用，并从十项第一项开始。
 
 批次执行过程中：
 
 - 严格串行；
-- 每项结束后独立做进程快照，要求相对基线无新增且绝对目标进程仍为零；
-- 每项只允许一次外部模型尝试；
-- 不使用 fallback；
+- 每项调用前先发布含 `running`、ordinal、LLM、task、时间戳和固定身份的不可变 checkpoint；
+- 每项结束后独立做边界进程快照，要求目标分类绝对计数仍为零；
+- 每项只允许一次 adapter client 调用、零 adapter 重试、零运行时明示重试和零协调器 fallback；
 - 每个 evidence 必须带相同的 `batchId`、commit 和构建身份；
-- manifest 通过同目录临时文件加原子替换持续更新，以便异常中断后仍可审计。
+- evidence 验真后再发布该项的 `passed` 或 `failed` checkpoint；
+- 任一时刻崩溃都按最新不可变 checkpoint 与 case evidence 推导为 `interrupted`，绝不续跑。
 
 建议的 fail-fast 顺序：
 
@@ -150,7 +169,7 @@ Pi adapter 当前对 Gemini review 的特定免费层限流可做一次延迟重
 任一项失败或基础设施异常时：
 
 - 立即停止剩余项目；
-- manifest 写为 `blocked`，保留已完成 evidence、失败原因和未执行清单；
+- manifest 写为 `blocked`，保留已完成 evidence、失败原因、可观测调用统计和未执行清单；
 - 不晋升任何 pending 能力；
 - 后续若重新授权重入，必须创建新批次并从十项第一项开始，不能复用或拼接本批次通过项。
 
@@ -160,11 +179,12 @@ Pi adapter 当前对 Gemini review 的特定免费层限流可做一次延迟重
 
 只有十项在同一批次全部得到新的 `passed` evidence，才执行：
 
-1. 成对晋升 Gemini 与 Ark Coding Plan；
-2. 更新三份 smoke 索引、注册表、README、运维文档和发布清单；
-3. 把 `docs/release/real-plugin-install-review.md` 重新编写并独立审阅为 `ready`；
-4. 再次完成确定性验证与只读外部审阅；
-5. 停止并向用户提交真实安装前的最小充分审阅材料。
+1. 运行独立的晋升前验证器：只从磁盘重读 manifest、十份 evidence 和构建产物，重新计算全部 SHA-256，并核对 batchId、commit、构建身份、固定模型/provider/route、门禁结果和 `1 / 0 / 0 / false`；任何不一致都 fail closed。
+2. 成对晋升 Gemini 与 Ark Coding Plan。
+3. 更新三份 smoke 索引、注册表、README、运维文档和发布清单。
+4. 把 `docs/release/real-plugin-install-review.md` 重新编写并独立审阅为 `ready`。
+5. 再次完成确定性验证与只读外部审阅。
+6. 停止并向用户提交真实安装前的最小充分审阅材料。
 
 即使全部通过，也不得在本阶段执行真实 marketplace/plugin add/remove。
 
@@ -187,7 +207,15 @@ Pi adapter 当前对 Gemini review 的特定免费层限流可做一次延迟重
 - 设计与最终状态仅使用当前已资格化的 `kimi-k3` 和 `ark-agent-plan` 做只读外部审阅；Codex 负责反驳、合并和最终裁决。
 - 真模型调用只允许出现在一次资格认证批次及其明确的只读设计/代码审阅中；不以调试为名循环试错。
 
-## 8. 明确不做
+## 8. 设计审阅记录
+
+- 独立 Ark 根因审计确认历史 evidence 只能支持“正确文件名下内容不符”，不能支持产品行为修复；假 adapter 重放复现同一布尔组合。
+- 独立资格策略审计发现 Gemini review 的 adapter 重试与 Pi 明示自动重试事件未进入 evidence，促成可观测统计、零基线和 fail-fast 批次设计。
+- 独立实现审计进一步收窄“原子”“一次调用”“零进程”的可证明边界，并给出不可变 checkpoint、stale 锁恢复和受控工作区差异方案。
+- Kimi K3 聚焦只读审阅成功完成且 `filesChanged=[]`，独立命中四项实质问题：可观测重试边界、调用前 `running` checkpoint、崩溃锁恢复、晋升前磁盘验真和进程快照脱敏；均已吸收。
+- Ark Agent Plan 聚焦只读审阅保持 `filesChanged=[]`，但 Pi RPC 在形成正文前因输出管道 `EPIPE` 失败；该次不计审阅通过，也没有提供可吸收结论。
+
+## 9. 明确不做
 
 - 不读取、写入、备份或恢复活动 `~/.codex/config.toml`；
 - 不调用、修改或卸载 Claude Code；
