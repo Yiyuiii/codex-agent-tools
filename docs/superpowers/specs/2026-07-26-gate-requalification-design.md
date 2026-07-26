@@ -125,9 +125,11 @@ Pi RPC 报告的 `auto_retry_start/end`、`agent_end.willRetry` 和 `compaction_
 
 批次目录位于 `docs/smoke/evidence/batches/<batchId>/`：每个 checkpoint 和 case evidence 都通过既有的“同目录排他临时文件 + hard link”机制发布，不能覆盖；终态 `manifest.json` 也只能发布一次。运行中不持续替换同一个文件，从而避免 Windows 覆盖语义和崩溃窗口。
 
+这里的“不可变”是本项目发布协议的排他、只追加语义：它能阻止发布器覆盖既有目标，并通过互相引用的 SHA-256 发现非一致篡改或损坏；它不是数字签名、外部时间戳或仓库外信任锚，不能证明来源真实性，也不能抵抗拥有同等文件写权限的进程一致重写 evidence、checkpoint、manifest 及其全部引用。后续 verifier 和审阅材料必须明确这一威胁边界，不得把磁盘内哈希重算夸大为对同权限恶意重写的鉴真。
+
 批次开始前必须：
 
-1. 在系统临时目录以仓库 realpath 的 SHA-256 为身份取得排他锁目录；锁记录 PID、进程启动时间、owner nonce、batchId、授权引用 SHA-256 和取得时间。
+1. 在系统临时目录以仓库 realpath 的 SHA-256 为身份取得排他锁目录；锁记录 PID、进程启动时间、owner nonce、batchId、授权引用 SHA-256 和取得时间。临时目录、固定锁根和仓库哈希目录在取得、读取、恢复与释放时都必须以 `lstat`、`realpath` 和直接父子 containment 复验，拒绝 junction/symlink 祖先；Windows 合法的短路径/长路径规范别名不能被误判为逃逸。
 2. 要求源码工作树干净并冻结 commit。
 3. 重新通过类型检查、全量测试、构建、release smoke、diff check 和隔离插件生命周期。
 4. 再次确认工作树干净、commit 未变，并冻结构建 identity；此后工作树只允许新增当前批次目录。
@@ -153,6 +155,8 @@ Pi RPC 报告的 `auto_retry_start/end`、`agent_end.willRetry` 和 `compaction_
 - 每个 evidence 必须带相同的 `batchId`、commit 和构建身份；
 - evidence 验真后再发布该项的 `passed` 或 `failed` checkpoint；
 - 任一时刻崩溃都按最新不可变 checkpoint 与 case evidence 推导为 `interrupted`，绝不续跑。
+
+若 `running` 之后恰好一份 case evidence 已排他落盘、但在 completion checkpoint 前被判为旧 schema、JSON 损坏、身份或 telemetry 不合法，终态不得采信其正文、结果或观测统计，也不得因此永久卡死批次。受控基础设施异常写为 `blocked`，进程崩溃恢复写为 `interrupted`；两者只在 `uncommittedEvidence` 中保存固定 running identity、受限仓库相对路径、原始文件 SHA-256、`validationStatus: "invalid"` 和固定基础设施失败类别，所有不可信观测值为 `null`。它不进入 completed cases，不能参与晋升；多份、未配对、路径异常或无法安全有界读取的文件仍 fail closed。
 
 建议的 fail-fast 顺序：
 

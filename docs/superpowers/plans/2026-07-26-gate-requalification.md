@@ -262,7 +262,7 @@ Pi/Kimi/Ark smoke 测试：
 
 - observer 未报告或为 `null` 时失败；
 - client invocation 非 1、adapter retry 非 0、runtime retry 非 0、fallback true 任一均失败；
--正常为 `1 / 0 / 0 / false`。
+  -正常为 `1 / 0 / 0 / false`。
 
 分别观察 RED 后最小实现，运行：
 
@@ -385,9 +385,15 @@ git commit -m "feat: bind smoke evidence to qualification batches"
 
 ```ts
 {
-  kimi: { count: number };
-  piRpc: { count: number };
-  realSmoke: { count: number };
+  kimi: {
+    count: number;
+  }
+  piRpc: {
+    count: number;
+  }
+  realSmoke: {
+    count: number;
+  }
 }
 ```
 
@@ -417,12 +423,12 @@ git commit -m "feat: bind smoke evidence to qualification batches"
 - 非 owner nonce 不能释放；
 - owner 活着时不能恢复；
 - owner 已死也不能自动启动新批次；
--显式 recover 在目标分类非零时失败；
+  -显式 recover 在目标分类非零时失败；
 - recover 在零进程时调用 manifest interrupt publisher，验证后释放；
--已有合法终态 manifest 时 recover 只验真并释放锁，不尝试发布第二个终态；
--缺失/损坏 owner、终态冲突和 nonce 漂移全部 fail closed；
+  -已有合法终态 manifest 时 recover 只验真并释放锁，不尝试发布第二个终态；
+  -缺失/损坏 owner、终态冲突和 nonce 漂移全部 fail closed；
 - PID reuse/process start time 不匹配按死 owner 处理；
--异常退出不误删别人锁。
+  -异常退出不误删别人锁。
 
 ### Step 3：不可变 checkpoint/manifest RED
 
@@ -438,26 +444,26 @@ docs/smoke/evidence/batches/<batchId>/
 覆盖：
 
 - checkpoint 序号单调且不可覆盖；
--任何真实调用前必须发布 `batch_started`，其中只含 authorization ref SHA-256；
--授权复用扫描终态 manifest、未完成 checkpoint 与 live/stale owner；不可读状态 fail closed；
+  -任何真实调用前必须发布 `batch_started`，其中只含 authorization ref SHA-256；
+  -授权复用扫描终态 manifest、未完成 checkpoint 与 live/stale owner；不可读状态 fail closed；
 - 调用前必须先发布 `running`；
--完成 checkpoint 只能跟在同 ordinal running 后；
--终态 manifest 只能发布一次；
--碰撞/哈希不一致 fail closed；
+  -完成 checkpoint 只能跟在同 ordinal running 后；
+  -终态 manifest 只能发布一次；
+  -碰撞/哈希不一致 fail closed；
 - evidence 已发布但完成 checkpoint 未发布的恢复结果为 `interrupted`；
--首个 checkpoint 前、`running` 后、evidence 后和终态 manifest 发布后/释放锁前四个崩溃窗口都有确定恢复结果；
+  -首个 checkpoint 前、`running` 后、evidence 后和终态 manifest 发布后/释放锁前四个崩溃窗口都有确定恢复结果；
 - v1 evidence、其它 batchId/commit/build 的 evidence 拒绝；
 - manifest 和 checkpoint JSON 不含异常原文、PID、命令行、凭据；
--授权 reference 只存 SHA-256，重复 ref 可被历史批次索引拒绝。
+  -授权 reference 只存 SHA-256，重复 ref 可被历史批次索引拒绝。
 
 定义不可变 `FrozenPreflightRecord`，由 `batch_started` checkpoint、case evidence 和终态 manifest 共同绑定，至少包含：
 
 - commit/branch/package version/package-lock hash；
--构建 artifact hash 与 build identity；
+  -构建 artifact hash 与 build identity；
 - Node/Codex/Kimi/Pi 版本；
 - Pi config hash；
--五条固定逻辑 LLM 身份；
--命中的凭据变量名称；
+  -五条固定逻辑 LLM 身份；
+  -命中的凭据变量名称；
 - 10808 与目标进程分类结论。
 
 先 RED，再用 Task 3 的通用不可变 JSON 发布器实现。
@@ -483,6 +489,8 @@ git commit -m "feat: add immutable qualification batch ledger"
 ```
 
 质量审阅重点检查 Windows 锁、PID reuse、nonce owner、stale 恢复、checkpoint 覆盖、目录穿越和中断空档。
+
+完成状态（2026-07-26）：代码与测试已由 `d70f368` 提交。审阅发现并修复了 ledger/lock 祖先 junction 逃逸、失败后仍可继续、owner 写后未验真、`running` 基础设施终态、evidence 固定身份未交叉核对、Windows CIM fail-open、Unix 长命令截断、终态与 stale owner 授权未绑定，以及无效未完成 evidence 永久封死批次等问题。最终独立规格与质量复审均为 PASS；主线程受影响验证为 124 passed / 1 个平台权限条件 skip，类型检查、构建、diff check 和格式检查通过。未运行真实模型门禁。
 
 ---
 
@@ -516,9 +524,9 @@ Preflight 固定采集：
   `dist/smoke-evidence.js` 和插件 bundle 哈希组成的 build identity；
 - Pi 配置 SHA-256；
 - 10808 loopback listener；
--每个 profile 实际命中的 credential env **名称**；
--目标进程分类全为零；
--当前授权 reference 未使用。
+  -每个 profile 实际命中的 credential env **名称**；
+  -目标进程分类全为零；
+  -当前授权 reference 未使用。
 
 它依次执行并要求退出 0：
 
@@ -564,22 +572,23 @@ git diff --check
 
 -严格顺序、最多一个 in-flight；
 -完整生命周期固定为
-  `acquire lock → preflight → batch_started → cases → terminal manifest → owner-checked release`；
+`acquire lock → preflight → batch_started → cases → terminal manifest → owner-checked release`；
 -所有正常/失败退出路径都释放自己的锁；终态发布后释放前崩溃由 recover 只验真并释放；
 -每项先 `running` checkpoint 后 runCase；
 -首项失败不调用第二项；
 -第四项失败不调用后六项；
 -每项前 commit/build/lock owner/目标进程仍有效；
 -每项后绝对目标分类为零；
+
 - evidence 必须 v2、同 batch/commit/build/ordinal、固定实际模型/provider/route；
 - adapter telemetry 与协调器选择合计必须
   `1 / 0 / 0 / false / false`；
--失败发布 blocked manifest 与 not_run 清单；
--十项全过只产生 `promotionEligible=true` manifest，不自行改注册表；
--工作树只允许当前 batch 目录新增；
--任一 infrastructure exception 仍发布脱敏 checkpoint/blocked manifest；
--没有 retry、fallback、parallel、resume 或 only case 分支。
--首个 checkpoint 前、running 后、evidence 后、终态发布后四类故障注入都不得续跑或重复发布终态。
+  -失败发布 blocked manifest 与 not_run 清单；
+  -十项全过只产生 `promotionEligible=true` manifest，不自行改注册表；
+  -工作树只允许当前 batch 目录新增；
+  -任一 infrastructure exception 仍发布脱敏 checkpoint/blocked manifest；
+  -没有 retry、fallback、parallel、resume 或 only case 分支。
+  -首个 checkpoint 前、running 后、evidence 后、终态发布后四类故障注入都不得续跑或重复发布终态。
 
 ### Step 4：实现协调器与维护者入口
 
@@ -693,7 +702,7 @@ git status --short
 
 - Kimi K3 聚焦文档审阅约 294 秒成功，命中四个真实设计缺口；
 - Ark Agent Plan 本轮因 Pi RPC `EPIPE` 无正文，不算 PASS；
--并行审阅把另一个审阅的临时文件误判为 workspace change，后续只读外审应输出到 workspace 外且严格串行。
+  -并行审阅把另一个审阅的临时文件误判为 workspace change，后续只读外审应输出到 workspace 外且严格串行。
 
 不得把一次失败写成永久模型能力结论。
 
@@ -789,8 +798,8 @@ Expected：只读 verifier exit 0。然后进入 Task 8；verifier 通过前不�
 
 - `passed`；
 - evidence anchor 指向同一新 batch；
--没有 pending；
--五个 logical LLM 共十项全部 enabled。
+  -没有 pending；
+  -五个 logical LLM 共十项全部 enabled。
 
 运行：
 
@@ -820,7 +829,7 @@ Expected：因旧 pending 断言失败。再改为用新全通过注册表验证
 - pairwise 10/10；
 - Layer 3 passed；
 - Layer 4 尚未执行；
--当前仍未真实安装；
+  -当前仍未真实安装；
 - Task 8 的 `ready` 只表示可以向用户准备逐动作安装授权，不表示已授权。
 
 ### Step 4：外部只读审阅
@@ -859,8 +868,8 @@ git commit -m "feat: qualify all external llm routes"
 
 - batchId/commit/build identity；
 - 10/10 新 evidence 与 verifier 结果；
--确定性/隔离/外审结果；
--预计官方 add 对活动 Codex 的语义变化；
--逐动作验证与回滚边界。
+  -确定性/隔离/外审结果；
+  -预计官方 add 对活动 Codex 的语义变化；
+  -逐动作验证与回滚边界。
 
 不得在本任务执行 marketplace/plugin add/remove；Task 9 仍需用户针对那一次真实操作另行明确授权。
