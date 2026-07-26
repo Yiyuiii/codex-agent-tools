@@ -114,8 +114,7 @@ const scripts = [
     script: "scripts/real-pi-smoke.mjs",
     llm: "gemini-3.5-flash",
     task: "delegate" as const,
-    expectedFile:
-      "2026-07-25T01-02-03.000Z-gemini-3.5-flash-delegate-pi.json",
+    expectedFile: "2026-07-25T01-02-03.000Z-gemini-3.5-flash-delegate-pi.json",
     expectedRuntime: "pi-rpc",
     expectedRoute: "proxy-10808",
     expectedKind: "pi",
@@ -130,8 +129,7 @@ const scripts = [
     script: "scripts/real-ark-smoke.mjs",
     llm: "ark-agent-plan",
     task: "review" as const,
-    expectedFile:
-      "2026-07-25T01-02-03.000Z-ark-agent-plan-review-ark.json",
+    expectedFile: "2026-07-25T01-02-03.000Z-ark-agent-plan-review-ark.json",
     expectedRuntime: "pi-rpc",
     expectedRoute: "direct",
     expectedKind: "ark",
@@ -145,9 +143,9 @@ const scripts = [
 
 describe("production real-smoke script entrypoints", () => {
   it("builds the library before npm test loads production scripts", async () => {
-    const packageJson = JSON.parse(
-      await readFile("package.json", "utf8"),
-    ) as { scripts?: Record<string, string> };
+    const packageJson = JSON.parse(await readFile("package.json", "utf8")) as {
+      scripts?: Record<string, string>;
+    };
 
     expect(packageJson.scripts?.pretest).toBe("npm run build:library");
   });
@@ -169,9 +167,7 @@ describe("production real-smoke script entrypoints", () => {
       const dist = (await import(distUrl.href)) as Record<string, unknown>;
       expect(Object.isFrozen(module.productionConfig)).toBe(true);
       expect(module.productionConfig.kind).toBe(expectedKind);
-      expect(module.productionConfig.parseArguments).toBe(
-        dist[parserExport],
-      );
+      expect(module.productionConfig.parseArguments).toBe(dist[parserExport]);
       expect(module.productionConfig.runSmoke).toBe(dist[runnerExport]);
     },
   );
@@ -189,12 +185,7 @@ describe("production real-smoke script entrypoints", () => {
         kind: "kimi",
         usage: "unused",
         parseArguments: (args) => {
-          expect(args).toEqual([
-            "--llm",
-            "kimi-k3",
-            "--task",
-            "review",
-          ]);
+          expect(args).toEqual(["--llm", "kimi-k3", "--task", "review"]);
           return { llm: "kimi-k3", task: "review" };
         },
         runSmoke: async () => {
@@ -306,12 +297,7 @@ describe("production real-smoke script entrypoints", () => {
 
   it.each(scripts)(
     "$name programmatically binds qualification context and a batch case directory",
-    async ({
-      script,
-      llm,
-      task,
-      expectedFile,
-    }) => {
+    async ({ script, llm, task, expectedFile }) => {
       const module = await importSmokeScript(script);
       expect(module.main).toBeTypeOf("function");
       if (module.main === undefined) return;
@@ -393,14 +379,7 @@ describe("production real-smoke script entrypoints", () => {
       let runnerCalls = 0;
       let stderr = "";
       const exitCode = await module.main({
-        args: [
-          "--llm",
-          llm,
-          "--task",
-          "review",
-          "--batch",
-          "forbidden",
-        ],
+        args: ["--llm", llm, "--task", "review", "--batch", "forbidden"],
         evidenceDirectory: path.join(root, "evidence"),
         runSmoke: async () => {
           runnerCalls += 1;
@@ -470,4 +449,186 @@ describe("production real-smoke script entrypoints", () => {
       expect(result.stderr).toBe("");
     },
   );
+});
+
+describe("qualification maintainer script entrypoints", () => {
+  it("registers maintainer-only npm scripts without adding public bins", async () => {
+    const packageJson = JSON.parse(await readFile("package.json", "utf8")) as {
+      scripts?: Record<string, string>;
+      bin?: Record<string, string>;
+    };
+
+    expect(packageJson.scripts?.["qualify:gates"]).toBe(
+      "tsx scripts/gate-requalification.ts",
+    );
+    expect(packageJson.scripts?.["verify:qualification"]).toBe(
+      "tsx scripts/verify-qualification.ts",
+    );
+    expect(Object.values(packageJson.bin ?? {})).not.toContain(
+      "scripts/gate-requalification.ts",
+    );
+    expect(Object.values(packageJson.bin ?? {})).not.toContain(
+      "scripts/verify-qualification.ts",
+    );
+  });
+
+  it("accepts only the fixed qualification, recovery, or help command shapes", async () => {
+    const { parseGateRequalificationArguments } =
+      await import("../../scripts/gate-requalification.js");
+    const authorizationReference = "6ce61ce4-02ed-4e95-9813-f30e74ce9af5";
+
+    expect(parseGateRequalificationArguments(["--help"])).toEqual({
+      kind: "help",
+    });
+    expect(
+      parseGateRequalificationArguments([
+        "--authorization-ref",
+        authorizationReference,
+      ]),
+    ).toEqual({
+      kind: "qualify",
+      authorizationReference,
+    });
+    expect(
+      parseGateRequalificationArguments([
+        "--recover-interrupted",
+        "batch-2026-07-26",
+      ]),
+    ).toEqual({
+      kind: "recover",
+      batchId: "batch-2026-07-26",
+    });
+
+    for (const args of [
+      [],
+      ["--authorization-ref"],
+      ["--authorization-ref", authorizationReference, "--retry"],
+      ["--recover-interrupted", "../escape"],
+      ["--only", "1"],
+      ["--llm", "kimi-k3"],
+      ["--model", "kimi-code/k3"],
+      ["--provider", "google"],
+      ["--retry"],
+      ["--resume"],
+      ["--fallback"],
+      ["--parallel"],
+    ]) {
+      expect(() => parseGateRequalificationArguments(args)).toThrowError(
+        "Invalid gate requalification arguments",
+      );
+    }
+  });
+
+  it("accepts only the two fixed verifier modes and a safe manifest path", async () => {
+    const { parseQualificationVerifierArguments } =
+      await import("../../scripts/verify-qualification.js");
+
+    expect(parseQualificationVerifierArguments(["--help"])).toEqual({
+      kind: "help",
+    });
+    for (const mode of ["frozen-candidate", "immutable-evidence"] as const) {
+      expect(
+        parseQualificationVerifierArguments([
+          "--mode",
+          mode,
+          "--manifest",
+          "docs/smoke/evidence/batches/batch-1/manifest.json",
+        ]),
+      ).toEqual({
+        kind: "verify",
+        mode,
+        manifestPath: "docs/smoke/evidence/batches/batch-1/manifest.json",
+      });
+    }
+    for (const args of [
+      [],
+      ["--mode", "unknown", "--manifest", "manifest.json"],
+      ["--mode", "frozen-candidate"],
+      [
+        "--mode",
+        "immutable-evidence",
+        "--manifest",
+        "../outside/manifest.json",
+      ],
+      [
+        "--mode",
+        "immutable-evidence",
+        "--manifest",
+        "docs/smoke/evidence/batches/b/manifest.json",
+        "--write-registry",
+      ],
+    ]) {
+      expect(() => parseQualificationVerifierArguments(args)).toThrowError(
+        "Invalid qualification verifier arguments",
+      );
+    }
+  });
+
+  it.each([
+    {
+      script: "scripts/gate-requalification.ts",
+      expected: "Usage: npm run --silent qualify:gates --",
+    },
+    {
+      script: "scripts/verify-qualification.ts",
+      expected: "Usage: npm run verify:qualification --",
+    },
+  ])(
+    "$script exposes help without entering production work",
+    async ({ script, expected }) => {
+      const result = await execa(
+        process.platform === "win32" ? "npx.cmd" : "npx",
+        ["tsx", script, "--help"],
+        {
+          cwd: process.cwd(),
+          reject: false,
+          timeout: 30_000,
+          windowsHide: true,
+        },
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(expected);
+      expect(result.stderr).toBe("");
+    },
+  );
+
+  it("keeps the authorization reference out of the prescribed npm entrypoint output", async () => {
+    const authorizationReference = "authorization-reference-sentinel";
+    const result = await execa(
+      process.platform === "win32" ? "npm.cmd" : "npm",
+      [
+        "run",
+        "--silent",
+        "qualify:gates",
+        "--",
+        "--authorization-ref",
+        authorizationReference,
+      ],
+      {
+        cwd: process.cwd(),
+        reject: false,
+        timeout: 30_000,
+        windowsHide: true,
+      },
+    );
+
+    expect(result.exitCode).toBe(1);
+    expect(`${result.stdout}\n${result.stderr}`).not.toContain(
+      authorizationReference,
+    );
+  });
+
+  it("dynamically imports only the existing real smoke main entrypoints", async () => {
+    const source = await readFile("scripts/gate-requalification.ts", "utf8");
+
+    for (const script of [
+      "./real-kimi-smoke.mjs",
+      "./real-pi-smoke.mjs",
+      "./real-ark-smoke.mjs",
+    ]) {
+      expect(source).toContain(`import("${script}")`);
+    }
+    expect(source).not.toMatch(/runKimiSmoke|runPiSmoke|runArkSmoke/u);
+  });
 });

@@ -11,6 +11,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { resolveLlm } from "../../src/llms/registry.js";
 import {
   assertAuthorizationReferenceUnused,
   createQualificationLedger,
@@ -195,6 +196,7 @@ async function publishEvidence(
   const credential = preflight().credentialMatches.find(
     (candidate) => candidate.llm === identity.llm,
   )!;
+  const profile = resolveLlm(identity.llm);
   await writeFile(
     evidencePath,
     `${JSON.stringify({
@@ -219,7 +221,8 @@ async function publishEvidence(
       ...(identityRecord.runtime === "pi-rpc"
         ? {
             configSha256: preflight().piConfigSha256,
-            credentialEnv: credential.environmentVariableName,
+            credentialEnv:
+              profile.credentialTargetEnv ?? credential.environmentVariableName,
           }
         : {}),
       passed,
@@ -431,6 +434,45 @@ describe("immutable qualification ledger", () => {
     expect(
       manifest.cases.map(({ ordinal, llm, task }) => ({ ordinal, llm, task })),
     ).toEqual(cases());
+  });
+
+  it("records the parent credential source but validates Ark evidence against the child target name", async () => {
+    const repository = await tempRepository();
+    const ledger = createQualificationLedger({
+      repositoryRoot: repository,
+      batchId,
+    });
+    await ledger.publishBatchStarted({
+      authorizationReferenceSha256: authHash,
+      preflight: preflight(),
+      recordedAt: "2026-07-26T02:00:00.000Z",
+    });
+    for (const identity of cases().slice(0, 3)) {
+      await ledger.publishCaseRunning({
+        ...identity,
+        recordedAt: `2026-07-26T02:0${identity.ordinal}:00.000Z`,
+      });
+      const evidencePath = await publishEvidence(repository, identity);
+      if (identity.ordinal === 3) {
+        const evidence = JSON.parse(
+          await readFile(evidencePath, "utf8"),
+        ) as Record<string, unknown>;
+        expect(
+          preflight().credentialMatches.find(
+            (entry) => entry.llm === identity.llm,
+          )?.environmentVariableName,
+        ).toBe("API_KEY_DOUBAO_CODING");
+        expect(evidence.credentialEnv).toBe("CODEX_AGENT_ARK_CODING_KEY");
+      }
+      await expect(
+        ledger.publishCaseCompleted({
+          ...identity,
+          result: "passed",
+          evidencePath,
+          recordedAt: `2026-07-26T03:0${identity.ordinal}:00.000Z`,
+        }),
+      ).resolves.toBeUndefined();
+    }
   });
 
   it("enforces batch_started, same-ordinal pairing, and strict ordinal order", async () => {
@@ -912,10 +954,6 @@ describe("immutable qualification ledger", () => {
         repositoryRoot: repository,
         batchId,
         authorizationReferenceSha256: authHash,
-        notRun:
-          crashWindow === "after_running" || crashWindow === "after_evidence"
-            ? cases().slice(1)
-            : cases(),
         completedAt: "2026-07-26T02:03:00.000Z",
       });
       expect(manifest.status).toBe("interrupted");

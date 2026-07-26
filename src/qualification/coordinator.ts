@@ -1,0 +1,397 @@
+import { createHash } from "node:crypto";
+import path from "node:path";
+
+import type {
+  FrozenPreflightRecord,
+  QualificationCaseIdentity,
+  QualificationLockHandle,
+  QualificationTerminalManifest,
+  TargetAgentProcessCounts,
+} from "./types.js";
+import { QUALIFICATION_CASES } from "./types.js";
+import type { QualificationLedger } from "./manifest.js";
+
+const AUTHORIZATION_REFERENCE_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+export type QualificationCoordinatorStage =
+  "arguments" | "lock" | "preflight" | "batch" | "release";
+
+export class QualificationCoordinatorError extends Error {
+  readonly category = "infrastructure";
+  readonly stage: QualificationCoordinatorStage;
+  readonly count = 1;
+
+  constructor(stage: QualificationCoordinatorStage) {
+    super("Qualification coordination failed");
+    this.name = "QualificationCoordinatorError";
+    this.stage = stage;
+  }
+}
+
+class QualificationLockOwnershipLostError extends Error {}
+
+export interface QualificationCaseRunResult {
+  exitCode: 0 | 1;
+  evidencePath: string;
+}
+
+export interface QualificationCoordinatorDependencies {
+  createBatchId(): string;
+  now(): Date;
+  acquireLock(options: {
+    repositoryRoot: string;
+    batchId: string;
+    authorizationReferenceSha256: string;
+  }): Promise<QualificationLockHandle>;
+  releaseLock(handle: QualificationLockHandle): Promise<void>;
+  runPreflight(options: {
+    repositoryRoot: string;
+    authorizationReferenceSha256: string;
+    lockHandle: QualificationLockHandle;
+  }): Promise<FrozenPreflightRecord>;
+  createLedger(options: {
+    repositoryRoot: string;
+    batchId: string;
+  }): QualificationLedger;
+  assertLockOwner(handle: QualificationLockHandle): Promise<void>;
+  assertFrozenCandidate(options: {
+    repositoryRoot: string;
+    batchId: string;
+    preflight: FrozenPreflightRecord;
+  }): Promise<void>;
+  inspectTargetProcesses(): Promise<TargetAgentProcessCounts>;
+  runCase(options: {
+    identity: QualificationCaseIdentity;
+    qualificationContext: Readonly<{
+      batchId: string;
+      ordinal: number;
+      repositoryCommit: string;
+      buildIdentitySha256: string;
+      authorizationReferenceSha256: string;
+      orchestratorFallbackUsed: false;
+    }>;
+    evidenceDirectory: string;
+  }): Promise<QualificationCaseRunResult>;
+}
+
+function authorizationReferenceSha256(reference: string): string {
+  return createHash("sha256").update(reference.toLowerCase()).digest("hex");
+}
+
+function safeTimestamp(dependencies: QualificationCoordinatorDependencies) {
+  try {
+    return dependencies.now().toISOString();
+  } catch {
+    throw new QualificationCoordinatorError("batch");
+  }
+}
+
+function assertZeroTargetProcesses(counts: TargetAgentProcessCounts): void {
+  const record = counts as unknown as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  if (
+    keys.length !== 3 ||
+    keys[0] !== "kimi" ||
+    keys[1] !== "piRpc" ||
+    keys[2] !== "realSmoke"
+  ) {
+    throw new QualificationCoordinatorError("batch");
+  }
+  for (const key of keys) {
+    const value = record[key];
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      Array.isArray(value) ||
+      Object.keys(value).length !== 1 ||
+      (value as { count?: unknown }).count !== 0
+    ) {
+      throw new QualificationCoordinatorError("batch");
+    }
+  }
+}
+
+function normalizeRunResult(value: unknown): QualificationCaseRunResult {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join(",") !== "evidencePath,exitCode"
+  ) {
+    throw new QualificationCoordinatorError("batch");
+  }
+  const result = value as {
+    exitCode?: unknown;
+    evidencePath?: unknown;
+  };
+  if (
+    (result.exitCode !== 0 && result.exitCode !== 1) ||
+    typeof result.evidencePath !== "string" ||
+    result.evidencePath.length === 0
+  ) {
+    throw new QualificationCoordinatorError("batch");
+  }
+  return Object.freeze({
+    exitCode: result.exitCode,
+    evidencePath: result.evidencePath,
+  });
+}
+
+async function assertBatchLockOwner(
+  dependencies: QualificationCoordinatorDependencies,
+  lockHandle: QualificationLockHandle,
+): Promise<void> {
+  try {
+    await dependencies.assertLockOwner(lockHandle);
+  } catch {
+    throw new QualificationLockOwnershipLostError();
+  }
+}
+
+async function publishInfrastructureTerminal(options: {
+  ledger: QualificationLedger;
+  currentIndex: number;
+  runningPublished: boolean;
+  dependencies: QualificationCoordinatorDependencies;
+}): Promise<QualificationTerminalManifest> {
+  const notRunStart = options.currentIndex + (options.runningPublished ? 1 : 0);
+  return options.ledger.publishTerminalManifest({
+    status: "blocked",
+    stopReason: "infrastructure_failure",
+    notRun: QUALIFICATION_CASES.slice(notRunStart),
+    completedAt: safeTimestamp(options.dependencies),
+  });
+}
+
+export async function runQualificationBatch(
+  options: {
+    repositoryRoot: string;
+    authorizationReference: string;
+  },
+  dependencies: QualificationCoordinatorDependencies,
+): Promise<QualificationTerminalManifest> {
+  if (
+    typeof options.repositoryRoot !== "string" ||
+    options.repositoryRoot.length === 0 ||
+    typeof options.authorizationReference !== "string" ||
+    !AUTHORIZATION_REFERENCE_PATTERN.test(options.authorizationReference)
+  ) {
+    throw new QualificationCoordinatorError("arguments");
+  }
+
+  let batchId: string;
+  try {
+    batchId = dependencies.createBatchId();
+    if (typeof batchId !== "string" || batchId.length === 0) {
+      throw new Error("invalid batch id");
+    }
+  } catch {
+    throw new QualificationCoordinatorError("arguments");
+  }
+  const authorizationHash = authorizationReferenceSha256(
+    options.authorizationReference,
+  );
+
+  let lockHandle: QualificationLockHandle;
+  try {
+    lockHandle = await dependencies.acquireLock({
+      repositoryRoot: options.repositoryRoot,
+      batchId,
+      authorizationReferenceSha256: authorizationHash,
+    });
+  } catch {
+    throw new QualificationCoordinatorError("lock");
+  }
+
+  let result: QualificationTerminalManifest | null = null;
+  let failure: QualificationCoordinatorError | null = null;
+  let batchStarted = false;
+  try {
+    let preflight: FrozenPreflightRecord;
+    try {
+      preflight = await dependencies.runPreflight({
+        repositoryRoot: options.repositoryRoot,
+        authorizationReferenceSha256: authorizationHash,
+        lockHandle,
+      });
+    } catch {
+      throw new QualificationCoordinatorError("preflight");
+    }
+
+    let ledger: QualificationLedger;
+    try {
+      await dependencies.assertLockOwner(lockHandle);
+      await dependencies.assertFrozenCandidate({
+        repositoryRoot: options.repositoryRoot,
+        batchId,
+        preflight,
+      });
+      ledger = dependencies.createLedger({
+        repositoryRoot: options.repositoryRoot,
+        batchId,
+      });
+      await ledger.publishBatchStarted({
+        authorizationReferenceSha256: authorizationHash,
+        preflight,
+        recordedAt: safeTimestamp(dependencies),
+      });
+      batchStarted = true;
+    } catch {
+      throw new QualificationCoordinatorError("batch");
+    }
+
+    let terminalPublicationAttempted = false;
+    for (let index = 0; index < QUALIFICATION_CASES.length; index += 1) {
+      const identity = QUALIFICATION_CASES[index]!;
+      let runningPublished = false;
+      let postProcessInspectionAttempted = false;
+      try {
+        await assertBatchLockOwner(dependencies, lockHandle);
+        await dependencies.assertFrozenCandidate({
+          repositoryRoot: options.repositoryRoot,
+          batchId,
+          preflight,
+        });
+        assertZeroTargetProcesses(await dependencies.inspectTargetProcesses());
+        await ledger.publishCaseRunning({
+          ...identity,
+          recordedAt: safeTimestamp(dependencies),
+        });
+        runningPublished = true;
+
+        const run = normalizeRunResult(
+          await dependencies.runCase({
+            identity,
+            qualificationContext: Object.freeze({
+              batchId,
+              ordinal: identity.ordinal,
+              repositoryCommit: preflight.repositoryCommit,
+              buildIdentitySha256: preflight.buildIdentitySha256,
+              authorizationReferenceSha256: authorizationHash,
+              orchestratorFallbackUsed: false,
+            }),
+            evidenceDirectory: path.join(ledger.batchDirectory, "cases"),
+          }),
+        );
+        postProcessInspectionAttempted = true;
+        assertZeroTargetProcesses(await dependencies.inspectTargetProcesses());
+        await assertBatchLockOwner(dependencies, lockHandle);
+        await dependencies.assertFrozenCandidate({
+          repositoryRoot: options.repositoryRoot,
+          batchId,
+          preflight,
+        });
+        await ledger.publishCaseCompleted({
+          ...identity,
+          result: run.exitCode === 0 ? "passed" : "failed",
+          evidencePath: run.evidencePath,
+          recordedAt: safeTimestamp(dependencies),
+        });
+        runningPublished = false;
+
+        if (run.exitCode === 1) {
+          await assertBatchLockOwner(dependencies, lockHandle);
+          terminalPublicationAttempted = true;
+          result = await ledger.publishTerminalManifest({
+            status: "blocked",
+            stopReason: "case_failed",
+            notRun: QUALIFICATION_CASES.slice(index + 1),
+            completedAt: safeTimestamp(dependencies),
+          });
+          break;
+        }
+      } catch (error) {
+        if (error instanceof QualificationLockOwnershipLostError) {
+          throw new QualificationCoordinatorError("batch");
+        }
+        if (terminalPublicationAttempted) {
+          throw new QualificationCoordinatorError("batch");
+        }
+        if (runningPublished && !postProcessInspectionAttempted) {
+          postProcessInspectionAttempted = true;
+          try {
+            assertZeroTargetProcesses(
+              await dependencies.inspectTargetProcesses(),
+            );
+          } catch {
+            // The terminal remains an infrastructure block; never retry the case.
+          }
+        }
+        try {
+          await assertBatchLockOwner(dependencies, lockHandle);
+          terminalPublicationAttempted = true;
+          result = await publishInfrastructureTerminal({
+            ledger,
+            currentIndex: index,
+            runningPublished,
+            dependencies,
+          });
+        } catch {
+          throw new QualificationCoordinatorError("batch");
+        }
+        break;
+      }
+    }
+
+    if (result === null) {
+      try {
+        await assertBatchLockOwner(dependencies, lockHandle);
+        await dependencies.assertFrozenCandidate({
+          repositoryRoot: options.repositoryRoot,
+          batchId,
+          preflight,
+        });
+        assertZeroTargetProcesses(await dependencies.inspectTargetProcesses());
+      } catch (error) {
+        if (error instanceof QualificationLockOwnershipLostError) {
+          throw new QualificationCoordinatorError("batch");
+        }
+        try {
+          await assertBatchLockOwner(dependencies, lockHandle);
+          terminalPublicationAttempted = true;
+          result = await ledger.publishTerminalManifest({
+            status: "blocked",
+            stopReason: "infrastructure_failure",
+            notRun: [],
+            completedAt: safeTimestamp(dependencies),
+          });
+        } catch {
+          throw new QualificationCoordinatorError("batch");
+        }
+      }
+    }
+
+    if (result === null) {
+      try {
+        await assertBatchLockOwner(dependencies, lockHandle);
+        terminalPublicationAttempted = true;
+        result = await ledger.publishTerminalManifest({
+          status: "passed",
+          stopReason: null,
+          notRun: [],
+          completedAt: safeTimestamp(dependencies),
+        });
+      } catch {
+        throw new QualificationCoordinatorError("batch");
+      }
+    }
+  } catch (error) {
+    failure =
+      error instanceof QualificationCoordinatorError
+        ? error
+        : new QualificationCoordinatorError("batch");
+  }
+
+  if (failure !== null && batchStarted && result === null) {
+    throw failure;
+  }
+  try {
+    await dependencies.releaseLock(lockHandle);
+  } catch {
+    throw new QualificationCoordinatorError("release");
+  }
+  if (failure !== null) throw failure;
+  if (result === null) throw new QualificationCoordinatorError("batch");
+  return result;
+}

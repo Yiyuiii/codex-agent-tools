@@ -1033,6 +1033,8 @@ function validateEvidenceForIdentity(
   const credentialMatch = preflight.credentialMatches.find(
     (candidate) => candidate.llm === identity.llm,
   );
+  const expectedEvidenceCredential =
+    profile.credentialTargetEnv ?? credentialMatch?.environmentVariableName;
   const actualModelIsSafeFailureObservation =
     !Object.hasOwn(evidence, "actualModel") ||
     evidence.actualModel === null ||
@@ -1055,9 +1057,9 @@ function validateEvidenceForIdentity(
       evidence.configSha256 !== preflight.piConfigSha256) ||
     (frozenIdentity.runtime === "pi-rpc"
       ? evidence.passed === true
-        ? evidence.credentialEnv !== credentialMatch.environmentVariableName
+        ? evidence.credentialEnv !== expectedEvidenceCredential
         : Object.hasOwn(evidence, "credentialEnv") &&
-          evidence.credentialEnv !== credentialMatch.environmentVariableName
+          evidence.credentialEnv !== expectedEvidenceCredential
       : Object.hasOwn(evidence, "credentialEnv"))
   ) {
     throw new QualificationLedgerError();
@@ -1991,7 +1993,7 @@ export async function recoverInterruptedQualificationBatch(options: {
   repositoryRoot: string;
   batchId: string;
   authorizationReferenceSha256: string;
-  notRun: readonly QualificationCaseIdentity[];
+  notRun?: readonly QualificationCaseIdentity[];
   completedAt: string;
 }): Promise<QualificationTerminalManifest> {
   try {
@@ -2031,12 +2033,15 @@ export async function recoverInterruptedQualificationBatch(options: {
       options.batchId,
       state,
     );
+    const inferredNotRun = QUALIFICATION_CASES.slice(
+      state.completed.length + (state.running === null ? 0 : 1),
+    );
     const manifest = buildManifest(state, {
       batchId: options.batchId,
       authorizationReferenceSha256: options.authorizationReferenceSha256,
       status: "interrupted",
       stopReason: "process_interrupted",
-      notRun: options.notRun,
+      notRun: options.notRun ?? inferredNotRun,
       completedAt: options.completedAt,
       uncommittedEvidence,
     });

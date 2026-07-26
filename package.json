@@ -40,7 +40,9 @@
     "smoke:pi": "npm run build && node scripts/real-pi-smoke.mjs",
     "smoke:ark": "npm run build && node scripts/real-ark-smoke.mjs",
     "acceptance:local": "npm run build && node scripts/local-acceptance.mjs",
-    "acceptance:plugin:isolated": "npm run build && node scripts/plugin-isolated-acceptance.mjs"
+    "acceptance:plugin:isolated": "npm run build && node scripts/plugin-isolated-acceptance.mjs",
+    "qualify:gates": "tsx scripts/gate-requalification.ts",
+    "verify:qualification": "tsx scripts/verify-qualification.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.2.1",

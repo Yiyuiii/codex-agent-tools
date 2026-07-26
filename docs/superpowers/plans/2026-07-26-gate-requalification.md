@@ -595,9 +595,9 @@ git diff --check
 维护者入口只提供：
 
 ```text
-npm run qualify:gates -- --authorization-ref <uuid>
-npm run qualify:gates -- --recover-interrupted <batchId>
-npm run qualify:gates -- --help
+npm run --silent qualify:gates -- --authorization-ref <uuid>
+npm run --silent qualify:gates -- --recover-interrupted <batchId>
+npm run --silent qualify:gates -- --help
 ```
 
 明确拒绝 `--only`、`--llm`、`--model`、`--provider`、`--retry`、
@@ -639,7 +639,7 @@ npm test -- --run test/qualification
 npm test -- --run test/smoke/script-entrypoints.test.ts
 npm run typecheck
 npm run build
-npm run qualify:gates -- --help
+npm run --silent qualify:gates -- --help
 npm run verify:qualification -- --help
 git diff --check
 ```
@@ -672,7 +672,7 @@ npm test
 npm run build
 npm run smoke:release
 npm run acceptance:plugin:isolated
-npm run qualify:gates -- --help
+npm run --silent qualify:gates -- --help
 git diff --check
 git status --short
 ```
@@ -732,7 +732,7 @@ Expected：commit 后工作树干净。此 commit 是真实批次的 `repository
 ### Step 2：启动维护者入口
 
 ```powershell
-npm run qualify:gates -- --authorization-ref <uuid>
+npm run --silent qualify:gates -- --authorization-ref <uuid>
 ```
 
 不并行执行其它 Kimi/Pi 外审。持续监控脱敏 progress 和终态；不得手工跳项、重试或重启失败 case。
@@ -757,7 +757,7 @@ npm run qualify:gates -- --authorization-ref <uuid>
 先只读确认 stale owner 对应 batchId，且 Kimi/Pi RPC/real-smoke 目标分类为零；随后恰好一次执行：
 
 ```powershell
-npm run qualify:gates -- --recover-interrupted <batchId>
+npm run --silent qualify:gates -- --recover-interrupted <batchId>
 ```
 
 验真新发布的 `interrupted` manifest（若已有合法终态，只验真并释放锁），再进入普通 blocked 文档分支。不得 resume、不得在同一授权下重启 batch。

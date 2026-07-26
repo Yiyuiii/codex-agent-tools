@@ -20,10 +20,17 @@ import {
   snapshotDirectory,
 } from "../dist/plugin-state-snapshot.js";
 import { cleanupOwnedMcpTransport } from "../dist/plugin-mcp-cleanup.js";
+import {
+  parseIsolatedReportArguments,
+  synchronizeIsolatedReport,
+} from "../dist/plugin-isolated-report.js";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
+);
+const { mode: reportMode } = parseIsolatedReportArguments(
+  process.argv.slice(2),
 );
 const reportPath = path.join(
   repositoryRoot,
@@ -70,9 +77,11 @@ let client;
 let transport;
 
 function samePath(left, right) {
-  return left.localeCompare(right, undefined, {
-    sensitivity: process.platform === "win32" ? "accent" : "variant",
-  }) === 0;
+  return (
+    left.localeCompare(right, undefined, {
+      sensitivity: process.platform === "win32" ? "accent" : "variant",
+    }) === 0
+  );
 }
 
 function isInside(parent, candidate) {
@@ -94,7 +103,9 @@ function assertIsolationGate() {
       !samePath(isolatedHome, inheritedCodexHome),
   };
   if (!Object.values(checks).every(Boolean)) {
-    throw new Error("Refusing to run Codex outside the isolated temporary home");
+    throw new Error(
+      "Refusing to run Codex outside the isolated temporary home",
+    );
   }
   return checks;
 }
@@ -151,9 +162,7 @@ async function snapshotStep(name, before) {
 }
 
 function assertPluginStatus(output, expectedStatus) {
-  const line = output
-    .split(/\r?\n/u)
-    .find((entry) => entry.includes(selector));
+  const line = output.split(/\r?\n/u).find((entry) => entry.includes(selector));
   if (line === undefined) {
     throw new Error(`Official plugin list did not contain ${selector}`);
   }
@@ -217,10 +226,7 @@ async function resolveInstalledPluginRoot() {
       "Official plugin cache must contain exactly the manifest-version directory",
     );
   }
-  const installedRoot = path.resolve(
-    installedPluginParent,
-    entries[0].name,
-  );
+  const installedRoot = path.resolve(installedPluginParent, entries[0].name);
   if (!isInside(isolatedHome, installedRoot)) {
     throw new Error("Installed plugin root escaped the isolated Codex home");
   }
@@ -331,7 +337,9 @@ function quoteCmdArgument(value) {
 
 async function writeFakePiWrapper() {
   if (process.platform !== "win32") {
-    throw new Error("The isolated fake Pi environment gate currently requires Windows");
+    throw new Error(
+      "The isolated fake Pi environment gate currently requires Windows",
+    );
   }
   const wrapper = [
     "@echo off",
@@ -605,7 +613,9 @@ try {
 
   const marketplaceList = await runCodex(["plugin", "marketplace", "list"]);
   if (marketplaceList.includes(marketplace)) {
-    throw new Error("Official marketplace list retained the removed marketplace");
+    throw new Error(
+      "Official marketplace list retained the removed marketplace",
+    );
   }
   step = await snapshotStep("marketplace list after remove", previous);
   steps.push(step);
@@ -614,18 +624,13 @@ try {
   const configHashLabels = new Map();
   const configStates = steps.map((entry) => {
     const config = findStateFile(entry.snapshot, "config.toml");
-    if (
-      config !== undefined &&
-      !configHashLabels.has(config.sha256)
-    ) {
+    if (config !== undefined && !configHashLabels.has(config.sha256)) {
       configHashLabels.set(config.sha256, `H${configHashLabels.size + 1}`);
     }
     const state = {
       name: entry.name,
       hashLabel:
-        config === undefined
-          ? undefined
-          : configHashLabels.get(config.sha256),
+        config === undefined ? undefined : configHashLabels.get(config.sha256),
       changed:
         config !== undefined &&
         previousConfigHash !== undefined &&
@@ -651,12 +656,20 @@ try {
       throw new Error("Generated report contains isolated runtime details");
     }
   }
-  await writeFile(reportPath, report, "utf8");
+  const reportResult = await synchronizeIsolatedReport({
+    mode: reportMode,
+    reportPath,
+    render: () => report,
+  });
   process.stdout.write(
-    "isolated plugin lifecycle accepted; report updated at docs/release/plugin-isolated-state.md\n",
+    reportResult.status === "updated"
+      ? "isolated plugin lifecycle accepted; report updated at docs/release/plugin-isolated-state.md\n"
+      : "isolated plugin lifecycle accepted; committed report is current\n",
   );
 } catch (error) {
-  throw new Error(redactFailure(error instanceof Error ? error.message : error));
+  throw new Error(
+    redactFailure(error instanceof Error ? error.message : error),
+  );
 } finally {
   try {
     await cleanupOwnedMcpTransport(client, transport);
