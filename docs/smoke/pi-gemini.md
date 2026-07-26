@@ -2,11 +2,20 @@
 
 ## 当前结论
 
-逻辑 LLM `gemini-3.5-flash` 固定绑定 `pi-rpc`、Google provider、真实模型 `gemini-3.5-flash` 与 `proxy-10808` 路由，不会回退到其它模型或路由。2026-07-25 串行复跑中 review passed，delegate 因 Google 免费层额度失败；按照同一逻辑 LLM 两项必须共同通过的门禁策略，注册表中的 review/delegate 当前均为 pending。
+逻辑 LLM `gemini-3.5-flash` 固定绑定 `pi-rpc`、Google provider、真实模型 `gemini-3.5-flash` 与 `proxy-10808` 路由，不会回退到其它模型或路由。2026-07-25 串行复跑中 review passed，delegate 因 Google 免费层额度失败；按照同一逻辑 LLM 两项必须共同通过的门禁策略，注册表中的 review/delegate 当前均为 pending。2026-07-26 的原子重认证批次又在首项 Gemini delegate 命中同一稳定额度类别并立即停止，未执行其余九项，因此没有形成新的全量资格来源，也没有改变注册表。
 
 本轮使用 Pi 0.80.10 和隔离配置 SHA-256 `61ffbd4c6ea41adc6a8313f957b732da2b98b8b28b082c52a95226b2a6fb2fe9`。凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 顺序只选第一个非空值。证据只记录命中的变量名，不记录凭据内容。
 
 两次 evidence 的 `environmentIsolated` 与 `noNewPiRpcProcesses` 均为 true；每次 evidence 验收后的独立系统快照也确认 Kimi 与 Pi RPC 进程数均为 0。delegate 的失败保留为 `google_free_tier_quota`，没有重试或 fallback。
+
+## 2026-07-26 原子重认证停止证据
+
+- 批次：`2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f`；冻结 commit：`f7209cd5744bad12fd27fbb3f5b6cd6fc42c3521`。
+- 固定顺序的第 1 项 `gemini-3.5-flash delegate` 状态为 failed，`failureReason=google_free_tier_quota`；第 2 项 Gemini review 与后续八项均为 not run。
+- 实际/预期模型、Google provider、`proxy-10808`、凭据名称、结果文件、命令与隔离检查均符合契约；可观测统计为 `1 / 0 / 0 / false / false`。批次后独立系统快照确认 Kimi ACP、Pi RPC、real-smoke 均为 0。
+- evidence：[JSON](evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/cases/2026-07-26T09-01-07.689Z-gemini-3.5-flash-delegate-pi.json)；SHA-256 `ed2e5c79c4cfbf851c7901aeeee5be885055ef244aefcf4ee11dca6ccbccf484`。
+- blocked manifest：[JSON](evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json)；SHA-256 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`；`promotionEligible=false`。冻结候选 verifier 按预期拒绝晋升。
+- 当前授权已由 `batch_started` 消费；没有 retry、fallback、resume、跳项或第二批。未来若重入，必须取得新的明确授权并从十项第一项开始。
 
 <a id="gemini-review"></a>
 ## Gemini review

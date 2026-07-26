@@ -2,9 +2,11 @@
 
 ## 当前结论
 
-当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。2026-07-25 串行复跑的 review/delegate 两项门禁均为 passed，注册表继续启用两项能力。
+当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。2026-07-25 串行复跑的 review/delegate 两项门禁均为 passed，注册表继续启用两项能力。2026-07-26 原子重认证批次在第 1 项 Gemini delegate 失败后按计划停止，Kimi 两项均为 not run；该不完整批次没有替换 2026-07-25 的 Kimi 通过证据，也没有改变注册表。
 
 本轮没有回退到其它 Kimi 模型。两次 evidence 内的 `noNewKimiProcesses` 均为 true，且每次 evidence 验收后的独立系统快照也确认 Kimi 与 Pi RPC 进程数均为 0。
+
+最新 blocked 批次的终态见 [manifest](evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json)，SHA-256 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`。它只记录 Kimi 两项未运行，不构成新的 Kimi 质量结论。
 
 ## 方法与通过标准
 

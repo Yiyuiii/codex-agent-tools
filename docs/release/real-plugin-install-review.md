@@ -13,6 +13,7 @@
 - 第 1 层确定性检查和第 2 层隔离官方插件生命周期已经通过。
 - 第 3 层十项真实模型门禁的原始调用结果是 **8 passed / 2 failed**。
 - 按同一逻辑 LLM 的 review/delegate 必须成对通过的规则，当前注册表结果是 **6 passed / 4 pending**。
+- 2026-07-26 的一次原子重认证在首项 Gemini delegate 因免费层额度失败后立即停止，后九项未运行，未产生任何晋升；当前授权已经消费，不得重试或重开。
 - 第 4 层真实 Codex App 宿主门禁尚未执行。
 - 当前没有执行活动 Codex 的 marketplace/plugin add 或 remove，也没有读取、写入、备份或恢复活动 `~/.codex/config.toml`。
 
@@ -23,6 +24,16 @@
 [OpenAI 官方插件文档](https://developers.openai.com/plugins/build/plugins)要求用 `codex plugin marketplace` 管理 marketplace，而不是手工编辑 `config.toml`；文档同时说明插件启停状态存储在 `~/.codex/config.toml`。只有未来通过官方机制把插件安装到活动 Codex，再从真实 Codex App 新会话验证工具发现、调用、取消和进程清理，才能完成第 4 层宿主验收。
 
 当前的[隔离状态报告](plugin-isolated-state.md)只证明 Codex CLI 0.135.0 在唯一临时 `CODEX_HOME` 中可以添加 marketplace、安装缓存副本、启动 MCP、卸载插件并按官方列表语义回滚。它不证明活动 Codex App 已安装或可用，也不能代替真实宿主门禁。
+
+## 最新原子重认证停止事实
+
+- 批次：`2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f`；冻结 commit：`f7209cd5744bad12fd27fbb3f5b6cd6fc42c3521`。
+- 第 1 项 `gemini-3.5-flash delegate` 因 `google_free_tier_quota` failed；模型、provider、`proxy-10808`、凭据隔离、文件/命令检查和 `1 / 0 / 0 / false / false` 可观测统计均符合契约。
+- evidence：[JSON](../smoke/evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/cases/2026-07-26T09-01-07.689Z-gemini-3.5-flash-delegate-pi.json)，SHA-256 `ed2e5c79c4cfbf851c7901aeeee5be885055ef244aefcf4ee11dca6ccbccf484`。
+- blocked manifest：[JSON](../smoke/evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json)，SHA-256 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`；`promotionEligible=false`，后九项 not run。
+- 冻结候选 verifier 按预期拒绝晋升，批次后 Kimi ACP、Pi RPC、real-smoke 目标进程均为 0。没有 retry、fallback、resume、跳项或第二批。
+
+该失败批次没有替换 2026-07-25 的完整十项证据，也没有撤销或增加既有注册表能力；它只证明当前这次重认证未通过。未来重入必须由用户重新明确授权、生成新的授权引用，并从十项第一项开始。
 
 ## 十项门禁：原始结果与注册表结果
 

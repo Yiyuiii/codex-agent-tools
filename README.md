@@ -10,7 +10,7 @@
 - `ark-agent-plan`：隔离 Pi RPC / Ark Agent Plan / `ark-code-latest`，直连；
 - `ark-agent-deepseek-v4-flash`：隔离 Pi RPC / Ark Agent Plan / `deepseek-v4-flash`，直连。
 
-2026-07-25 十项真实门禁的原始结果为 8 passed / 2 failed：Kimi K3 两项通过；Gemini review 通过、delegate 因额度失败；Ark Coding Plan review 通过、delegate 因验收内容失败；两个 Agent Plan profile 各两项通过。注册表采用 review/delegate 成对晋级，因此当前能力状态是 6 passed / 4 pending：`kimi-k3`、`ark-agent-plan` 与 `ark-agent-deepseek-v4-flash` 各两项 passed，`gemini-3.5-flash` 与 `ark-coding-plan` 各两项 pending。pending 能力会明确拒绝，不会复用单项通过或旧模型证据，也不会静默切换到其它 LLM。
+2026-07-25 十项真实门禁的原始结果为 8 passed / 2 failed：Kimi K3 两项通过；Gemini review 通过、delegate 因额度失败；Ark Coding Plan review 通过、delegate 因验收内容失败；两个 Agent Plan profile 各两项通过。注册表采用 review/delegate 成对晋级，因此当前能力状态是 6 passed / 4 pending：`kimi-k3`、`ark-agent-plan` 与 `ark-agent-deepseek-v4-flash` 各两项 passed，`gemini-3.5-flash` 与 `ark-coding-plan` 各两项 pending。2026-07-26 的原子重认证批次在首项 Gemini delegate 再次命中免费层额度后 fail-fast，后九项未运行且 verifier 拒绝晋升，因此没有替换上述完整批次或改变注册表。pending 能力会明确拒绝，不会复用单项通过或旧模型证据，也不会静默切换到其它 LLM。
 
 项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端。
 

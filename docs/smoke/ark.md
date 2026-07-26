@@ -10,6 +10,8 @@
 
 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的 `ark-agent-plan` 配额池。2026-07-20 对旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 完成的四项 passed 证据现仅作为历史事实保留，不属于当前公开面，也不得用于晋级两个新 Agent Plan 路线。原始 evidence JSON 保持不变。
 
+2026-07-26 原子重认证批次在第 1 项 Gemini delegate 失败后立即停止，六项 Ark case 均为 not run；因此该批次没有替换下述 2026-07-25 Ark 证据，也没有改变三条 Ark 路线的注册表状态。blocked [manifest](evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json) 的 SHA-256 为 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`；批次后目标进程分类为 0，未重试或另开批次。
+
 2026-07-20 历史 passed evidence 使用的旧隔离配置 SHA-256 为 `ab12536cc03dd368115d71bab6eb65216506717fc63b33c4b8a077d82b3ebbf6`。2026-07-25 本轮三模型配置包含 Agent Plan 的 `ark-code-latest`、`deepseek-v4-flash` 与 Coding Plan 的 `ark-code-latest`；按生成器实际输出计算的 SHA-256 为 `61ffbd4c6ea41adc6a8313f957b732da2b98b8b28b082c52a95226b2a6fb2fe9`。两代配置的 endpoint host 均固定为 `ark.cn-beijing.volces.com`，网络策略均为 direct。
 
 2026-07-25 的六项 Ark 门禁严格串行执行，未重试或 fallback。每次 evidence 都确认环境隔离与无新增 Pi RPC 进程；每次 evidence 验收后的独立系统快照也确认 Kimi 与 Pi RPC 进程数均为 0。Coding Plan 的 delegate 失败被如实保留，因此 review 即使单独 passed 也不启用；两个 Agent profile 各自两项全部通过后才使用下方稳定 anchor 晋级。

@@ -46,7 +46,7 @@ npm run acceptance:plugin:isolated
 
 ## 5. 准备真实安装权限包
 
-只有五项逻辑 LLM 的 review/delegate 十项真实门禁全部 passed，才能准备可供授权的 ready 权限包。当前原始门禁为 8 passed / 2 failed，成对注册表为 6 passed / 4 pending，因此本阶段只生成 `blocked / not ready` 状态包，记录失败证据和重入条件；不提出真实安装授权问题，也不接受固定授权语句作为越过门禁的依据。
+只有五项逻辑 LLM 的 review/delegate 十项真实门禁全部 passed，才能准备可供授权的 ready 权限包。2026-07-25 完整批次为 8 passed / 2 failed，成对注册表为 6 passed / 4 pending；2026-07-26 原子重认证又在首项 Gemini delegate 因免费层额度失败后立即停止，后九项未运行，没有晋升或重试。因此本阶段只保持 `blocked / not ready` 状态包，记录失败证据和下一次必须重新授权、从第一项开始的条件；不提出真实安装授权问题，也不接受固定授权语句作为越过门禁的依据。
 
 权限包必须列出：
 

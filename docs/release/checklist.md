@@ -92,6 +92,10 @@ npm run acceptance:plugin:isolated
 
 2026-07-25 已严格串行执行十项精确门禁，原始结果为 8 passed / 2 failed；每次结束后的 evidence 与独立系统快照均确认无新增 Kimi/Pi RPC 进程。Kimi K3 与两个 Agent Plan profile 各自 review/delegate 均通过，共 6 项注册表能力为 passed；Gemini delegate 因免费层额度失败，Ark Coding delegate 因结果文件内容验收失败，因此这两个 profile 按成对策略共 4 项保持 pending。精确 evidence、SHA-256、模型、provider 与 route 见三个 smoke 索引。
 
+2026-07-26 在冻结 commit `f7209cd5744bad12fd27fbb3f5b6cd6fc42c3521` 上只启动了一次原子重认证批次 `2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f`。第 1 项 Gemini delegate 因 `google_free_tier_quota` failed，协调器立即发布 `blocked` 终态并把后九项记为 not run；没有 retry、fallback、resume 或第二批。manifest SHA-256 为 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`，冻结 verifier 按预期拒绝晋升，批次后 Kimi ACP、Pi RPC、real-smoke 目标进程均为 0。该不完整批次不替换 2026-07-25 的完整证据，也不改变 6 passed / 4 pending 注册表状态。
+
+blocked evidence 加入 npm 包面后，`npm pack --dry-run --json` 会把 batch UUID 展示为 `***`。release smoke 已通过 TDD 把 npm 展示路径与本地敏感内容扫描路径分开：只允许安全相对路径，脱敏路径必须唯一匹配本地文件，缺失或歧义均失败；修复后的 release smoke 通过。该确定性包装修复未修改批次 evidence 或 manifest。
+
 ### 失败停止条件
 
 任一精确门禁因模型、路由、额度、工作区、工具证据或残留进程失败时，该逻辑 LLM 的 review/delegate 都不得晋级。不得复用旧模型证据、自动 fallback、并行运行 Pi smoke 或把确定性测试当成真实模型证据。五项十门禁未全 passed 前，不准备真实 App 安装执行。

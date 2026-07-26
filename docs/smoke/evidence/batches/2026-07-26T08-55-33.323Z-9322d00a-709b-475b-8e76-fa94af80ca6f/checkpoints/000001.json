@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sequence": 1,
+  "kind": "case_running",
+  "batchId": "2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f",
+  "recordedAt": "2026-07-26T08:57:43.979Z",
+  "repositoryCommit": "f7209cd5744bad12fd27fbb3f5b6cd6fc42c3521",
+  "buildIdentitySha256": "3e9df4b42f1a61328f488eb24fe5476c4ce99f9c3cd41b0bbd03e18e1ab6b216",
+  "preflightSha256": "cc756e60a3b9b25433bc3df7fbda9d7d0cde012d7bac46edeb2ddb92c4805a72",
+  "ordinal": 1,
+  "llm": "gemini-3.5-flash",
+  "task": "delegate"
+}

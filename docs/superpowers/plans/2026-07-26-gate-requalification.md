@@ -776,6 +776,8 @@ npm run verify:qualification -- --mode frozen-candidate --manifest docs/smoke/ev
 
 Expected：只读 verifier exit 0。然后进入 Task 8；verifier 通过前不得改 registry。
 
+完成状态（2026-07-26）：冻结候选 `f7209cd5744bad12fd27fbb3f5b6cd6fc42c3521` 上只启动了一次批次 `2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f`。完整 preflight 通过后，第 1 项 `gemini-3.5-flash delegate` 以固定 Google / `gemini-3.5-flash` / `proxy-10808` 身份调用一次，结果因 `google_free_tier_quota` failed；模型、凭据隔离、结果文件、命令和工作区检查均符合契约，telemetry 为 `1 / 0 / 0 / false / false`。协调器立即发布 `blocked` manifest，把后九项记为 not run，并消费当前授权；未 retry、fallback、resume、跳项或重开。evidence SHA-256 为 `ed2e5c79c4cfbf851c7901aeeee5be885055ef244aefcf4ee11dca6ccbccf484`，manifest SHA-256 为 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`；冻结 verifier 按预期 exit 1，批次后 Kimi ACP、Pi RPC、real-smoke 目标进程全为 0。注册表保持 6 passed / 4 pending，Task 8 不执行。提交 blocked 证据前的 release smoke 发现 npm 会在 `pack --json` 展示中把批次 UUID 段替换为 `***`，旧检查器随后错误读取脱敏路径；该确定性包装缺口已用 RED→GREEN 增加安全路径、唯一匹配和歧义拒绝，再次 release smoke 通过。修复不修改冻结 evidence，不构成资格重试。未来若重入必须由用户重新明确授权并从十项第一项开始。
+
 ---
 
 ## Task 8：成功批次后的成对晋升与 `ready` 审阅包（仅 10/10 时执行）
