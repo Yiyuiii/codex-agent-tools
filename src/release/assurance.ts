@@ -3,9 +3,7 @@ import path from "node:path";
 
 import type * as TypeScript from "typescript";
 
-const ts = createRequire(import.meta.url)(
-  "typescript",
-) as typeof TypeScript;
+const ts = createRequire(import.meta.url)("typescript") as typeof TypeScript;
 
 export interface ReleaseTextEntry {
   name: string;
@@ -40,6 +38,49 @@ function normalizePackPath(fileName: string): string {
   return path.posix.normalize(fileName.replaceAll("\\", "/"));
 }
 
+function assertSafePackPath(fileName: string): string {
+  const normalized = normalizePackPath(fileName);
+  if (
+    normalized.length === 0 ||
+    normalized.length > 1_024 ||
+    normalized === "." ||
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    path.posix.isAbsolute(normalized)
+  ) {
+    throw new Error(`Unsafe npm package path: ${fileName}`);
+  }
+  return normalized;
+}
+
+export function resolvePackInspectionPath(
+  packPath: string,
+  localCandidates: readonly string[],
+): string {
+  const normalizedPackPath = assertSafePackPath(packPath);
+  if (!normalizedPackPath.includes("***")) {
+    return normalizedPackPath;
+  }
+  if (normalizedPackPath.replaceAll("***", "").includes("*")) {
+    throw new Error(`Unsafe npm package path: ${packPath}`);
+  }
+  const pattern = new RegExp(
+    `^${normalizedPackPath
+      .replace(/[|\\{}()[\]^$+?.]/gu, "\\$&")
+      .replaceAll("***", "[^/]+")}$`,
+    "u",
+  );
+  const matches = [
+    ...new Set(
+      localCandidates.map((candidate) => assertSafePackPath(candidate)),
+    ),
+  ].filter((candidate) => pattern.test(candidate));
+  if (matches.length !== 1) {
+    throw new Error(`Unable to resolve redacted npm package path: ${packPath}`);
+  }
+  return matches[0]!;
+}
+
 function normalizeForSearch(value: string): string {
   return value
     .replaceAll("\\", "/")
@@ -57,14 +98,11 @@ function literalModuleSpecifier(
 ): string {
   if (
     node !== undefined &&
-    (ts.isStringLiteral(node) ||
-      ts.isNoSubstitutionTemplateLiteral(node))
+    (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
   ) {
     return node.text;
   }
-  throw new Error(
-    `Non-literal production import found in ${entryName}`,
-  );
+  throw new Error(`Non-literal production import found in ${entryName}`);
 }
 
 // This compiler-AST check is release-only and is not reachable from the
@@ -89,16 +127,12 @@ function productionImportSpecifiers(entry: ReleaseTextEntry): string[] {
   const specifiers: string[] = [];
   const visit = (node: TypeScript.Node): void => {
     if (ts.isImportDeclaration(node)) {
-      specifiers.push(
-        literalModuleSpecifier(node.moduleSpecifier, entry.name),
-      );
+      specifiers.push(literalModuleSpecifier(node.moduleSpecifier, entry.name));
     } else if (
       ts.isExportDeclaration(node) &&
       node.moduleSpecifier !== undefined
     ) {
-      specifiers.push(
-        literalModuleSpecifier(node.moduleSpecifier, entry.name),
-      );
+      specifiers.push(literalModuleSpecifier(node.moduleSpecifier, entry.name));
     } else if (ts.isCallExpression(node)) {
       const isDynamicImport =
         node.expression.kind === ts.SyntaxKind.ImportKeyword;
@@ -107,9 +141,7 @@ function productionImportSpecifiers(entry: ReleaseTextEntry): string[] {
         (node.expression.text === "require" ||
           node.expression.text === "__require");
       if (isDynamicImport || isRequire) {
-        specifiers.push(
-          literalModuleSpecifier(node.arguments[0], entry.name),
-        );
+        specifiers.push(literalModuleSpecifier(node.arguments[0], entry.name));
       }
     }
     ts.forEachChild(node, visit);
@@ -119,15 +151,11 @@ function productionImportSpecifiers(entry: ReleaseTextEntry): string[] {
 }
 
 function assertPluginBundleContent(entry: ReleaseTextEntry): void {
-  if (
-    normalizeForSearch(entry.content).includes("../dist/mcp.js")
-  ) {
+  if (normalizeForSearch(entry.content).includes("../dist/mcp.js")) {
     throw new Error(`Development entrypoint reference found in ${entry.name}`);
   }
   if (
-    productionImportSpecifiers(entry).some(
-      (specifier) => !isBuiltin(specifier),
-    )
+    productionImportSpecifiers(entry).some((specifier) => !isBuiltin(specifier))
   ) {
     throw new Error(`Non-builtin production import found in ${entry.name}`);
   }
@@ -136,9 +164,7 @@ function assertPluginBundleContent(entry: ReleaseTextEntry): void {
 export function assertAllowedPackFiles(fileNames: readonly string[]): void {
   for (const originalName of fileNames) {
     const name = normalizePackPath(originalName);
-    const containsNodeModules = name
-      .split("/")
-      .includes("node_modules");
+    const containsNodeModules = name.split("/").includes("node_modules");
     const allowed =
       EXACT_PUBLIC_FILES.has(name) ||
       EXACT_PLUGIN_FILES.has(name) ||

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertAllowedPackFiles,
   assertNoSensitiveContent,
+  resolvePackInspectionPath,
 } from "../../src/release/assurance.js";
 
 const PLUGIN_BUNDLE_NAME =
@@ -17,6 +18,40 @@ function assertBundleContent(content: string): void {
 }
 
 describe("release assurance", () => {
+  it("resolves an npm-redacted package path to exactly one local file", () => {
+    const actual =
+      "docs/smoke/evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json";
+
+    expect(
+      resolvePackInspectionPath(
+        "docs/smoke/evidence/batches/2026-07-26T08-55-33.323Z-***/manifest.json",
+        [actual, "docs/smoke/evidence/other.json"],
+      ),
+    ).toBe(actual);
+    expect(
+      resolvePackInspectionPath("docs/smoke/evidence/other.json", [actual]),
+    ).toBe("docs/smoke/evidence/other.json");
+  });
+
+  it("fails closed when an npm-redacted package path is missing or ambiguous", () => {
+    const redacted =
+      "docs/smoke/evidence/batches/2026-07-26T08-55-33.323Z-***/manifest.json";
+    const first =
+      "docs/smoke/evidence/batches/2026-07-26T08-55-33.323Z-first/manifest.json";
+    const second =
+      "docs/smoke/evidence/batches/2026-07-26T08-55-33.323Z-second/manifest.json";
+
+    expect(() => resolvePackInspectionPath(redacted, [])).toThrow(
+      /Unable to resolve redacted npm package path/u,
+    );
+    expect(() => resolvePackInspectionPath(redacted, [first, second])).toThrow(
+      /Unable to resolve redacted npm package path/u,
+    );
+    expect(() => resolvePackInspectionPath("../***", ["../escape"])).toThrow(
+      /Unsafe npm package path/u,
+    );
+  });
+
   it("accepts only the documented runtime package surface", () => {
     expect(() =>
       assertAllowedPackFiles([
@@ -39,9 +74,9 @@ describe("release assurance", () => {
     expect(() =>
       assertAllowedPackFiles(["package.json", "src/cli/main.ts"]),
     ).toThrow(/src\/cli\/main\.ts/);
-    expect(() =>
-      assertAllowedPackFiles(["package.json", "AGENTS.md"]),
-    ).toThrow(/AGENTS\.md/);
+    expect(() => assertAllowedPackFiles(["package.json", "AGENTS.md"])).toThrow(
+      /AGENTS\.md/,
+    );
     expect(() =>
       assertAllowedPackFiles([
         "plugins/codex-external-agents/node_modules/zod/index.js",
@@ -56,9 +91,7 @@ describe("release assurance", () => {
       ]),
     ).toThrow(/Unexpected file/u);
     expect(() =>
-      assertAllowedPackFiles([
-        ".agents/plugins/another-marketplace.json",
-      ]),
+      assertAllowedPackFiles([".agents/plugins/another-marketplace.json"]),
     ).toThrow(/Unexpected file/u);
   });
 
@@ -155,10 +188,7 @@ describe("release assurance", () => {
   it.each([
     ["module export", 'module.exports = require("zod");'],
     ["conditional require", 'condition ? require("zod") : null;'],
-    [
-      "import options",
-      'import("zod", { with: { type: "json" } });',
-    ],
+    ["import options", 'import("zod", { with: { type: "json" } });'],
     ["commented import clause", 'import /*comment*/ z from "zod";'],
     ["commented export clause", 'export * /*comment*/ from "zod";'],
     ["template require", "require(`zod`);"],
@@ -171,10 +201,7 @@ describe("release assurance", () => {
   it.each([
     ["block comment", '/*\nimport z from "zod";\n*/'],
     ["line comment", '// import z from "zod";'],
-    [
-      "ordinary string",
-      "const text = '\\\nimport z from \"zod\"';",
-    ],
+    ["ordinary string", "const text = '\\\nimport z from \"zod\"';"],
     ["template literal", 'const text = `\nimport z from "zod";\n`;'],
   ])("ignores dependency-like text inside a %s", (_label, content) => {
     expect(() => assertBundleContent(content)).not.toThrow();
@@ -193,22 +220,10 @@ describe("release assurance", () => {
 
   it.each([
     ["module export", 'module.exports = require("node:path");'],
-    [
-      "conditional require",
-      'condition ? require("node:path") : null;',
-    ],
-    [
-      "import options",
-      'import("node:fs", { with: { type: "json" } });',
-    ],
-    [
-      "commented import clause",
-      'import /*comment*/ path from "node:path";',
-    ],
-    [
-      "commented export clause",
-      'export * /*comment*/ from "node:fs";',
-    ],
+    ["conditional require", 'condition ? require("node:path") : null;'],
+    ["import options", 'import("node:fs", { with: { type: "json" } });'],
+    ["commented import clause", 'import /*comment*/ path from "node:path";'],
+    ["commented export clause", 'export * /*comment*/ from "node:fs";'],
     ["template require", "require(`node:path`);"],
   ])("allows a Node builtin dependency through %s", (_label, content) => {
     expect(() => assertBundleContent(content)).not.toThrow();
@@ -228,8 +243,6 @@ describe("release assurance", () => {
     expect((failure as Error).message).toMatch(
       /Unable to parse plugin bundle/u,
     );
-    expect((failure as Error).message).not.toContain(
-      "parse-secret-sentinel",
-    );
+    expect((failure as Error).message).not.toContain("parse-secret-sentinel");
   });
 });

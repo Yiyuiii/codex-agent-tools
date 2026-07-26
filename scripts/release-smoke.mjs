@@ -4,6 +4,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   rm,
   stat,
 } from "node:fs/promises";
@@ -18,6 +19,7 @@ import { execa } from "execa";
 import {
   assertAllowedPackFiles,
   assertNoSensitiveContent,
+  resolvePackInspectionPath,
 } from "../dist/release-assurance.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -89,10 +91,11 @@ function checkNpmNameAvailability() {
 
 function releaseSecrets(environment) {
   return Object.entries(environment)
-    .filter(([name, value]) =>
-      /(?:KEY|TOKEN|SECRET|PASSWORD|AUTH)/iu.test(name) &&
-      typeof value === "string" &&
-      value.length >= 8,
+    .filter(
+      ([name, value]) =>
+        /(?:KEY|TOKEN|SECRET|PASSWORD|AUTH)/iu.test(name) &&
+        typeof value === "string" &&
+        value.length >= 8,
     )
     .map(([, value]) => value);
 }
@@ -105,9 +108,11 @@ function requireObject(value, label) {
 }
 
 function samePath(left, right) {
-  return path.resolve(left).localeCompare(path.resolve(right), undefined, {
-    sensitivity: process.platform === "win32" ? "accent" : "variant",
-  }) === 0;
+  return (
+    path.resolve(left).localeCompare(path.resolve(right), undefined, {
+      sensitivity: process.platform === "win32" ? "accent" : "variant",
+    }) === 0
+  );
 }
 
 function isInside(parent, candidate) {
@@ -145,7 +150,10 @@ async function checkMcpContract(serverPath, cwd) {
     await client.connect(transport);
     const listed = await client.listTools();
     const names = listed.tools.map((tool) => tool.name).sort();
-    if (JSON.stringify(names) !== JSON.stringify(["external_delegate", "external_review"])) {
+    if (
+      JSON.stringify(names) !==
+      JSON.stringify(["external_delegate", "external_review"])
+    ) {
       throw new Error(`Unexpected MCP tools: ${names.join(", ")}`);
     }
     for (const tool of listed.tools) {
@@ -154,11 +162,19 @@ async function checkMcpContract(serverPath, cwd) {
       }
     }
     const review = listed.tools.find((tool) => tool.name === "external_review");
-    const delegate = listed.tools.find((tool) => tool.name === "external_delegate");
-    if (review?.annotations?.readOnlyHint !== true || review.annotations.destructiveHint !== false) {
+    const delegate = listed.tools.find(
+      (tool) => tool.name === "external_delegate",
+    );
+    if (
+      review?.annotations?.readOnlyHint !== true ||
+      review.annotations.destructiveHint !== false
+    ) {
       throw new Error("external_review annotations are unsafe");
     }
-    if (delegate?.annotations?.readOnlyHint !== false || delegate.annotations.destructiveHint !== true) {
+    if (
+      delegate?.annotations?.readOnlyHint !== false ||
+      delegate.annotations.destructiveHint !== true
+    ) {
       throw new Error("external_delegate annotations are unsafe");
     }
   } finally {
@@ -169,13 +185,18 @@ async function checkMcpContract(serverPath, cwd) {
 async function checkDoctorJson() {
   const output = run(process.execPath, [cliPath, "doctor", "--json"]);
   const report = JSON.parse(output);
-  const publicTools = report.checks?.find((check) => check.name === "Public MCP tools");
+  const publicTools = report.checks?.find(
+    (check) => check.name === "Public MCP tools",
+  );
   if (publicTools?.detail !== "external_review, external_delegate") {
     throw new Error("doctor JSON does not report the public tool contract");
   }
-  const logicalLlms = report.checks?.filter((check) => check.name.startsWith("LLM ")) ?? [];
+  const logicalLlms =
+    report.checks?.filter((check) => check.name.startsWith("LLM ")) ?? [];
   if (logicalLlms.length !== 5) {
-    throw new Error(`doctor JSON reported ${logicalLlms.length} logical LLMs, expected 5`);
+    throw new Error(
+      `doctor JSON reported ${logicalLlms.length} logical LLMs, expected 5`,
+    );
   }
 
   const deprecatedConfig = spawnSync(
@@ -232,10 +253,7 @@ async function checkPluginArtifact() {
   ) {
     throw new Error("marketplace does not reference the target local plugin");
   }
-  const resolvedMarketplaceSource = path.resolve(
-    root,
-    marketplaceSource.path,
-  );
+  const resolvedMarketplaceSource = path.resolve(root, marketplaceSource.path);
   if (
     !samePath(resolvedMarketplaceSource, pluginRoot) ||
     !(await stat(resolvedMarketplaceSource)).isDirectory()
@@ -244,10 +262,7 @@ async function checkPluginArtifact() {
   }
 
   const serverNames = Object.keys(requireObject(mcpManifest, "MCP manifest"));
-  if (
-    serverNames.length !== 1 ||
-    serverNames[0] !== "codex_external_agents"
-  ) {
+  if (serverNames.length !== 1 || serverNames[0] !== "codex_external_agents") {
     throw new Error("plugin MCP manifest must contain one target server");
   }
   const server = requireObject(
@@ -271,7 +286,12 @@ async function checkPluginArtifact() {
   await access(pluginBundlePath);
 
   assertNoSensitiveContent(
-    [{ name: exactPluginFiles[3], content: await readFile(pluginBundlePath, "utf8") }],
+    [
+      {
+        name: exactPluginFiles[3],
+        content: await readFile(pluginBundlePath, "utf8"),
+      },
+    ],
     {
       forbiddenPaths: [root, os.homedir()],
       secrets: releaseSecrets(process.env),
@@ -353,8 +373,7 @@ async function checkPackage() {
   }
   const actualPluginFiles = fileNames
     .filter(
-      (name) =>
-        name.startsWith("plugins/") || name.startsWith(".agents/"),
+      (name) => name.startsWith("plugins/") || name.startsWith(".agents/"),
     )
     .sort();
   if (
@@ -367,7 +386,30 @@ async function checkPackage() {
   const textEntries = [];
   for (const name of fileNames) {
     if (/\.(?:js|map|ts|json|md)$/iu.test(name) || name === "LICENSE") {
-      textEntries.push({ name, content: await readFile(path.join(root, name), "utf8") });
+      let inspectionName = name;
+      if (name.includes("***")) {
+        const normalized = name.replaceAll("\\", "/");
+        const wildcardIndex = normalized.indexOf("***");
+        const candidateDirectory = path.posix.dirname(
+          normalized.slice(0, wildcardIndex),
+        );
+        if (candidateDirectory === ".") {
+          throw new Error("Unable to resolve redacted npm package path");
+        }
+        const entries = await readdir(path.join(root, candidateDirectory), {
+          recursive: true,
+        });
+        inspectionName = resolvePackInspectionPath(
+          normalized,
+          entries.map((entry) =>
+            path.posix.join(candidateDirectory, entry.replaceAll("\\", "/")),
+          ),
+        );
+      }
+      textEntries.push({
+        name: inspectionName,
+        content: await readFile(path.join(root, inspectionName), "utf8"),
+      });
     }
   }
   assertNoSensitiveContent(textEntries, {
@@ -376,11 +418,7 @@ async function checkPackage() {
   });
 }
 
-await Promise.all([
-  access(cliPath),
-  access(mcpPath),
-  access(pluginBundlePath),
-]);
+await Promise.all([access(cliPath), access(mcpPath), access(pluginBundlePath)]);
 run(process.execPath, [cliPath, "--version"]);
 run(process.execPath, [cliPath, "--help"]);
 run(process.execPath, [mcpPath, "--help"]);
