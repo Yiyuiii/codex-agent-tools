@@ -150,20 +150,20 @@ describe("logical LLM registry", () => {
   it("continues to resolve valid passed and pending profiles", () => {
     const registry = createLlmRegistry([
       resolveLlm("kimi-k3"),
-      resolveLlm("gemini-3.5-flash"),
+      resolveLlm("ark-coding-plan"),
     ]);
 
     expect(registry.resolve("kimi-k3", "review").model).toBe("kimi-code/k3");
-    expect(registry.resolve("gemini-3.5-flash").qualityGates).toEqual({
+    expect(registry.resolve("ark-coding-plan").qualityGates).toEqual({
       review: { status: "pending" },
       delegate: { status: "pending" },
     });
-    expect(() => registry.resolve("gemini-3.5-flash", "review")).toThrow(
+    expect(() => registry.resolve("ark-coding-plan", "review")).toThrow(
       /disabled pending real smoke/u,
     );
   });
 
-  it("exposes exactly the five approved logical LLMs", () => {
+  it("exposes exactly the four active logical LLMs", () => {
     expect(resolveLlm("kimi-k3")).toMatchObject({
       runtime: "kimi-acp",
       model: "kimi-code/k3",
@@ -173,9 +173,11 @@ describe("logical LLM registry", () => {
       "ark-agent-deepseek-v4-flash",
       "ark-agent-plan",
       "ark-coding-plan",
-      "gemini-3.5-flash",
       "kimi-k3",
     ]);
+    expect(() => resolveLlm("gemini-3.5-flash")).toThrow(
+      /Unknown logical llm/u,
+    );
   });
 
   it("keeps both Ark Coding Plan tasks pending after its delegate gate failed", () => {
@@ -250,49 +252,25 @@ describe("logical LLM registry", () => {
     },
   );
 
-  it("keeps both Gemini tasks pending after its delegate quota gate failed", () => {
-    expect(resolveLlm("gemini-3.5-flash")).toMatchObject({
-      runtime: "pi-rpc",
-      provider: "google",
-      model: "gemini-3.5-flash",
-      network: "proxy-10808",
-      credentialEnv: [
-        "GEMINI_API_KEY",
-        "GOOGLE_API_KEY",
-        "GOOGLE_GENERATIVE_AI_API_KEY",
-      ],
-      maxConcurrency: 2,
-      capabilities: { review: true, delegate: true },
-      qualityGates: {
-        review: { status: "pending" },
-        delegate: { status: "pending" },
-      },
-    });
-    expect(() => resolveLlm("gemini-3.5-flash", "review")).toThrow(
-      /disabled pending real smoke/u,
-    );
-    expect(() => resolveLlm("gemini-3.5-flash", "delegate")).toThrow(
-      /disabled pending real smoke/u,
-    );
-  });
-
   it("derives the complete MCP credential allowlist from logical profiles", () => {
     expect(credentialEnvironmentNames()).toEqual([
       "ARK_API_KEY",
       "VOLCENGINE_API_KEY",
       "API_KEY_DOUBAO_CODING",
       "OPENAI_API_KEY_DOUBAO",
-      "GEMINI_API_KEY",
-      "GOOGLE_API_KEY",
-      "GOOGLE_GENERATIVE_AI_API_KEY",
     ]);
+    expect(credentialEnvironmentNames()).not.toContain("GEMINI_API_KEY");
+    expect(credentialEnvironmentNames()).not.toContain("GOOGLE_API_KEY");
+    expect(credentialEnvironmentNames()).not.toContain(
+      "GOOGLE_GENERATIVE_AI_API_KEY",
+    );
   });
 
   it.each(["claude-opus", "codex", "deepseek"])(
     "does not register excluded source %s",
     (id) => {
       expect(() => resolveLlm(id)).toThrow(
-        /Supported llms: ark-agent-deepseek-v4-flash, ark-agent-plan, ark-coding-plan, gemini-3\.5-flash, kimi-k3/u,
+        /Supported llms: ark-agent-deepseek-v4-flash, ark-agent-plan, ark-coding-plan, kimi-k3/u,
       );
     },
   );

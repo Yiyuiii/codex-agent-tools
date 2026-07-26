@@ -11,6 +11,7 @@ function profile(): LlmProfile {
     runtime: "pi-rpc",
     provider: "google",
     model: "gemini-3.5-flash",
+    // @ts-expect-error Task 9 removes this retired Gemini fixture.
     network: "proxy-10808",
     credentialEnv: [
       "GEMINI_API_KEY",

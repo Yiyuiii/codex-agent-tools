@@ -2,7 +2,7 @@ export type TaskKind = "review" | "delegate";
 
 export type RuntimeKind = "kimi-acp" | "pi-rpc";
 
-export type NetworkPolicy = "direct" | "proxy-10808";
+export type NetworkPolicy = "direct";
 
 export type QualityGate =
   | {

@@ -313,21 +313,6 @@ export async function collectDoctorReport(
     }
   }
 
-  const gemini = resolveLlm("gemini-3.5-flash");
-  const geminiCredential = selectedCredentialName(
-    gemini.credentialEnv,
-    environment,
-  );
-  checks.push({
-    name: "Gemini authentication",
-    ok: geminiCredential !== undefined,
-    level: geminiCredential === undefined ? "error" : "ok",
-    detail:
-      geminiCredential === undefined
-        ? `missing credential environment; checked ${gemini.credentialEnv.join(", ")}`
-        : `credential environment: ${geminiCredential}`,
-  });
-
   for (const [name, id] of [
     ["Ark Coding authentication", "ark-coding-plan"],
     ["Ark Agent authentication", "ark-agent-plan"],

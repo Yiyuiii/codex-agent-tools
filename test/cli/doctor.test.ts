@@ -24,8 +24,6 @@ describe("doctor diagnostics", () => {
       environment: {
         PATH: "x",
         SOME_SECRET: secret,
-        GEMINI_API_KEY: "primary-gemini-secret",
-        GOOGLE_API_KEY: "secondary-gemini-secret",
         API_KEY_DOUBAO_CODING: "local-ark-coding-secret",
         OPENAI_API_KEY_DOUBAO: "agent-ark-secret",
       },
@@ -89,17 +87,7 @@ describe("doctor diagnostics", () => {
     expect(report.checks.find((check) => check.name === "Ark Pi models")?.detail).toContain(
       "ark.cn-beijing.volces.com; models=3; sha256=",
     );
-    expect(report.checks.find((check) => check.name === "Gemini authentication")?.detail).toBe(
-      "credential environment: GEMINI_API_KEY",
-    );
-    expect(
-      report.checks.find((check) => check.name === "LLM gemini-3.5-flash"),
-    ).toMatchObject({
-      ok: false,
-      level: "warn",
-      detail:
-        "gemini-3.5-flash via pi-rpc; route=proxy-10808; review=pending; delegate=pending",
-    });
+    expect(report.checks.some(({ name }) => /Gemini/u.test(name))).toBe(false);
     expect(report.checks.find((check) => check.name === "Ark Coding authentication")?.detail).toBe(
       "credential environment: API_KEY_DOUBAO_CODING -> CODEX_AGENT_ARK_CODING_KEY",
     );
@@ -108,7 +96,7 @@ describe("doctor diagnostics", () => {
     );
     expect(
       report.checks.filter((check) => check.name.startsWith("LLM ")),
-    ).toHaveLength(5);
+    ).toHaveLength(4);
     expect(
       report.checks.find((check) => check.name === "LLM ark-coding-plan"),
     ).toMatchObject({
@@ -141,7 +129,6 @@ describe("doctor diagnostics", () => {
   it("rejects an Ark model listing that contains an extra provider/model", async () => {
     const report = await collectDoctorReport({
       environment: {
-        GEMINI_API_KEY: "gemini",
         ARK_API_KEY: "coding",
         OPENAI_API_KEY_DOUBAO: "agent",
       },
@@ -202,7 +189,6 @@ describe("doctor diagnostics", () => {
   it("rejects an Ark config whose content no longer matches its generated hash", async () => {
     const report = await collectDoctorReport({
       environment: {
-        GEMINI_API_KEY: "gemini",
         ARK_API_KEY: "coding",
         OPENAI_API_KEY_DOUBAO: "agent",
       },

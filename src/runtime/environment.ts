@@ -70,13 +70,5 @@ export function buildChildEnvironment(
     }
   }
 
-  if (policy.network === "proxy-10808") {
-    const proxy = "http://127.0.0.1:10808";
-    childEnvironment.HTTP_PROXY = proxy;
-    childEnvironment.HTTPS_PROXY = proxy;
-    childEnvironment.http_proxy = proxy;
-    childEnvironment.https_proxy = proxy;
-  }
-
   return childEnvironment;
 }

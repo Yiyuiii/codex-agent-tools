@@ -863,7 +863,7 @@ git commit -m "feat: verify qualification records by protocol"
 - Modify: `test/runtime/environment.test.ts`
 - Modify: `test/cli/doctor.test.ts`
 
-- [ ] **Step 1: Write active-surface RED tests**
+- [x] **Step 1: Write active-surface RED tests**
 
 ```ts
 expect(supportedLlmIds()).toEqual([
@@ -885,7 +885,7 @@ expect(report.checks.filter(({ name }) => name.startsWith("LLM "))).toHaveLength
 
 Add compile-time coverage that active `NetworkPolicy` is only `"direct"`. Retain exact Ark endpoints, credentials, models, concurrency keys, and pending/passed gates.
 
-- [ ] **Step 2: Observe RED**
+- [x] **Step 2: Observe RED**
 
 ```powershell
 npm exec -- vitest run test/llms/registry.test.ts test/runtime/environment.test.ts test/cli/doctor.test.ts
@@ -894,11 +894,11 @@ npm run typecheck
 
 Expected: FAIL because Gemini and proxy policy remain active.
 
-- [ ] **Step 3: Remove active Gemini**
+- [x] **Step 3: Remove active Gemini**
 
 Delete the Gemini profile, Google credential collection, active proxy branch, and doctor checks. Keep direct child-environment proxy clearing. Keep legacy route/credential definitions only inside qualification codecs, not active domain types.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 ```powershell
 npm exec -- vitest run test/llms/registry.test.ts test/runtime/environment.test.ts test/cli/doctor.test.ts
@@ -907,7 +907,7 @@ npm run typecheck
 
 Expected: targeted tests and typecheck PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/llms/registry.ts src/domain/types.ts src/runtime/environment.ts src/cli/doctor.ts test/llms/registry.test.ts test/runtime/environment.test.ts test/cli/doctor.test.ts
