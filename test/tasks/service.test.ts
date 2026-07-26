@@ -241,18 +241,45 @@ describe("ExternalAgentService", () => {
     await Promise.all([coding, agent]);
   });
 
-  it("routes Pi and Kimi profiles only to their bound runtime adapters", async () => {
+  it("rejects retired Gemini before starting any adapter", async () => {
     const kimiRun = vi.fn(async () => completed());
     const piRun = vi.fn(async () =>
-      completed({ actualModel: "gemini-3.5-flash" }),
+      completed({ actualModel: "deepseek-v4-flash" }),
+    );
+    const service = new ExternalAgentService({
+      registry: createLlmRegistry([
+        enabledProfile(),
+        enabledProfile("ark-agent-deepseek-v4-flash"),
+        enabledProfile("ark-agent-plan"),
+        enabledProfile("ark-coding-plan"),
+      ]),
+      adapters: new Map([
+        ["kimi-acp", { runtime: "kimi-acp", run: kimiRun }],
+        ["pi-rpc", { runtime: "pi-rpc", run: piRun }],
+      ]),
+    });
+
+    await expect(
+      service.review({
+        llm: "gemini-3.5-flash",
+        task: "review_doc",
+        prompt: "Review",
+        cwd,
+      }),
+    ).rejects.toThrow(
+      /Unknown logical llm.*ark-agent-deepseek-v4-flash, ark-agent-plan, ark-coding-plan, kimi-k3/u,
+    );
+    expect(kimiRun).not.toHaveBeenCalled();
+    expect(piRun).not.toHaveBeenCalled();
+  });
+
+  it("routes active Ark Pi and Kimi profiles only to their bound runtime adapters", async () => {
+    const kimiRun = vi.fn(async () => completed());
+    const piRun = vi.fn(async () =>
+      completed({ actualModel: "deepseek-v4-flash" }),
     );
     const piProfile: LlmProfile = {
-      ...enabledProfile(),
-      id: "gemini-3.5-flash",
-      displayName: "Gemini 3.5 Flash",
-      runtime: "pi-rpc",
-      provider: "google",
-      model: "gemini-3.5-flash",
+      ...enabledProfile("ark-agent-deepseek-v4-flash"),
     };
     const service = new ExternalAgentService({
       registry: createLlmRegistry([enabledProfile(), piProfile]),
@@ -264,7 +291,7 @@ describe("ExternalAgentService", () => {
     });
 
     await service.delegate({
-      llm: "gemini-3.5-flash",
+      llm: "ark-agent-deepseek-v4-flash",
       prompt: "Use Pi",
       cwd,
     });
@@ -274,18 +301,13 @@ describe("ExternalAgentService", () => {
 
   it("fails review when Pi reports a disallowed writable tool event", async () => {
     const piProfile: LlmProfile = {
-      ...enabledProfile(),
-      id: "gemini-3.5-flash",
-      displayName: "Gemini 3.5 Flash",
-      runtime: "pi-rpc",
-      provider: "google",
-      model: "gemini-3.5-flash",
+      ...enabledProfile("ark-agent-deepseek-v4-flash"),
     };
     const adapter: ExternalAgentAdapter = {
       runtime: "pi-rpc",
       run: async () =>
         completed({
-          actualModel: "gemini-3.5-flash",
+          actualModel: "deepseek-v4-flash",
           events: [
             {
               type: "tool_call",
@@ -302,7 +324,7 @@ describe("ExternalAgentService", () => {
       adapters: new Map([["pi-rpc", adapter]]),
     });
     const result = await service.review({
-      llm: "gemini-3.5-flash",
+      llm: "ark-agent-deepseek-v4-flash",
       task: "review_diff",
       prompt: "Review",
       cwd,

@@ -50,6 +50,27 @@ const exactPluginFiles = [
   "plugins/codex-external-agents/.mcp.json",
   "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
 ];
+const exactLogicalLlms = [
+  "ark-agent-deepseek-v4-flash",
+  "ark-agent-plan",
+  "ark-coding-plan",
+  "kimi-k3",
+];
+const retainedHistoricalPackageSources = [
+  "docs/smoke/pi-gemini.md",
+  "docs/smoke/evidence",
+];
+const worktreeMarker = `${path.sep}.worktrees${path.sep}`;
+const worktreeMarkerIndex = root
+  .toLocaleLowerCase("en-US")
+  .indexOf(worktreeMarker.toLocaleLowerCase("en-US"));
+const forbiddenDevelopmentPaths = [
+  root,
+  os.homedir(),
+  ...(worktreeMarkerIndex < 0
+    ? []
+    : [root.slice(0, worktreeMarkerIndex)]),
+];
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -193,9 +214,15 @@ async function checkDoctorJson() {
   }
   const logicalLlms =
     report.checks?.filter((check) => check.name.startsWith("LLM ")) ?? [];
-  if (logicalLlms.length !== 5) {
+  const actualLogicalLlms = logicalLlms
+    .map((check) => check.name.slice("LLM ".length))
+    .sort();
+  if (
+    JSON.stringify(actualLogicalLlms) !==
+    JSON.stringify(exactLogicalLlms)
+  ) {
     throw new Error(
-      `doctor JSON reported ${logicalLlms.length} logical LLMs, expected 5`,
+      `doctor JSON reported unexpected logical LLMs: ${actualLogicalLlms.join(", ")}`,
     );
   }
 
@@ -229,6 +256,14 @@ async function checkPluginArtifact() {
 
   if (packageManifest.version !== pluginManifest.version) {
     throw new Error("package and plugin versions differ");
+  }
+  if (
+    !Array.isArray(packageManifest.files) ||
+    !retainedHistoricalPackageSources.every((entry) =>
+      packageManifest.files.includes(entry),
+    )
+  ) {
+    throw new Error("package files omit retained Gemini history");
   }
 
   if (
@@ -293,7 +328,7 @@ async function checkPluginArtifact() {
       },
     ],
     {
-      forbiddenPaths: [root, os.homedir()],
+      forbiddenPaths: forbiddenDevelopmentPaths,
       secrets: releaseSecrets(process.env),
     },
   );
@@ -363,6 +398,7 @@ async function checkPackage() {
     "LICENSE",
     "docs/operations.md",
     "docs/migration-from-codex-cc-tools.md",
+    "docs/smoke/pi-gemini.md",
     "dist/cli.js",
     "dist/mcp.js",
     ...exactPluginFiles,
@@ -384,6 +420,7 @@ async function checkPackage() {
   }
 
   const textEntries = [];
+  const inspectedPackNames = new Set();
   for (const name of fileNames) {
     if (/\.(?:js|map|ts|json|md)$/iu.test(name) || name === "LICENSE") {
       let inspectionName = name;
@@ -410,10 +447,26 @@ async function checkPackage() {
         name: inspectionName,
         content: await readFile(path.join(root, inspectionName), "utf8"),
       });
+      inspectedPackNames.add(name);
     }
   }
+  const retainedHistory = fileNames.filter(
+    (name) =>
+      name === "docs/smoke/pi-gemini.md" ||
+      (name.startsWith("docs/smoke/evidence/") && name.endsWith(".json")),
+  );
+  const retainedEvidence = retainedHistory.filter((name) =>
+    name.startsWith("docs/smoke/evidence/"),
+  );
+  if (
+    !retainedHistory.includes("docs/smoke/pi-gemini.md") ||
+    retainedEvidence.length === 0 ||
+    retainedHistory.some((name) => !inspectedPackNames.has(name))
+  ) {
+    throw new Error("Retained history was not fully inspected");
+  }
   assertNoSensitiveContent(textEntries, {
-    forbiddenPaths: [root, os.homedir()],
+    forbiddenPaths: forbiddenDevelopmentPaths,
     secrets: releaseSecrets(process.env),
   });
 }

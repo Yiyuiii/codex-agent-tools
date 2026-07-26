@@ -68,6 +68,10 @@ const isolatedLocalAppData = path.resolve(temporaryRoot, "local-app-data");
 const isolatedAppData = path.resolve(temporaryRoot, "roaming-app-data");
 const fixtureRoot = path.resolve(temporaryRoot, "fixture");
 const fakePiCommand = path.resolve(temporaryRoot, "fake-pi.cmd");
+const fakePiInvocationLog = path.resolve(
+  temporaryRoot,
+  "fake-pi-invocations.log",
+);
 const activeCodexHome = path.resolve(os.homedir(), ".codex");
 const inheritedCodexHome =
   process.env.CODEX_HOME === undefined || process.env.CODEX_HOME.trim() === ""
@@ -343,6 +347,7 @@ async function writeFakePiWrapper() {
   }
   const wrapper = [
     "@echo off",
+    `>>${quoteCmdArgument(fakePiInvocationLog)} echo invocation`,
     "if defined HTTPS_PROXY exit /b 91",
     "if defined HTTP_PROXY exit /b 92",
     "if defined ALL_PROXY exit /b 93",
@@ -351,11 +356,36 @@ async function writeFakePiWrapper() {
     "if defined http_proxy exit /b 96",
     `if not "%CODEX_AGENT_ARK_AGENT_KEY%"=="${credentialSentinel}" exit /b 97`,
     "if defined OPENAI_API_KEY_DOUBAO exit /b 98",
+    "if defined CODEX_AGENT_ARK_CODING_KEY exit /b 99",
+    "if defined ARK_API_KEY exit /b 100",
+    "if defined VOLCENGINE_API_KEY exit /b 101",
+    "if defined API_KEY_DOUBAO_CODING exit /b 102",
+    "if defined GEMINI_API_KEY exit /b 103",
+    "if defined GOOGLE_API_KEY exit /b 104",
+    "if defined GOOGLE_GENERATIVE_AI_API_KEY exit /b 105",
     `${quoteCmdArgument(process.execPath)} ${quoteCmdArgument(fakePiScript)} %*`,
     "exit /b %ERRORLEVEL%",
     "",
   ].join("\r\n");
   await writeFile(fakePiCommand, wrapper, "utf8");
+}
+
+async function readFakePiInvocationCount() {
+  try {
+    return (await readFile(fakePiInvocationLog, "utf8"))
+      .split(/\r?\n/u)
+      .filter((line) => line === "invocation").length;
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
+      return 0;
+    }
+    throw error;
+  }
 }
 
 function renderPaths(paths) {
@@ -423,9 +453,9 @@ ${configLines}
 - 已安装副本从上述缓存目录作为工作目录启动，MCP initialize/listTools 成功。
 - 工具严格为 \`external_review\` 与 \`external_delegate\`；二者输入均要求 \`llm\`。
 - \`external_review\` 为只读且非破坏性；\`external_delegate\` 为可写且具破坏性提示。
-- pending 的 Gemini review 被已安装 MCP 明确拒绝，没有启动 Pi，也没有返回伪造的结构化成功结果。
-- fake Pi 的 Ark Agent Plan DeepSeek V4 Flash review 返回 \`completed\`，实际模型为 \`deepseek-v4-flash\`，且没有文件变化。
-- fake Pi 包装器确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 Agent Plan 目标凭据，未收到原始候选变量。Gemini 固定 proxy-10808 的替换规则继续由确定性环境测试与真实 smoke evidence 覆盖。
+- 已退役的 Gemini review 被已安装 MCP 以 unknown logical LLM 明确拒绝；错误列出精确四项活动 LLM，没有启动 Pi，也没有返回伪造的结构化成功结果。
+- fake Pi 的 Ark Agent Plan DeepSeek V4 Flash review 恰好调用一次并返回 \`completed\`，实际模型为 \`deepseek-v4-flash\`，且没有文件变化。
+- fake Pi 包装器确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 Agent Plan 目标凭据，未收到原始候选变量、其它 Ark 目标凭据或 Google 凭据。
 - 异常清理仅管理本脚本所启动 transport 的 PID，并在关闭 MCP client/transport 前终止其整个进程树。
 
 ## 语义回滚
@@ -525,7 +555,7 @@ try {
   await client.connect(transport);
   const listed = await client.listTools();
   assertToolContract(listed.tools);
-  const pendingResult = await client.callTool({
+  const retiredResult = await client.callTool({
     name: "external_review",
     arguments: {
       llm: "gemini-3.5-flash",
@@ -535,17 +565,22 @@ try {
     },
   });
   if (
-    pendingResult.isError !== true ||
-    pendingResult.structuredContent !== undefined ||
-    !Array.isArray(pendingResult.content) ||
-    !pendingResult.content.some(
+    retiredResult.isError !== true ||
+    retiredResult.structuredContent !== undefined ||
+    !Array.isArray(retiredResult.content) ||
+    !retiredResult.content.some(
       (entry) =>
         entry.type === "text" &&
         typeof entry.text === "string" &&
-        entry.text.includes("disabled pending real smoke"),
+        /Unknown logical llm.*ark-agent-deepseek-v4-flash, ark-agent-plan, ark-coding-plan, kimi-k3/u.test(
+          entry.text,
+        ),
     )
   ) {
-    throw new Error("Installed MCP did not reject the pending Gemini review");
+    throw new Error("Installed MCP did not reject the retired Gemini review");
+  }
+  if ((await readFakePiInvocationCount()) !== 0) {
+    throw new Error("Retired Gemini review unexpectedly started fake Pi");
   }
   const toolResult = structuredContent(
     await client.callTool(
@@ -583,6 +618,11 @@ try {
       `Installed MCP fake Pi review did not meet the acceptance gate: status=${String(
         toolResult.status,
       )} model=${String(toolResult.actualModel)} diagnostics=${diagnostics}`,
+    );
+  }
+  if ((await readFakePiInvocationCount()) !== 1) {
+    throw new Error(
+      "Ark Agent Plan DeepSeek V4 Flash review did not invoke fake Pi exactly once",
     );
   }
   await client.close();

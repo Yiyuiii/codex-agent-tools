@@ -259,8 +259,8 @@ try {
   try {
     piReview = await callReview(
       client,
-      "gemini-3.5-flash",
-      "gemini-3.5-flash",
+      "ark-agent-deepseek-v4-flash",
+      "deepseek-v4-flash",
       await createFixture("pi-review"),
     );
   } catch (error) {

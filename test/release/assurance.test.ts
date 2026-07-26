@@ -61,6 +61,9 @@ describe("release assurance", () => {
         "docs/operations.md",
         "docs/migration-from-codex-cc-tools.md",
         "docs/release/checklist.md",
+        "docs/smoke/pi-gemini.md",
+        "docs/smoke/evidence/gemini-review.json",
+        "docs/smoke/evidence/batches/legacy/manifest.json",
         "dist/cli.js",
         "dist/mcp.js",
         "dist/index.d.ts",
@@ -93,6 +96,51 @@ describe("release assurance", () => {
     expect(() =>
       assertAllowedPackFiles([".agents/plugins/another-marketplace.json"]),
     ).toThrow(/Unexpected file/u);
+  });
+
+  it("scans retained historical documents and evidence with the same secret and path policy", () => {
+    const options = {
+      forbiddenPaths: ["D:\\Codes\\codex-agent-tools"],
+      secrets: ["historical-secret-sentinel"],
+    };
+
+    expect(() =>
+      assertNoSensitiveContent(
+        [
+          {
+            name: "docs/smoke/pi-gemini.md",
+            content: "Retired Gemini history without machine-local values.",
+          },
+          {
+            name: "docs/smoke/evidence/gemini-review.json",
+            content: '{"status":"failed","reason":"quota"}',
+          },
+        ],
+        options,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertNoSensitiveContent(
+        [
+          {
+            name: "docs/smoke/evidence/gemini-review.json",
+            content: '{"credential":"historical-secret-sentinel"}',
+          },
+        ],
+        options,
+      ),
+    ).toThrow(/gemini-review\.json/u);
+    expect(() =>
+      assertNoSensitiveContent(
+        [
+          {
+            name: "docs/smoke/pi-gemini.md",
+            content: "D:\\Codes\\codex-agent-tools",
+          },
+        ],
+        options,
+      ),
+    ).toThrow(/pi-gemini\.md/u);
   });
 
   it("rejects development-machine paths and supplied secret values", () => {

@@ -153,6 +153,7 @@ describe("Codex plugin artifact", () => {
   it("runs library then plugin builds and ignores only the runtime directory", () => {
     const packageManifest = readJson("package.json");
     const scripts = packageManifest.scripts as Record<string, string>;
+    const packageFiles = packageManifest.files as string[];
     const gitignoreLines = readFileSync(
       resolve(repositoryRoot, ".gitignore"),
       "utf8",
@@ -167,12 +168,34 @@ describe("Codex plugin artifact", () => {
     expect(scripts.build).toBe(
       "npm run build:library && npm run build:plugin",
     );
+    expect(scripts).not.toHaveProperty("smoke:pi");
+    expect(packageFiles).toEqual(
+      expect.arrayContaining([
+        "docs/smoke/pi-gemini.md",
+        "docs/smoke/evidence",
+      ]),
+    );
     expect(gitignoreLines).toContain(
       "plugins/codex-external-agents/runtime/",
     );
     expect(dirname(pluginRoot)).toBe(
       resolve(repositoryRoot, "plugins"),
     );
+  });
+
+  it("pins release smoke to the exact four active logical LLMs and retained history", () => {
+    const releaseSmoke = readFileSync(
+      resolve(repositoryRoot, "scripts/release-smoke.mjs"),
+      "utf8",
+    );
+
+    expect(releaseSmoke).toContain('"ark-agent-deepseek-v4-flash"');
+    expect(releaseSmoke).toContain('"ark-agent-plan"');
+    expect(releaseSmoke).toContain('"ark-coding-plan"');
+    expect(releaseSmoke).toContain('"kimi-k3"');
+    expect(releaseSmoke).toContain('"docs/smoke/pi-gemini.md"');
+    expect(releaseSmoke).toContain('"docs/smoke/evidence"');
+    expect(releaseSmoke).not.toContain("expected 5");
   });
 
   it("builds and runs the bundled MCP entry without repository dependencies", async () => {

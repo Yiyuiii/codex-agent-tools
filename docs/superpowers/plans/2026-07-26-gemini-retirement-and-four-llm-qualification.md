@@ -1006,7 +1006,7 @@ git commit -m "refactor: remove standalone Gemini runtime paths"
 - Modify: `test/release/assurance.test.ts`
 - Modify: `test/tasks/service.test.ts`
 
-- [ ] **Step 1: Add acceptance/package RED tests**
+- [x] **Step 1: Add acceptance/package RED tests**
 
 Assert unknown Gemini fails before adapter startup:
 
@@ -1025,7 +1025,7 @@ expect(fakePiInvocationCount).toBe(0);
 
 Assert Google credentials are excluded, `smoke:pi` is absent, and historical Gemini docs/evidence remain in `package.json.files`.
 
-- [ ] **Step 2: Observe RED**
+- [x] **Step 2: Observe RED**
 
 ```powershell
 npm exec -- vitest run test/acceptance/local.test.ts test/plugin/artifact.test.ts test/release/assurance.test.ts test/tasks/service.test.ts
@@ -1033,7 +1033,7 @@ npm exec -- vitest run test/acceptance/local.test.ts test/plugin/artifact.test.t
 
 Expected: FAIL because acceptance still treats Gemini as pending and package scripts still expose Pi smoke.
 
-- [ ] **Step 3: Implement four-LLM acceptance**
+- [x] **Step 3: Implement four-LLM acceptance**
 
 Change isolated acceptance to:
 
@@ -1046,7 +1046,7 @@ Release smoke must compare exact doctor LLM names, retain the historical page/ev
 
 Do not run `scripts/local-acceptance.mjs`; only update its real route from Gemini to the already-qualified Ark Flash profile.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 ```powershell
 npm exec -- vitest run test/acceptance/local.test.ts test/plugin/artifact.test.ts test/release/assurance.test.ts test/tasks/service.test.ts
@@ -1055,7 +1055,7 @@ npm run build
 
 Expected: targeted tests and build PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add scripts/local-acceptance.mjs scripts/plugin-isolated-acceptance.mjs scripts/release-smoke.mjs test/acceptance/local.test.ts test/plugin/artifact.test.ts test/release/assurance.test.ts test/tasks/service.test.ts
