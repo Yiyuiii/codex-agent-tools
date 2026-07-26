@@ -11,7 +11,7 @@
 
 当前八项 review/delegate 能力的过渡状态为 6 passed / 2 pending：`kimi-k3`、`ark-agent-plan` 与 `ark-agent-deepseek-v4-flash` 各两项 passed，只有 `ark-coding-plan` 的两项能力 pending。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用和 2026-07-26 五模型 blocked 批次只作为历史审计证据保留。pending 能力会明确拒绝，不会复用单项通过、旧模型证据或静默切换到其它 LLM。
 
-下一次资格认证必须以 `four-llm-v1` 协议在同一冻结候选上产生完整的 8/8 passed 批次；不能只补跑 Ark Coding Plan，也不能把历史证据拼接成当前资格。
+2026-07-27 已在冻结 commit `b57382ed4f2fddce4946613b5aa5739c6eed5c8f` 上只运行一次 `four-llm-v1` 批次。首项 Ark Coding Plan delegate 因结果文件内容验收失败而停止，后七项未运行，当前授权已经消费；没有 retry、fallback、resume 或第二批。未来若重新认证，必须先取得新的明确授权，再从首项开始产生完整的同批 8/8 passed 结果；不能只补跑 Ark Coding Plan，也不能把历史证据拼接成当前资格。
 
 项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端。
 
@@ -84,4 +84,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。当前候选的第 1 层确定性验证和第 2 层隔离官方插件生命周期均已通过。四模型八项能力仍处于 6 passed / 2 pending，新的 `four-llm-v1` 8/8 批次尚未执行，真实 Codex App 宿主门禁也尚未执行。因此当前只能称为“第 1、2 层已通过的官方插件候选”，不能称为已安装、已替代旧工具或可公开发布。
+当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。当前候选的第 1 层确定性验证和第 2 层隔离官方插件生命周期均已通过。四模型八项能力仍处于 6 passed / 2 pending；最新 `four-llm-v1` 批次在首项失败后形成 `blocked` 终态，未产生 8/8 资格，真实 Codex App 宿主门禁也尚未执行。因此当前只能称为“第 1、2 层已通过、模型资格被阻断的官方插件候选”，不能称为已安装、已替代旧工具或可公开发布。

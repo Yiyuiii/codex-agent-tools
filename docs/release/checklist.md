@@ -8,7 +8,7 @@
 
 包版本：`0.1.0-alpha.1`
 
-当前结论：**当前候选的第 1 层确定性验证与第 2 层隔离官方插件生命周期均已通过；第 3 层四模型八项能力处于 6 passed / 2 pending，新的 `four-llm-v1` 8/8 批次尚未执行；第 4 层真实 Codex App 宿主门禁尚未执行。当前不是已安装、已替代旧工具或可公开发布状态。**
+当前结论：**当前候选的第 1 层确定性验证与第 2 层隔离官方插件生命周期均已通过；第 3 层四模型八项能力处于 6 passed / 2 pending，最新 `four-llm-v1` 批次在首项失败后形成 blocked 终态，未取得 8/8 资格；第 4 层真实 Codex App 宿主门禁尚未执行。当前不是已安装、已替代旧工具或可公开发布状态。**
 
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 
@@ -18,7 +18,7 @@
 | --- | --- | --- | --- |
 | 1 | 确定性单测、类型检查、构建、release smoke | passed | Task 12 fresh verification：44 files，560 passed / 1 skipped；类型检查、构建、release smoke、隔离报告 check-only、资格入口 help、diff check 与生产进程 0/0/0 基线均通过 |
 | 2 | 临时 `CODEX_HOME` 中的官方插件生命周期 | passed | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs` |
-| 3 | 四个逻辑 LLM 的八项真实模型门禁 | incomplete：6 passed / 2 pending；`four-llm-v1` 未运行 | [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)、[Gemini 退役历史](../smoke/pi-gemini.md)、`docs/smoke/evidence/` |
+| 3 | 四个逻辑 LLM 的八项真实模型门禁 | blocked：6 passed / 2 pending；最新 `four-llm-v1` 首项 failed、后七项 not run | [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)、[最新 blocked manifest](../smoke/evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json)、[Gemini 退役历史](../smoke/pi-gemini.md) |
 | 4 | 活动 Codex 的真实 App 宿主门禁 | not run / blocked | [real-plugin-install-review.md](real-plugin-install-review.md) 当前已存在，但只是 `blocked / not ready` 草案；只有 `four-llm-v1` 同批 8/8 passed 后才能重新审阅并改为 `ready`，授权后才可生成 `real-host-acceptance.md` |
 
 ## 第 1 层：确定性单测与构建
@@ -91,7 +91,13 @@ npm run acceptance:plugin:isolated
 
 ### 当前证据
 
-移除 Gemini 后，当前活动产品面为四个逻辑 LLM、八项能力，过渡注册表是 6 passed / 2 pending；只有 Ark Coding Plan 的 review/delegate pending。既有 Kimi K3 和两个 Agent Plan profile 的通过证据仍解释当前过渡状态，但新的资格来源必须是尚未执行的 `four-llm-v1` 同批 8/8，不能把既有通过项与新结果拼接。
+移除 Gemini 后，当前活动产品面为四个逻辑 LLM、八项能力，过渡注册表是 6 passed / 2 pending；只有 Ark Coding Plan 的 review/delegate pending。既有 Kimi K3 和两个 Agent Plan profile 的通过证据仍解释当前过渡状态，但不能与最新 blocked 结果或其它历史 evidence 拼接成新资格。
+
+### 最新四模型 blocked 批次
+
+2026-07-27 在冻结 commit `b57382ed4f2fddce4946613b5aa5739c6eed5c8f` 上只启动一次 `four-llm-v1` 批次 `2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d`。完整 preflight 通过；第 1 项 Ark Coding Plan delegate 的模型、provider、direct 路由、凭据隔离、文件范围、命令和进程清理均正确，telemetry 为 `1 / 0 / 0 / false / false`，但结果文件内容不含预期行，故以 `acceptance_failed` 停止。case evidence SHA-256 为 `166947716c19d435155e4ce0d041e4c88b7ef9b79f302787e0c27572eb39e6c9`；blocked manifest SHA-256 为 `f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c`，immutable-evidence verifier 通过，`promotionEligible=false`，后七项 not run。当前授权已经消费，批次后 Kimi ACP、Pi RPC、real-smoke 计数为 0/0/0；没有 retry、fallback、resume、跳项或第二批。
+
+未来如需重新认证，必须取得新的明确授权并从第 1 项开始运行完整八项；不得复用本次授权或只补跑失败项。
 
 ### 历史五模型证据
 

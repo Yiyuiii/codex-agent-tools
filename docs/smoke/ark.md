@@ -4,13 +4,15 @@
 
 当前 Ark 公开面共有三项固定 Pi/direct 路线：
 
-- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；2026-07-25 复跑的 review passed、delegate 因结果文件内容不符而 failed，注册表两项均为 pending。
+- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；2026-07-25 复跑的 review passed、delegate 因结果文件内容不符而 failed；2026-07-27 的最新四模型批次中 delegate 再次在同一内容验收层失败，注册表两项仍为 pending。
 - `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；2026-07-25 review/delegate 均为 passed，注册表两项已晋级。
 - `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；2026-07-25 review/delegate 均为 passed，注册表两项已晋级。
 
 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的 `ark-agent-plan` 配额池。2026-07-20 对旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 完成的四项 passed 证据现仅作为历史事实保留，不属于当前公开面，也不得用于晋级两个新 Agent Plan 路线。原始 evidence JSON 保持不变。
 
-Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力，过渡注册表为 6 passed / 2 pending；两个 pending 项都属于 `ark-coding-plan`。新的资格来源必须是一个尚未执行的 `four-llm-v1` 同批 8/8 结果，不能只补跑 Coding Plan，也不能把下述既有通过证据与新结果拼接。
+Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力，过渡注册表为 6 passed / 2 pending；两个 pending 项都属于 `ark-coding-plan`。最新 `four-llm-v1` 批次未通过，未来资格来源仍必须是取得新授权后的完整同批 8/8 结果；不能只补跑 Coding Plan，也不能把下述既有通过证据与新结果拼接。
+
+2026-07-27 只在冻结 commit `b57382ed4f2fddce4946613b5aa5739c6eed5c8f` 上启动一次四模型批次 `2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d`。第 1 项 Ark Coding Plan delegate 的实际模型、provider、direct 路由、凭据隔离、变更范围、命令和进程清理均正确，telemetry 为 `1 / 0 / 0 / false / false`，但安全读取到的 30 字节单行结果文件不含预期行，故以 `acceptance_failed` 停止。case [evidence](evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/cases/2026-07-26T17-23-31.295Z-ark-coding-plan-delegate-ark.json) SHA-256 为 `166947716c19d435155e4ce0d041e4c88b7ef9b79f302787e0c27572eb39e6c9`；blocked [manifest](evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json) SHA-256 为 `f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c`，`promotionEligible=false`，后七项 not run。当前授权已经消费，批次后目标进程为 0/0/0；没有 retry、fallback、resume、跳项或第二批。
 
 2026-07-26 的旧五模型原子重认证批次在第 1 项 Gemini delegate 失败后立即停止，六项 Ark case 均为 not run。该历史批次没有替换下述 2026-07-25 Ark 证据；blocked [manifest](evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json) 的 SHA-256 为 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`，批次后目标进程分类为 0，未重试或另开批次。它现在只作为 `five-llm-v1` 历史审计材料保留，不能参与当前四模型晋级。
 
