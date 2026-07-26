@@ -10,7 +10,7 @@
 
 本状态包为 **blocked / not ready**，不是当前有效的安装权限包。
 
-- 当前候选的第 1 层尚待 Task 12 fresh verification，未复核为 passed。
+- 当前候选的第 1 层确定性验证已经新鲜通过：44 个测试文件、560 passed / 1 个平台条件 skipped，类型检查、完整构建、release smoke、隔离报告 check-only、资格入口 help、diff check 与生产进程 0/0/0 基线均通过。
 - 第 2 层隔离官方插件生命周期已经通过。
 - 当前活动产品面是四个逻辑 LLM、八项 review/delegate 能力，全部固定使用 direct。
 - 按同一逻辑 LLM 的 review/delegate 必须成对通过的规则，当前过渡注册表是 **6 passed / 2 pending**；只有 Ark Coding Plan 的两项能力 pending。
@@ -72,7 +72,7 @@
 2. 每次实际 backend、模型、provider 和 route 与上表固定身份精确一致；不并行运行 Pi smoke，不重用旧证据，不自动 retry 或 fallback。
 3. review 找到预置缺陷且工作区零变化；delegate 只产生预期变化并观测到验证命令；每次结束后都没有新增 Kimi/Pi RPC 进程。
 4. Kimi/Ark smoke 索引、`docs/smoke/evidence/`、内置注册表、README、运维文档与四层发布清单重新收敛为八项全部 passed，不保留 pending 或自相矛盾的当前状态；Gemini 页面继续只作为退役历史。
-5. Task 12 对当前候选完成确定性测试、类型检查、构建与 `npm run smoke:release` 的 fresh verification；全部通过后才能把第 1 层更新为 passed。第 2 层隔离官方插件生命周期当前已经通过；若候选随后变化，仍须在当时版本重新确认。
+5. Task 12 已对当前候选完成确定性测试、类型检查、构建、`npm run smoke:release`、隔离报告 check-only、资格入口 help、diff check 与生产进程基线的 fresh verification，第 1 层已经更新为 passed。第 2 层隔离官方插件生命周期也已通过；若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
 6. 本状态包改写为 `ready`，以当时的构建产物、隔离状态差异和官方命令行为重新独立审阅。
 
 在这些条件全部成立前，不生成真实安装授权问题，也不进入真实安装执行。

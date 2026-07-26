@@ -8,7 +8,7 @@
 
 包版本：`0.1.0-alpha.1`
 
-当前结论：**当前候选的第 1 层尚待 Task 12 fresh verification，未复核为 passed；第 2 层隔离官方插件生命周期已通过；第 3 层四模型八项能力处于 6 passed / 2 pending，新的 `four-llm-v1` 8/8 批次尚未执行；第 4 层真实 Codex App 宿主门禁尚未执行。当前不是已安装、已替代旧工具或可公开发布状态。**
+当前结论：**当前候选的第 1 层确定性验证与第 2 层隔离官方插件生命周期均已通过；第 3 层四模型八项能力处于 6 passed / 2 pending，新的 `four-llm-v1` 8/8 批次尚未执行；第 4 层真实 Codex App 宿主门禁尚未执行。当前不是已安装、已替代旧工具或可公开发布状态。**
 
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 
@@ -16,7 +16,7 @@
 
 | 层级 | 验收对象 | 当前状态 | 通过证据路径 |
 | --- | --- | --- | --- |
-| 1 | 确定性单测、类型检查、构建、release smoke | pending：待 Task 12 fresh verification | 当前候选尚未复核；任务 5 的旧五模型结果只作为历史记录 |
+| 1 | 确定性单测、类型检查、构建、release smoke | passed | Task 12 fresh verification：44 files，560 passed / 1 skipped；类型检查、构建、release smoke、隔离报告 check-only、资格入口 help、diff check 与生产进程 0/0/0 基线均通过 |
 | 2 | 临时 `CODEX_HOME` 中的官方插件生命周期 | passed | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs` |
 | 3 | 四个逻辑 LLM 的八项真实模型门禁 | incomplete：6 passed / 2 pending；`four-llm-v1` 未运行 | [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)、[Gemini 退役历史](../smoke/pi-gemini.md)、`docs/smoke/evidence/` |
 | 4 | 活动 Codex 的真实 App 宿主门禁 | not run / blocked | [real-plugin-install-review.md](real-plugin-install-review.md) 当前已存在，但只是 `blocked / not ready` 草案；只有 `four-llm-v1` 同批 8/8 passed 后才能重新审阅并改为 `ready`，授权后才可生成 `real-host-acceptance.md` |
@@ -43,7 +43,7 @@ git diff --check
 
 ### 当前证据
 
-任务 5 的旧五模型阶段曾由主线程复验 release assurance 24/24、全量 191/191、类型检查、构建与 release smoke；这些数字只描述当时提交，不能证明当前四模型候选。当前候选尚未执行 Task 12 fresh verification，因此第 1 层保持 pending；Task 12 完整通过后，主线程再把本层更新为 passed 并记录当次证据。
+任务 5 的旧五模型阶段曾由主线程复验 release assurance 24/24、全量 191/191、类型检查、构建与 release smoke；这些数字只描述当时提交，不能证明当前四模型候选。Task 12 已对当前候选新鲜执行完整命令组：类型检查通过；全量测试为 44 个文件、560 passed / 1 个平台条件 skipped、0 failed；完整构建、release smoke、隔离插件报告 `--check-report`、资格入口 `--help`、`git diff --check` 均通过；生产 `classifyAgentProcesses()` 返回 Kimi ACP、Pi RPC、real-smoke 计数 0/0/0。因此第 1 层为 passed。该结论不替代第 3 层真实模型资格或第 4 层真实 App 宿主门禁。
 
 ### 失败停止条件
 

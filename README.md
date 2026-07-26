@@ -42,7 +42,7 @@
 
 要求 Node.js 20+，并已安装、登录本机 Kimi Code。Kimi 使用本机 OAuth 会话，本项目不复制或保存其令牌。
 
-仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。当前候选的第 2 层隔离官方插件生命周期已经通过：Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。当前候选的第 1 层确定性单测、类型检查、构建与 release smoke 尚待 Task 12 fresh verification，不能沿用旧五模型阶段的检查结果宣称通过。
+仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。当前候选的第 1 层确定性验证已经新鲜通过：类型检查、44 个测试文件（560 passed / 1 个平台条件 skipped）、完整构建、release smoke、隔离报告 check-only、资格入口 help 与 diff check 全部成功，生产进程分类器复核 Kimi ACP、Pi RPC、real-smoke 均为 0。当前候选的第 2 层隔离官方插件生命周期也已经通过：Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。
 
 当前尚未执行真实官方安装。项目代码绝不直接读取或写入活动 `~/.codex/config.toml`；只有 `four-llm-v1` 同批八项全部 passed、隔离验收完成、阻断状态包重新收敛为 ready 权限包，并取得针对本次动作的明确许可后，维护者才可使用官方 `codex plugin` 命令。当前仍有两项注册表能力 pending，因此真实安装授权准备处于 blocked / not ready。任何真实安装、升级或回滚都必须逐次授权，且不得用手工编辑配置代替官方机制。
 
@@ -84,4 +84,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。当前候选的第 1 层尚待 Task 12 fresh verification，未复核为 passed；第 2 层隔离官方插件生命周期已经通过。四模型八项能力处于 6 passed / 2 pending，新的 `four-llm-v1` 8/8 批次尚未执行，真实 Codex App 宿主门禁也尚未执行。因此当前只能称为“官方插件候选已完成隔离取证”，不能称为已安装、已替代旧工具或可公开发布。
+当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。当前候选的第 1 层确定性验证和第 2 层隔离官方插件生命周期均已通过。四模型八项能力仍处于 6 passed / 2 pending，新的 `four-llm-v1` 8/8 批次尚未执行，真实 Codex App 宿主门禁也尚未执行。因此当前只能称为“第 1、2 层已通过的官方插件候选”，不能称为已安装、已替代旧工具或可公开发布。
