@@ -76,6 +76,45 @@ Plugin/release files:
 - `scripts/gate-requalification.ts`, `scripts/local-acceptance.mjs`, `scripts/plugin-isolated-acceptance.mjs`, `scripts/release-smoke.mjs`.
 - `package.json`, `tsup.config.ts`, `docs/release/plugin-isolated-state.md`.
 
+## Task 0: Make the Windows Worktree Baseline Newline-Portable
+
+**Files:**
+
+- Modify: `test/adapters/pi/config.test.ts`
+- Modify: `test/plugin/isolated-report.test.ts`
+
+- [ ] **Step 1: Preserve the observed RED evidence**
+
+On a fresh Windows worktree under system `core.autocrlf=true`, run:
+
+```powershell
+npm test
+```
+
+Expected baseline: three failures only. Two compare LF-generated Pi config with a CRLF checkout fixture; one compares a multiline LF literal with a CRLF checkout script. This is a test portability defect, not a runtime regression.
+
+- [ ] **Step 2: Normalize only checkout text at assertion boundaries**
+
+Normalize the fixture/script strings from `\r\n` to `\n` inside the two tests. Keep generated runtime output byte assertions and hashes unchanged; do not change production serialization.
+
+- [ ] **Step 3: Verify the focused tests and complete baseline**
+
+```powershell
+npm exec -- vitest run test/adapters/pi/config.test.ts test/plugin/isolated-report.test.ts
+npm run typecheck
+npm test
+```
+
+Expected: focused and full baseline PASS.
+
+- [ ] **Step 4: Commit**
+
+```powershell
+git add -- test/adapters/pi/config.test.ts test/plugin/isolated-report.test.ts docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md
+git diff --cached --check
+git commit -m "test: make Windows worktree assertions newline-portable"
+```
+
 ## Task 1: Add Immutable Versioned Qualification Protocol Definitions
 
 **Files:**

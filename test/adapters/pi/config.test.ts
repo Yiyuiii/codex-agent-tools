@@ -12,6 +12,10 @@ import {
 
 const roots: string[] = [];
 
+function normalizeCheckoutLineEndings(value: string): string {
+  return value.replaceAll("\r\n", "\n");
+}
+
 async function tempRoot(): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "codex-pi-config-test-"));
   roots.push(root);
@@ -38,7 +42,7 @@ describe("isolated Pi configuration", () => {
     );
     const actual = await readFile(result.modelsPath, "utf8");
 
-    expect(actual).toBe(expected);
+    expect(actual).toBe(normalizeCheckoutLineEndings(expected));
     expect(actual).not.toContain("/v3");
     const configuredModels = Object.fromEntries(
       Object.entries(
@@ -131,7 +135,7 @@ describe("isolated Pi configuration", () => {
       path.resolve("test/fixtures/pi/expected-ark-models.json"),
       "utf8",
     );
-    expect(modelsText).toBe(expectedModels);
+    expect(modelsText).toBe(normalizeCheckoutLineEndings(expectedModels));
     expect(modelsText).not.toMatch(
       /"(?:ARK_API_KEY|VOLCENGINE_API_KEY|OPENAI_API_KEY_DOUBAO)"/u,
     );

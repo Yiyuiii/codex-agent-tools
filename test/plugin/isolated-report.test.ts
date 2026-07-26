@@ -67,14 +67,19 @@ describe("isolated plugin report synchronization", () => {
       path.resolve("scripts/plugin-isolated-acceptance.mjs"),
       "utf8",
     );
+    const normalizedScript = script.replaceAll("\r\n", "\n");
 
-    expect(script).toContain('from "../dist/plugin-isolated-report.js"');
-    expect(script).toContain(
+    expect(normalizedScript).toContain(
+      'from "../dist/plugin-isolated-report.js"',
+    );
+    expect(normalizedScript).toContain(
       "parseIsolatedReportArguments(\n  process.argv.slice(2),\n)",
     );
-    expect(script).not.toMatch(/writeFile\s*\(\s*reportPath\s*,/u);
-    expect(script.indexOf("synchronizeIsolatedReport({")).toBeGreaterThan(
-      script.indexOf(
+    expect(normalizedScript).not.toMatch(/writeFile\s*\(\s*reportPath\s*,/u);
+    expect(
+      normalizedScript.indexOf("synchronizeIsolatedReport({"),
+    ).toBeGreaterThan(
+      normalizedScript.indexOf(
         'runCodex(["plugin", "marketplace", "remove", marketplace])',
       ),
     );
