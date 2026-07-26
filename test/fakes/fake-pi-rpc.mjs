@@ -7,10 +7,9 @@ const childPidPath = process.env.FAKE_PI_CHILD_PID_FILE;
 const argv = process.argv.slice(2);
 let buffer = Buffer.alloc(0);
 let grandchild;
-let selectedModel = "gemini-3.5-flash";
-let selectedProvider = "google";
+let selectedModel = "ark-code-latest";
+let selectedProvider = "ark-agent-plan";
 const providerApis = {
-  google: "google-generative-ai",
   "ark-coding-plan": "anthropic-messages",
   "ark-agent-plan": "anthropic-messages",
 };
@@ -97,8 +96,8 @@ function handle(command) {
           type: "message_end",
           message: {
             role: "assistant",
-            model: "glm-5.2",
-            provider: "ark-agent-plan",
+            model: selectedModel,
+            provider: selectedProvider,
             content: [],
             stopReason: "error",
             errorMessage: "upstream rejected fake-secret",
@@ -174,8 +173,8 @@ function handle(command) {
           type: "message_end",
           message: {
             role: "assistant",
-            model: "gemini-3.5-flash",
-            provider: "google",
+            model: selectedModel,
+            provider: selectedProvider,
             content: [],
             stopReason: "error",
             errorMessage: "temporary quota fake-secret",
@@ -193,8 +192,8 @@ function handle(command) {
           type: "message_end",
           message: {
             role: "assistant",
-            model: "gemini-3.5-flash",
-            provider: "google",
+            model: selectedModel,
+            provider: selectedProvider,
             content: [{ type: "text", text: "Recovered after retry." }],
             stopReason: "stop",
           },

@@ -34,8 +34,11 @@ export function parseArkSmokeArguments(args: readonly string[]): {
   if (llm === undefined || llm.trim() === "") {
     throw new Error("Ark smoke requires --llm <logical-id>");
   }
+  if (!ARK_LLM_IDS.has(llm)) {
+    throw new Error(`Logical llm ${llm} is not an Ark Pi profile`);
+  }
   const profile = resolveLlm(llm);
-  if (!ARK_LLM_IDS.has(llm) || profile.runtime !== "pi-rpc") {
+  if (profile.runtime !== "pi-rpc") {
     throw new Error(`Logical llm ${llm} is not an Ark Pi profile`);
   }
   if (task !== "review" && task !== "delegate") {

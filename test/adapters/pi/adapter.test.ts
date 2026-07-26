@@ -1,25 +1,24 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import { PiAdapter } from "../../../src/adapters/pi/adapter.js";
+import {
+  PiAdapter,
+  type PiAdapterDependencies,
+} from "../../../src/adapters/pi/adapter.js";
 import type { PiRpcRunRequest } from "../../../src/adapters/pi/client.js";
 import type { LlmProfile } from "../../../src/domain/types.js";
 
 function profile(): LlmProfile {
   return {
-    id: "gemini-3.5-flash",
-    displayName: "Gemini 3.5 Flash",
+    id: "ark-agent-plan",
+    displayName: "Ark Agent Plan",
     runtime: "pi-rpc",
-    provider: "google",
-    model: "gemini-3.5-flash",
-    // @ts-expect-error Task 9 removes this retired Gemini fixture.
-    network: "proxy-10808",
-    credentialEnv: [
-      "GEMINI_API_KEY",
-      "GOOGLE_API_KEY",
-      "GOOGLE_GENERATIVE_AI_API_KEY",
-    ],
-    timeoutMs: 600_000,
-    maxConcurrency: 2,
+    provider: "ark-agent-plan",
+    model: "ark-code-latest",
+    network: "direct",
+    credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
+    credentialTargetEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+    timeoutMs: 900_000,
+    maxConcurrency: 1,
     capabilities: { review: true, delegate: true },
     qualityGates: {
       review: { status: "passed", evidence: "test" },
@@ -29,11 +28,15 @@ function profile(): LlmProfile {
 }
 
 describe("PiAdapter", () => {
+  it("does not expose a retry-wait dependency", () => {
+    expectTypeOf<PiAdapterDependencies>().not.toHaveProperty("waitForRetry");
+  });
+
   it("uses isolated config, fixed provider/model/route, and maps tool events", async () => {
     const runClient = vi.fn(async (_request: PiRpcRunRequest) => ({
       status: "completed" as const,
       text: "done",
-      actualModel: "gemini-3.5-flash",
+      actualModel: "ark-code-latest",
       elapsedMs: 10,
       events: [
         {
@@ -83,8 +86,7 @@ describe("PiAdapter", () => {
       parentEnvironment: {
         PATH: "C:\\Windows",
         HTTPS_PROXY: "http://parent:9999",
-        GEMINI_API_KEY: "gemini-secret",
-        GOOGLE_API_KEY: "must-not-be-copied",
+        OPENAI_API_KEY_DOUBAO: "ark-secret",
         ANTHROPIC_API_KEY: "forbidden",
       },
     });
@@ -111,24 +113,21 @@ describe("PiAdapter", () => {
     const request = runClient.mock.calls[0]![0];
     expect(request).toMatchObject({
       executable: "C:\\npm\\pi.cmd",
-      provider: "google",
-      model: "gemini-3.5-flash",
+      provider: "ark-agent-plan",
+      model: "ark-code-latest",
       thinkingLevel: "medium",
       task: "delegate",
-      timeoutMs: 600_000,
+      timeoutMs: 900_000,
       environment: {
         PATH: "C:\\Windows",
-        GEMINI_API_KEY: "gemini-secret",
-        HTTP_PROXY: "http://127.0.0.1:10808",
-        HTTPS_PROXY: "http://127.0.0.1:10808",
-        http_proxy: "http://127.0.0.1:10808",
-        https_proxy: "http://127.0.0.1:10808",
+        CODEX_AGENT_ARK_AGENT_KEY: "ark-secret",
         PI_CODING_AGENT_DIR:
           "C:\\cache\\codex-agent-tools\\pi\\0.1.0-alpha.1",
       },
     });
-    expect(request.environment.HTTPS_PROXY).toBe("http://127.0.0.1:10808");
+    expect(request.environment.HTTPS_PROXY).toBeUndefined();
     expect(request.environment.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(request.environment.OPENAI_API_KEY_DOUBAO).toBeUndefined();
   });
 
   it("fails explicitly when Pi reports a different actual model", async () => {
@@ -162,14 +161,17 @@ describe("PiAdapter", () => {
       task: "review",
       cwd: process.cwd(),
       prompt: "Review",
-      parentEnvironment: { PATH: "x" },
+      parentEnvironment: {
+        PATH: "x",
+        OPENAI_API_KEY_DOUBAO: "secret",
+      },
     });
     expect(result.status).toBe("failed");
     expect(result.executionTelemetry).toMatchObject({
       adapterReportedFallbackUsed: true,
     });
     expect(result.diagnostics.join("\n")).toContain(
-      "expected gemini-3.5-flash but Pi reported other-model",
+      "expected ark-code-latest but Pi reported other-model",
     );
   });
 
@@ -207,7 +209,10 @@ describe("PiAdapter", () => {
         task: "delegate",
         cwd: process.cwd(),
         prompt: "Run",
-        parentEnvironment: { PATH: "x" },
+        parentEnvironment: {
+          PATH: "x",
+          OPENAI_API_KEY_DOUBAO: "secret",
+        },
       });
 
       expect(result.status).toBe("failed");
@@ -248,7 +253,10 @@ describe("PiAdapter", () => {
       task: "delegate",
       cwd: process.cwd(),
       prompt: "Run",
-      parentEnvironment: { PATH: "x" },
+      parentEnvironment: {
+        PATH: "x",
+        OPENAI_API_KEY_DOUBAO: "secret",
+      },
     });
 
     expect(result.status).toBe("failed");
@@ -257,9 +265,24 @@ describe("PiAdapter", () => {
     });
   });
 
-  it("retries only bounded Gemini free-tier throttles after the requested delay", async () => {
-    const waits: number[] = [];
-    let calls = 0;
+  it("invokes the client once even when diagnostics contain retired quota text", async () => {
+    const runClient = vi.fn(async () => ({
+      status: "failed" as const,
+      text: "",
+      actualModel: "ark-code-latest",
+      elapsedMs: 10,
+      events: [],
+      diagnostics: [
+        "generate_content_free_tier_requests; Please retry in 15.25s.",
+      ],
+      executionTelemetry: {
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "pi-rpc-observable" as const,
+      },
+    }));
     const adapter = new PiAdapter({
       locateExecutable: async () => "pi.cmd",
       buildConfig: async () => ({
@@ -269,60 +292,7 @@ describe("PiAdapter", () => {
         environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
         contentSha256: "a".repeat(64),
       }),
-      waitForRetry: async (delayMs) => {
-        waits.push(delayMs);
-      },
-      runClient: async () => {
-        calls += 1;
-        if (calls === 1) {
-          return {
-            status: "failed",
-            text: "",
-            actualModel: "gemini-3.5-flash",
-            elapsedMs: 10,
-            events: [
-              {
-                type: "tool_execution_start",
-                toolCallId: "first",
-                toolName: "read",
-                args: { path: "a.txt" },
-              },
-            ],
-            diagnostics: [
-              "generate_content_free_tier_requests; Please retry in 15.25s.",
-            ],
-            executionTelemetry: {
-              adapterClientInvocationCount: 1,
-              adapterRetryCount: 0,
-              runtimeReportedAutoRetryCount: 1,
-              adapterReportedFallbackUsed: false,
-              source: "pi-rpc-observable",
-            },
-          };
-        }
-        return {
-          status: "completed",
-          text: "recovered",
-          actualModel: "gemini-3.5-flash",
-          elapsedMs: 20,
-          events: [
-            {
-              type: "tool_execution_start",
-              toolCallId: "second",
-              toolName: "read",
-              args: { path: "b.txt" },
-            },
-          ],
-          diagnostics: [],
-          executionTelemetry: {
-            adapterClientInvocationCount: 1,
-            adapterRetryCount: 0,
-            runtimeReportedAutoRetryCount: 0,
-            adapterReportedFallbackUsed: false,
-            source: "pi-rpc-observable",
-          },
-        };
-      },
+      runClient,
     });
 
     const result = await adapter.run({
@@ -330,133 +300,31 @@ describe("PiAdapter", () => {
       task: "review",
       cwd: process.cwd(),
       prompt: "Review",
-      parentEnvironment: { PATH: "x", GEMINI_API_KEY: "secret" },
+      parentEnvironment: {
+        PATH: "x",
+        OPENAI_API_KEY_DOUBAO: "secret",
+      },
     });
 
-    expect(calls).toBe(2);
-    expect(waits).toEqual([60_000]);
-    expect(result).toMatchObject({ status: "completed", text: "recovered" });
+    expect(runClient).toHaveBeenCalledOnce();
+    expect(result.status).toBe("failed");
     expect(result.executionTelemetry).toEqual({
-      adapterClientInvocationCount: 2,
-      adapterRetryCount: 1,
-      runtimeReportedAutoRetryCount: 1,
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
       source: "pi-rpc-observable",
     });
-    expect(result.events).toEqual([
-      expect.objectContaining({ type: "tool_call", toolCallId: "first" }),
-      expect.objectContaining({ type: "tool_call", toolCallId: "second" }),
-    ]);
     expect(result.diagnostics.join("\n")).toContain(
       "generate_content_free_tier_requests",
     );
-  });
-
-  it("stops after one full-window Gemini free-tier retry", async () => {
-    let calls = 0;
-    let waits = 0;
-    const adapter = new PiAdapter({
-      locateExecutable: async () => "pi.cmd",
-      buildConfig: async () => ({
-        agentDir: "C:\\cache\\pi",
-        settingsPath: "C:\\cache\\pi\\settings.json",
-        modelsPath: "C:\\cache\\pi\\models.json",
-        environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
-        contentSha256: "a".repeat(64),
-      }),
-      waitForRetry: async () => {
-        waits += 1;
-      },
-      runClient: async () => {
-        calls += 1;
-        return {
-          status: "failed",
-          text: "",
-          actualModel: "gemini-3.5-flash",
-          elapsedMs: 1,
-          events: [],
-          diagnostics: [
-            "generate_content_free_tier_requests; Please retry in 10s.",
-          ],
-          executionTelemetry: {
-            adapterClientInvocationCount: 1,
-            adapterRetryCount: 0,
-            runtimeReportedAutoRetryCount: 0,
-            adapterReportedFallbackUsed: false,
-            source: "pi-rpc-observable",
-          },
-        };
-      },
-    });
-
-    const result = await adapter.run({
-      profile: profile(),
-      task: "review",
-      cwd: process.cwd(),
-      prompt: "Review",
-      parentEnvironment: { PATH: "x", GEMINI_API_KEY: "secret" },
-    });
-
-    expect(result.status).toBe("failed");
-    expect(calls).toBe(2);
-    expect(waits).toBe(1);
-  });
-
-  it("never retries a writable delegate after a Gemini free-tier failure", async () => {
-    let calls = 0;
-    let waits = 0;
-    const adapter = new PiAdapter({
-      locateExecutable: async () => "pi.cmd",
-      buildConfig: async () => ({
-        agentDir: "C:\\cache\\pi",
-        settingsPath: "C:\\cache\\pi\\settings.json",
-        modelsPath: "C:\\cache\\pi\\models.json",
-        environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
-        contentSha256: "a".repeat(64),
-      }),
-      waitForRetry: async () => {
-        waits += 1;
-      },
-      runClient: async () => {
-        calls += 1;
-        return {
-          status: "failed",
-          text: "",
-          actualModel: "gemini-3.5-flash",
-          elapsedMs: 1,
-          events: [],
-          diagnostics: [
-            "generate_content_free_tier_requests; Please retry in 10s.",
-          ],
-          executionTelemetry: {
-            adapterClientInvocationCount: 1,
-            adapterRetryCount: 0,
-            runtimeReportedAutoRetryCount: 0,
-            adapterReportedFallbackUsed: false,
-            source: "pi-rpc-observable",
-          },
-        };
-      },
-    });
-
-    const result = await adapter.run({
-      profile: profile(),
-      task: "delegate",
-      cwd: process.cwd(),
-      prompt: "Implement",
-      parentEnvironment: { PATH: "x", GEMINI_API_KEY: "secret" },
-    });
-
-    expect(result.status).toBe("failed");
-    expect(calls).toBe(1);
-    expect(waits).toBe(0);
   });
 
   it("uses one client attempt with Pi retries disabled in qualification mode", async () => {
     const runClient = vi.fn(async (_request: PiRpcRunRequest) => ({
       status: "failed" as const,
       text: "",
-      actualModel: "gemini-3.5-flash",
+      actualModel: "ark-code-latest",
       elapsedMs: 1,
       events: [],
       diagnostics: [
@@ -470,7 +338,6 @@ describe("PiAdapter", () => {
         source: "pi-rpc-observable" as const,
       },
     }));
-    const waitForRetry = vi.fn(async () => undefined);
     const adapter = new PiAdapter({
       retryMode: "qualification-single-attempt",
       locateExecutable: async () => "pi.cmd",
@@ -482,7 +349,6 @@ describe("PiAdapter", () => {
         contentSha256: "a".repeat(64),
       }),
       runClient,
-      waitForRetry,
     });
 
     const result = await adapter.run({
@@ -490,11 +356,13 @@ describe("PiAdapter", () => {
       task: "review",
       cwd: process.cwd(),
       prompt: "Review",
-      parentEnvironment: { PATH: "x", GEMINI_API_KEY: "secret" },
+      parentEnvironment: {
+        PATH: "x",
+        OPENAI_API_KEY_DOUBAO: "secret",
+      },
     });
 
     expect(runClient).toHaveBeenCalledOnce();
-    expect(waitForRetry).not.toHaveBeenCalled();
     expect(runClient.mock.calls[0]![0]).toMatchObject({
       autoRetry: false,
       autoCompaction: false,
@@ -508,60 +376,4 @@ describe("PiAdapter", () => {
     });
   });
 
-  it("keeps aggregate telemetry unknown when any retry attempt reports null", async () => {
-    let calls = 0;
-    const adapter = new PiAdapter({
-      locateExecutable: async () => "pi.cmd",
-      buildConfig: async () => ({
-        agentDir: "C:\\cache\\pi",
-        settingsPath: "C:\\cache\\pi\\settings.json",
-        modelsPath: "C:\\cache\\pi\\models.json",
-        environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
-        contentSha256: "a".repeat(64),
-      }),
-      waitForRetry: async () => undefined,
-      runClient: async () => {
-        calls += 1;
-        if (calls === 1) {
-          return {
-            status: "failed",
-            text: "",
-            actualModel: "gemini-3.5-flash",
-            elapsedMs: 1,
-            events: [],
-            diagnostics: [
-              "generate_content_free_tier_requests; Please retry in 10s.",
-            ],
-            executionTelemetry: null,
-          };
-        }
-        return {
-          status: "completed",
-          text: "recovered",
-          actualModel: "gemini-3.5-flash",
-          elapsedMs: 1,
-          events: [],
-          diagnostics: [],
-          executionTelemetry: {
-            adapterClientInvocationCount: 1,
-            adapterRetryCount: 0,
-            runtimeReportedAutoRetryCount: 0,
-            adapterReportedFallbackUsed: false,
-            source: "pi-rpc-observable",
-          },
-        };
-      },
-    });
-
-    const result = await adapter.run({
-      profile: profile(),
-      task: "review",
-      cwd: process.cwd(),
-      prompt: "Review",
-      parentEnvironment: { PATH: "x", GEMINI_API_KEY: "secret" },
-    });
-
-    expect(calls).toBe(2);
-    expect(result.executionTelemetry).toBeNull();
-  });
 });

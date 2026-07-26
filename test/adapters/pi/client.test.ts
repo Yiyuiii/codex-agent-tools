@@ -61,8 +61,8 @@ function baseRequest(
     executableArgs: [fakePath],
     cwd,
     environment,
-    provider: "google",
-    model: "gemini-3.5-flash",
+    provider: "ark-agent-plan",
+    model: "ark-code-latest",
     thinkingLevel: "medium" as const,
     task,
     prompt: "Do the task",
@@ -115,25 +115,11 @@ async function readFakeSetModelMetadata(
 
 describe("Pi RPC client", () => {
   it("reports the configured API in fake set_model responses", async () => {
-    const google = await readFakeSetModelMetadata(
-      "google",
-      "gemini-3.5-flash",
-    );
     const arkAgent = await readFakeSetModelMetadata(
       "ark-agent-plan",
       "ark-code-latest",
     );
 
-    expect(google).toMatchObject({
-      type: "response",
-      command: "set_model",
-      success: true,
-      data: {
-        id: "gemini-3.5-flash",
-        provider: "google",
-        api: "google-generative-ai",
-      },
-    });
     expect(arkAgent).toMatchObject({
       type: "response",
       command: "set_model",
@@ -146,16 +132,15 @@ describe("Pi RPC client", () => {
     });
   });
 
-  it("spawns Pi with the explicit request environment without parent proxy reinjection", async () => {
+  it("spawns direct Ark Pi without parent proxy reinjection", async () => {
     const cwd = await tempDirectory();
     const logPath = path.join(cwd, "rpc-log.jsonl");
     const wrapperPath = path.join(cwd, "assert-environment.mjs");
-    const expectedProxy = "http://127.0.0.1:10808";
     await writeFile(
       wrapperPath,
       [
-        `if (process.env.HTTP_PROXY !== ${JSON.stringify(expectedProxy)}) process.exit(81);`,
-        `if (process.env.HTTPS_PROXY !== ${JSON.stringify(expectedProxy)}) process.exit(82);`,
+        "if (process.env.HTTP_PROXY !== undefined || process.env.http_proxy !== undefined) process.exit(81);",
+        "if (process.env.HTTPS_PROXY !== undefined || process.env.https_proxy !== undefined) process.exit(82);",
         "if (process.env.ALL_PROXY !== undefined || process.env.all_proxy !== undefined) process.exit(83);",
         "if (!process.env.PATH) process.exit(84);",
         'if (process.platform === "win32" && !process.env.SYSTEMROOT) process.exit(85);',
@@ -172,8 +157,6 @@ describe("Pi RPC client", () => {
           ...baseRequest(cwd, {
             PATH: process.env.PATH,
             SYSTEMROOT: process.env.SYSTEMROOT,
-            HTTP_PROXY: expectedProxy,
-            HTTPS_PROXY: expectedProxy,
             FAKE_PI_LOG: logPath,
           }),
           executableArgs: [wrapperPath],
@@ -181,7 +164,7 @@ describe("Pi RPC client", () => {
       );
 
       expect(result.status).toBe("completed");
-      expect(result.actualModel).toBe("gemini-3.5-flash");
+      expect(result.actualModel).toBe("ark-code-latest");
       expect((await readLog(logPath)).length).toBeGreaterThan(0);
     } finally {
       if (originalAllProxy === undefined) delete process.env.ALL_PROXY;
@@ -203,7 +186,7 @@ describe("Pi RPC client", () => {
     expect(result).toMatchObject({
       status: "completed",
       text: "Pi says hello.",
-      actualModel: "gemini-3.5-flash",
+      actualModel: "ark-code-latest",
       executionTelemetry: {
         adapterClientInvocationCount: 1,
         adapterRetryCount: 0,
@@ -235,9 +218,9 @@ describe("Pi RPC client", () => {
         "--name",
         "codex-external-agents",
         "--provider",
-        "google",
+        "ark-agent-plan",
         "--model",
-        "gemini-3.5-flash",
+        "ark-code-latest",
         "--tools",
         "read,grep,find,ls",
       ]),

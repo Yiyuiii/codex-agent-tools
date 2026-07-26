@@ -14,7 +14,7 @@ import {
   ACTIVE_QUALIFICATION_PLAN_ID,
 } from "../qualification/protocol.js";
 
-export type SmokeKind = "kimi" | "pi" | "ark";
+export type SmokeKind = "kimi" | "ark";
 export type SmokeTask = "review" | "delegate";
 
 export interface SmokeQualificationContext {

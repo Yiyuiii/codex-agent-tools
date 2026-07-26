@@ -935,7 +935,7 @@ git commit -m "refactor: retire Gemini from the active registry"
 - Modify: `tsup.config.ts`
 - Delete: `scripts/real-pi-smoke.mjs`
 
-- [ ] **Step 1: Add RED tests for the contracted runtime**
+- [x] **Step 1: Add RED tests for the contracted runtime**
 
 Assert:
 
@@ -962,7 +962,7 @@ await expect(
 
 Import `SmokeKind` from the evidence module and `classifyAgentProcesses` from the process-classification module in the relevant tests. Convert generic Pi fixtures to Ark identities. Keep runtime retry/fallback telemetry tests because they protect Ark qualification. Add an Ark regression showing Google quota text is not classified as the retired active failure reason. Preserve the count-only process-reporting boundary; do not add command names to the public classification result. The retired launcher remains a recognized process-safety signature so an old worktree cannot hide a live historical smoke process.
 
-- [ ] **Step 2: Observe RED**
+- [x] **Step 2: Observe RED**
 
 ```powershell
 npm exec -- vitest run test/adapters/pi/adapter.test.ts test/adapters/pi/client.test.ts test/smoke/pi.test.ts test/smoke/ark.test.ts test/smoke/script-entrypoints.test.ts test/runtime/agent-processes.test.ts
@@ -971,13 +971,13 @@ npm run typecheck
 
 Expected: FAIL on Gemini retry, smoke kind, smoke script, and build entry. The historical launcher process-classification characterization already passes and must stay green.
 
-- [ ] **Step 3: Remove only Gemini-specific active behavior**
+- [x] **Step 3: Remove only Gemini-specific active behavior**
 
 Delete adapter outer retry and `waitForRetry`; each adapter call invokes the client once. Retain Pi-reported retry/compaction/fallback observation and qualification single-attempt controls. Keep `src/smoke/pi.ts` as the Ark harness, but remove Gemini argument parsing, Google endpoint, proxy expectation, `PI_SMOKE_OK`, and active `google_free_tier_quota`. Remove package and tsup entrypoints for standalone Pi smoke and delete its script. Do not remove `real-pi-smoke.mjs` from the conservative historical process-signature set.
 
 Set fake Pi defaults to `ark-agent-plan` / `ark-code-latest` and retain neutral retry/fallback scenarios.
 
-- [ ] **Step 4: Verify GREEN and Ark invariants**
+- [x] **Step 4: Verify GREEN and Ark invariants**
 
 ```powershell
 npm exec -- vitest run test/adapters/pi/adapter.test.ts test/adapters/pi/client.test.ts test/adapters/pi/config.test.ts test/smoke/pi.test.ts test/smoke/ark.test.ts test/smoke/script-entrypoints.test.ts test/runtime/agent-processes.test.ts
@@ -986,7 +986,7 @@ npm run typecheck
 
 Expected: targeted tests PASS; config still contains exactly the two Ark providers and three Ark models.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/adapters/pi/adapter.ts src/adapters/pi/client.ts src/smoke/evidence.ts src/smoke/pi.ts src/smoke/ark.ts test/fakes/fake-pi-rpc.mjs test/adapters/pi/adapter.test.ts test/adapters/pi/client.test.ts test/smoke/pi.test.ts test/smoke/ark.test.ts test/smoke/script-entrypoints.test.ts test/runtime/agent-processes.test.ts package.json tsup.config.ts

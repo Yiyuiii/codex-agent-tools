@@ -1,5 +1,4 @@
 import type {
-  AdapterExecutionTelemetry,
   AdapterRunRequest,
   AdapterRunResult,
   ExternalAgentAdapter,
@@ -17,51 +16,7 @@ export interface PiAdapterDependencies {
   locateExecutable?: (environment: NodeJS.ProcessEnv) => Promise<string>;
   buildConfig?: () => Promise<IsolatedPiConfig>;
   runClient?: (request: PiRpcRunRequest) => Promise<AdapterRunResult>;
-  waitForRetry?: (delayMs: number, signal?: AbortSignal) => Promise<void>;
   retryMode?: "default" | "qualification-single-attempt";
-}
-
-const MAX_GEMINI_FREE_TIER_RETRIES = 1;
-
-async function waitForRetry(
-  delayMs: number,
-  signal?: AbortSignal,
-): Promise<void> {
-  if (signal?.aborted) throw new Error("Gemini retry cancelled");
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, delayMs);
-    const onAbort = (): void => {
-      clearTimeout(timer);
-      reject(new Error("Gemini retry cancelled"));
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-}
-
-function geminiFreeTierRetryDelay(
-  profile: AdapterRunRequest["profile"],
-  result: AdapterRunResult,
-): number | undefined {
-  if (
-    profile.provider !== "google" ||
-    result.status !== "failed" ||
-    !result.diagnostics.some((entry) =>
-      entry.includes("generate_content_free_tier_requests"),
-    )
-  ) {
-    return undefined;
-  }
-  const match = result.diagnostics.join("\n").match(
-    /Please retry in\s+(\d+(?:\.\d+)?)s/iu,
-  );
-  const seconds = match?.[1] === undefined ? Number.NaN : Number(match[1]);
-  if (!Number.isFinite(seconds) || seconds < 0 || seconds > 60) {
-    return undefined;
-  }
-  return 60_000;
 }
 
 function mapToolEvent(event: unknown): unknown {
@@ -114,10 +69,6 @@ export class PiAdapter implements ExternalAgentAdapter {
   readonly #runClient: (
     request: PiRpcRunRequest,
   ) => Promise<AdapterRunResult>;
-  readonly #waitForRetry: (
-    delayMs: number,
-    signal?: AbortSignal,
-  ) => Promise<void>;
   readonly #retryMode: "default" | "qualification-single-attempt";
 
   public constructor(dependencies: PiAdapterDependencies = {}) {
@@ -132,7 +83,6 @@ export class PiAdapter implements ExternalAgentAdapter {
           providers: ["ark"],
         }));
     this.#runClient = dependencies.runClient ?? runPiRpc;
-    this.#waitForRetry = dependencies.waitForRetry ?? waitForRetry;
     this.#retryMode = dependencies.retryMode ?? "default";
   }
 
@@ -177,128 +127,52 @@ export class PiAdapter implements ExternalAgentAdapter {
       clientRequest.autoRetry = false;
       clientRequest.autoCompaction = false;
     }
-    const events: unknown[] = [];
-    const diagnostics: string[] = [];
-    let elapsedMs = 0;
-    let retryCount = 0;
-    let aggregateTelemetry: AdapterExecutionTelemetry | null = {
-      adapterClientInvocationCount: 0,
-      adapterRetryCount: 0,
-      runtimeReportedAutoRetryCount: 0,
-      adapterReportedFallbackUsed: false,
-      source: "pi-rpc-observable",
+    const result = await this.#runClient(clientRequest);
+    const combined = {
+      ...result,
+      events: result.events
+        .filter((event) =>
+          typeof event === "object" &&
+          event !== null &&
+          ((event as Record<string, unknown>).type ===
+            "tool_execution_start" ||
+            (event as Record<string, unknown>).type === "tool_execution_end"),
+        )
+        .map(mapToolEvent),
     };
-
-    for (;;) {
-      const result = await this.#runClient(clientRequest);
-      if (
-        aggregateTelemetry !== null &&
-        result.executionTelemetry !== null &&
-        result.executionTelemetry.source === "pi-rpc-observable"
-      ) {
-        aggregateTelemetry = {
-          adapterClientInvocationCount:
-            aggregateTelemetry.adapterClientInvocationCount +
-            result.executionTelemetry.adapterClientInvocationCount,
-          adapterRetryCount:
-            aggregateTelemetry.adapterRetryCount +
-            result.executionTelemetry.adapterRetryCount,
-          runtimeReportedAutoRetryCount:
-            aggregateTelemetry.runtimeReportedAutoRetryCount +
-            result.executionTelemetry.runtimeReportedAutoRetryCount,
-          adapterReportedFallbackUsed:
-            aggregateTelemetry.adapterReportedFallbackUsed ||
-            result.executionTelemetry.adapterReportedFallbackUsed,
-          source: "pi-rpc-observable",
-        };
-      } else {
-        aggregateTelemetry = null;
-      }
-      elapsedMs += result.elapsedMs;
-      diagnostics.push(...result.diagnostics);
-      events.push(
-        ...result.events
-          .filter((event) =>
-            typeof event === "object" &&
-            event !== null &&
-            ((event as Record<string, unknown>).type ===
-              "tool_execution_start" ||
-              (event as Record<string, unknown>).type === "tool_execution_end"),
-          )
-          .map(mapToolEvent),
-      );
-      const combined = {
-        ...result,
-        elapsedMs,
-        events,
-        diagnostics,
+    if (
+      result.actualModel !== undefined &&
+      result.actualModel !== request.profile.model
+    ) {
+      return {
+        ...combined,
+        status: "failed",
+        diagnostics: [
+          ...result.diagnostics,
+          `Model binding violation: expected ${request.profile.model} but Pi reported ${result.actualModel}`,
+        ],
         executionTelemetry:
-          aggregateTelemetry === null
+          combined.executionTelemetry === null
             ? null
             : {
-                ...aggregateTelemetry,
-                adapterRetryCount:
-                  aggregateTelemetry.adapterRetryCount + retryCount,
+                ...combined.executionTelemetry,
+                adapterReportedFallbackUsed: true,
               },
       };
-      if (
-        result.actualModel !== undefined &&
-        result.actualModel !== request.profile.model
-      ) {
-        return {
-          ...combined,
-          status: "failed",
-          diagnostics: [
-            ...diagnostics,
-            `Model binding violation: expected ${request.profile.model} but Pi reported ${result.actualModel ?? "no model"}`,
-          ],
-          executionTelemetry:
-            combined.executionTelemetry === null
-              ? null
-              : {
-                  ...combined.executionTelemetry,
-                  adapterReportedFallbackUsed: true,
-                },
-        };
-      }
-      if (
-        result.status === "completed" &&
-        result.actualModel === undefined
-      ) {
-        return {
-          ...combined,
-          status: "failed",
-          diagnostics: [
-            ...diagnostics,
-            `Model binding violation: expected ${request.profile.model} but Pi reported no model`,
-          ],
-        };
-      }
-      const delayMs =
-        request.task === "review"
-          ? geminiFreeTierRetryDelay(request.profile, result)
-          : undefined;
-      if (
-        delayMs === undefined ||
-        this.#retryMode === "qualification-single-attempt" ||
-        retryCount >= MAX_GEMINI_FREE_TIER_RETRIES
-      ) {
-        return combined;
-      }
-      try {
-        await this.#waitForRetry(delayMs, request.signal);
-      } catch (error) {
-        return {
-          ...combined,
-          status: request.signal?.aborted ? "cancelled" : "failed",
-          diagnostics: [
-            ...diagnostics,
-            error instanceof Error ? error.message : String(error),
-          ],
-        };
-      }
-      elapsedMs += delayMs;
-      retryCount += 1;
     }
+    if (
+      result.status === "completed" &&
+      result.actualModel === undefined
+    ) {
+      return {
+        ...combined,
+        status: "failed",
+        diagnostics: [
+          ...result.diagnostics,
+          `Model binding violation: expected ${request.profile.model} but Pi reported no model`,
+        ],
+      };
+    }
+    return combined;
   }
 }

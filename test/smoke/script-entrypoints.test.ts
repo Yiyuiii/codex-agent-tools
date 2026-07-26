@@ -113,21 +113,6 @@ const scripts = [
       "Usage: npm run smoke:kimi -- --llm <logical-id> --task review|delegate\n",
   },
   {
-    name: "Pi/Gemini",
-    script: "scripts/real-pi-smoke.mjs",
-    llm: "gemini-3.5-flash",
-    task: "delegate" as const,
-    expectedFile: "2026-07-25T01-02-03.000Z-gemini-3.5-flash-delegate-pi.json",
-    expectedRuntime: "pi-rpc",
-    expectedRoute: "proxy-10808",
-    expectedKind: "pi",
-    distModule: "dist/pi-smoke.js",
-    parserExport: "parsePiSmokeArguments",
-    runnerExport: "runPiSmoke",
-    usage:
-      "Usage: npm run smoke:pi -- --llm gemini-3.5-flash --task review|delegate\n",
-  },
-  {
     name: "Ark",
     script: "scripts/real-ark-smoke.mjs",
     llm: "ark-agent-plan",
@@ -151,6 +136,16 @@ describe("production real-smoke script entrypoints", () => {
     };
 
     expect(packageJson.scripts?.pretest).toBe("npm run build:library");
+  });
+
+  it("does not expose a standalone Pi smoke script or build entry", async () => {
+    const packageJson = JSON.parse(await readFile("package.json", "utf8")) as {
+      scripts?: Record<string, string>;
+    };
+    const tsupSource = await readFile("tsup.config.ts", "utf8");
+
+    expect(packageJson.scripts).not.toHaveProperty("smoke:pi");
+    expect(tsupSource).not.toMatch(/["']pi-smoke["']\s*:/u);
   });
 
   it.each(scripts)(
@@ -301,7 +296,7 @@ describe("production real-smoke script entrypoints", () => {
     },
   );
 
-  const qualificationScripts = [scripts[0], scripts[2]] as const;
+  const qualificationScripts = [scripts[0], scripts[1]] as const;
 
   it.each(qualificationScripts)(
     "$name programmatically binds qualification context and a batch case directory",

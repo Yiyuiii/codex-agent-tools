@@ -263,6 +263,45 @@ describe("Ark real-smoke harness", () => {
     expect(JSON.stringify(evidence)).not.toContain("weekly usage quota");
   });
 
+  it("does not classify retired Google free-tier quota text as an active reason", async () => {
+    const root = await tempRoot();
+    const service: PiSmokeService = {
+      review: async () => ({
+        ok: false,
+        status: "failed",
+        llm: "ark-agent-plan",
+        actualModel: "ark-code-latest",
+        elapsedMs: 10,
+        diagnostics: [
+          "generate_content_free_tier_requests; Please retry in 30s.",
+        ],
+        filesChanged: [],
+        review: "",
+      }),
+      delegate: async () => {
+        throw new Error("not used");
+      },
+    };
+
+    const evidence = await runArkSmoke(
+      { llm: "ark-agent-plan", task: "review", tempRoot: root },
+      {
+        service,
+        runtimeEvidence: {
+          configSha256: "e".repeat(64),
+          childEnvironment: {
+            CODEX_AGENT_ARK_AGENT_KEY: "secret",
+            PI_CODING_AGENT_DIR: "C:\\cache\\pi",
+          },
+        },
+        readPiVersion: async () => "0.80.10",
+        listPiRpcProcessIds: async () => [],
+      },
+    );
+
+    expect(evidence.failureReason).toBe("adapter_failure");
+  });
+
   it("rejects an Ark case when the adapter reports fallback", async () => {
     const root = await tempRoot();
     const service: PiSmokeService = {

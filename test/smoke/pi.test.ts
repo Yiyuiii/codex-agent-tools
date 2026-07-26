@@ -3,7 +3,7 @@ import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import type { AdapterExecutionTelemetry } from "../../src/adapters/adapter.js";
 import {
@@ -15,11 +15,13 @@ import type {
   IsolatedPiConfig,
 } from "../../src/adapters/pi/config.js";
 import {
-  parsePiSmokeArguments,
   runPiSmoke,
   type PiSmokeService,
 } from "../../src/smoke/pi.js";
-import { SmokeInfrastructureError } from "../../src/smoke/evidence.js";
+import {
+  SmokeInfrastructureError,
+  type SmokeKind,
+} from "../../src/smoke/evidence.js";
 
 const roots: string[] = [];
 
@@ -44,11 +46,7 @@ afterEach(async () => {
 });
 
 function runtimeEvidence(environment: NodeJS.ProcessEnv = {
-  GEMINI_API_KEY: "secret",
-  HTTP_PROXY: "http://127.0.0.1:10808",
-  HTTPS_PROXY: "http://127.0.0.1:10808",
-  http_proxy: "http://127.0.0.1:10808",
-  https_proxy: "http://127.0.0.1:10808",
+  CODEX_AGENT_ARK_AGENT_KEY: "secret",
   PI_CODING_AGENT_DIR: "C:\\cache\\pi",
 }) {
   return {
@@ -77,11 +75,15 @@ const qualificationContext = {
   orchestratorFallbackUsed: false as const,
 };
 
-describe("Pi/Gemini real-smoke harness", () => {
+describe("Ark Pi real-smoke harness", () => {
+  it("limits public smoke kinds to active launchers", () => {
+    expectTypeOf<SmokeKind>().toEqualTypeOf<"ark" | "kimi">();
+  });
+
   it.each([
     {
-      label: "standalone Gemini",
-      llm: "gemini-3.5-flash",
+      label: "standalone Ark",
+      llm: "ark-agent-plan",
       qualificationContext: null,
       expectedQualification: undefined,
       expectedRetryMode: "default",
@@ -157,29 +159,7 @@ describe("Pi/Gemini real-smoke harness", () => {
     },
   );
 
-  it("requires the fixed Gemini logical id and one task", () => {
-    expect(
-      parsePiSmokeArguments([
-        "--llm",
-        "gemini-3.5-flash",
-        "--task",
-        "review",
-      ]),
-    ).toEqual({ llm: "gemini-3.5-flash", task: "review" });
-    expect(() => parsePiSmokeArguments(["--task", "review"])).toThrow(
-      /--llm/u,
-    );
-    expect(() =>
-      parsePiSmokeArguments([
-        "--llm",
-        "kimi-k3",
-        "--task",
-        "review",
-      ]),
-    ).toThrow(/Pi profile/u);
-  });
-
-  it("validates review, fixed 10808 environment isolation, and process cleanup", async () => {
+  it("validates Ark review, direct environment isolation, and process cleanup", async () => {
     const root = await tempRoot();
     const service: PiSmokeService = {
       review: async (_input, context) => {
@@ -187,8 +167,8 @@ describe("Pi/Gemini real-smoke harness", () => {
         return {
           ok: true,
           status: "completed",
-          llm: "gemini-3.5-flash",
-          actualModel: "gemini-3.5-flash",
+          llm: "ark-agent-plan",
+          actualModel: "ark-code-latest",
           elapsedMs: 12,
           diagnostics: [],
           filesChanged: [],
@@ -201,7 +181,7 @@ describe("Pi/Gemini real-smoke harness", () => {
     };
     const evidence = await runPiSmoke(
       {
-        llm: "gemini-3.5-flash",
+        llm: "ark-agent-plan",
         task: "review",
         tempRoot: root,
       },
@@ -216,12 +196,12 @@ describe("Pi/Gemini real-smoke harness", () => {
     expect(evidence).toMatchObject({
       schemaVersion: 2,
       qualification: null,
-      llm: "gemini-3.5-flash",
+      llm: "ark-agent-plan",
       task: "review",
-      actualModel: "gemini-3.5-flash",
+      actualModel: "ark-code-latest",
       piVersion: "0.80.10",
-      route: "proxy-10808",
-      credentialEnv: "GEMINI_API_KEY",
+      route: "direct",
+      credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
       passed: true,
       adapterClientInvocationCount: 1,
       adapterRetryCount: 0,
@@ -241,41 +221,6 @@ describe("Pi/Gemini real-smoke harness", () => {
     expect(await readdir(root)).toEqual([]);
   });
 
-  it("classifies Google free-tier quota failures without storing diagnostics", async () => {
-    const root = await tempRoot();
-    const service: PiSmokeService = {
-      review: async () => ({
-        ok: false,
-        status: "failed",
-        llm: "gemini-3.5-flash",
-        actualModel: "gemini-3.5-flash",
-        elapsedMs: 60_010,
-        diagnostics: [
-          "generate_content_free_tier_requests; Please retry in 30s.",
-        ],
-        filesChanged: [],
-        review: "",
-      }),
-      delegate: async () => {
-        throw new Error("not used");
-      },
-    };
-
-    const evidence = await runPiSmoke(
-      { llm: "gemini-3.5-flash", task: "review", tempRoot: root },
-      {
-        service,
-        runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [100],
-      },
-    );
-
-    expect(evidence.failureReason).toBe("google_free_tier_quota");
-    expect(evidence.diagnosticCount).toBe(1);
-    expect(evidence).not.toHaveProperty("diagnostics");
-  });
-
   it("validates delegate file and command evidence", async () => {
     const root = await tempRoot();
     let receivedPrompt = "";
@@ -286,16 +231,20 @@ describe("Pi/Gemini real-smoke harness", () => {
       delegate: async (input, context) => {
         context?.onExecutionTelemetry?.(validPiTelemetry);
         receivedPrompt = input.prompt;
-        await writeFile(path.join(input.cwd, "result.txt"), "PI_SMOKE_OK\n", "utf8");
+        await writeFile(
+          path.join(input.cwd, "ark-agent-plan-smoke.txt"),
+          "ARK_SMOKE_OK:ark-agent-plan\n",
+          "utf8",
+        );
         return {
           ok: true,
           status: "completed",
-          llm: "gemini-3.5-flash",
-          actualModel: "gemini-3.5-flash",
+          llm: "ark-agent-plan",
+          actualModel: "ark-code-latest",
           elapsedMs: 15,
           diagnostics: [],
-          filesChanged: ["result.txt"],
-          summary: "Created result.txt and ran git status.",
+          filesChanged: ["ark-agent-plan-smoke.txt"],
+          summary: "Created the Ark result file and ran git status.",
           commandsRun: ["git status --short"],
           verification: [],
           risks: [],
@@ -303,7 +252,7 @@ describe("Pi/Gemini real-smoke harness", () => {
       },
     };
     const evidence = await runPiSmoke(
-      { llm: "gemini-3.5-flash", task: "delegate", tempRoot: root },
+      { llm: "ark-agent-plan", task: "delegate", tempRoot: root },
       {
         service,
         runtimeEvidence: runtimeEvidence(),
@@ -318,13 +267,17 @@ describe("Pi/Gemini real-smoke harness", () => {
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
       executionTelemetrySource: "pi-rpc-observable",
-      filesChanged: ["result.txt"],
+      filesChanged: ["ark-agent-plan-smoke.txt"],
       commandCount: 1,
       resultFileReadStatus: "read",
-      resultFileByteLength: Buffer.byteLength("PI_SMOKE_OK\n"),
-      resultFileRawSha256: sha256("PI_SMOKE_OK\n"),
-      resultFileNormalizedSha256: sha256("PI_SMOKE_OK"),
-      expectedResultNormalizedSha256: sha256("PI_SMOKE_OK"),
+      resultFileByteLength: Buffer.byteLength(
+        "ARK_SMOKE_OK:ark-agent-plan\n",
+      ),
+      resultFileRawSha256: sha256("ARK_SMOKE_OK:ark-agent-plan\n"),
+      resultFileNormalizedSha256: sha256("ARK_SMOKE_OK:ark-agent-plan"),
+      expectedResultNormalizedSha256: sha256(
+        "ARK_SMOKE_OK:ark-agent-plan",
+      ),
       resultFileNormalizedLineCount: 1,
       resultFileContainsExpectedLine: true,
       checks: {
@@ -354,18 +307,18 @@ describe("Pi/Gemini real-smoke harness", () => {
         },
         delegate: async (input) => {
           await writeFile(
-            path.join(input.cwd, "result.txt"),
-            "PI_SMOKE_OK\n",
+            path.join(input.cwd, "ark-agent-plan-smoke.txt"),
+            "ARK_SMOKE_OK:ark-agent-plan\n",
             "utf8",
           );
           return {
             ok: true,
             status: "completed",
-            llm: "gemini-3.5-flash",
-            actualModel: "gemini-3.5-flash",
+            llm: "ark-agent-plan",
+            actualModel: "ark-code-latest",
             elapsedMs: 15,
             diagnostics: [],
-            filesChanged: ["result.txt"],
+            filesChanged: ["ark-agent-plan-smoke.txt"],
             summary: "Tool event claimed git status --short.",
             commandsRun,
             verification: [],
@@ -375,7 +328,7 @@ describe("Pi/Gemini real-smoke harness", () => {
       };
 
       const evidence = await runPiSmoke(
-        { llm: "gemini-3.5-flash", task: "delegate", tempRoot: root },
+        { llm: "ark-agent-plan", task: "delegate", tempRoot: root },
         {
           service,
           runtimeEvidence: runtimeEvidence(),
@@ -397,8 +350,8 @@ describe("Pi/Gemini real-smoke harness", () => {
       review: async () => ({
         ok: true,
         status: "completed",
-        llm: "gemini-3.5-flash",
-        actualModel: "gemini-3.5-flash",
+        llm: "ark-agent-plan",
+        actualModel: "ark-code-latest",
         elapsedMs: 12,
         diagnostics: [],
         filesChanged: [],
@@ -409,11 +362,11 @@ describe("Pi/Gemini real-smoke harness", () => {
       },
     };
     const evidence = await runPiSmoke(
-      { llm: "gemini-3.5-flash", task: "review", tempRoot: root },
+      { llm: "ark-agent-plan", task: "review", tempRoot: root },
       {
         service,
         runtimeEvidence: runtimeEvidence({
-          GEMINI_API_KEY: "secret",
+          CODEX_AGENT_ARK_AGENT_KEY: "secret",
           ANTHROPIC_API_KEY: "forbidden",
           HTTPS_PROXY: "http://127.0.0.1:11808",
           PI_CODING_AGENT_DIR: "C:\\cache\\pi",
@@ -452,8 +405,8 @@ describe("Pi/Gemini real-smoke harness", () => {
         return {
           ok: true,
           status: "completed",
-          llm: "gemini-3.5-flash",
-          actualModel: "gemini-3.5-flash",
+          llm: "ark-agent-plan",
+          actualModel: "ark-code-latest",
           elapsedMs: 12,
           diagnostics: [],
           filesChanged: [],
@@ -466,7 +419,7 @@ describe("Pi/Gemini real-smoke harness", () => {
     };
 
     const evidence = await runPiSmoke(
-      { llm: "gemini-3.5-flash", task: "review", tempRoot: root },
+      { llm: "ark-agent-plan", task: "review", tempRoot: root },
       {
         service,
         runtimeEvidence: runtimeEvidence(),
@@ -492,7 +445,7 @@ describe("Pi/Gemini real-smoke harness", () => {
     };
 
     const failure = await runPiSmoke(
-      { llm: "gemini-3.5-flash", task: "review", tempRoot: root },
+      { llm: "ark-agent-plan", task: "review", tempRoot: root },
       {
         service,
         runtimeEvidence: runtimeEvidence(),
@@ -519,8 +472,8 @@ describe("Pi/Gemini real-smoke harness", () => {
       review: async () => ({
         ok: true,
         status: "completed",
-        llm: "gemini-3.5-flash",
-        actualModel: "gemini-3.5-flash",
+        llm: "ark-agent-plan",
+        actualModel: "ark-code-latest",
         elapsedMs: 12,
         diagnostics: [],
         filesChanged: [],
@@ -532,7 +485,7 @@ describe("Pi/Gemini real-smoke harness", () => {
     };
 
     const failure = await runPiSmoke(
-      { llm: "gemini-3.5-flash", task: "review", tempRoot: root },
+      { llm: "ark-agent-plan", task: "review", tempRoot: root },
       {
         service,
         runtimeEvidence: runtimeEvidence(),

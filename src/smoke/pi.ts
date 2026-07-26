@@ -88,7 +88,6 @@ interface PiSmokeEvidencePayload {
   passed: boolean;
   failureReason:
     | "missing_credential"
-    | "google_free_tier_quota"
     | "account_quota_exceeded"
     | "adapter_failure"
     | "acceptance_failed"
@@ -141,37 +140,6 @@ export interface PiSmokeRuntimeFactoryDependencies {
     options: BuildIsolatedPiConfigOptions,
   ) => Promise<IsolatedPiConfig>;
   createAdapter?: (dependencies: PiAdapterDependencies) => PiAdapter;
-}
-
-export function parsePiSmokeArguments(args: readonly string[]): {
-  llm: string;
-  task: PiSmokeTask;
-} {
-  let llm: string | undefined;
-  let task: string | undefined;
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
-    if (argument === "--llm") {
-      llm = args[index + 1];
-      index += 1;
-    } else if (argument === "--task") {
-      task = args[index + 1];
-      index += 1;
-    } else {
-      throw new Error(`Unknown Pi smoke argument: ${argument ?? ""}`);
-    }
-  }
-  if (llm === undefined || llm.trim() === "") {
-    throw new Error("Pi smoke requires --llm <logical-id>");
-  }
-  const profile = resolveLlm(llm);
-  if (llm !== "gemini-3.5-flash" || profile.runtime !== "pi-rpc") {
-    throw new Error(`Logical llm ${llm} is not the Gemini Pi profile`);
-  }
-  if (task !== "review" && task !== "delegate") {
-    throw new Error("Pi smoke requires --task review|delegate");
-  }
-  return { llm, task };
 }
 
 export async function createPiSmokeRuntime(
@@ -358,39 +326,19 @@ function inspectEnvironment(
   const proxyEntries = Object.entries(environment).filter(([name]) =>
     /^(?:HTTP|HTTPS|ALL|SOCKS5)_PROXY$/iu.test(name),
   );
-  const expectedProxy =
-    profile.network === "direct"
-      ? undefined
-      : "http://127.0.0.1:10808";
-  const proxyIsolated =
-    expectedProxy === undefined
-      ? proxyEntries.length === 0
-      : ["HTTP_PROXY", "HTTPS_PROXY"].every((expectedName) =>
-          proxyEntries.some(
-            ([name, value]) =>
-              name.toUpperCase() === expectedName && value === expectedProxy,
-          ),
-        ) &&
-        proxyEntries.every(
-          ([name, value]) =>
-            ["HTTP_PROXY", "HTTPS_PROXY"].includes(name.toUpperCase()) &&
-            value === expectedProxy,
-        );
   const hasAgentDir = keys.includes("PI_CODING_AGENT_DIR");
   return {
     isolated:
       !forbiddenCredential &&
-      proxyIsolated &&
+      proxyEntries.length === 0 &&
       hasAgentDir &&
       credentialNames.length === 1,
     credentialEnv: credentialNames[0] ?? null,
   };
 }
 
-function endpointHost(profile: LlmProfile): string {
-  return profile.provider?.startsWith("ark-") === true
-    ? "ark.cn-beijing.volces.com"
-    : "generativelanguage.googleapis.com";
+function endpointHost(): string {
+  return "ark.cn-beijing.volces.com";
 }
 
 function telemetryIsValid(
@@ -466,8 +414,6 @@ function commonEvidence(
     ? null
     : /Missing credential:/iu.test(diagnosticText)
       ? "missing_credential"
-      : /generate_content_free_tier_requests/iu.test(diagnosticText)
-        ? "google_free_tier_quota"
       : /AccountQuotaExceeded|weekly usage quota/iu.test(diagnosticText)
         ? "account_quota_exceeded"
         : result.status !== "completed"
@@ -481,7 +427,7 @@ function commonEvidence(
     expectedModel: profile.model,
     runtime: "pi-rpc",
     provider: profile.provider!,
-    endpointHost: endpointHost(profile),
+    endpointHost: endpointHost(),
     route: profile.network,
     credentialEnv: environment.credentialEnv,
     configSha256: runtimeEvidence.configSha256,
@@ -657,14 +603,8 @@ export async function runPiSmoke(
       );
     }
 
-    const resultFileName =
-      profile.provider.startsWith("ark-")
-        ? `${options.llm}-smoke.txt`
-        : "result.txt";
-    const expectedLine =
-      profile.provider.startsWith("ark-")
-        ? `ARK_SMOKE_OK:${options.llm}`
-        : "PI_SMOKE_OK";
+    const resultFileName = `${options.llm}-smoke.txt`;
+    const expectedLine = `ARK_SMOKE_OK:${options.llm}`;
     const result = await inSmokeInfrastructureStage(
       "task_execution",
       () =>

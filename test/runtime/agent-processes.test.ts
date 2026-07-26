@@ -9,6 +9,24 @@ import {
 const secret = "SECRET_CREDENTIAL_SENTINEL";
 
 describe("target agent process classification", () => {
+  it("keeps the retired Pi launcher as a conservative process signature", async () => {
+    await expect(
+      classifyAgentProcesses({
+        platform: "win32",
+        rows: [
+          {
+            processId: 41,
+            commandLine: "node scripts/real-pi-smoke.mjs",
+          },
+        ],
+      }),
+    ).resolves.toEqual({
+      kimi: { count: 0 },
+      piRpc: { count: 0 },
+      realSmoke: { count: 1 },
+    });
+  });
+
   it.each(["win32", "linux"] as const)(
     "classifies only fixed agent identities on %s",
     async (platform) => {

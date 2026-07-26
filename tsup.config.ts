@@ -7,7 +7,6 @@ export default defineConfig({
     "kimi-smoke": "src/smoke/kimi.ts",
     "smoke-evidence": "src/smoke/evidence.ts",
     mcp: "src/mcp/main.ts",
-    "pi-smoke": "src/smoke/pi.ts",
     "ark-smoke": "src/smoke/ark.ts",
     "local-acceptance": "src/acceptance/local.ts",
     "plugin-mcp-cleanup": "src/plugin/mcp-cleanup.ts",

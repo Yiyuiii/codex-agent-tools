@@ -13,7 +13,6 @@ import {
 } from "../../src/smoke/evidence.js";
 import { parseArkSmokeArguments } from "../../src/smoke/ark.js";
 import { parseKimiSmokeArguments } from "../../src/smoke/kimi.js";
-import { parsePiSmokeArguments } from "../../src/smoke/pi.js";
 
 const roots: string[] = [];
 
@@ -1260,13 +1259,6 @@ describe("real smoke evidence entrypoint", () => {
 
   it.each([
     {
-      kind: "pi" as const,
-      llm: "gemini-3.5-flash",
-      parseArguments: parsePiSmokeArguments,
-      expectedFile:
-        "2026-07-25T01-02-03.000Z-gemini-3.5-flash-delegate-pi.json",
-    },
-    {
       kind: "ark" as const,
       llm: "ark-agent-plan",
       parseArguments: parseArkSmokeArguments,
@@ -1274,7 +1266,7 @@ describe("real smoke evidence entrypoint", () => {
         "2026-07-25T01-02-03.000Z-ark-agent-plan-delegate-ark.json",
     },
   ])(
-    "sanitizes $kind failures and preserves the existing evidence suffix",
+    "sanitizes $kind failures and preserves the active evidence suffix",
     async ({ kind, llm, parseArguments, expectedFile }) => {
       const root = await tempRoot();
       const evidenceDirectory = path.join(root, "evidence");
