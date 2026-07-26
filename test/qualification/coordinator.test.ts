@@ -7,13 +7,13 @@ import {
   runQualificationBatch,
   type QualificationCoordinatorDependencies,
 } from "../../src/qualification/coordinator.js";
+import { LEGACY_QUALIFICATION_CASES } from "../../src/qualification/protocol.js";
 import type {
   FrozenPreflightRecord,
   QualificationCaseIdentity,
   QualificationLockHandle,
   QualificationTerminalManifest,
 } from "../../src/qualification/types.js";
-import { QUALIFICATION_CASES } from "../../src/qualification/types.js";
 
 const AUTHORIZATION_REFERENCE = "6ce61ce4-02ed-4e95-9813-f30e74ce9af5";
 const AUTHORIZATION_HASH = createHash("sha256")
@@ -296,7 +296,7 @@ describe("qualification coordinator", () => {
       vi
         .mocked(fixture.dependencies.runCase)
         .mock.calls.map(([input]) => input.identity),
-    ).toEqual(QUALIFICATION_CASES);
+    ).toEqual(LEGACY_QUALIFICATION_CASES);
     expect(fixture.events.slice(0, 5)).toEqual([
       "acquire",
       "preflight",
@@ -304,7 +304,7 @@ describe("qualification coordinator", () => {
       "assert_candidate",
       "batch_started",
     ]);
-    for (const identity of QUALIFICATION_CASES) {
+    for (const identity of LEGACY_QUALIFICATION_CASES) {
       const running = fixture.events.indexOf(`running:${identity.ordinal}`);
       const run = fixture.events.indexOf(`run:${identity.ordinal}`);
       const completed = fixture.events.indexOf(
@@ -347,7 +347,7 @@ describe("qualification coordinator", () => {
         expect.objectContaining({
           status: "blocked",
           stopReason: "case_failed",
-          notRun: QUALIFICATION_CASES.slice(failOrdinal),
+          notRun: LEGACY_QUALIFICATION_CASES.slice(failOrdinal),
         }),
       );
       expect(fixture.events.at(-1)).toBe("release");
@@ -399,7 +399,7 @@ describe("qualification coordinator", () => {
       expect.objectContaining({
         status: "blocked",
         stopReason: "infrastructure_failure",
-        notRun: QUALIFICATION_CASES.slice(4),
+        notRun: LEGACY_QUALIFICATION_CASES.slice(4),
       }),
     );
     expect(JSON.stringify(result)).not.toContain("secret");
@@ -424,7 +424,7 @@ describe("qualification coordinator", () => {
     expect(fixture.dependencies.inspectTargetProcesses).toHaveBeenCalledTimes(
       21,
     );
-    for (const identity of QUALIFICATION_CASES) {
+    for (const identity of LEGACY_QUALIFICATION_CASES) {
       const run = fixture.events.indexOf(`run:${identity.ordinal}`);
       expect(fixture.events.slice(Math.max(0, run - 4), run)).toEqual([
         "assert_owner",
@@ -493,7 +493,7 @@ describe("qualification coordinator", () => {
       expect.objectContaining({
         status: "blocked",
         stopReason: "infrastructure_failure",
-        notRun: QUALIFICATION_CASES.slice(1),
+        notRun: LEGACY_QUALIFICATION_CASES.slice(1),
       }),
     );
   });
@@ -605,7 +605,7 @@ describe("qualification coordinator", () => {
       expect.objectContaining({
         status: "blocked",
         stopReason: "infrastructure_failure",
-        notRun: QUALIFICATION_CASES,
+        notRun: LEGACY_QUALIFICATION_CASES,
       }),
     );
   });
@@ -629,7 +629,7 @@ describe("qualification coordinator", () => {
       expect.objectContaining({
         status: "blocked",
         stopReason: "infrastructure_failure",
-        notRun: QUALIFICATION_CASES.slice(1),
+        notRun: LEGACY_QUALIFICATION_CASES.slice(1),
       }),
     );
   });

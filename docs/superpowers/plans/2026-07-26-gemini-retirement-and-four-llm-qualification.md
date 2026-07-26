@@ -83,7 +83,7 @@ Plugin/release files:
 - Modify: `test/adapters/pi/config.test.ts`
 - Modify: `test/plugin/isolated-report.test.ts`
 
-- [ ] **Step 1: Preserve the observed RED evidence**
+- [x] **Step 1: Preserve the observed RED evidence**
 
 On a fresh Windows worktree under system `core.autocrlf=true`, run:
 
@@ -93,11 +93,11 @@ npm test
 
 Expected baseline: three failures only. Two compare LF-generated Pi config with a CRLF checkout fixture; one compares a multiline LF literal with a CRLF checkout script. This is a test portability defect, not a runtime regression.
 
-- [ ] **Step 2: Normalize only checkout text at assertion boundaries**
+- [x] **Step 2: Normalize only checkout text at assertion boundaries**
 
 Normalize the fixture/script strings from `\r\n` to `\n` inside the two tests. Keep generated runtime output byte assertions and hashes unchanged; do not change production serialization.
 
-- [ ] **Step 3: Verify the focused tests and complete baseline**
+- [x] **Step 3: Verify the focused tests and complete baseline**
 
 ```powershell
 npm exec -- vitest run test/adapters/pi/config.test.ts test/plugin/isolated-report.test.ts
@@ -107,7 +107,7 @@ npm test
 
 Expected: focused and full baseline PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
 git add -- test/adapters/pi/config.test.ts test/plugin/isolated-report.test.ts docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md
@@ -129,7 +129,7 @@ git commit -m "test: make Windows worktree assertions newline-portable"
 - Modify: `test/qualification/coordinator.test.ts`
 - Modify: `test/qualification/verifier.test.ts`
 
-- [ ] **Step 1: Write protocol RED tests**
+- [x] **Step 1: Write protocol RED tests**
 
 Create tests that fix both schedules and reject ambiguous envelope combinations:
 
@@ -199,7 +199,7 @@ describe("qualification protocol", () => {
 });
 ```
 
-- [ ] **Step 2: Run the protocol test and observe RED**
+- [x] **Step 2: Run the protocol test and observe RED**
 
 ```powershell
 npm exec -- vitest run test/qualification/protocol.test.ts
@@ -207,7 +207,7 @@ npm exec -- vitest run test/qualification/protocol.test.ts
 
 Expected: FAIL because `src/qualification/protocol.ts` and its exports do not exist.
 
-- [ ] **Step 3: Implement the minimal protocol module**
+- [x] **Step 3: Implement the minimal protocol module**
 
 Create immutable constants and fail-closed dispatch:
 
@@ -284,7 +284,7 @@ export function qualificationPlanForEnvelope(
 
 Move the existing ten-case constant out of `types.ts`. In the same change, mechanically migrate every current import in the manifest, coordinator, verifier, and their tests from the removed context-free `QUALIFICATION_CASES` name to the explicit `LEGACY_QUALIFICATION_CASES` name. This keeps pre-migration behavior and typecheck green until later tasks move each write/current path to `ACTIVE_QUALIFICATION_CASES`. Do not introduce even a temporary context-free alias: every call site must state whether it is legacy or active.
 
-- [ ] **Step 4: Verify GREEN and type safety**
+- [x] **Step 4: Verify GREEN and type safety**
 
 ```powershell
 npm exec -- vitest run test/qualification/protocol.test.ts
@@ -293,7 +293,7 @@ npm run typecheck
 
 Expected: protocol tests PASS and typecheck exits 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/qualification/protocol.ts src/qualification/types.ts src/qualification/manifest.ts src/qualification/coordinator.ts src/qualification/verifier.ts test/qualification/protocol.test.ts test/qualification/manifest.test.ts test/qualification/coordinator.test.ts test/qualification/verifier.test.ts

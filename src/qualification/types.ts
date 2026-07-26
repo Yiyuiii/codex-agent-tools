@@ -90,60 +90,6 @@ export interface QualificationCaseIdentity {
   task: QualificationTask;
 }
 
-export const QUALIFICATION_CASES: readonly QualificationCaseIdentity[] =
-  Object.freeze([
-    Object.freeze({
-      ordinal: 1,
-      llm: "gemini-3.5-flash",
-      task: "delegate" as const,
-    }),
-    Object.freeze({
-      ordinal: 2,
-      llm: "gemini-3.5-flash",
-      task: "review" as const,
-    }),
-    Object.freeze({
-      ordinal: 3,
-      llm: "ark-coding-plan",
-      task: "delegate" as const,
-    }),
-    Object.freeze({
-      ordinal: 4,
-      llm: "ark-coding-plan",
-      task: "review" as const,
-    }),
-    Object.freeze({
-      ordinal: 5,
-      llm: "kimi-k3",
-      task: "review" as const,
-    }),
-    Object.freeze({
-      ordinal: 6,
-      llm: "kimi-k3",
-      task: "delegate" as const,
-    }),
-    Object.freeze({
-      ordinal: 7,
-      llm: "ark-agent-plan",
-      task: "review" as const,
-    }),
-    Object.freeze({
-      ordinal: 8,
-      llm: "ark-agent-plan",
-      task: "delegate" as const,
-    }),
-    Object.freeze({
-      ordinal: 9,
-      llm: "ark-agent-deepseek-v4-flash",
-      task: "review" as const,
-    }),
-    Object.freeze({
-      ordinal: 10,
-      llm: "ark-agent-deepseek-v4-flash",
-      task: "delegate" as const,
-    }),
-  ]);
-
 export interface QualificationCaseManifestEntry
   extends QualificationCaseIdentity, QualificationExecutionTelemetry {
   result: QualificationCaseResult;

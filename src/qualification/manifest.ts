@@ -17,6 +17,7 @@ import {
   publishImmutableJson,
 } from "../smoke/evidence.js";
 import { readQualificationLockOwner } from "./lock.js";
+import { LEGACY_QUALIFICATION_CASES } from "./protocol.js";
 import type {
   BuildArtifactIdentity,
   FrozenCredentialMatch,
@@ -35,7 +36,6 @@ import type {
   QualificationTerminalManifest,
   QualificationUncommittedEvidence,
 } from "./types.js";
-import { QUALIFICATION_CASES } from "./types.js";
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/u;
@@ -635,7 +635,7 @@ function normalizeCaseIdentity(value: unknown): QualificationCaseIdentity {
     llm: record.llm,
     task: record.task,
   });
-  const fixed = QUALIFICATION_CASES[identity.ordinal - 1];
+  const fixed = LEGACY_QUALIFICATION_CASES[identity.ordinal - 1];
   if (fixed === undefined || !identitiesEqual(identity, fixed)) {
     throw new QualificationLedgerError();
   }
@@ -1346,7 +1346,9 @@ function buildManifest(
       ? 1
       : 0);
   const expectedNotRun =
-    options.status === "passed" ? [] : QUALIFICATION_CASES.slice(notRunStart);
+    options.status === "passed"
+      ? []
+      : LEGACY_QUALIFICATION_CASES.slice(notRunStart);
   if (
     JSON.stringify(notRun) !== JSON.stringify(expectedNotRun) ||
     (options.status === "blocked" &&
@@ -1361,7 +1363,7 @@ function buildManifest(
     cases.every(
       (entry, index) =>
         entry.result === "passed" &&
-        identitiesEqual(entry, QUALIFICATION_CASES[index]!),
+        identitiesEqual(entry, LEGACY_QUALIFICATION_CASES[index]!),
     ) &&
     notRun.length === 0 &&
     state.running === null &&
@@ -2033,7 +2035,7 @@ export async function recoverInterruptedQualificationBatch(options: {
       options.batchId,
       state,
     );
-    const inferredNotRun = QUALIFICATION_CASES.slice(
+    const inferredNotRun = LEGACY_QUALIFICATION_CASES.slice(
       state.completed.length + (state.running === null ? 0 : 1),
     );
     const manifest = buildManifest(state, {

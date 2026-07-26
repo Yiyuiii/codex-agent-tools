@@ -9,13 +9,13 @@ import {
   inspectQualificationTerminal,
   QualificationLedgerError,
 } from "./manifest.js";
+import { LEGACY_QUALIFICATION_CASES } from "./protocol.js";
 import type {
   BuildArtifactIdentity,
   FrozenCredentialMatch,
   FrozenLogicalLlmIdentity,
   FrozenPreflightRecord,
 } from "./types.js";
-import { QUALIFICATION_CASES } from "./types.js";
 
 const MAX_VERIFIER_FILE_BYTES = 1_048_576;
 const BATCH_ID_PATTERN =
@@ -196,15 +196,19 @@ function validatePassedManifest(
     manifest.promotionEligible !== true ||
     manifest.stopReason !== null ||
     !Array.isArray(manifest.cases) ||
-    manifest.cases.length !== QUALIFICATION_CASES.length ||
+    manifest.cases.length !== LEGACY_QUALIFICATION_CASES.length ||
     !Array.isArray(manifest.notRun) ||
     manifest.notRun.length !== 0 ||
     manifest.uncommittedEvidence !== null
   ) {
     throw new QualificationVerificationError();
   }
-  for (let index = 0; index < QUALIFICATION_CASES.length; index += 1) {
-    const expected = QUALIFICATION_CASES[index]!;
+  for (
+    let index = 0;
+    index < LEGACY_QUALIFICATION_CASES.length;
+    index += 1
+  ) {
+    const expected = LEGACY_QUALIFICATION_CASES[index]!;
     const actual = plainRecord(manifest.cases[index]);
     if (
       actual.ordinal !== expected.ordinal ||
@@ -221,7 +225,7 @@ function validatePassedManifest(
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 
 function expectedChecks(
-  identity: (typeof QUALIFICATION_CASES)[number],
+  identity: (typeof LEGACY_QUALIFICATION_CASES)[number],
   runtime: FrozenLogicalLlmIdentity["runtime"],
 ): readonly string[] {
   const processCheck =
@@ -249,7 +253,7 @@ function expectedChecks(
 }
 
 function expectedResultLine(
-  identity: (typeof QUALIFICATION_CASES)[number],
+  identity: (typeof LEGACY_QUALIFICATION_CASES)[number],
 ): string {
   if (identity.llm === "kimi-k3") return "KIMI_SMOKE_OK";
   if (identity.llm === "gemini-3.5-flash") return "PI_SMOKE_OK";
@@ -258,7 +262,7 @@ function expectedResultLine(
 
 function validateTaskAcceptance(
   evidence: Record<string, unknown>,
-  identity: (typeof QUALIFICATION_CASES)[number],
+  identity: (typeof LEGACY_QUALIFICATION_CASES)[number],
   runtime: FrozenLogicalLlmIdentity["runtime"],
 ): void {
   const checks = plainRecord(evidence.checks);
@@ -308,7 +312,7 @@ function validateTaskAcceptance(
 
 function validateQualificationIdentity(
   evidence: Record<string, unknown>,
-  identity: (typeof QUALIFICATION_CASES)[number],
+  identity: (typeof LEGACY_QUALIFICATION_CASES)[number],
   preflight: FrozenPreflightRecord,
   authorizationReferenceSha256: unknown,
   batchId: string,
@@ -342,7 +346,7 @@ function validateQualificationIdentity(
 
 function validateEvidenceIdentityAndAcceptance(
   evidenceValue: unknown,
-  identity: (typeof QUALIFICATION_CASES)[number],
+  identity: (typeof LEGACY_QUALIFICATION_CASES)[number],
   preflight: FrozenPreflightRecord,
   authorizationReferenceSha256: unknown,
   batchId: string,
@@ -425,8 +429,12 @@ async function validateManifestEvidence(
     "cases",
   );
   const cases = manifest.cases as unknown[];
-  for (let index = 0; index < QUALIFICATION_CASES.length; index += 1) {
-    const identity = QUALIFICATION_CASES[index]!;
+  for (
+    let index = 0;
+    index < LEGACY_QUALIFICATION_CASES.length;
+    index += 1
+  ) {
+    const identity = LEGACY_QUALIFICATION_CASES[index]!;
     const entry = plainRecord(cases[index]);
     const reference = plainRecord(entry.evidence);
     if (

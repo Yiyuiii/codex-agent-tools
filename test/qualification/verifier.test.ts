@@ -10,8 +10,8 @@ import {
   createQualificationLedger,
   freezePreflightRecord,
 } from "../../src/qualification/manifest.js";
+import { LEGACY_QUALIFICATION_CASES } from "../../src/qualification/protocol.js";
 import {
-  QUALIFICATION_CASES,
   type FrozenPreflightRecord,
   type QualificationCaseIdentity,
 } from "../../src/qualification/types.js";
@@ -289,7 +289,7 @@ async function createPassedBatch(
     preflight,
     recordedAt: "2026-07-26T00:00:00.000Z",
   });
-  for (const identity of QUALIFICATION_CASES) {
+  for (const identity of LEGACY_QUALIFICATION_CASES) {
     await ledger.publishCaseRunning({
       ...identity,
       recordedAt: "2026-07-26T00:00:00.000Z",

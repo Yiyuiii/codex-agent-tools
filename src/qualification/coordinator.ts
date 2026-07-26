@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 
+import { LEGACY_QUALIFICATION_CASES } from "./protocol.js";
 import type {
   FrozenPreflightRecord,
   QualificationCaseIdentity,
@@ -8,7 +9,6 @@ import type {
   QualificationTerminalManifest,
   TargetAgentProcessCounts,
 } from "./types.js";
-import { QUALIFICATION_CASES } from "./types.js";
 import type { QualificationLedger } from "./manifest.js";
 
 const AUTHORIZATION_REFERENCE_PATTERN =
@@ -159,7 +159,7 @@ async function publishInfrastructureTerminal(options: {
   return options.ledger.publishTerminalManifest({
     status: "blocked",
     stopReason: "infrastructure_failure",
-    notRun: QUALIFICATION_CASES.slice(notRunStart),
+    notRun: LEGACY_QUALIFICATION_CASES.slice(notRunStart),
     completedAt: safeTimestamp(options.dependencies),
   });
 }
@@ -242,8 +242,12 @@ export async function runQualificationBatch(
     }
 
     let terminalPublicationAttempted = false;
-    for (let index = 0; index < QUALIFICATION_CASES.length; index += 1) {
-      const identity = QUALIFICATION_CASES[index]!;
+    for (
+      let index = 0;
+      index < LEGACY_QUALIFICATION_CASES.length;
+      index += 1
+    ) {
+      const identity = LEGACY_QUALIFICATION_CASES[index]!;
       let runningPublished = false;
       let postProcessInspectionAttempted = false;
       try {
@@ -296,7 +300,7 @@ export async function runQualificationBatch(
           result = await ledger.publishTerminalManifest({
             status: "blocked",
             stopReason: "case_failed",
-            notRun: QUALIFICATION_CASES.slice(index + 1),
+            notRun: LEGACY_QUALIFICATION_CASES.slice(index + 1),
             completedAt: safeTimestamp(dependencies),
           });
           break;
