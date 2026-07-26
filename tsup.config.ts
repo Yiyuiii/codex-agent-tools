@@ -13,6 +13,7 @@ export default defineConfig({
     "plugin-mcp-cleanup": "src/plugin/mcp-cleanup.ts",
     "plugin-state-snapshot": "src/plugin/state-snapshot.ts",
     "release-assurance": "src/release/assurance.ts",
+    qualification: "src/qualification/manifest.ts",
   },
   format: ["esm"],
   dts: true,
