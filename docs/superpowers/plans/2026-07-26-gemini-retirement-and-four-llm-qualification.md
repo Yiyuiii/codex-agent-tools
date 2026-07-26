@@ -742,7 +742,7 @@ git commit -m "feat: bind qualification locks to plan identity"
 - Modify: `test/qualification/coordinator.test.ts`
 - Modify: `test/smoke/script-entrypoints.test.ts`
 
-- [ ] **Step 1: Replace ten-case expectations with RED eight-case assertions**
+- [x] **Step 1: Replace ten-case expectations with RED eight-case assertions**
 
 ```ts
 expect(startedCases).toEqual(ACTIVE_QUALIFICATION_CASES);
@@ -757,7 +757,7 @@ expect(passedTerminal).toMatchObject({
 
 Assert every smoke context has `qualificationPlanId`, adapter invocation 1, retry counts 0, and both fallback flags false.
 
-- [ ] **Step 2: Observe RED**
+- [x] **Step 2: Observe RED**
 
 ```powershell
 npm exec -- vitest run test/qualification/coordinator.test.ts test/smoke/script-entrypoints.test.ts
@@ -765,7 +765,7 @@ npm exec -- vitest run test/qualification/coordinator.test.ts test/smoke/script-
 
 Expected: FAIL because coordinator still executes ten cases and routes Gemini to `real-pi-smoke.mjs`.
 
-- [ ] **Step 3: Implement the active coordinator**
+- [x] **Step 3: Implement the active coordinator**
 
 `runQualificationBatch()` must bind one `QualificationProtocol` at entry and use its schedule throughout. Dependencies for lock, preflight, ledger, case context, not-run, terminal, and recovery must receive the plan explicitly. Remove the Gemini smoke-module branch:
 
@@ -780,7 +780,7 @@ async function smokeModule(identity: QualificationCaseIdentity) {
 
 Do not expose a CLI plan selector; production execution can only start `four-llm-v1`.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 ```powershell
 npm exec -- vitest run test/qualification/coordinator.test.ts test/smoke/script-entrypoints.test.ts
@@ -789,7 +789,7 @@ npm run typecheck
 
 Expected: coordinator tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/qualification/coordinator.ts scripts/gate-requalification.ts test/qualification/coordinator.test.ts test/smoke/script-entrypoints.test.ts

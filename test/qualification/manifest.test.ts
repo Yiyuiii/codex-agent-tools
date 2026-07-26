@@ -1592,12 +1592,15 @@ describe("immutable qualification ledger", () => {
       }
 
       await expect(
-        recoverInterruptedQualificationBatch({
-          repositoryRoot: repository,
-          batchId,
-          authorizationReferenceSha256: authHash,
-          completedAt: "2026-07-26T02:03:00.000Z",
-        }),
+        recoverInterruptedQualificationBatch(
+          // @ts-expect-error Recovery callers must provide a recorded plan.
+          {
+            repositoryRoot: repository,
+            batchId,
+            authorizationReferenceSha256: authHash,
+            completedAt: "2026-07-26T02:03:00.000Z",
+          },
+        ),
       ).rejects.toThrow("Qualification ledger operation failed");
       await expect(
         readFile(

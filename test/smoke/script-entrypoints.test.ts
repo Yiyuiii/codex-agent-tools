@@ -630,16 +630,22 @@ describe("qualification maintainer script entrypoints", () => {
     );
   });
 
-  it("dynamically imports only the existing real smoke main entrypoints", async () => {
+  it("routes active qualification cases only through Kimi and Ark smoke entrypoints", async () => {
     const source = await readFile("scripts/gate-requalification.ts", "utf8");
 
-    for (const script of [
-      "./real-kimi-smoke.mjs",
-      "./real-pi-smoke.mjs",
-      "./real-ark-smoke.mjs",
-    ]) {
+    for (const script of ["./real-kimi-smoke.mjs", "./real-ark-smoke.mjs"]) {
       expect(source).toContain(`import("${script}")`);
     }
+    expect(source).not.toContain('import("./real-pi-smoke.mjs")');
+    expect(source).not.toContain('identity.llm === "gemini-3.5-flash"');
     expect(source).not.toMatch(/runKimiSmoke|runPiSmoke|runArkSmoke/u);
+  });
+
+  it("forwards the recovered lock plan into interrupted manifest recovery", async () => {
+    const source = await readFile("scripts/gate-requalification.ts", "utf8");
+
+    expect(source).toMatch(
+      /recoverInterruptedQualificationBatch\(\{[\s\S]*?qualificationPlanId:\s*reference\.qualificationPlanId/u,
+    );
   });
 });

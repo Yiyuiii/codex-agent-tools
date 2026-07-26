@@ -65,10 +65,13 @@ interface SmokeMainModule {
     args: readonly string[];
     evidenceDirectory: string;
     qualificationContext: Readonly<{
+      qualificationPlanId: "four-llm-v1";
       batchId: string;
       ordinal: number;
-      repositoryCommit: string;
-      buildIdentitySha256: string;
+      llm: string;
+      task: "review" | "delegate";
+      frozenCommit: string;
+      frozenBuildIdentity: string;
       authorizationReferenceSha256: string;
       orchestratorFallbackUsed: false;
     }>;
@@ -84,10 +87,6 @@ async function smokeModule(
     // @ts-expect-error The production .mjs entrypoint intentionally has no declaration file.
     return import("./real-kimi-smoke.mjs") as Promise<SmokeMainModule>;
   }
-  if (identity.llm === "gemini-3.5-flash") {
-    // @ts-expect-error The production .mjs entrypoint intentionally has no declaration file.
-    return import("./real-pi-smoke.mjs") as Promise<SmokeMainModule>;
-  }
   // @ts-expect-error The production .mjs entrypoint intentionally has no declaration file.
   return import("./real-ark-smoke.mjs") as Promise<SmokeMainModule>;
 }
@@ -100,10 +99,13 @@ async function runSmokeCase(options: {
   repositoryRoot: string;
   identity: QualificationCaseIdentity;
   qualificationContext: Readonly<{
+    qualificationPlanId: "four-llm-v1";
     batchId: string;
     ordinal: number;
-    repositoryCommit: string;
-    buildIdentitySha256: string;
+    llm: string;
+    task: "review" | "delegate";
+    frozenCommit: string;
+    frozenBuildIdentity: string;
     authorizationReferenceSha256: string;
     orchestratorFallbackUsed: false;
   }>;
@@ -156,6 +158,14 @@ function ownersEqual(
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function assertActiveQualificationPlan(
+  qualificationPlanId: unknown,
+): asserts qualificationPlanId is "four-llm-v1" {
+  if (qualificationPlanId !== "four-llm-v1") {
+    throw new Error("Qualification plan mismatch");
+  }
+}
+
 async function runProductionQualification(options: {
   repositoryRoot: string;
   authorizationReference: string;
@@ -174,7 +184,7 @@ async function runProductionQualification(options: {
     assertQualificationCandidateUnchanged(input: {
       repositoryRoot: string;
       batchId: string;
-      preflight: import("../src/qualification/types.js").FrozenPreflightRecord;
+      preflight: import("../src/qualification/types.js").CurrentFrozenPreflightRecord;
     }): Promise<void>;
   };
 
@@ -186,20 +196,29 @@ async function runProductionQualification(options: {
     {
       createBatchId: batchId,
       now: () => new Date(),
-      acquireLock: (input) => lock.acquireQualificationLock(input),
+      acquireLock: (input) => {
+        assertActiveQualificationPlan(input.qualificationPlanId);
+        return lock.acquireQualificationLock(input);
+      },
       releaseLock: (handle) => lock.releaseQualificationLock(handle),
       runPreflight: ({
         repositoryRoot,
         authorizationReferenceSha256,
         lockHandle,
-      }) =>
-        preflight.runQualificationPreflight({
+        qualificationPlanId,
+      }) => {
+        assertActiveQualificationPlan(qualificationPlanId);
+        return preflight.runQualificationPreflight({
           repositoryRoot,
           authorizationReferenceSha256,
           lockDirectory: lockHandle.lockDirectory,
           currentOwnerNonce: lockHandle.owner.nonce,
-        }),
-      createLedger: (input) => manifest.createQualificationLedger(input),
+        });
+      },
+      createLedger: (input) => {
+        assertActiveQualificationPlan(input.qualificationPlanId);
+        return manifest.createQualificationLedger(input);
+      },
       assertLockOwner: async (handle) => {
         const owner = await lock.readQualificationLockOwner(
           handle.lockDirectory,
@@ -208,8 +227,10 @@ async function runProductionQualification(options: {
           throw new Error("Qualification lock owner changed");
         }
       },
-      assertFrozenCandidate: (input) =>
-        preflightModule.assertQualificationCandidateUnchanged(input),
+      assertFrozenCandidate: (input) => {
+        assertActiveQualificationPlan(input.qualificationPlanId);
+        return preflightModule.assertQualificationCandidateUnchanged(input);
+      },
       inspectTargetProcesses: () => processes.classifyAgentProcesses(),
       runCase: ({ identity, qualificationContext, evidenceDirectory }) =>
         runSmokeCase({
@@ -246,6 +267,7 @@ async function recoverProductionQualification(options: {
         repositoryRoot: options.repositoryRoot,
         batchId: reference.batchId,
         authorizationReferenceSha256: reference.authorizationReferenceSha256,
+        qualificationPlanId: reference.qualificationPlanId,
         completedAt: new Date().toISOString(),
       });
     },

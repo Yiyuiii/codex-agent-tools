@@ -2418,7 +2418,7 @@ export async function recoverInterruptedQualificationBatch(options: {
   repositoryRoot: string;
   batchId: string;
   authorizationReferenceSha256: string;
-  qualificationPlanId?: QualificationPlanId;
+  qualificationPlanId: QualificationPlanId;
   notRun?: readonly QualificationCaseIdentity[];
   completedAt: string;
 }): Promise<QualificationTerminalManifest> {

@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 
-import { LEGACY_QUALIFICATION_CASES } from "./protocol.js";
+import {
+  ACTIVE_QUALIFICATION_CASES,
+  ACTIVE_QUALIFICATION_PLAN_ID,
+} from "./protocol.js";
 import type {
-  FrozenPreflightRecord,
+  CurrentFrozenPreflightRecord,
   QualificationCaseIdentity,
   QualificationLockHandle,
   QualificationTerminalManifest,
@@ -13,6 +16,10 @@ import type { QualificationLedger } from "./manifest.js";
 
 const AUTHORIZATION_REFERENCE_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const ACTIVE_QUALIFICATION_PROTOCOL = Object.freeze({
+  qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+  schedule: ACTIVE_QUALIFICATION_CASES,
+});
 
 export type QualificationCoordinatorStage =
   "arguments" | "lock" | "preflight" | "batch" | "release";
@@ -43,31 +50,38 @@ export interface QualificationCoordinatorDependencies {
     repositoryRoot: string;
     batchId: string;
     authorizationReferenceSha256: string;
+    qualificationPlanId: "four-llm-v1";
   }): Promise<QualificationLockHandle>;
   releaseLock(handle: QualificationLockHandle): Promise<void>;
   runPreflight(options: {
     repositoryRoot: string;
     authorizationReferenceSha256: string;
     lockHandle: QualificationLockHandle;
-  }): Promise<FrozenPreflightRecord>;
+    qualificationPlanId: "four-llm-v1";
+  }): Promise<CurrentFrozenPreflightRecord>;
   createLedger(options: {
     repositoryRoot: string;
     batchId: string;
+    qualificationPlanId: "four-llm-v1";
   }): QualificationLedger;
   assertLockOwner(handle: QualificationLockHandle): Promise<void>;
   assertFrozenCandidate(options: {
     repositoryRoot: string;
     batchId: string;
-    preflight: FrozenPreflightRecord;
+    preflight: CurrentFrozenPreflightRecord;
+    qualificationPlanId: "four-llm-v1";
   }): Promise<void>;
   inspectTargetProcesses(): Promise<TargetAgentProcessCounts>;
   runCase(options: {
     identity: QualificationCaseIdentity;
     qualificationContext: Readonly<{
+      qualificationPlanId: "four-llm-v1";
       batchId: string;
       ordinal: number;
-      repositoryCommit: string;
-      buildIdentitySha256: string;
+      llm: string;
+      task: "review" | "delegate";
+      frozenCommit: string;
+      frozenBuildIdentity: string;
       authorizationReferenceSha256: string;
       orchestratorFallbackUsed: false;
     }>;
@@ -154,12 +168,13 @@ async function publishInfrastructureTerminal(options: {
   currentIndex: number;
   runningPublished: boolean;
   dependencies: QualificationCoordinatorDependencies;
+  schedule: readonly QualificationCaseIdentity[];
 }): Promise<QualificationTerminalManifest> {
   const notRunStart = options.currentIndex + (options.runningPublished ? 1 : 0);
   return options.ledger.publishTerminalManifest({
     status: "blocked",
     stopReason: "infrastructure_failure",
-    notRun: LEGACY_QUALIFICATION_CASES.slice(notRunStart),
+    notRun: options.schedule.slice(notRunStart),
     completedAt: safeTimestamp(options.dependencies),
   });
 }
@@ -171,6 +186,7 @@ export async function runQualificationBatch(
   },
   dependencies: QualificationCoordinatorDependencies,
 ): Promise<QualificationTerminalManifest> {
+  const protocol = ACTIVE_QUALIFICATION_PROTOCOL;
   if (
     typeof options.repositoryRoot !== "string" ||
     options.repositoryRoot.length === 0 ||
@@ -199,7 +215,14 @@ export async function runQualificationBatch(
       repositoryRoot: options.repositoryRoot,
       batchId,
       authorizationReferenceSha256: authorizationHash,
+      qualificationPlanId: protocol.qualificationPlanId,
     });
+    if (
+      lockHandle.owner.schemaVersion !== 2 ||
+      lockHandle.owner.qualificationPlanId !== protocol.qualificationPlanId
+    ) {
+      throw new Error("qualification lock protocol mismatch");
+    }
   } catch {
     throw new QualificationCoordinatorError("lock");
   }
@@ -208,13 +231,20 @@ export async function runQualificationBatch(
   let failure: QualificationCoordinatorError | null = null;
   let batchStarted = false;
   try {
-    let preflight: FrozenPreflightRecord;
+    let preflight: CurrentFrozenPreflightRecord;
     try {
       preflight = await dependencies.runPreflight({
         repositoryRoot: options.repositoryRoot,
         authorizationReferenceSha256: authorizationHash,
         lockHandle,
+        qualificationPlanId: protocol.qualificationPlanId,
       });
+      if (
+        preflight.schemaVersion !== 2 ||
+        preflight.qualificationPlanId !== protocol.qualificationPlanId
+      ) {
+        throw new Error("qualification preflight protocol mismatch");
+      }
     } catch {
       throw new QualificationCoordinatorError("preflight");
     }
@@ -226,10 +256,12 @@ export async function runQualificationBatch(
         repositoryRoot: options.repositoryRoot,
         batchId,
         preflight,
+        qualificationPlanId: protocol.qualificationPlanId,
       });
       ledger = dependencies.createLedger({
         repositoryRoot: options.repositoryRoot,
         batchId,
+        qualificationPlanId: protocol.qualificationPlanId,
       });
       await ledger.publishBatchStarted({
         authorizationReferenceSha256: authorizationHash,
@@ -242,12 +274,8 @@ export async function runQualificationBatch(
     }
 
     let terminalPublicationAttempted = false;
-    for (
-      let index = 0;
-      index < LEGACY_QUALIFICATION_CASES.length;
-      index += 1
-    ) {
-      const identity = LEGACY_QUALIFICATION_CASES[index]!;
+    for (let index = 0; index < protocol.schedule.length; index += 1) {
+      const identity = protocol.schedule[index]!;
       let runningPublished = false;
       let postProcessInspectionAttempted = false;
       try {
@@ -256,6 +284,7 @@ export async function runQualificationBatch(
           repositoryRoot: options.repositoryRoot,
           batchId,
           preflight,
+          qualificationPlanId: protocol.qualificationPlanId,
         });
         assertZeroTargetProcesses(await dependencies.inspectTargetProcesses());
         await ledger.publishCaseRunning({
@@ -268,10 +297,13 @@ export async function runQualificationBatch(
           await dependencies.runCase({
             identity,
             qualificationContext: Object.freeze({
+              qualificationPlanId: protocol.qualificationPlanId,
               batchId,
               ordinal: identity.ordinal,
-              repositoryCommit: preflight.repositoryCommit,
-              buildIdentitySha256: preflight.buildIdentitySha256,
+              llm: identity.llm,
+              task: identity.task,
+              frozenCommit: preflight.repositoryCommit,
+              frozenBuildIdentity: preflight.buildIdentitySha256,
               authorizationReferenceSha256: authorizationHash,
               orchestratorFallbackUsed: false,
             }),
@@ -285,6 +317,7 @@ export async function runQualificationBatch(
           repositoryRoot: options.repositoryRoot,
           batchId,
           preflight,
+          qualificationPlanId: protocol.qualificationPlanId,
         });
         await ledger.publishCaseCompleted({
           ...identity,
@@ -300,7 +333,7 @@ export async function runQualificationBatch(
           result = await ledger.publishTerminalManifest({
             status: "blocked",
             stopReason: "case_failed",
-            notRun: LEGACY_QUALIFICATION_CASES.slice(index + 1),
+            notRun: protocol.schedule.slice(index + 1),
             completedAt: safeTimestamp(dependencies),
           });
           break;
@@ -330,6 +363,7 @@ export async function runQualificationBatch(
             currentIndex: index,
             runningPublished,
             dependencies,
+            schedule: protocol.schedule,
           });
         } catch {
           throw new QualificationCoordinatorError("batch");
@@ -345,6 +379,7 @@ export async function runQualificationBatch(
           repositoryRoot: options.repositoryRoot,
           batchId,
           preflight,
+          qualificationPlanId: protocol.qualificationPlanId,
         });
         assertZeroTargetProcesses(await dependencies.inspectTargetProcesses());
       } catch (error) {

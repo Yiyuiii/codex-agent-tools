@@ -7,7 +7,10 @@ import {
   runQualificationBatch,
   type QualificationCoordinatorDependencies,
 } from "../../src/qualification/coordinator.js";
-import { LEGACY_QUALIFICATION_CASES } from "../../src/qualification/protocol.js";
+import {
+  ACTIVE_QUALIFICATION_CASES,
+  ACTIVE_QUALIFICATION_PLAN_ID,
+} from "../../src/qualification/protocol.js";
 import type {
   FrozenPreflightRecord,
   QualificationCaseIdentity,
@@ -30,7 +33,8 @@ const zeroProcesses = Object.freeze({
 });
 
 const preflight = Object.freeze({
-  schemaVersion: 1,
+  schemaVersion: 2,
+  qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
   repositoryCommit: COMMIT,
   repositoryBranch: "codex/ark-cutover",
   repositoryDirty: false,
@@ -39,7 +43,6 @@ const preflight = Object.freeze({
   buildArtifacts: Object.freeze([
     Object.freeze({ path: "dist/ark-smoke.js", sha256: "d".repeat(64) }),
     Object.freeze({ path: "dist/kimi-smoke.js", sha256: "e".repeat(64) }),
-    Object.freeze({ path: "dist/pi-smoke.js", sha256: "f".repeat(64) }),
     Object.freeze({ path: "dist/smoke-evidence.js", sha256: "1".repeat(64) }),
     Object.freeze({
       path: "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
@@ -77,13 +80,6 @@ const preflight = Object.freeze({
       route: "direct" as const,
     }),
     Object.freeze({
-      llm: "gemini-3.5-flash",
-      runtime: "pi-rpc" as const,
-      model: "gemini-3.5-flash",
-      provider: "google",
-      route: "proxy-10808" as const,
-    }),
-    Object.freeze({
       llm: "kimi-k3",
       runtime: "kimi-acp" as const,
       model: "kimi-code/k3",
@@ -105,26 +101,18 @@ const preflight = Object.freeze({
       environmentVariableName: "ARK_API_KEY",
     }),
     Object.freeze({
-      llm: "gemini-3.5-flash",
-      environmentVariableName: "GEMINI_API_KEY",
-    }),
-    Object.freeze({
       llm: "kimi-k3",
       environmentVariableName: null,
     }),
   ]),
-  proxy10808: Object.freeze({
-    host: "127.0.0.1" as const,
-    port: 10808 as const,
-    listening: true as const,
-  }),
   targetProcesses: zeroProcesses,
 }) satisfies FrozenPreflightRecord;
 
 const lockHandle = Object.freeze({
   lockDirectory: "X:/temp/codex-agent-tools-qualification/repository",
   owner: Object.freeze({
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
+    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     repositoryRealpathSha256: "4".repeat(64),
     processId: 1234,
     processStartTime: "2026-07-26T11:59:00.000Z",
@@ -137,7 +125,8 @@ const lockHandle = Object.freeze({
 
 function terminal(status: "passed" | "blocked"): QualificationTerminalManifest {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     batchId: BATCH_ID,
     status,
     authorizationReferenceSha256: AUTHORIZATION_HASH,
@@ -279,7 +268,7 @@ function makeDependencies(options?: {
 }
 
 describe("qualification coordinator", () => {
-  it("runs the fixed ten-case schedule strictly serially and publishes one passed terminal", async () => {
+  it("runs the active eight-case schedule strictly serially and publishes one current passed terminal", async () => {
     const fixture = makeDependencies();
 
     const result = await runQualificationBatch(
@@ -290,13 +279,18 @@ describe("qualification coordinator", () => {
       fixture.dependencies,
     );
 
-    expect(result.status).toBe("passed");
+    expect(result).toMatchObject({
+      schemaVersion: 2,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      status: "passed",
+      promotionEligible: true,
+    });
     expect(fixture.maximumInFlight()).toBe(1);
     expect(
       vi
         .mocked(fixture.dependencies.runCase)
         .mock.calls.map(([input]) => input.identity),
-    ).toEqual(LEGACY_QUALIFICATION_CASES);
+    ).toEqual(ACTIVE_QUALIFICATION_CASES);
     expect(fixture.events.slice(0, 5)).toEqual([
       "acquire",
       "preflight",
@@ -304,7 +298,7 @@ describe("qualification coordinator", () => {
       "assert_candidate",
       "batch_started",
     ]);
-    for (const identity of LEGACY_QUALIFICATION_CASES) {
+    for (const identity of ACTIVE_QUALIFICATION_CASES) {
       const running = fixture.events.indexOf(`running:${identity.ordinal}`);
       const run = fixture.events.indexOf(`run:${identity.ordinal}`);
       const completed = fixture.events.indexOf(
@@ -347,7 +341,7 @@ describe("qualification coordinator", () => {
         expect.objectContaining({
           status: "blocked",
           stopReason: "case_failed",
-          notRun: LEGACY_QUALIFICATION_CASES.slice(failOrdinal),
+          notRun: ACTIVE_QUALIFICATION_CASES.slice(failOrdinal),
         }),
       );
       expect(fixture.events.at(-1)).toBe("release");
@@ -399,7 +393,7 @@ describe("qualification coordinator", () => {
       expect.objectContaining({
         status: "blocked",
         stopReason: "infrastructure_failure",
-        notRun: LEGACY_QUALIFICATION_CASES.slice(4),
+        notRun: ACTIVE_QUALIFICATION_CASES.slice(4),
       }),
     );
     expect(JSON.stringify(result)).not.toContain("secret");
@@ -417,14 +411,14 @@ describe("qualification coordinator", () => {
       fixture.dependencies,
     );
 
-    expect(fixture.dependencies.assertLockOwner).toHaveBeenCalledTimes(23);
+    expect(fixture.dependencies.assertLockOwner).toHaveBeenCalledTimes(19);
     expect(fixture.dependencies.assertFrozenCandidate).toHaveBeenCalledTimes(
-      22,
+      18,
     );
     expect(fixture.dependencies.inspectTargetProcesses).toHaveBeenCalledTimes(
-      21,
+      17,
     );
-    for (const identity of LEGACY_QUALIFICATION_CASES) {
+    for (const identity of ACTIVE_QUALIFICATION_CASES) {
       const run = fixture.events.indexOf(`run:${identity.ordinal}`);
       expect(fixture.events.slice(Math.max(0, run - 4), run)).toEqual([
         "assert_owner",
@@ -444,7 +438,7 @@ describe("qualification coordinator", () => {
     vi.mocked(fixture.dependencies.assertFrozenCandidate).mockImplementation(
       async () => {
         candidateChecks += 1;
-        if (candidateChecks === 21) {
+        if (candidateChecks === 17) {
           throw new Error("final-case build drift");
         }
       },
@@ -459,8 +453,8 @@ describe("qualification coordinator", () => {
     );
 
     expect(result.status).toBe("blocked");
-    expect(fixture.dependencies.runCase).toHaveBeenCalledTimes(10);
-    expect(fixture.publishCaseCompleted).toHaveBeenCalledTimes(9);
+    expect(fixture.dependencies.runCase).toHaveBeenCalledTimes(8);
+    expect(fixture.publishCaseCompleted).toHaveBeenCalledTimes(7);
     expect(fixture.publishTerminalManifest).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "blocked",
@@ -493,7 +487,7 @@ describe("qualification coordinator", () => {
       expect.objectContaining({
         status: "blocked",
         stopReason: "infrastructure_failure",
-        notRun: LEGACY_QUALIFICATION_CASES.slice(1),
+        notRun: ACTIVE_QUALIFICATION_CASES.slice(1),
       }),
     );
   });
@@ -521,7 +515,7 @@ describe("qualification coordinator", () => {
   it.each([
     ["before a case", 2, 0],
     ["after a case", 3, 1],
-    ["during the final promotion check", 22, 10],
+    ["during the final promotion check", 18, 8],
   ])(
     "leaves recovery ownership intact when lock ownership is lost %s",
     async (_label, ownerFailureFromCall, expectedRuns) => {
@@ -605,7 +599,7 @@ describe("qualification coordinator", () => {
       expect.objectContaining({
         status: "blocked",
         stopReason: "infrastructure_failure",
-        notRun: LEGACY_QUALIFICATION_CASES,
+        notRun: ACTIVE_QUALIFICATION_CASES,
       }),
     );
   });
@@ -629,7 +623,7 @@ describe("qualification coordinator", () => {
       expect.objectContaining({
         status: "blocked",
         stopReason: "infrastructure_failure",
-        notRun: LEGACY_QUALIFICATION_CASES.slice(1),
+        notRun: ACTIVE_QUALIFICATION_CASES.slice(1),
       }),
     );
   });
@@ -667,6 +661,52 @@ describe("qualification coordinator", () => {
       repositoryRoot: "D:/repo",
       batchId: BATCH_ID,
       authorizationReferenceSha256: AUTHORIZATION_HASH,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     });
+  });
+
+  it("binds every current batch dependency and smoke context to four-llm-v1", async () => {
+    const fixture = makeDependencies();
+
+    await runQualificationBatch(
+      {
+        repositoryRoot: "D:/repo",
+        authorizationReference: AUTHORIZATION_REFERENCE,
+      },
+      fixture.dependencies,
+    );
+
+    expect(fixture.dependencies.acquireLock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      }),
+    );
+    expect(fixture.dependencies.runPreflight).toHaveBeenCalledWith(
+      expect.objectContaining({
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      }),
+    );
+    expect(fixture.dependencies.createLedger).toHaveBeenCalledWith({
+      repositoryRoot: "D:/repo",
+      batchId: BATCH_ID,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+    });
+    for (const [input] of vi.mocked(fixture.dependencies.runCase).mock.calls) {
+      expect(input.qualificationContext).toEqual({
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+        batchId: BATCH_ID,
+        ordinal: input.identity.ordinal,
+        llm: input.identity.llm,
+        task: input.identity.task,
+        frozenCommit: COMMIT,
+        frozenBuildIdentity: BUILD_IDENTITY,
+        authorizationReferenceSha256: AUTHORIZATION_HASH,
+        orchestratorFallbackUsed: false,
+      });
+    }
+    for (const [input] of vi.mocked(fixture.dependencies.assertFrozenCandidate)
+      .mock.calls) {
+      expect(input.qualificationPlanId).toBe(ACTIVE_QUALIFICATION_PLAN_ID);
+    }
   });
 });
