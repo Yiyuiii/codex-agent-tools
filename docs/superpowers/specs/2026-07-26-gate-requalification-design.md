@@ -74,7 +74,7 @@ Pi adapter 当前对 Gemini review 的特定免费层限流可做一次延迟重
 - `resultFileNormalizedLineCount`；
 - `resultFileContainsExpectedLine`。
 
-检查器先用 `lstat` 拒绝符号链接、目录和其它非普通文件，并在读取前执行 64 KiB 上限；随后读取原始字节、计算原始哈希，再用 fatal UTF-8 decoder 解码。非法 UTF-8 仍可记录原始长度与哈希，但不生成规范化字段。规范化只用于诊断和明确记录，严格验收语义保持为当前 `decoded.trim() === expectedLine`，不因新增字段而放宽。无法读取时用明确状态并省略不成立的派生值。
+检查器先用 `lstat` 拒绝符号链接、目录和其它非普通文件，并在读取前执行 64 KiB 上限；随后打开 file handle，用 `fstat` 核对文件类型、identity 与长度没有在 `lstat`/open 之间漂移，只通过该 handle 读取，并在读取后再次 `fstat`。任何 identity/type/size 漂移都 fail closed，不能让路径替换把工作区外文件哈希进 evidence。随后计算原始哈希，再用 fatal UTF-8 decoder 解码。非法 UTF-8 仍可记录原始长度与哈希，但不生成规范化字段。规范化只用于诊断和明确记录，严格验收语义保持为当前 `decoded.trim() === expectedLine`，不因新增字段而放宽。无法读取时用明确状态并省略不成立的派生值。
 
 不得保存：
 
@@ -94,10 +94,11 @@ Pi adapter 当前对 Gemini review 的特定免费层限流可做一次延迟重
 - `adapterClientInvocationCount`；
 - `adapterRetryCount`；
 - `runtimeReportedAutoRetryCount`；
+- `adapterReportedFallbackUsed`；
 - `orchestratorFallbackUsed`；
 - `executionTelemetrySource`，固定说明该 runtime 的可观测来源与边界。
 
-资格认证 smoke 必须得到 `1 / 0 / 0 / false`，否则该项失败。该结论只覆盖本项目 adapter client 调度、Kimi ACP 可见的 session/prompt 路径、Pi RPC 明示重试事件和协调器 profile 选择；它不声称能观察 provider 服务端或底层 SDK 未上报的内部 HTTP 重试。
+资格认证 smoke 与协调器必须合计得到 `1 / 0 / 0 / false / false`，否则该项失败。该结论只覆盖本项目 adapter client 调度、Kimi ACP 可见的 session/prompt 路径、Pi RPC 明示重试/模型事件和协调器 profile 选择；它不声称能观察 provider 服务端或底层 SDK 未上报的内部 HTTP 重试或 fallback。
 
 Pi 资格认证入口在 prompt 前显式发送 `set_auto_retry=false` 与 `set_auto_compaction=false`，并在隔离 settings 中把 provider retry 上限钉死为 0；同时禁用 Gemini review 的 adapter 外层重试。生产环境是否保留现有有界只读重试不由本设计改变。
 
@@ -119,26 +120,28 @@ Pi RPC 报告的 `auto_retry_start/end`、`agent_end.willRetry` 和 `compaction_
 - Pi 隔离配置 SHA-256；
 - 五条固定逻辑 LLM 身份；
 - 仅凭据变量名的命中结果，不保存值；
-- 每项 evidence 路径、SHA-256、结果和四项可观测调用统计；
+- 每项 evidence 路径、SHA-256、结果和五项可观测调用统计；
 - 批次最终状态、停止原因和未执行项目。
 
 批次目录位于 `docs/smoke/evidence/batches/<batchId>/`：每个 checkpoint 和 case evidence 都通过既有的“同目录排他临时文件 + hard link”机制发布，不能覆盖；终态 `manifest.json` 也只能发布一次。运行中不持续替换同一个文件，从而避免 Windows 覆盖语义和崩溃窗口。
 
 批次开始前必须：
 
-1. 在系统临时目录以仓库 realpath 的 SHA-256 为身份取得排他锁目录；锁记录 PID、进程启动时间、owner nonce、batchId 和取得时间。
+1. 在系统临时目录以仓库 realpath 的 SHA-256 为身份取得排他锁目录；锁记录 PID、进程启动时间、owner nonce、batchId、授权引用 SHA-256 和取得时间。
 2. 要求源码工作树干净并冻结 commit。
 3. 重新通过类型检查、全量测试、构建、release smoke、diff check 和隔离插件生命周期。
 4. 再次确认工作树干净、commit 未变，并冻结构建 identity；此后工作树只允许新增当前批次目录。
 5. 验证 10808 本地监听和固定路由配置；这不等价于证明 Gemini 额度可用。
 6. 对 Kimi Code、Pi RPC 和本项目真实 smoke 进程取得边界快照，并要求目标分类基线为零。只持久化分类计数和布尔结论，不保存全机命令行、PID 清单或无关进程信息。
-7. 记录本次由当前会话用户“继续”授权的一次不确定额度资格认证动作；只记录脱敏授权种类、唯一引用与时间，不保存对话原文。相同授权引用不能启动第二批。
+7. 所有 preflight 均通过后、任何真实调用前，先发布不可变 `batch_started` checkpoint，记录本次由当前会话用户“继续”授权的一次不确定额度资格认证动作；只记录脱敏授权种类、唯一引用 SHA-256 与时间，不保存对话原文。相同授权引用不能启动第二批，复用检查必须扫描终态 manifest、未完成 checkpoint 和 live/stale lock owner。
+
+在 `batch_started` 发布前，协调器不得创建批次目录或修改任何 tracked source/doc；preflight 只可重建预期的 gitignored 构建产物，隔离生命周期以 check-only 模式比较报告而不写 tracked 报告。普通 preflight 失败只返回脱敏错误并释放自己的锁，不发布 batch manifest，也不消费授权；若进程崩溃留下 stale owner，则恢复流程保守发布 `interrupted` 记录并把该授权引用视为已消费。
 
 锁只能排除遵守本协调器协议的并发批次，边界快照也不能证明两个采样点之间绝无极短进程；文档和 manifest 不得夸大为全系统互斥证明。遇到已有锁时：
 
 - owner 仍存活：fail closed；
 - owner 已死亡：不得继续旧批次；
-- 只有显式恢复入口在确认目标进程分类均为零后，才可根据不可变 checkpoint/evidence 把旧批次发布为 `interrupted` 并释放 stale 锁；
+- 只有显式恢复入口在确认目标进程分类均为零后，才可根据不可变 checkpoint/evidence 把没有合法终态 manifest 的旧批次发布为 `interrupted` 并释放 stale 锁；若终态 manifest 已合法发布而只差释放锁，恢复入口只验真该终态后释放，不得再发布第二个终态；
 - 新批次仍需新的授权引用，并从十项第一项开始。
 
 批次执行过程中：
@@ -146,7 +149,7 @@ Pi RPC 报告的 `auto_retry_start/end`、`agent_end.willRetry` 和 `compaction_
 - 严格串行；
 - 每项调用前先发布含 `running`、ordinal、LLM、task、时间戳和固定身份的不可变 checkpoint；
 - 每项结束后独立做边界进程快照，要求目标分类绝对计数仍为零；
-- 每项只允许一次 adapter client 调用、零 adapter 重试、零运行时明示重试和零协调器 fallback；
+- 每项只允许一次 adapter client 调用、零 adapter 重试、零运行时明示重试、零 adapter/runtime 明示 fallback 和零协调器 fallback；
 - 每个 evidence 必须带相同的 `batchId`、commit 和构建身份；
 - evidence 验真后再发布该项的 `passed` 或 `failed` checkpoint；
 - 任一时刻崩溃都按最新不可变 checkpoint 与 case evidence 推导为 `interrupted`，绝不续跑。
@@ -179,12 +182,13 @@ Pi RPC 报告的 `auto_retry_start/end`、`agent_end.willRetry` 和 `compaction_
 
 只有十项在同一批次全部得到新的 `passed` evidence，才执行：
 
-1. 运行独立的晋升前验证器：只从磁盘重读 manifest、十份 evidence 和构建产物，重新计算全部 SHA-256，并核对 batchId、commit、构建身份、固定模型/provider/route、门禁结果和 `1 / 0 / 0 / false`；任何不一致都 fail closed。
+1. 运行独立的冻结候选验证器：只从磁盘重读 manifest、十份 evidence、冻结 preflight record 和构建产物，重新计算全部 SHA-256，并核对当前 HEAD、batchId、commit、package/lockfile、Pi 配置、固定逻辑身份、运行时/凭据名称记录、构建身份、固定模型/provider/route、门禁结果和 `1 / 0 / 0 / false / false`；任何不一致都 fail closed。
 2. 成对晋升 Gemini 与 Ark Coding Plan。
 3. 更新三份 smoke 索引、注册表、README、运维文档和发布清单。
 4. 把 `docs/release/real-plugin-install-review.md` 重新编写并独立审阅为 `ready`。
-5. 再次完成确定性验证与只读外部审阅。
-6. 停止并向用户提交真实安装前的最小充分审阅材料。
+5. 晋升修改发生后，使用第二种 immutable-evidence verifier 重新校验不可变 manifest/evidence/checkpoint 及其原始冻结身份，但不要求新构建产物等于晋升前构建；新源码、registry、bundle 与隔离生命周期由 fresh 类型检查、测试、构建和 acceptance 独立验证。最终构建后再运行一次 immutable-evidence verifier。
+6. 再次完成只读外部审阅。
+7. 停止并向用户提交真实安装前的最小充分审阅材料。
 
 即使全部通过，也不得在本阶段执行真实 marketplace/plugin add/remove。
 

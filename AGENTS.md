@@ -45,13 +45,15 @@
 - 2026-07-26：任务 7 质量复审进一步收敛了发布状态叙述与后续授权边界：README 明确区分十项原始 8 passed / 2 failed 和成对注册表 6 passed / 4 pending；运维文档不再把隔离 fake Pi 验收误述为成功调用 Gemini。Task 8 当前只能生成 `blocked / not ready` 状态包并报告重入条件，不得索要真实安装授权；Task 9 必须同时满足十门禁全部 passed、状态包重新审阅为 ready 和当前会话精确授权。只读外部审阅只选执行时 qualified 的 profile，当前为 Kimi K3 与 Ark Agent Plan。fake Pi 的 `set_model` 元数据也按生产配置收敛：Google 使用 `google-generative-ai`，Ark Plan 使用 `anthropic-messages`。
 - 2026-07-26：任务 8 的 [真实插件安装审阅状态包](docs/release/real-plugin-install-review.md) 已完成并保持 `blocked / not ready`，记录原始 8 passed / 2 failed、成对注册表 6 passed / 4 pending、两个失败 evidence、十门禁重入条件、隔离状态差异及未来官方回滚边界。qualified 的 Kimi K3 与 Ark Agent Plan 已依次完成只读外审，二者都没有改动文件；Kimi 只指出发布清单状态措辞，Ark Agent Plan 只指出 `docs/operations.md` 顶部硬编码的 as-of 日期，后者已通过删除该硬编码日期修复。独立规格复审通过；独立质量复审发现并修复了新插件工具范围可能被误解为全局唯一、发布清单未区分建立日期与最近复核日期、临时缓存路径可能被误作未来版本承诺、临时隔离配置主体误写为活动配置，以及审阅归因漂移。最终质量复核与主线程敏感词、授权指示、证据哈希、链接、release smoke、进程残留和工作树检查均通过。当前不提出或接受真实安装许可，任务 9 未执行；只有十项门禁全部通过并把状态包重新审阅为 `ready` 后，才可重新准备逐次授权。
 - 2026-07-26：下一阶段采用 [十门禁原子重认证设计](docs/superpowers/specs/2026-07-26-gate-requalification-design.md)。Ark Coding Plan 的历史失败仅能证明正确文件名下的内容未通过严格契约，不能据此放宽验收、修改路由或增加重试；Gemini 当前额度也无法通过 doctor 预知。实施先补充脱敏结果文件哈希/长度/读取状态、精确命令证据、调用/重试/fallback 计数和原子批次 manifest，再按风险优先顺序只执行一次严格串行、无重试、无 fallback 的全量重认证。任一失败立即停止且保持 `blocked`；十项同批全部通过才允许准备新的 `ready` 审阅包，仍不构成真实安装授权。
-- 2026-07-26：重认证设计已完成独立根因、资格策略、实现可行性与 Kimi K3 只读外审收敛。最终语义不宣称 provider 内部绝对单次请求，而要求 adapter client 调用/adapter 重试/Pi 明示自动重试/协调器 fallback 为 `1 / 0 / 0 / false`；Pi 资格模式在 prompt 前显式关闭自动重试和自动压缩，并固定 provider retry 为 0。批次使用系统临时目录锁、不可变 `running`/终态 checkpoint、只发布一次的 manifest 和晋升前磁盘重验；“原子”只指同批证据与 all-or-none 晋升，不表示真实调用或额度可回滚。Kimi 外审成功且未改文件；Ark Agent Plan 审阅在无文件改动下因 Pi RPC `EPIPE` 未形成正文，不计通过。
+- 2026-07-26：重认证设计已完成独立根因、资格策略、实现可行性与 Kimi K3 只读外审收敛。最终语义不宣称 provider 内部绝对单次请求，而要求 adapter client 调用/adapter 重试/Pi 明示自动重试/adapter 明示 fallback/协调器 fallback 为 `1 / 0 / 0 / false / false`；Pi 资格模式在 prompt 前显式关闭自动重试和自动压缩，并固定 provider retry 为 0。批次使用系统临时目录锁、不可变 `running`/终态 checkpoint、只发布一次的 manifest 和晋升前磁盘重验；“原子”只指同批证据与 all-or-none 晋升，不表示真实调用或额度可回滚。Kimi 外审成功且未改文件；Ark Agent Plan 审阅在无文件改动下因 Pi RPC `EPIPE` 未形成正文，不计通过。
+- 2026-07-26：[十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md) 已完成独立规格与可执行性复核。计划把冻结候选 verifier 与晋升后的 immutable-evidence verifier 分开，避免 registry/bundle 重建后错误要求匹配旧 build；preflight 在任何 batch tracked 文件出现前完成，隔离报告使用 check-only 模式；锁绑定授权哈希并覆盖四个崩溃窗口，`batch_started` 在真实调用前耐崩溃占用授权；结果文件通过 file handle/fstat identity 防路径替换；成功后旧 pending 隔离断言以真实 integration RED→GREEN 更新。Task 1–6 不运行十门禁真实批次，Task 7 只消费一次当前授权，失败不自动重开。
 
 ## 架构与计划索引
 
 - [产品设计历史基线](docs/superpowers/specs/2026-07-18-codex-external-agents-design.md)
 - [当前官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)
 - [十门禁原子重认证设计](docs/superpowers/specs/2026-07-26-gate-requalification-design.md)
+- [十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md)
 - [官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)
 - [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)
 - [Pi/Gemini 适配实施计划](docs/superpowers/plans/2026-07-18-pi-gemini-adapter.md)
