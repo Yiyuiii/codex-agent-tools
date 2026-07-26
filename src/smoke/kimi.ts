@@ -19,7 +19,11 @@ import type {
   ExternalDelegateInput,
   ExternalReviewInput,
 } from "../tasks/schemas.js";
-import { inSmokeInfrastructureStage } from "./evidence.js";
+import {
+  inSmokeInfrastructureStage,
+  normalizeSmokeQualificationContext,
+  type SmokeQualificationContext,
+} from "./evidence.js";
 import {
   inspectResultFile,
   type ResultFileEvidence,
@@ -31,6 +35,7 @@ export type KimiSmokeTask = "review" | "delegate";
 export interface KimiSmokeOptions {
   llm: string;
   task: KimiSmokeTask;
+  qualificationContext?: SmokeQualificationContext;
   tempRoot?: string;
   timeoutMs?: number;
   onProgress?: (message: string) => void;
@@ -49,7 +54,8 @@ export interface KimiSmokeChecks {
 }
 
 export interface KimiSmokeEvidence {
-  schemaVersion: 1;
+  schemaVersion: 2;
+  qualification: SmokeQualificationContext | null;
   timestamp: string;
   kimiVersion: string;
   llm: string;
@@ -75,6 +81,7 @@ export interface KimiSmokeEvidence {
   adapterRetryCount: number | null;
   runtimeReportedAutoRetryCount: number | null;
   adapterReportedFallbackUsed: boolean | null;
+  orchestratorFallbackUsed: boolean | null;
   executionTelemetrySource: AdapterExecutionTelemetry["source"] | null;
   checks: KimiSmokeChecks;
   resultFileReadStatus?: ResultFileReadStatus;
@@ -328,10 +335,12 @@ function commonEvidence(
   checks: KimiSmokeChecks,
   passed: boolean,
   telemetry: AdapterExecutionTelemetry | null | undefined,
+  qualification: SmokeQualificationContext | null,
 ): KimiSmokeEvidence {
   const output = "review" in result ? result.review : result.summary;
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    qualification,
     timestamp: now.toISOString(),
     kimiVersion,
     llm: options.llm,
@@ -362,6 +371,8 @@ function commonEvidence(
       telemetry?.runtimeReportedAutoRetryCount ?? null,
     adapterReportedFallbackUsed:
       telemetry?.adapterReportedFallbackUsed ?? null,
+    orchestratorFallbackUsed:
+      qualification?.orchestratorFallbackUsed ?? null,
     executionTelemetrySource: telemetry?.source ?? null,
     checks,
   };
@@ -371,6 +382,9 @@ export async function runKimiSmoke(
   options: KimiSmokeOptions,
   dependencies: KimiSmokeDependencies = {},
 ): Promise<KimiSmokeEvidence> {
+  const qualification = normalizeSmokeQualificationContext(
+    options.qualificationContext,
+  );
   const profile = resolveLlm(options.llm);
   if (profile.runtime !== "kimi-acp" || profile.network !== "direct") {
     throw new Error(`Logical llm ${options.llm} is not a direct Kimi profile`);
@@ -465,6 +479,7 @@ export async function runKimiSmoke(
         checks,
         passed,
         executionTelemetry,
+        qualification,
       );
     }
 
@@ -530,6 +545,7 @@ export async function runKimiSmoke(
         checks,
         passed,
         executionTelemetry,
+        qualification,
       ),
       ...resultFileArtifactFields(resultFile),
     };

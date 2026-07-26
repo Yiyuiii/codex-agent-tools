@@ -7,6 +7,14 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { AdapterExecutionTelemetry } from "../../src/adapters/adapter.js";
 import {
+  PiAdapter,
+  type PiAdapterDependencies,
+} from "../../src/adapters/pi/adapter.js";
+import type {
+  BuildIsolatedPiConfigOptions,
+  IsolatedPiConfig,
+} from "../../src/adapters/pi/config.js";
+import {
   parsePiSmokeArguments,
   runPiSmoke,
   type PiSmokeService,
@@ -57,7 +65,98 @@ const validPiTelemetry: AdapterExecutionTelemetry = {
   source: "pi-rpc-observable",
 };
 
+const qualificationContext = {
+  batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
+  ordinal: 2,
+  repositoryCommit: "a".repeat(40),
+  buildIdentitySha256: "b".repeat(64),
+  authorizationReferenceSha256: "c".repeat(64),
+  orchestratorFallbackUsed: false as const,
+};
+
 describe("Pi/Gemini real-smoke harness", () => {
+  it.each([
+    {
+      label: "standalone Gemini",
+      llm: "gemini-3.5-flash",
+      qualificationContext: null,
+      expectedQualification: undefined,
+      expectedRetryMode: "default",
+    },
+    {
+      label: "qualified Ark",
+      llm: "ark-agent-plan",
+      qualificationContext: {
+        ...qualificationContext,
+        ordinal: 7,
+      },
+      expectedQualification: true,
+      expectedRetryMode: "qualification-single-attempt",
+    },
+  ] as const)(
+    "constructs $label runtime with the intended config and retry mode",
+    async ({
+      llm,
+      qualificationContext: context,
+      expectedQualification,
+      expectedRetryMode,
+    }) => {
+      const module = await import("../../src/smoke/pi.js");
+      const createRuntime = (
+        module as unknown as {
+          createPiSmokeRuntime?: (
+            llm: string,
+            task: "review" | "delegate",
+            qualificationContext: typeof context,
+            dependencies: {
+              buildConfig: (
+                options: BuildIsolatedPiConfigOptions,
+              ) => Promise<IsolatedPiConfig>;
+              createAdapter: (
+                dependencies: PiAdapterDependencies,
+              ) => PiAdapter;
+            },
+          ) => Promise<unknown>;
+        }
+      ).createPiSmokeRuntime;
+      expect(createRuntime).toBeTypeOf("function");
+      if (createRuntime === undefined) return;
+
+      const configCalls: BuildIsolatedPiConfigOptions[] = [];
+      const retryModes: string[] = [];
+      await createRuntime(llm, "review", context, {
+        buildConfig: async (options) => {
+          configCalls.push({ ...options });
+          return {
+            agentDir: "C:\\isolated\\pi",
+            settingsPath: "C:\\isolated\\pi\\settings.json",
+            modelsPath: "C:\\isolated\\pi\\models.json",
+            environment: { PI_CODING_AGENT_DIR: "C:\\isolated\\pi" },
+            contentSha256: "d".repeat(64),
+          };
+        },
+        createAdapter: (dependencies) => {
+          retryModes.push(dependencies.retryMode ?? "default");
+          return new PiAdapter(dependencies);
+        },
+      });
+
+      expect(configCalls).toHaveLength(1);
+      expect(configCalls[0]).toMatchObject({
+        providers: ["ark"],
+        ...(expectedQualification === undefined
+          ? {}
+          : { qualification: expectedQualification }),
+      });
+      if (expectedQualification === true) {
+        expect(configCalls[0]?.qualification).toBe(true);
+      } else {
+        expect(configCalls[0]).not.toHaveProperty("qualification");
+      }
+      expect(retryModes).toEqual([expectedRetryMode]);
+    },
+  );
+
   it("requires the fixed Gemini logical id and one task", () => {
     expect(
       parsePiSmokeArguments([
@@ -101,7 +200,12 @@ describe("Pi/Gemini real-smoke harness", () => {
       },
     };
     const evidence = await runPiSmoke(
-      { llm: "gemini-3.5-flash", task: "review", tempRoot: root },
+      {
+        llm: "gemini-3.5-flash",
+        task: "review",
+        tempRoot: root,
+        qualificationContext,
+      },
       {
         service,
         runtimeEvidence: runtimeEvidence(),
@@ -111,6 +215,8 @@ describe("Pi/Gemini real-smoke harness", () => {
       },
     );
     expect(evidence).toMatchObject({
+      schemaVersion: 2,
+      qualification: qualificationContext,
       llm: "gemini-3.5-flash",
       task: "review",
       actualModel: "gemini-3.5-flash",
@@ -122,6 +228,7 @@ describe("Pi/Gemini real-smoke harness", () => {
       adapterRetryCount: 0,
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
+      orchestratorFallbackUsed: false,
       executionTelemetrySource: "pi-rpc-observable",
       checks: {
         actualModelMatches: true,

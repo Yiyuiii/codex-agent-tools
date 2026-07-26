@@ -11,10 +11,19 @@ type SmokeTask = "review" | "delegate";
 interface ScriptMainOptions {
   args: string[];
   evidenceDirectory: string;
+  qualificationContext?: {
+    batchId: string;
+    ordinal: number;
+    repositoryCommit: string;
+    buildIdentitySha256: string;
+    authorizationReferenceSha256: string;
+    orchestratorFallbackUsed: false;
+  };
   runSmoke: (options: {
     llm: string;
     task: SmokeTask;
     onProgress: (message: string) => void;
+    qualificationContext?: ScriptMainOptions["qualificationContext"];
   }) => Promise<never>;
   now: () => Date;
   writeStdout: (text: string) => void;
@@ -28,6 +37,22 @@ interface SmokeScriptModule {
     parseArguments: unknown;
     runSmoke: unknown;
   };
+}
+
+interface RealSmokeMainModule {
+  runRealSmokeMain?: (
+    config: {
+      kind: "kimi";
+      usage: string;
+      parseArguments: (args: readonly string[]) => {
+        llm: string;
+        task: SmokeTask;
+      };
+      runSmoke: ScriptMainOptions["runSmoke"];
+      evidenceDirectory: string;
+    },
+    options: Omit<ScriptMainOptions, "evidenceDirectory">,
+  ) => Promise<number>;
 }
 
 const roots: string[] = [];
@@ -54,6 +79,12 @@ async function importSmokeScript(script: string): Promise<SmokeScriptModule> {
     process.argv = originalArgv;
     process.exitCode = originalExitCode;
   }
+}
+
+async function importRealSmokeMain(): Promise<RealSmokeMainModule> {
+  const url = pathToFileURL(path.resolve("scripts/real-smoke-main.mjs"));
+  url.searchParams.set("vitest", `${Date.now()}-${Math.random()}`);
+  return (await import(url.href)) as RealSmokeMainModule;
 }
 
 afterEach(async () => {
@@ -145,6 +176,63 @@ describe("production real-smoke script entrypoints", () => {
     },
   );
 
+  it("requires a programmatic final case directory for qualification mode", async () => {
+    const common = await importRealSmokeMain();
+    expect(common.runRealSmokeMain).toBeTypeOf("function");
+    if (common.runRealSmokeMain === undefined) return;
+
+    const root = await tempRoot();
+    let runnerCalls = 0;
+    let stderr = "";
+    const exitCode = await common.runRealSmokeMain(
+      {
+        kind: "kimi",
+        usage: "unused",
+        parseArguments: (args) => {
+          expect(args).toEqual([
+            "--llm",
+            "kimi-k3",
+            "--task",
+            "review",
+          ]);
+          return { llm: "kimi-k3", task: "review" };
+        },
+        runSmoke: async () => {
+          runnerCalls += 1;
+          throw new Error("must not run");
+        },
+        evidenceDirectory: path.join(root, "standalone"),
+      },
+      {
+        args: ["--llm", "kimi-k3", "--task", "review"],
+        qualificationContext: {
+          batchId: "valid-batch",
+          ordinal: 1,
+          repositoryCommit: "a".repeat(40),
+          buildIdentitySha256: "b".repeat(64),
+          authorizationReferenceSha256: "c".repeat(64),
+          orchestratorFallbackUsed: false,
+        },
+        runSmoke: async () => {
+          runnerCalls += 1;
+          throw new Error("must not run");
+        },
+        now: () => new Date("2026-07-25T01:02:03.000Z"),
+        writeStdout: () => {},
+        writeStderr: (text) => {
+          stderr += text;
+        },
+      },
+    );
+
+    expect(exitCode).toBe(1);
+    expect(runnerCalls).toBe(0);
+    expect(stderr).toBe(
+      "Smoke qualification evidence directory is required.\n",
+    );
+    expect(await readdir(root)).toEqual([]);
+  });
+
   it.each(scripts)(
     "$name uses the injected runner and writes sanitized failure evidence",
     async ({
@@ -213,6 +301,122 @@ describe("production real-smoke script entrypoints", () => {
           "Smoke failed; sanitized evidence was written.\n",
       );
       expect(stderr).not.toContain(secret);
+    },
+  );
+
+  it.each(scripts)(
+    "$name programmatically binds qualification context and a batch case directory",
+    async ({
+      script,
+      llm,
+      task,
+      expectedFile,
+    }) => {
+      const module = await importSmokeScript(script);
+      expect(module.main).toBeTypeOf("function");
+      if (module.main === undefined) return;
+
+      const root = await tempRoot();
+      const qualificationContext = {
+        batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
+        ordinal: 1,
+        repositoryCommit: "a".repeat(40),
+        buildIdentitySha256: "b".repeat(64),
+        authorizationReferenceSha256: "c".repeat(64),
+        orchestratorFallbackUsed: false as const,
+      };
+      const caseDirectory = path.join(
+        root,
+        "evidence",
+        "batches",
+        qualificationContext.batchId,
+        "cases",
+      );
+      let receivedContext: unknown;
+      let stdout = "";
+
+      const exitCode = await module.main({
+        args: ["--llm", llm, "--task", task],
+        evidenceDirectory: caseDirectory,
+        qualificationContext,
+        runSmoke: async (options) => {
+          receivedContext = options.qualificationContext;
+          throw new Error("sanitized infrastructure failure");
+        },
+        now: () => new Date("2026-07-25T01:02:03.000Z"),
+        writeStdout: (text) => {
+          stdout += text;
+        },
+        writeStderr: () => {},
+      });
+
+      expect(exitCode).toBe(1);
+      expect(receivedContext).toEqual(qualificationContext);
+      expect(await readdir(caseDirectory)).toEqual([expectedFile]);
+      expect(
+        await readdir(
+          path.join(
+            caseDirectory,
+            "batches",
+            qualificationContext.batchId,
+            "cases",
+          ),
+        ).catch(() => []),
+      ).toEqual([]);
+      const evidence = JSON.parse(
+        await readFile(path.join(caseDirectory, expectedFile), "utf8"),
+      ) as Record<string, unknown>;
+      expect(evidence).toMatchObject({
+        schemaVersion: 2,
+        qualification: qualificationContext,
+        adapterClientInvocationCount: null,
+        adapterRetryCount: null,
+        runtimeReportedAutoRetryCount: null,
+        adapterReportedFallbackUsed: null,
+        orchestratorFallbackUsed: false,
+        executionTelemetrySource: null,
+      });
+      expect(stdout).toContain(
+        `docs/smoke/evidence/batches/${qualificationContext.batchId}/cases/${expectedFile}`,
+      );
+    },
+  );
+
+  it.each(scripts)(
+    "$name does not expose qualification through public CLI arguments",
+    async ({ script, llm }) => {
+      const module = await importSmokeScript(script);
+      expect(module.main).toBeTypeOf("function");
+      if (module.main === undefined) return;
+
+      const root = await tempRoot();
+      let runnerCalls = 0;
+      let stderr = "";
+      const exitCode = await module.main({
+        args: [
+          "--llm",
+          llm,
+          "--task",
+          "review",
+          "--batch",
+          "forbidden",
+        ],
+        evidenceDirectory: path.join(root, "evidence"),
+        runSmoke: async () => {
+          runnerCalls += 1;
+          throw new Error("must not run");
+        },
+        now: () => new Date("2026-07-25T01:02:03.000Z"),
+        writeStdout: () => {},
+        writeStderr: (text) => {
+          stderr += text;
+        },
+      });
+
+      expect(exitCode).toBe(1);
+      expect(runnerCalls).toBe(0);
+      expect(stderr).toBe("Smoke arguments are invalid.\n");
+      expect(await readdir(root)).toEqual([]);
     },
   );
 

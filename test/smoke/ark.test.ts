@@ -42,6 +42,15 @@ const validPiTelemetry: AdapterExecutionTelemetry = {
   source: "pi-rpc-observable",
 };
 
+const qualificationContext = {
+  batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
+  ordinal: 7,
+  repositoryCommit: "a".repeat(40),
+  buildIdentitySha256: "b".repeat(64),
+  authorizationReferenceSha256: "c".repeat(64),
+  orchestratorFallbackUsed: false as const,
+};
+
 describe("Ark real-smoke harness", () => {
   it.each([
     "ark-coding-plan",
@@ -89,7 +98,12 @@ describe("Ark real-smoke harness", () => {
     };
 
     const evidence = await runArkSmoke(
-      { llm: "ark-agent-plan", task: "review", tempRoot: root },
+      {
+        llm: "ark-agent-plan",
+        task: "review",
+        tempRoot: root,
+        qualificationContext,
+      },
       {
         service,
         runtimeEvidence: {
@@ -106,6 +120,8 @@ describe("Ark real-smoke harness", () => {
     );
 
     expect(evidence).toMatchObject({
+      schemaVersion: 2,
+      qualification: qualificationContext,
       llm: "ark-agent-plan",
       provider: "ark-agent-plan",
       actualModel: "ark-code-latest",
@@ -117,6 +133,7 @@ describe("Ark real-smoke harness", () => {
       adapterRetryCount: 0,
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
+      orchestratorFallbackUsed: false,
       executionTelemetrySource: "pi-rpc-observable",
       failureReason: null,
       checks: {

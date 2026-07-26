@@ -43,6 +43,15 @@ const validKimiTelemetry: AdapterExecutionTelemetry = {
   source: "kimi-acp-observable",
 };
 
+const qualificationContext = {
+  batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
+  ordinal: 6,
+  repositoryCommit: "a".repeat(40),
+  buildIdentitySha256: "b".repeat(64),
+  authorizationReferenceSha256: "c".repeat(64),
+  orchestratorFallbackUsed: false as const,
+};
+
 describe("Kimi real-smoke harness", () => {
   it("requires an explicit supported llm and one task", () => {
     expect(
@@ -96,6 +105,8 @@ describe("Kimi real-smoke harness", () => {
     );
 
     expect(evidence).toMatchObject({
+      schemaVersion: 2,
+      qualification: null,
       llm: "kimi-k3",
       task: "review",
       actualModel: "kimi-code/k3",
@@ -145,7 +156,12 @@ describe("Kimi real-smoke harness", () => {
     };
 
     const evidence = await runKimiSmoke(
-      { llm: "kimi-k3", task: "delegate", tempRoot: root },
+      {
+        llm: "kimi-k3",
+        task: "delegate",
+        tempRoot: root,
+        qualificationContext,
+      },
       {
         service,
         readKimiVersion: async () => "0.27.0",
@@ -154,11 +170,14 @@ describe("Kimi real-smoke harness", () => {
     );
 
     expect(evidence).toMatchObject({
+      schemaVersion: 2,
+      qualification: qualificationContext,
       passed: true,
       adapterClientInvocationCount: 1,
       adapterRetryCount: 0,
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
+      orchestratorFallbackUsed: false,
       executionTelemetrySource: "kimi-acp-observable",
       resultFileReadStatus: "read",
       resultFileByteLength: Buffer.byteLength("KIMI_SMOKE_OK\n"),

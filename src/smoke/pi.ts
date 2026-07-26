@@ -6,9 +6,16 @@ import path from "node:path";
 import { execa } from "execa";
 
 import type { AdapterExecutionTelemetry } from "../adapters/adapter.js";
-import { PiAdapter } from "../adapters/pi/adapter.js";
+import {
+  PiAdapter,
+  type PiAdapterDependencies,
+} from "../adapters/pi/adapter.js";
 import { runPiRpc } from "../adapters/pi/client.js";
-import { buildIsolatedPiConfig } from "../adapters/pi/config.js";
+import {
+  buildIsolatedPiConfig,
+  type BuildIsolatedPiConfigOptions,
+  type IsolatedPiConfig,
+} from "../adapters/pi/config.js";
 import { locatePi } from "../adapters/pi/locator.js";
 import type { LlmProfile, NetworkPolicy, RuntimeKind } from "../domain/types.js";
 import { createLlmRegistry, resolveLlm } from "../llms/registry.js";
@@ -22,7 +29,11 @@ import type {
 } from "../tasks/schemas.js";
 import { ExternalAgentService, type TaskExecutionContext } from "../tasks/service.js";
 import { VERSION } from "../version.js";
-import { inSmokeInfrastructureStage } from "./evidence.js";
+import {
+  inSmokeInfrastructureStage,
+  normalizeSmokeQualificationContext,
+  type SmokeQualificationContext,
+} from "./evidence.js";
 import {
   inspectResultFile,
   type ResultFileEvidence,
@@ -34,6 +45,7 @@ export type PiSmokeTask = "review" | "delegate";
 export interface PiSmokeOptions {
   llm: string;
   task: PiSmokeTask;
+  qualificationContext?: SmokeQualificationContext;
   tempRoot?: string;
   timeoutMs?: number;
   onProgress?: (message: string) => void;
@@ -58,7 +70,8 @@ export interface PiSmokeChecks {
 }
 
 export interface PiSmokeEvidence {
-  schemaVersion: 1;
+  schemaVersion: 2;
+  qualification: SmokeQualificationContext | null;
   timestamp: string;
   piVersion: string;
   llm: string;
@@ -89,6 +102,7 @@ export interface PiSmokeEvidence {
   adapterRetryCount: number | null;
   runtimeReportedAutoRetryCount: number | null;
   adapterReportedFallbackUsed: boolean | null;
+  orchestratorFallbackUsed: boolean | null;
   executionTelemetrySource: AdapterExecutionTelemetry["source"] | null;
   checks: PiSmokeChecks;
   resultFileReadStatus?: ResultFileReadStatus;
@@ -117,6 +131,13 @@ export interface PiSmokeDependencies {
   readPiVersion?: () => Promise<string>;
   listPiRpcProcessIds?: () => Promise<number[]>;
   now?: () => Date;
+}
+
+export interface PiSmokeRuntimeFactoryDependencies {
+  buildConfig?: (
+    options: BuildIsolatedPiConfigOptions,
+  ) => Promise<IsolatedPiConfig>;
+  createAdapter?: (dependencies: PiAdapterDependencies) => PiAdapter;
 }
 
 export function parsePiSmokeArguments(args: readonly string[]): {
@@ -150,10 +171,15 @@ export function parsePiSmokeArguments(args: readonly string[]): {
   return { llm, task };
 }
 
-async function createSmokeRuntime(
+export async function createPiSmokeRuntime(
   llm: string,
   task: PiSmokeTask,
+  qualification: SmokeQualificationContext | null,
+  dependencies: PiSmokeRuntimeFactoryDependencies = {},
 ): Promise<{ service: PiSmokeService; evidence: PiSmokeRuntimeEvidence }> {
+  const normalizedQualification = normalizeSmokeQualificationContext(
+    qualification,
+  );
   const base = resolveLlm(llm);
   const profile = {
     ...base,
@@ -163,17 +189,26 @@ async function createSmokeRuntime(
       [task]: { status: "passed" as const, evidence: "ephemeral smoke gate" },
     },
   };
-  const config = await buildIsolatedPiConfig({
+  const buildConfig = dependencies.buildConfig ?? buildIsolatedPiConfig;
+  const config = await buildConfig({
     version: VERSION,
     providers: ["ark"],
-    qualification: true,
+    ...(normalizedQualification === null
+      ? {}
+      : { qualification: true }),
   });
   const evidence: PiSmokeRuntimeEvidence = {
     configSha256: config.contentSha256,
     childEnvironment: {},
   };
-  const pi = new PiAdapter({
-    retryMode: "qualification-single-attempt",
+  const createAdapter =
+    dependencies.createAdapter ??
+    ((adapterDependencies: PiAdapterDependencies) =>
+      new PiAdapter(adapterDependencies));
+  const pi = createAdapter({
+    ...(normalizedQualification === null
+      ? {}
+      : { retryMode: "qualification-single-attempt" as const }),
     buildConfig: async () => config,
     runClient: async (request) => {
       evidence.childEnvironment = { ...request.environment };
@@ -415,6 +450,7 @@ function commonEvidence(
   checks: PiSmokeChecks,
   passed: boolean,
   telemetry: AdapterExecutionTelemetry | null | undefined,
+  qualification: SmokeQualificationContext | null,
 ): PiSmokeEvidence {
   const environment = inspectEnvironment(
     runtimeEvidence.childEnvironment,
@@ -434,7 +470,8 @@ function commonEvidence(
           ? "adapter_failure"
           : "acceptance_failed";
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    qualification,
     timestamp: now.toISOString(),
     piVersion,
     llm: options.llm,
@@ -462,6 +499,8 @@ function commonEvidence(
       telemetry?.runtimeReportedAutoRetryCount ?? null,
     adapterReportedFallbackUsed:
       telemetry?.adapterReportedFallbackUsed ?? null,
+    orchestratorFallbackUsed:
+      qualification?.orchestratorFallbackUsed ?? null,
     executionTelemetrySource: telemetry?.source ?? null,
     checks: {
       ...checks,
@@ -478,6 +517,9 @@ export async function runPiSmoke(
   options: PiSmokeOptions,
   dependencies: PiSmokeDependencies = {},
 ): Promise<PiSmokeEvidence> {
+  const qualification = normalizeSmokeQualificationContext(
+    options.qualificationContext,
+  );
   const profile = resolveLlm(options.llm);
   if (
     profile.runtime !== "pi-rpc" ||
@@ -493,7 +535,7 @@ export async function runPiSmoke(
     }
     const runtime = await inSmokeInfrastructureStage(
       "runtime_setup",
-      () => createSmokeRuntime(options.llm, options.task),
+      () => createPiSmokeRuntime(options.llm, options.task, qualification),
     );
     service = runtime.service;
     runtimeEvidence = runtime.evidence;
@@ -593,6 +635,7 @@ export async function runPiSmoke(
         checks,
         passed,
         executionTelemetry,
+        qualification,
       );
     }
 
@@ -668,6 +711,7 @@ export async function runPiSmoke(
         checks,
         passed,
         executionTelemetry,
+        qualification,
       ),
       ...resultFileArtifactFields(resultFile),
     };
