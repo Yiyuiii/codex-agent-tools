@@ -11,15 +11,17 @@ import type { Dirent } from "node:fs";
 import path from "node:path";
 import { types as nodeUtilTypes } from "node:util";
 
-import { resolveLlm, supportedLlmIds } from "../llms/registry.js";
 import {
   defaultSmokeEvidenceFileOperations,
   publishImmutableJson,
 } from "../smoke/evidence.js";
 import { readQualificationLockOwner } from "./lock.js";
 import {
+  ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
+  LEGACY_QUALIFICATION_PLAN_ID,
+  type QualificationPlanId,
 } from "./protocol.js";
 import type {
   BuildArtifactIdentity,
@@ -199,6 +201,36 @@ const CURRENT_CREDENTIAL_ENVIRONMENT_NAMES = Object.freeze([
   frozenCredentialRule("kimi-k3", [null]),
 ]);
 
+interface QualificationProtocol {
+  readonly planId: QualificationPlanId;
+  readonly manifestSchemaVersion: 1 | 2;
+  readonly checkpointSchemaVersion: 1 | 2;
+  readonly evidenceSchemaVersion: 2 | 3;
+  readonly schedule: readonly QualificationCaseIdentity[];
+  readonly allowGoogleFreeTierQuota: boolean;
+  readonly freezePreflight: (value: unknown) => FrozenPreflightRecord;
+}
+
+const LEGACY_PROTOCOL: QualificationProtocol = Object.freeze({
+  planId: LEGACY_QUALIFICATION_PLAN_ID,
+  manifestSchemaVersion: 1,
+  checkpointSchemaVersion: 1,
+  evidenceSchemaVersion: 2,
+  schedule: LEGACY_QUALIFICATION_CASES,
+  allowGoogleFreeTierQuota: true,
+  freezePreflight: freezeLegacyPreflightRecord,
+});
+
+const CURRENT_PROTOCOL: QualificationProtocol = Object.freeze({
+  planId: ACTIVE_QUALIFICATION_PLAN_ID,
+  manifestSchemaVersion: 2,
+  checkpointSchemaVersion: 2,
+  evidenceSchemaVersion: 3,
+  schedule: ACTIVE_QUALIFICATION_CASES,
+  allowGoogleFreeTierQuota: false,
+  freezePreflight: freezeCurrentPreflightRecord,
+});
+
 export class QualificationLedgerError extends Error {
   readonly category = "infrastructure";
   readonly stage = "qualification_ledger";
@@ -275,6 +307,51 @@ function plainRecord(
     }
   }
   return record;
+}
+
+function protocolForEnvelope(value: unknown): QualificationProtocol {
+  const envelope = plainRecord(value);
+  const hasPlan = Object.hasOwn(envelope, "qualificationPlanId");
+  if (envelope.schemaVersion === 1 && !hasPlan) {
+    return LEGACY_PROTOCOL;
+  }
+  if (
+    envelope.schemaVersion === 2 &&
+    envelope.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID
+  ) {
+    return CURRENT_PROTOCOL;
+  }
+  throw new QualificationLedgerError();
+}
+
+function protocolEnvelope(
+  protocol: QualificationProtocol,
+): Readonly<
+  | { schemaVersion: 1 }
+  | { schemaVersion: 2; qualificationPlanId: "four-llm-v1" }
+> {
+  return protocol === LEGACY_PROTOCOL
+    ? Object.freeze({ schemaVersion: 1 as const })
+    : Object.freeze({
+        schemaVersion: 2 as const,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      });
+}
+
+function assertProtocol(
+  actual: QualificationProtocol,
+  expected: QualificationProtocol,
+): void {
+  if (actual !== expected) throw new QualificationLedgerError();
+}
+
+function keysForProtocol(
+  protocol: QualificationProtocol,
+  keys: readonly string[],
+): readonly string[] {
+  return protocol === LEGACY_PROTOCOL
+    ? keys
+    : [...keys, "qualificationPlanId"];
 }
 
 function densePlainArray(value: unknown): readonly unknown[] {
@@ -564,17 +641,7 @@ function freezeCurrentPreflightRecord(
 
 export function freezePreflightRecord(value: unknown): FrozenPreflightRecord {
   try {
-    const envelope = plainRecord(value);
-    if (envelope.schemaVersion === 1) {
-      return freezeLegacyPreflightRecord(value);
-    }
-    if (
-      envelope.schemaVersion === 2 &&
-      envelope.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID
-    ) {
-      return freezeCurrentPreflightRecord(value);
-    }
-    throw new QualificationLedgerError();
+    return protocolForEnvelope(value).freezePreflight(value);
   } catch {
     throw new QualificationLedgerError();
   }
@@ -853,15 +920,17 @@ async function readLedgerDirectory(
   return readdir(directory, { withFileTypes: true });
 }
 
-function normalizeCaseIdentity(value: unknown): QualificationCaseIdentity {
+function normalizeCaseIdentity(
+  value: unknown,
+  protocol: QualificationProtocol,
+): QualificationCaseIdentity {
   const record = plainRecord(value, ["llm", "ordinal", "task"]);
   if (
     typeof record.ordinal !== "number" ||
     !Number.isSafeInteger(record.ordinal) ||
     record.ordinal < 1 ||
-    record.ordinal > 10 ||
+    record.ordinal > protocol.schedule.length ||
     typeof record.llm !== "string" ||
-    !supportedLlmIds().includes(record.llm) ||
     (record.task !== "review" && record.task !== "delegate")
   ) {
     throw new QualificationLedgerError();
@@ -871,7 +940,7 @@ function normalizeCaseIdentity(value: unknown): QualificationCaseIdentity {
     llm: record.llm,
     task: record.task,
   });
-  const fixed = LEGACY_QUALIFICATION_CASES[identity.ordinal - 1];
+  const fixed = protocol.schedule[identity.ordinal - 1];
   if (fixed === undefined || !identitiesEqual(identity, fixed)) {
     throw new QualificationLedgerError();
   }
@@ -890,7 +959,8 @@ function identitiesEqual(
 }
 
 interface BatchStartedCheckpoint {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
+  qualificationPlanId?: "four-llm-v1";
   sequence: 0;
   kind: "batch_started";
   batchId: string;
@@ -901,7 +971,8 @@ interface BatchStartedCheckpoint {
 }
 
 interface CaseRunningCheckpoint extends QualificationCaseIdentity {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
+  qualificationPlanId?: "four-llm-v1";
   sequence: number;
   kind: "case_running";
   batchId: string;
@@ -912,7 +983,8 @@ interface CaseRunningCheckpoint extends QualificationCaseIdentity {
 }
 
 interface CaseCompletedCheckpoint extends QualificationCaseIdentity {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
+  qualificationPlanId?: "four-llm-v1";
   sequence: number;
   kind: "case_completed";
   batchId: string;
@@ -1027,10 +1099,11 @@ function normalizeCheckpoint(
   value: unknown,
   expectedSequence: number,
   expectedBatchId: string,
+  protocol: QualificationProtocol,
 ): QualificationCheckpoint {
   const base = plainRecord(value);
+  assertProtocol(protocolForEnvelope(value), protocol);
   if (
-    base.schemaVersion !== 1 ||
     base.sequence !== expectedSequence ||
     base.batchId !== expectedBatchId ||
     !validTimestamp(base.recordedAt)
@@ -1038,17 +1111,20 @@ function normalizeCheckpoint(
     throw new QualificationLedgerError();
   }
   if (base.kind === "batch_started") {
-    plainRecord(value, [
-      "authorizationReferenceSha256",
-      "batchId",
-      "kind",
-      "preflight",
-      "preflightSha256",
-      "recordedAt",
-      "schemaVersion",
-      "sequence",
-    ]);
-    const preflight = freezePreflightRecord(base.preflight);
+    plainRecord(
+      value,
+      keysForProtocol(protocol, [
+        "authorizationReferenceSha256",
+        "batchId",
+        "kind",
+        "preflight",
+        "preflightSha256",
+        "recordedAt",
+        "schemaVersion",
+        "sequence",
+      ]),
+    );
+    const preflight = protocol.freezePreflight(base.preflight);
     if (
       expectedSequence !== 0 ||
       typeof base.authorizationReferenceSha256 !== "string" ||
@@ -1058,7 +1134,7 @@ function normalizeCheckpoint(
       throw new QualificationLedgerError();
     }
     return Object.freeze({
-      schemaVersion: 1,
+      ...protocolEnvelope(protocol),
       sequence: 0,
       kind: "batch_started",
       batchId: expectedBatchId,
@@ -1068,11 +1144,14 @@ function normalizeCheckpoint(
       preflight,
     });
   }
-  const identity = normalizeCaseIdentity({
-    ordinal: base.ordinal,
-    llm: base.llm,
-    task: base.task,
-  });
+  const identity = normalizeCaseIdentity(
+    {
+      ordinal: base.ordinal,
+      llm: base.llm,
+      task: base.task,
+    },
+    protocol,
+  );
   const commonKeys = [
     "batchId",
     "buildIdentitySha256",
@@ -1097,9 +1176,9 @@ function normalizeCheckpoint(
     throw new QualificationLedgerError();
   }
   if (base.kind === "case_running") {
-    plainRecord(value, commonKeys);
+    plainRecord(value, keysForProtocol(protocol, commonKeys));
     return Object.freeze({
-      schemaVersion: 1,
+      ...protocolEnvelope(protocol),
       sequence: expectedSequence,
       kind: "case_running",
       batchId: expectedBatchId,
@@ -1115,20 +1194,23 @@ function normalizeCheckpoint(
       throw new QualificationLedgerError();
     }
     const telemetry = normalizeExecutionTelemetry(base);
-    plainRecord(value, [
-      ...commonKeys,
-      "adapterClientInvocationCount",
-      "adapterReportedFallbackUsed",
-      "adapterRetryCount",
-      "evidence",
-      "executionTelemetrySource",
-      "failureReason",
-      "orchestratorFallbackUsed",
-      "result",
-      "runtimeReportedAutoRetryCount",
-    ]);
+    plainRecord(
+      value,
+      keysForProtocol(protocol, [
+        ...commonKeys,
+        "adapterClientInvocationCount",
+        "adapterReportedFallbackUsed",
+        "adapterRetryCount",
+        "evidence",
+        "executionTelemetrySource",
+        "failureReason",
+        "orchestratorFallbackUsed",
+        "result",
+        "runtimeReportedAutoRetryCount",
+      ]),
+    );
     return Object.freeze({
-      schemaVersion: 1,
+      ...protocolEnvelope(protocol),
       sequence: expectedSequence,
       kind: "case_completed",
       batchId: expectedBatchId,
@@ -1143,6 +1225,7 @@ function normalizeCheckpoint(
       failureReason: normalizeFailureReason(
         base.failureReason,
         base.result === "passed",
+        protocol,
       ),
     });
   }
@@ -1182,12 +1265,19 @@ const QUALIFICATION_FAILURE_REASONS = new Set([
 function normalizeFailureReason(
   value: unknown,
   passed: boolean,
+  protocol: QualificationProtocol,
 ): QualificationFailureReason {
   if (passed) {
     if (value !== null) throw new QualificationLedgerError();
     return null;
   }
   if (typeof value !== "string" || !QUALIFICATION_FAILURE_REASONS.has(value)) {
+    throw new QualificationLedgerError();
+  }
+  if (
+    value === "google_free_tier_quota" &&
+    !protocol.allowGoogleFreeTierQuota
+  ) {
     throw new QualificationLedgerError();
   }
   return value as Exclude<QualificationFailureReason, null>;
@@ -1200,6 +1290,7 @@ async function evidenceForIdentity(
   evidencePath: string,
   preflight: FrozenPreflightRecord,
   authorizationReferenceSha256: string,
+  protocol: QualificationProtocol,
 ): Promise<ValidatedQualificationEvidence> {
   const expectedDirectory = path.join(
     batchDirectory(repositoryRoot, batchId),
@@ -1221,6 +1312,7 @@ async function evidenceForIdentity(
     preflight,
     authorizationReferenceSha256,
     file,
+    protocol,
   );
 }
 
@@ -1232,22 +1324,47 @@ function validateEvidenceForIdentity(
   preflight: FrozenPreflightRecord,
   authorizationReferenceSha256: string,
   file: ImmutableFile,
+  protocol: QualificationProtocol,
 ): ValidatedQualificationEvidence {
   const evidence = plainRecord(file.value);
-  const qualification = plainRecord(evidence.qualification, [
-    "authorizationReferenceSha256",
-    "batchId",
-    "buildIdentitySha256",
-    "orchestratorFallbackUsed",
-    "ordinal",
-    "repositoryCommit",
-  ]);
+  const qualification =
+    protocol === LEGACY_PROTOCOL
+      ? plainRecord(evidence.qualification, [
+          "authorizationReferenceSha256",
+          "batchId",
+          "buildIdentitySha256",
+          "orchestratorFallbackUsed",
+          "ordinal",
+          "repositoryCommit",
+        ])
+      : plainRecord(evidence.qualification, [
+          "authorizationReferenceSha256",
+          "batchId",
+          "frozenBuildIdentity",
+          "frozenCommit",
+          "llm",
+          "orchestratorFallbackUsed",
+          "ordinal",
+          "qualificationPlanId",
+          "task",
+        ]);
+  const qualificationIdentityMatches =
+    protocol === LEGACY_PROTOCOL
+      ? qualification.repositoryCommit === preflight.repositoryCommit &&
+        qualification.buildIdentitySha256 ===
+          preflight.buildIdentitySha256
+      : qualification.qualificationPlanId ===
+          ACTIVE_QUALIFICATION_PLAN_ID &&
+        qualification.llm === identity.llm &&
+        qualification.task === identity.task &&
+        qualification.frozenCommit === preflight.repositoryCommit &&
+        qualification.frozenBuildIdentity ===
+          preflight.buildIdentitySha256;
   if (
-    evidence.schemaVersion !== 2 ||
+    evidence.schemaVersion !== protocol.evidenceSchemaVersion ||
     qualification.batchId !== batchId ||
     qualification.ordinal !== identity.ordinal ||
-    qualification.repositoryCommit !== preflight.repositoryCommit ||
-    qualification.buildIdentitySha256 !== preflight.buildIdentitySha256 ||
+    !qualificationIdentityMatches ||
     qualification.authorizationReferenceSha256 !==
       authorizationReferenceSha256 ||
     qualification.orchestratorFallbackUsed !== false ||
@@ -1261,8 +1378,8 @@ function validateEvidenceForIdentity(
   const failureReason = normalizeFailureReason(
     evidence.failureReason,
     evidence.passed,
+    protocol,
   );
-  const profile = resolveLlm(identity.llm);
   const frozenIdentity = preflight.logicalLlms.find(
     (candidate) => candidate.llm === identity.llm,
   );
@@ -1270,7 +1387,12 @@ function validateEvidenceForIdentity(
     (candidate) => candidate.llm === identity.llm,
   );
   const expectedEvidenceCredential =
-    profile.credentialTargetEnv ?? credentialMatch?.environmentVariableName;
+    identity.llm === "ark-coding-plan"
+      ? "CODEX_AGENT_ARK_CODING_KEY"
+      : identity.llm === "ark-agent-plan" ||
+          identity.llm === "ark-agent-deepseek-v4-flash"
+        ? "CODEX_AGENT_ARK_AGENT_KEY"
+        : credentialMatch?.environmentVariableName;
   const actualModelIsSafeFailureObservation =
     !Object.hasOwn(evidence, "actualModel") ||
     evidence.actualModel === null ||
@@ -1301,7 +1423,7 @@ function validateEvidenceForIdentity(
     throw new QualificationLedgerError();
   }
   const expectedTelemetrySource =
-    profile.runtime === "kimi-acp"
+    frozenIdentity.runtime === "kimi-acp"
       ? "kimi-acp-observable"
       : "pi-rpc-observable";
   if (
@@ -1329,6 +1451,7 @@ function validateEvidenceForIdentity(
 }
 
 interface LedgerState {
+  protocol: QualificationProtocol | null;
   loaded: readonly LoadedCheckpoint[];
   started: BatchStartedCheckpoint | null;
   completed: readonly CaseCompletedCheckpoint[];
@@ -1377,6 +1500,7 @@ async function verifyEvidenceReference(
 async function loadLedgerState(
   repositoryRoot: string,
   batchId: string,
+  expectedProtocol?: QualificationProtocol,
 ): Promise<LedgerState> {
   const directory = path.join(
     batchDirectory(repositoryRoot, batchId),
@@ -1384,12 +1508,24 @@ async function loadLedgerState(
   );
   const files = await listCheckpointFiles(repositoryRoot, directory);
   const loaded: LoadedCheckpoint[] = [];
+  let protocol: QualificationProtocol | null = expectedProtocol ?? null;
   for (let index = 0; index < files.length; index += 1) {
     const expected = `${String(index).padStart(6, "0")}.json`;
     if (files[index] !== expected) throw new QualificationLedgerError();
     const absolute = path.join(directory, expected);
     const file = await readLedgerJson(repositoryRoot, absolute);
-    const checkpoint = normalizeCheckpoint(file.value, index, batchId);
+    const fileProtocol = protocolForEnvelope(file.value);
+    if (protocol === null) {
+      protocol = fileProtocol;
+    } else {
+      assertProtocol(fileProtocol, protocol);
+    }
+    const checkpoint = normalizeCheckpoint(
+      file.value,
+      index,
+      batchId,
+      protocol,
+    );
     loaded.push({
       checkpoint,
       reference: Object.freeze({
@@ -1401,6 +1537,7 @@ async function loadLedgerState(
   }
   if (loaded.length === 0) {
     return {
+      protocol,
       loaded: Object.freeze([]),
       started: null,
       completed: Object.freeze([]),
@@ -1442,6 +1579,7 @@ async function loadLedgerState(
         path.resolve(repositoryRoot, checkpoint.evidence.path),
         first.preflight,
         first.authorizationReferenceSha256,
+        protocol!,
       );
       if (
         validatedEvidence.reference.path !== checkpoint.evidence.path ||
@@ -1467,6 +1605,7 @@ async function loadLedgerState(
     }
   }
   return Object.freeze({
+    protocol,
     loaded: Object.freeze(loaded),
     started: first,
     completed: Object.freeze(completed),
@@ -1540,8 +1679,11 @@ function caseEntry(
 
 function normalizeNotRun(
   values: readonly QualificationCaseIdentity[],
+  protocol: QualificationProtocol,
 ): readonly QualificationCaseIdentity[] {
-  const normalized = values.map(normalizeCaseIdentity);
+  const normalized = values.map((value) =>
+    normalizeCaseIdentity(value, protocol),
+  );
   for (let index = 0; index < normalized.length; index += 1) {
     if (
       index > 0 &&
@@ -1555,6 +1697,7 @@ function normalizeNotRun(
 
 function buildManifest(
   state: LedgerState,
+  protocol: QualificationProtocol,
   options: {
     batchId: string;
     authorizationReferenceSha256: string;
@@ -1567,11 +1710,12 @@ function buildManifest(
 ): QualificationTerminalManifest {
   if (
     !validTimestamp(options.completedAt) ||
-    !SHA256_PATTERN.test(options.authorizationReferenceSha256)
+    !SHA256_PATTERN.test(options.authorizationReferenceSha256) ||
+    (state.protocol !== null && state.protocol !== protocol)
   ) {
     throw new QualificationLedgerError();
   }
-  const notRun = normalizeNotRun(options.notRun);
+  const notRun = normalizeNotRun(options.notRun, protocol);
   const cases = Object.freeze(state.completed.map(caseEntry));
   const notRunStart =
     state.completed.length +
@@ -1584,7 +1728,7 @@ function buildManifest(
   const expectedNotRun =
     options.status === "passed"
       ? []
-      : LEGACY_QUALIFICATION_CASES.slice(notRunStart);
+      : protocol.schedule.slice(notRunStart);
   if (
     JSON.stringify(notRun) !== JSON.stringify(expectedNotRun) ||
     (options.status === "blocked" &&
@@ -1595,11 +1739,11 @@ function buildManifest(
   }
   const passed =
     options.status === "passed" &&
-    cases.length === 10 &&
+    cases.length === protocol.schedule.length &&
     cases.every(
       (entry, index) =>
         entry.result === "passed" &&
-        identitiesEqual(entry, LEGACY_QUALIFICATION_CASES[index]!),
+        identitiesEqual(entry, protocol.schedule[index]!),
     ) &&
     notRun.length === 0 &&
     state.running === null &&
@@ -1618,7 +1762,7 @@ function buildManifest(
     throw new QualificationLedgerError();
   }
   return Object.freeze({
-    schemaVersion: 1,
+    ...protocolEnvelope(protocol),
     batchId: options.batchId,
     status: options.status,
     authorizationReferenceSha256: options.authorizationReferenceSha256,
@@ -1691,6 +1835,7 @@ export function createQualificationLedger(options: {
         const state = await loadLedgerState(
           options.repositoryRoot,
           options.batchId,
+          CURRENT_PROTOCOL,
         );
         if (
           state.loaded.length !== 0 ||
@@ -1699,12 +1844,12 @@ export function createQualificationLedger(options: {
         ) {
           throw new QualificationLedgerError();
         }
-        const preflight = freezePreflightRecord(input.preflight);
+        const preflight = freezeCurrentPreflightRecord(input.preflight);
         await publishLedgerJson(
           options.repositoryRoot,
           checkpointPath(options.repositoryRoot, options.batchId, 0),
           {
-            schemaVersion: 1,
+            ...protocolEnvelope(CURRENT_PROTOCOL),
             sequence: 0,
             kind: "batch_started",
             batchId: options.batchId,
@@ -1720,17 +1865,21 @@ export function createQualificationLedger(options: {
     ) =>
       run(async () => {
         await assertNoTerminal(options.repositoryRoot, options.batchId);
-        const identity = normalizeCaseIdentity({
-          ordinal: input.ordinal,
-          llm: input.llm,
-          task: input.task,
-        });
+        const identity = normalizeCaseIdentity(
+          {
+            ordinal: input.ordinal,
+            llm: input.llm,
+            task: input.task,
+          },
+          CURRENT_PROTOCOL,
+        );
         if (!validTimestamp(input.recordedAt)) {
           throw new QualificationLedgerError();
         }
         const state = await loadLedgerState(
           options.repositoryRoot,
           options.batchId,
+          CURRENT_PROTOCOL,
         );
         if (
           state.started === null ||
@@ -1748,7 +1897,7 @@ export function createQualificationLedger(options: {
             state.loaded.length,
           ),
           {
-            schemaVersion: 1,
+            ...protocolEnvelope(CURRENT_PROTOCOL),
             sequence: state.loaded.length,
             kind: "case_running",
             batchId: options.batchId,
@@ -1769,11 +1918,14 @@ export function createQualificationLedger(options: {
     ) =>
       run(async () => {
         await assertNoTerminal(options.repositoryRoot, options.batchId);
-        const identity = normalizeCaseIdentity({
-          ordinal: input.ordinal,
-          llm: input.llm,
-          task: input.task,
-        });
+        const identity = normalizeCaseIdentity(
+          {
+            ordinal: input.ordinal,
+            llm: input.llm,
+            task: input.task,
+          },
+          CURRENT_PROTOCOL,
+        );
         if (
           (input.result !== "passed" && input.result !== "failed") ||
           !validTimestamp(input.recordedAt)
@@ -1783,6 +1935,7 @@ export function createQualificationLedger(options: {
         const state = await loadLedgerState(
           options.repositoryRoot,
           options.batchId,
+          CURRENT_PROTOCOL,
         );
         if (
           state.started === null ||
@@ -1798,6 +1951,7 @@ export function createQualificationLedger(options: {
           input.evidencePath,
           state.started.preflight,
           state.started.authorizationReferenceSha256,
+          CURRENT_PROTOCOL,
         );
         if ((input.result === "passed") !== evidence.passed) {
           throw new QualificationLedgerError();
@@ -1810,7 +1964,7 @@ export function createQualificationLedger(options: {
             state.loaded.length,
           ),
           {
-            schemaVersion: 1,
+            ...protocolEnvelope(CURRENT_PROTOCOL),
             sequence: state.loaded.length,
             kind: "case_completed",
             batchId: options.batchId,
@@ -1837,9 +1991,10 @@ export function createQualificationLedger(options: {
         const state = await loadLedgerState(
           options.repositoryRoot,
           options.batchId,
+          CURRENT_PROTOCOL,
         );
         if (state.started === null) throw new QualificationLedgerError();
-        const manifest = buildManifest(state, {
+        const manifest = buildManifest(state, CURRENT_PROTOCOL, {
           batchId: options.batchId,
           authorizationReferenceSha256:
             state.started.authorizationReferenceSha256,
@@ -1851,6 +2006,7 @@ export function createQualificationLedger(options: {
             options.repositoryRoot,
             options.batchId,
             state,
+            CURRENT_PROTOCOL,
           ),
         });
         await publishLedgerJson(
@@ -1884,7 +2040,10 @@ const MANIFEST_KEYS = [
   "stopReason",
 ] as const;
 
-function normalizeCaseEntry(value: unknown): QualificationCaseManifestEntry {
+function normalizeCaseEntry(
+  value: unknown,
+  protocol: QualificationProtocol,
+): QualificationCaseManifestEntry {
   const record = plainRecord(value, [
     "adapterClientInvocationCount",
     "adapterReportedFallbackUsed",
@@ -1899,11 +2058,14 @@ function normalizeCaseEntry(value: unknown): QualificationCaseManifestEntry {
     "runtimeReportedAutoRetryCount",
     "task",
   ]);
-  const identity = normalizeCaseIdentity({
-    ordinal: record.ordinal,
-    llm: record.llm,
-    task: record.task,
-  });
+  const identity = normalizeCaseIdentity(
+    {
+      ordinal: record.ordinal,
+      llm: record.llm,
+      task: record.task,
+    },
+    protocol,
+  );
   if (record.result !== "passed" && record.result !== "failed") {
     throw new QualificationLedgerError();
   }
@@ -1914,6 +2076,7 @@ function normalizeCaseEntry(value: unknown): QualificationCaseManifestEntry {
     failureReason: normalizeFailureReason(
       record.failureReason,
       record.result === "passed",
+      protocol,
     ),
     ...normalizeExecutionTelemetry(record),
   });
@@ -1921,6 +2084,7 @@ function normalizeCaseEntry(value: unknown): QualificationCaseManifestEntry {
 
 function normalizeUncommittedEvidence(
   value: unknown,
+  protocol: QualificationProtocol,
 ): QualificationUncommittedEvidence {
   const base = plainRecord(value);
   const commonKeys = [
@@ -1945,16 +2109,20 @@ function normalizeUncommittedEvidence(
     }
     return Object.freeze({
       validationStatus: "valid",
-      ...normalizeCaseIdentity({
-        ordinal: record.ordinal,
-        llm: record.llm,
-        task: record.task,
-      }),
+      ...normalizeCaseIdentity(
+        {
+          ordinal: record.ordinal,
+          llm: record.llm,
+          task: record.task,
+        },
+        protocol,
+      ),
       evidence: normalizeEvidenceReference(record.evidence),
       observedPassed: record.observedPassed,
       failureReason: normalizeFailureReason(
         record.failureReason,
         record.observedPassed,
+        protocol,
       ),
       ...normalizeExecutionTelemetry(record),
     });
@@ -1975,11 +2143,14 @@ function normalizeUncommittedEvidence(
   }
   return Object.freeze({
     validationStatus: "invalid",
-    ...normalizeCaseIdentity({
-      ordinal: record.ordinal,
-      llm: record.llm,
-      task: record.task,
-    }),
+    ...normalizeCaseIdentity(
+      {
+        ordinal: record.ordinal,
+        llm: record.llm,
+        task: record.task,
+      },
+      protocol,
+    ),
     evidence: normalizeEvidenceReference(record.evidence),
     observedPassed: null,
     failureReason: "infrastructure_failure",
@@ -2021,9 +2192,12 @@ async function readAndValidateManifest(
     repositoryRoot,
     path.join(batchDirectory(repositoryRoot, batchId), "manifest.json"),
   );
-  const record = plainRecord(file.value, MANIFEST_KEYS);
+  const protocol = protocolForEnvelope(file.value);
+  const record = plainRecord(
+    file.value,
+    keysForProtocol(protocol, MANIFEST_KEYS),
+  );
   if (
-    record.schemaVersion !== 1 ||
     record.batchId !== batchId ||
     (record.status !== "passed" &&
       record.status !== "blocked" &&
@@ -2038,9 +2212,11 @@ async function readAndValidateManifest(
   ) {
     throw new QualificationLedgerError();
   }
-  const state = await loadLedgerState(repositoryRoot, batchId);
+  const state = await loadLedgerState(repositoryRoot, batchId, protocol);
   const preflight =
-    record.preflight === null ? null : freezePreflightRecord(record.preflight);
+    record.preflight === null
+      ? null
+      : protocol.freezePreflight(record.preflight);
   if (
     (preflight?.repositoryCommit ?? null) !== record.repositoryCommit ||
     (preflight?.buildIdentitySha256 ?? null) !== record.buildIdentitySha256 ||
@@ -2052,7 +2228,9 @@ async function readAndValidateManifest(
   ) {
     throw new QualificationLedgerError();
   }
-  const manifestCases = record.cases.map(normalizeCaseEntry);
+  const manifestCases = record.cases.map((entry) =>
+    normalizeCaseEntry(entry, protocol),
+  );
   const expectedCases = state.completed.map(caseEntry);
   if (JSON.stringify(manifestCases) !== JSON.stringify(expectedCases)) {
     throw new QualificationLedgerError();
@@ -2066,15 +2244,16 @@ async function readAndValidateManifest(
   ) {
     throw new QualificationLedgerError();
   }
-  const notRun = normalizeNotRun(record.notRun);
+  const notRun = normalizeNotRun(record.notRun, protocol);
   const uncommittedEvidence =
     record.uncommittedEvidence === null
       ? null
-      : normalizeUncommittedEvidence(record.uncommittedEvidence);
+      : normalizeUncommittedEvidence(record.uncommittedEvidence, protocol);
   const expectedUncommittedEvidence = await findUncommittedEvidence(
     repositoryRoot,
     batchId,
     state,
+    protocol,
   );
   if (
     JSON.stringify(uncommittedEvidence) !==
@@ -2088,7 +2267,7 @@ async function readAndValidateManifest(
   ) {
     throw new QualificationLedgerError();
   }
-  const rebuilt = buildManifest(state, {
+  const rebuilt = buildManifest(state, protocol, {
     batchId,
     authorizationReferenceSha256: record.authorizationReferenceSha256,
     status: record.status,
@@ -2148,7 +2327,11 @@ async function findUncommittedEvidence(
   repositoryRoot: string,
   batchId: string,
   state: LedgerState,
+  protocol: QualificationProtocol,
 ): Promise<QualificationUncommittedEvidence | null> {
+  if (state.protocol !== null && state.protocol !== protocol) {
+    throw new QualificationLedgerError();
+  }
   const directory = path.join(batchDirectory(repositoryRoot, batchId), "cases");
   let entries;
   try {
@@ -2194,6 +2377,7 @@ async function findUncommittedEvidence(
       state.started.preflight,
       state.started.authorizationReferenceSha256,
       parseImmutableBytes(beforeValidation),
+      protocol,
     );
     return Object.freeze({
       validationStatus: "valid",
@@ -2259,6 +2443,7 @@ export async function recoverInterruptedQualificationBatch(options: {
       options.repositoryRoot,
       options.batchId,
     );
+    const protocol = state.protocol ?? CURRENT_PROTOCOL;
     if (
       state.started !== null &&
       state.started.authorizationReferenceSha256 !==
@@ -2270,11 +2455,12 @@ export async function recoverInterruptedQualificationBatch(options: {
       options.repositoryRoot,
       options.batchId,
       state,
+      protocol,
     );
-    const inferredNotRun = LEGACY_QUALIFICATION_CASES.slice(
+    const inferredNotRun = protocol.schedule.slice(
       state.completed.length + (state.running === null ? 0 : 1),
     );
-    const manifest = buildManifest(state, {
+    const manifest = buildManifest(state, protocol, {
       batchId: options.batchId,
       authorizationReferenceSha256: options.authorizationReferenceSha256,
       status: "interrupted",

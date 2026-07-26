@@ -97,6 +97,19 @@ export type QualificationTask = "review" | "delegate";
 export type QualificationCaseResult = "passed" | "failed";
 export type QualificationManifestStatus = "passed" | "blocked" | "interrupted";
 
+export interface LegacyQualificationProtocolIdentity {
+  readonly schemaVersion: 1;
+}
+
+export interface CurrentQualificationProtocolIdentity {
+  readonly schemaVersion: 2;
+  readonly qualificationPlanId: "four-llm-v1";
+}
+
+export type QualificationProtocolIdentity =
+  | LegacyQualificationProtocolIdentity
+  | CurrentQualificationProtocolIdentity;
+
 export interface QualificationEvidenceReference {
   path: string;
   sha256: string;
@@ -124,9 +137,8 @@ export interface QualificationExecutionTelemetry {
   executionTelemetrySource: "kimi-acp-observable" | "pi-rpc-observable" | null;
 }
 
-export type QualificationFailureReason =
+export type CurrentQualificationFailureReason =
   | "missing_credential"
-  | "google_free_tier_quota"
   | "account_quota_exceeded"
   | "adapter_failure"
   | "adapter_auth_or_model_unavailable"
@@ -134,6 +146,13 @@ export type QualificationFailureReason =
   | "process_residual"
   | "infrastructure_failure"
   | null;
+
+export type LegacyQualificationFailureReason =
+  | CurrentQualificationFailureReason
+  | "google_free_tier_quota";
+
+export type QualificationFailureReason =
+  LegacyQualificationFailureReason;
 
 export interface QualificationValidUncommittedEvidence
   extends QualificationCaseIdentity, QualificationExecutionTelemetry {
@@ -169,8 +188,7 @@ export interface QualificationCheckpointReference {
 export type QualificationStopReason =
   "case_failed" | "infrastructure_failure" | "process_interrupted";
 
-export interface QualificationTerminalManifest {
-  schemaVersion: 1;
+interface QualificationTerminalManifestCommon {
   batchId: string;
   status: QualificationManifestStatus;
   authorizationReferenceSha256: string;
@@ -186,3 +204,20 @@ export interface QualificationTerminalManifest {
   promotionEligible: boolean;
   completedAt: string;
 }
+
+export type LegacyQualificationTerminalManifest =
+  QualificationTerminalManifestCommon &
+    Readonly<{
+      schemaVersion: 1;
+    }>;
+
+export type CurrentQualificationTerminalManifest =
+  QualificationTerminalManifestCommon &
+    Readonly<{
+      schemaVersion: 2;
+      qualificationPlanId: "four-llm-v1";
+    }>;
+
+export type QualificationTerminalManifest =
+  | LegacyQualificationTerminalManifest
+  | CurrentQualificationTerminalManifest;

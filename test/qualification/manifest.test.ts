@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  cp,
   mkdir,
   rename,
   readFile,
@@ -27,6 +28,11 @@ import {
   acquireQualificationLock,
   recoverQualificationLock,
 } from "../../src/qualification/lock.js";
+import {
+  ACTIVE_QUALIFICATION_CASES,
+  ACTIVE_QUALIFICATION_PLAN_ID,
+  LEGACY_QUALIFICATION_CASES,
+} from "../../src/qualification/protocol.js";
 import { publishImmutableJson } from "../../src/smoke/evidence.js";
 import type {
   CurrentFrozenPreflightRecord,
@@ -91,7 +97,7 @@ afterEach(async () => {
   );
 });
 
-function preflight(): FrozenPreflightRecord {
+function legacyPreflight(): LegacyFrozenPreflightRecord {
   return freezePreflightRecord({
     schemaVersion: 1,
     repositoryCommit: commit,
@@ -174,11 +180,11 @@ function preflight(): FrozenPreflightRecord {
       piRpc: { count: 0 },
       realSmoke: { count: 0 },
     },
-  });
+  }) as LegacyFrozenPreflightRecord;
 }
 
-function currentPreflightRecord() {
-  const legacy = preflight();
+function currentPreflightRecord(): CurrentFrozenPreflightRecord {
+  const legacy = legacyPreflight();
   const buildArtifacts = legacy.buildArtifacts.filter(
     ({ path: artifactPath }) => artifactPath !== "dist/pi-smoke.js",
   );
@@ -206,6 +212,10 @@ function currentPreflightRecord() {
   };
 }
 
+function preflight(): CurrentFrozenPreflightRecord {
+  return freezePreflightRecord(currentPreflightRecord()) as CurrentFrozenPreflightRecord;
+}
+
 function sparseCopy(values: readonly unknown[]): unknown[] {
   const sparse = new Array<unknown>(values.length);
   values.forEach((value, index) => {
@@ -215,26 +225,11 @@ function sparseCopy(values: readonly unknown[]): unknown[] {
 }
 
 function cases(): QualificationCaseIdentity[] {
-  return [
-    { ordinal: 1, llm: "gemini-3.5-flash", task: "delegate" },
-    { ordinal: 2, llm: "gemini-3.5-flash", task: "review" },
-    { ordinal: 3, llm: "ark-coding-plan", task: "delegate" },
-    { ordinal: 4, llm: "ark-coding-plan", task: "review" },
-    { ordinal: 5, llm: "kimi-k3", task: "review" },
-    { ordinal: 6, llm: "kimi-k3", task: "delegate" },
-    { ordinal: 7, llm: "ark-agent-plan", task: "review" },
-    { ordinal: 8, llm: "ark-agent-plan", task: "delegate" },
-    {
-      ordinal: 9,
-      llm: "ark-agent-deepseek-v4-flash",
-      task: "review",
-    },
-    {
-      ordinal: 10,
-      llm: "ark-agent-deepseek-v4-flash",
-      task: "delegate",
-    },
-  ];
+  return ACTIVE_QUALIFICATION_CASES.map((identity) => ({ ...identity }));
+}
+
+function legacyCases(): QualificationCaseIdentity[] {
+  return LEGACY_QUALIFICATION_CASES.map((identity) => ({ ...identity }));
 }
 
 async function publishEvidence(
@@ -256,22 +251,26 @@ async function publishEvidence(
     casesDirectory,
     `${String(identity.ordinal).padStart(2, "0")}.json`,
   );
-  const identityRecord = preflight().logicalLlms.find(
+  const frozenPreflight = preflight();
+  const identityRecord = frozenPreflight.logicalLlms.find(
     (candidate) => candidate.llm === identity.llm,
   )!;
-  const credential = preflight().credentialMatches.find(
+  const credential = frozenPreflight.credentialMatches.find(
     (candidate) => candidate.llm === identity.llm,
   )!;
   const profile = resolveLlm(identity.llm);
   await writeFile(
     evidencePath,
     `${JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 3,
       qualification: {
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
         batchId,
         ordinal: identity.ordinal,
-        repositoryCommit: commit,
-        buildIdentitySha256: buildHash,
+        llm: identity.llm,
+        task: identity.task,
+        frozenCommit: frozenPreflight.repositoryCommit,
+        frozenBuildIdentity: frozenPreflight.buildIdentitySha256,
         authorizationReferenceSha256: authHash,
         orchestratorFallbackUsed: false,
       },
@@ -286,7 +285,7 @@ async function publishEvidence(
       route: identityRecord.route,
       ...(identityRecord.runtime === "pi-rpc"
         ? {
-            configSha256: preflight().piConfigSha256,
+            configSha256: frozenPreflight.piConfigSha256,
             credentialEnv:
               profile.credentialTargetEnv ?? credential.environmentVariableName,
           }
@@ -352,7 +351,10 @@ describe("frozen qualification preflight", () => {
       authorizationReferenceSha256: string;
     };
 
-    expect(manifest.status).toBe("blocked");
+    expect(manifest).toMatchObject({
+      schemaVersion: 1,
+      status: "blocked",
+    });
     await expect(
       inspectQualificationTerminal({
         repositoryRoot,
@@ -366,13 +368,56 @@ describe("frozen qualification preflight", () => {
     });
   });
 
+  it("rejects changed bytes in a copied historical evidence file", async () => {
+    const repository = await tempRepository();
+    const source = path.join(
+      repositoryRoot,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      historicalBatchId,
+    );
+    const destination = path.join(
+      repository,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      historicalBatchId,
+    );
+    await mkdir(path.dirname(destination), { recursive: true });
+    await cp(source, destination, { recursive: true });
+    const manifest = JSON.parse(
+      await readFile(path.join(destination, "manifest.json"), "utf8"),
+    ) as {
+      cases: readonly [
+        { evidence: { path: string; sha256: string } },
+      ];
+    };
+    const evidencePath = path.resolve(
+      repository,
+      manifest.cases[0].evidence.path,
+    );
+    const bytes = await readFile(evidencePath);
+    await rm(evidencePath);
+    await writeFile(evidencePath, Buffer.concat([bytes, Buffer.from(" ")]));
+
+    await expect(
+      inspectQualificationTerminal({
+        repositoryRoot: repository,
+        batchId: historicalBatchId,
+      }),
+    ).rejects.toThrow("Qualification ledger operation failed");
+  });
+
   it("accepts only the current schema and matching four-LLM plan identity", () => {
     const current = currentPreflightRecord();
 
     expect(freezePreflightRecord(current)).toEqual(current);
     expect(() =>
       freezePreflightRecord({
-        ...preflight(),
+        ...legacyPreflight(),
         qualificationPlanId: "four-llm-v1",
       }),
     ).toThrow("Qualification ledger operation failed");
@@ -399,7 +444,7 @@ describe("frozen qualification preflight", () => {
     "logicalLlms",
     "credentialMatches",
   ] as const)("rejects sparse legacy and current %s arrays", (field) => {
-    const legacy = preflight();
+    const legacy = legacyPreflight();
     const current = currentPreflightRecord();
 
     expect(() =>
@@ -429,7 +474,7 @@ describe("frozen qualification preflight", () => {
           throw new Error("array proxy trap must not execute");
         },
       });
-    const legacy = preflight();
+    const legacy = legacyPreflight();
     const current = currentPreflightRecord();
 
     expect(() =>
@@ -449,17 +494,17 @@ describe("frozen qualification preflight", () => {
 
   it("rejects array index accessors and extra symbol properties without invoking them", () => {
     let getterCalls = 0;
-    const logicalLlms = [...preflight().logicalLlms];
+    const logicalLlms = [...legacyPreflight().logicalLlms];
     Object.defineProperty(logicalLlms, "1", {
       enumerable: true,
       configurable: true,
       get() {
         getterCalls += 1;
-        return preflight().logicalLlms[1];
+        return legacyPreflight().logicalLlms[1];
       },
     });
     expect(() =>
-      freezePreflightRecord({ ...preflight(), logicalLlms }),
+      freezePreflightRecord({ ...legacyPreflight(), logicalLlms }),
     ).toThrow("Qualification ledger operation failed");
     expect(getterCalls).toBe(0);
 
@@ -475,7 +520,7 @@ describe("frozen qualification preflight", () => {
   });
 
   it("binds legacy and current build identity hashes to normalized artifacts", () => {
-    const legacy = preflight();
+    const legacy = legacyPreflight();
     const current = currentPreflightRecord();
 
     expect(() =>
@@ -508,7 +553,7 @@ describe("frozen qualification preflight", () => {
   });
 
   it("deep-freezes and rejects drift in fixed identities or zero baseline", () => {
-    const frozen = preflight();
+    const frozen = legacyPreflight();
     expect(Object.isFrozen(frozen)).toBe(true);
     expect(Object.isFrozen(frozen.logicalLlms)).toBe(true);
     expect(Object.isFrozen(frozen.logicalLlms[0])).toBe(true);
@@ -558,12 +603,12 @@ describe("frozen qualification preflight", () => {
       },
     },
     {
-      credentialMatches: preflight().credentialMatches.map((match, index) =>
+      credentialMatches: legacyPreflight().credentialMatches.map((match, index) =>
         index === 0 ? { ...match, value: "SECRET_VALUE" } : match,
       ),
     },
   ])("fails closed for malformed frozen input %#", (patch) => {
-    expect(() => freezePreflightRecord({ ...preflight(), ...patch })).toThrow(
+    expect(() => freezePreflightRecord({ ...legacyPreflight(), ...patch })).toThrow(
       "Qualification ledger operation failed",
     );
   });
@@ -571,7 +616,7 @@ describe("frozen qualification preflight", () => {
   it.each(["schemaVersion", "repositoryBranch"] as const)(
     "rejects a non-enumerable %s preflight field",
     (field) => {
-      const candidate = { ...preflight() };
+      const candidate = { ...legacyPreflight() };
       Object.defineProperty(candidate, field, {
         configurable: true,
         enumerable: false,
@@ -588,7 +633,7 @@ describe("frozen qualification preflight", () => {
   it("rejects preflight accessors without executing getters", () => {
     let getterCalls = 0;
     const accessor = {
-      ...preflight(),
+      ...legacyPreflight(),
       get repositoryBranch() {
         getterCalls += 1;
         return "codex/ark-cutover";
@@ -602,7 +647,7 @@ describe("frozen qualification preflight", () => {
 
   it("rejects preflight proxies without executing traps", () => {
     let trapCalls = 0;
-    const proxy = new Proxy(preflight(), {
+    const proxy = new Proxy(legacyPreflight(), {
       getPrototypeOf() {
         trapCalls += 1;
         throw new Error("preflight proxy trap must not execute");
@@ -616,7 +661,7 @@ describe("frozen qualification preflight", () => {
 
   it("rejects extra preflight fields", () => {
     expect(() =>
-      freezePreflightRecord({ ...preflight(), extra: "forbidden" }),
+      freezePreflightRecord({ ...legacyPreflight(), extra: "forbidden" }),
     ).toThrow("Qualification ledger operation failed");
   });
 });
@@ -696,7 +741,7 @@ describe("immutable qualification ledger", () => {
     ).not.toContain("infrastructure secret");
   });
 
-  it("only marks the exact fixed ten-case schedule promotion eligible", async () => {
+  it("only marks the exact current eight-case protocol promotion eligible", async () => {
     const repository = await tempRepository();
     const ledger = createQualificationLedger({
       repositoryRoot: repository,
@@ -725,10 +770,257 @@ describe("immutable qualification ledger", () => {
       notRun: [],
       completedAt: "2026-07-26T04:00:00.000Z",
     });
-    expect(manifest.promotionEligible).toBe(true);
+    expect(manifest).toMatchObject({
+      schemaVersion: 2,
+      qualificationPlanId: "four-llm-v1",
+      promotionEligible: true,
+    });
+    expect(manifest.cases).toHaveLength(8);
     expect(
       manifest.cases.map(({ ordinal, llm, task }) => ({ ordinal, llm, task })),
     ).toEqual(cases());
+  });
+
+  it.each([
+    ["schema v1 plus a plan", { schemaVersion: 1 }],
+    ["schema v2 without a plan", { qualificationPlanId: undefined }],
+    ["schema v2 with the legacy plan", { qualificationPlanId: "five-llm-v1" }],
+    ["an unknown manifest field", { extra: "forbidden" }],
+  ] as const)("rejects %s", async (_label, patch) => {
+    const repository = await tempRepository();
+    const ledger = createQualificationLedger({
+      repositoryRoot: repository,
+      batchId,
+    });
+    await ledger.publishBatchStarted({
+      authorizationReferenceSha256: authHash,
+      preflight: preflight(),
+      recordedAt: "2026-07-26T02:00:00.000Z",
+    });
+    await ledger.publishCaseRunning({
+      ...cases()[0]!,
+      recordedAt: "2026-07-26T02:01:00.000Z",
+    });
+    await ledger.publishTerminalManifest({
+      status: "blocked",
+      stopReason: "infrastructure_failure",
+      notRun: cases().slice(1),
+      completedAt: "2026-07-26T02:02:00.000Z",
+    });
+    const manifestPath = path.join(
+      repository,
+      "docs/smoke/evidence/batches",
+      batchId,
+      "manifest.json",
+    );
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    await rm(manifestPath);
+    const patched = { ...manifest, ...patch };
+    if (
+      "qualificationPlanId" in patch &&
+      patch.qualificationPlanId === undefined
+    ) {
+      delete patched.qualificationPlanId;
+    }
+    await writeFile(
+      manifestPath,
+      `${JSON.stringify(patched, null, 2)}\n`,
+      "utf8",
+    );
+
+    await expect(
+      inspectQualificationTerminal({ repositoryRoot: repository, batchId }),
+    ).rejects.toThrow("Qualification ledger operation failed");
+  });
+
+  it.each([
+    ["schema v1 plus a plan", { schemaVersion: 1 }],
+    ["schema v2 without a plan", { qualificationPlanId: undefined }],
+    ["schema v2 with the legacy plan", { qualificationPlanId: "five-llm-v1" }],
+    ["an unknown checkpoint field", { extra: "forbidden" }],
+  ] as const)("rejects checkpoint %s", async (_label, patch) => {
+    const repository = await tempRepository();
+    const ledger = createQualificationLedger({
+      repositoryRoot: repository,
+      batchId,
+    });
+    await ledger.publishBatchStarted({
+      authorizationReferenceSha256: authHash,
+      preflight: preflight(),
+      recordedAt: "2026-07-26T02:00:00.000Z",
+    });
+    const checkpointPath = path.join(
+      repository,
+      "docs/smoke/evidence/batches",
+      batchId,
+      "checkpoints/000000.json",
+    );
+    const checkpoint = JSON.parse(await readFile(checkpointPath, "utf8"));
+    await rm(checkpointPath);
+    const patched = { ...checkpoint, ...patch };
+    if (
+      "qualificationPlanId" in patch &&
+      patch.qualificationPlanId === undefined
+    ) {
+      delete patched.qualificationPlanId;
+    }
+    await writeFile(
+      checkpointPath,
+      `${JSON.stringify(patched, null, 2)}\n`,
+      "utf8",
+    );
+
+    await expect(
+      ledger.publishCaseRunning({
+        ...cases()[0]!,
+        recordedAt: "2026-07-26T02:01:00.000Z",
+      }),
+    ).rejects.toThrow("Qualification ledger operation failed");
+  });
+
+  it("rejects a current checkpoint carrying a legacy schedule identity", async () => {
+    const repository = await tempRepository();
+    const ledger = createQualificationLedger({
+      repositoryRoot: repository,
+      batchId,
+    });
+    await ledger.publishBatchStarted({
+      authorizationReferenceSha256: authHash,
+      preflight: preflight(),
+      recordedAt: "2026-07-26T02:00:00.000Z",
+    });
+    const started = JSON.parse(
+      await readFile(
+        path.join(
+          repository,
+          "docs/smoke/evidence/batches",
+          batchId,
+          "checkpoints/000000.json",
+        ),
+        "utf8",
+      ),
+    );
+    await publishImmutableJson(
+      path.join(
+        repository,
+        "docs/smoke/evidence/batches",
+        batchId,
+        "checkpoints/000001.json",
+      ),
+      {
+        schemaVersion: 2,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+        sequence: 1,
+        kind: "case_running",
+        batchId,
+        recordedAt: "2026-07-26T02:01:00.000Z",
+        repositoryCommit: preflight().repositoryCommit,
+        buildIdentitySha256: preflight().buildIdentitySha256,
+        preflightSha256: started.preflightSha256,
+        ...legacyCases()[0]!,
+      },
+    );
+
+    await expect(
+      ledger.publishTerminalManifest({
+        status: "blocked",
+        stopReason: "infrastructure_failure",
+        notRun: cases().slice(1),
+        completedAt: "2026-07-26T02:02:00.000Z",
+      }),
+    ).rejects.toThrow("Qualification ledger operation failed");
+  });
+
+  it("rejects legacy manifests that reference schema v3 evidence", async () => {
+    const repository = await tempRepository();
+    const source = path.join(
+      repositoryRoot,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      historicalBatchId,
+    );
+    const destination = path.join(
+      repository,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      historicalBatchId,
+    );
+    await mkdir(path.dirname(destination), { recursive: true });
+    await cp(source, destination, { recursive: true });
+    const manifestPath = path.join(destination, "manifest.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    const evidencePath = path.resolve(
+      repository,
+      manifest.cases[0].evidence.path,
+    );
+    const evidence = JSON.parse(await readFile(evidencePath, "utf8"));
+    await rm(evidencePath);
+    const evidenceBytes = Buffer.from(
+      `${JSON.stringify({ ...evidence, schemaVersion: 3 }, null, 2)}\n`,
+    );
+    await writeFile(evidencePath, evidenceBytes);
+    const evidenceSha256 = createHash("sha256")
+      .update(evidenceBytes)
+      .digest("hex");
+    const completedPath = path.join(
+      destination,
+      "checkpoints",
+      "000002.json",
+    );
+    const completed = JSON.parse(await readFile(completedPath, "utf8"));
+    await rm(completedPath);
+    const completedBytes = Buffer.from(
+      `${JSON.stringify(
+        {
+          ...completed,
+          evidence: { ...completed.evidence, sha256: evidenceSha256 },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await writeFile(completedPath, completedBytes);
+    const completedSha256 = createHash("sha256")
+      .update(completedBytes)
+      .digest("hex");
+    await rm(manifestPath);
+    await writeFile(
+      manifestPath,
+      `${JSON.stringify(
+        {
+          ...manifest,
+          cases: [
+            {
+              ...manifest.cases[0],
+              evidence: {
+                ...manifest.cases[0].evidence,
+                sha256: evidenceSha256,
+              },
+            },
+          ],
+          checkpoints: manifest.checkpoints.map(
+            (reference: { sequence: number }) =>
+              reference.sequence === 2
+                ? { ...reference, sha256: completedSha256 }
+                : reference,
+          ),
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    await expect(
+      inspectQualificationTerminal({
+        repositoryRoot: repository,
+        batchId: historicalBatchId,
+      }),
+    ).rejects.toThrow("Qualification ledger operation failed");
   });
 
   it("records the parent credential source but validates Ark evidence against the child target name", async () => {
@@ -748,7 +1040,7 @@ describe("immutable qualification ledger", () => {
         recordedAt: `2026-07-26T02:0${identity.ordinal}:00.000Z`,
       });
       const evidencePath = await publishEvidence(repository, identity);
-      if (identity.ordinal === 3) {
+      if (identity.llm === "ark-coding-plan") {
         const evidence = JSON.parse(
           await readFile(evidencePath, "utf8"),
         ) as Record<string, unknown>;
@@ -802,6 +1094,70 @@ describe("immutable qualification ledger", () => {
         ...cases()[1]!,
         result: "failed",
         evidencePath: path.join(repository, "outside.json"),
+        recordedAt: "2026-07-26T02:02:00.000Z",
+      }),
+    ).rejects.toThrow("Qualification ledger operation failed");
+  });
+
+  it("rejects legacy schedule identities and ordinal drift on current writes", async () => {
+    const repository = await tempRepository();
+    const ledger = createQualificationLedger({
+      repositoryRoot: repository,
+      batchId,
+    });
+    await ledger.publishBatchStarted({
+      authorizationReferenceSha256: authHash,
+      preflight: preflight(),
+      recordedAt: "2026-07-26T02:00:00.000Z",
+    });
+
+    await expect(
+      ledger.publishCaseRunning({
+        ...legacyCases()[0]!,
+        recordedAt: "2026-07-26T02:01:00.000Z",
+      }),
+    ).rejects.toThrow("Qualification ledger operation failed");
+    await expect(
+      ledger.publishCaseRunning({
+        ...cases()[0]!,
+        ordinal: 2,
+        recordedAt: "2026-07-26T02:01:00.000Z",
+      }),
+    ).rejects.toThrow("Qualification ledger operation failed");
+  });
+
+  it("rejects the retired Google quota reason in current evidence", async () => {
+    const repository = await tempRepository();
+    const identity = cases()[0]!;
+    const ledger = createQualificationLedger({
+      repositoryRoot: repository,
+      batchId,
+    });
+    await ledger.publishBatchStarted({
+      authorizationReferenceSha256: authHash,
+      preflight: preflight(),
+      recordedAt: "2026-07-26T02:00:00.000Z",
+    });
+    await ledger.publishCaseRunning({
+      ...identity,
+      recordedAt: "2026-07-26T02:01:00.000Z",
+    });
+    const evidencePath = await publishEvidence(repository, identity, false);
+    const evidence = JSON.parse(await readFile(evidencePath, "utf8"));
+    await rm(evidencePath);
+    await writeFile(
+      evidencePath,
+      `${JSON.stringify({
+        ...evidence,
+        failureReason: "google_free_tier_quota",
+      })}\n`,
+    );
+
+    await expect(
+      ledger.publishCaseCompleted({
+        ...identity,
+        result: "failed",
+        evidencePath,
         recordedAt: "2026-07-26T02:02:00.000Z",
       }),
     ).rejects.toThrow("Qualification ledger operation failed");
@@ -879,7 +1235,8 @@ describe("immutable qualification ledger", () => {
         "checkpoints/000003.json",
       ),
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
         sequence: 3,
         kind: "case_running",
         batchId,
@@ -902,7 +1259,7 @@ describe("immutable qualification ledger", () => {
   });
 
   it.each([
-    ["v1", { schemaVersion: 1 }],
+    ["v2", { schemaVersion: 2 }],
     ["other batch", { qualification: { batchId: "other" } }],
     ["other commit", { qualification: { repositoryCommit: "f".repeat(40) } }],
     ["other build", { qualification: { buildIdentitySha256: "f".repeat(64) } }],
@@ -960,7 +1317,7 @@ describe("immutable qualification ledger", () => {
     ["other expected model", { expectedModel: "wrong-model" }],
     ["other runtime", { runtime: "kimi-acp" }],
     ["other provider", { provider: "wrong-provider" }],
-    ["other route", { route: "direct" }],
+    ["other route", { route: "proxy-10808" }],
     ["other Pi config", { configSha256: "8".repeat(64) }],
     ["missing Pi credential", { credentialEnv: undefined }],
     ["retry telemetry", { adapterRetryCount: 1 }],
@@ -1133,7 +1490,11 @@ describe("immutable qualification ledger", () => {
       notRun: cases().slice(1),
       completedAt: "2026-07-26T02:02:00.000Z",
     });
-    expect(manifest.status).toBe("blocked");
+    expect(manifest).toMatchObject({
+      schemaVersion: 2,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      status: "blocked",
+    });
     expect(manifest.notRun).toEqual(cases().slice(1));
     expect(manifest.checkpoints).toHaveLength(2);
     expect(
@@ -1251,7 +1612,11 @@ describe("immutable qualification ledger", () => {
         authorizationReferenceSha256: authHash,
         completedAt: "2026-07-26T02:03:00.000Z",
       });
-      expect(manifest.status).toBe("interrupted");
+      expect(manifest).toMatchObject({
+        schemaVersion: 2,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+        status: "interrupted",
+      });
       expect(manifest.promotionEligible).toBe(false);
       expect(manifest.uncommittedEvidence === null).toBe(
         crashWindow !== "after_evidence",
@@ -1260,7 +1625,7 @@ describe("immutable qualification ledger", () => {
         expect(manifest.uncommittedEvidence).toMatchObject({
           validationStatus: "valid",
           ordinal: 1,
-          llm: "gemini-3.5-flash",
+          llm: "ark-coding-plan",
           task: "delegate",
           observedPassed: true,
           failureReason: null,
@@ -1318,8 +1683,62 @@ describe("immutable qualification ledger", () => {
     expect(manifest.uncommittedEvidence).toBeNull();
   });
 
+  it("recovers an existing non-terminal legacy checkpoint chain with its disk protocol", async () => {
+    const repository = await tempRepository();
+    const source = path.join(
+      repositoryRoot,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      historicalBatchId,
+    );
+    const destination = path.join(
+      repository,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      historicalBatchId,
+    );
+    await mkdir(path.dirname(destination), { recursive: true });
+    await cp(source, destination, { recursive: true });
+    const historicalManifest = JSON.parse(
+      await readFile(path.join(destination, "manifest.json"), "utf8"),
+    ) as { authorizationReferenceSha256: string };
+    await rm(path.join(destination, "manifest.json"));
+
+    const recovered = await recoverInterruptedQualificationBatch({
+      repositoryRoot: repository,
+      batchId: historicalBatchId,
+      authorizationReferenceSha256:
+        historicalManifest.authorizationReferenceSha256,
+      completedAt: "2026-07-26T10:00:00.000Z",
+    });
+
+    expect(recovered).toMatchObject({
+      schemaVersion: 1,
+      status: "interrupted",
+      promotionEligible: false,
+    });
+    expect("qualificationPlanId" in recovered).toBe(false);
+    expect(recovered.cases).toHaveLength(1);
+    expect(recovered.notRun).toEqual(legacyCases().slice(1));
+    await expect(
+      inspectQualificationTerminal({
+        repositoryRoot: repository,
+        batchId: historicalBatchId,
+      }),
+    ).resolves.toEqual({
+      state: "valid",
+      batchId: historicalBatchId,
+      authorizationReferenceSha256:
+        historicalManifest.authorizationReferenceSha256,
+    });
+  });
+
   it.each([
-    "v1",
+    "v2",
     "invalid-json",
     "identity-mismatch",
     "model-drift",
@@ -1342,12 +1761,12 @@ describe("immutable qualification ledger", () => {
         recordedAt: "2026-07-26T02:01:00.000Z",
       });
       const first = await publishEvidence(repository, cases()[0]!);
-      if (scenario === "v1") {
+      if (scenario === "v2") {
         const value = JSON.parse(await readFile(first, "utf8"));
         await rm(first);
         await writeFile(
           first,
-          `${JSON.stringify({ ...value, schemaVersion: 1 })}\n`,
+          `${JSON.stringify({ ...value, schemaVersion: 2 })}\n`,
         );
       } else if (scenario === "invalid-json") {
         await rm(first);
@@ -1392,7 +1811,7 @@ describe("immutable qualification ledger", () => {
         uncommittedEvidence: {
           validationStatus: "invalid",
           ordinal: 1,
-          llm: "gemini-3.5-flash",
+          llm: "ark-coding-plan",
           task: "delegate",
           observedPassed: null,
           failureReason: "infrastructure_failure",
@@ -1454,7 +1873,7 @@ describe("immutable qualification ledger", () => {
     expect(manifest.uncommittedEvidence).toMatchObject({
       validationStatus: "invalid",
       ordinal: 1,
-      llm: "gemini-3.5-flash",
+      llm: "ark-coding-plan",
       task: "delegate",
       observedPassed: null,
       failureReason: "infrastructure_failure",
@@ -1498,7 +1917,7 @@ describe("immutable qualification ledger", () => {
     expect(manifest.uncommittedEvidence).toMatchObject({
       validationStatus: "valid",
       ordinal: 1,
-      llm: "gemini-3.5-flash",
+      llm: "ark-coding-plan",
       task: "delegate",
       observedPassed: true,
       failureReason: null,

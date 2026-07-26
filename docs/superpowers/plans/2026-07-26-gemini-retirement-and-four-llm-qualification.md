@@ -576,7 +576,7 @@ git commit -m "feat: version qualification smoke evidence"
 - Modify: `src/qualification/manifest.ts`
 - Modify: `test/qualification/manifest.test.ts`
 
-- [ ] **Step 1: Add RED coverage for both disk protocols**
+- [x] **Step 1: Add RED coverage for both disk protocols**
 
 Tests must cover:
 
@@ -605,7 +605,7 @@ Add rejection tests for:
 - `google_free_tier_quota` in current v2 records;
 - changed bytes in a copied historical evidence file.
 
-- [ ] **Step 2: Observe RED**
+- [x] **Step 2: Observe RED**
 
 ```powershell
 npm exec -- vitest run test/qualification/manifest.test.ts
@@ -613,7 +613,7 @@ npm exec -- vitest run test/qualification/manifest.test.ts
 
 Expected: FAIL on new schema/current schedule expectations.
 
-- [ ] **Step 3: Refactor parsing around a protocol object**
+- [x] **Step 3: Refactor parsing around a protocol object**
 
 Create an internal protocol descriptor:
 
@@ -633,7 +633,7 @@ Every disk parser must first select this descriptor from outer schema/plan. Upda
 
 New write paths must emit only schema v2/checkpoints and schema v3 evidence under `four-llm-v1`. Legacy paths are read-only. No function may consult an unqualified global case array.
 
-- [ ] **Step 4: Verify historical and current behavior**
+- [x] **Step 4: Verify historical and current behavior**
 
 ```powershell
 npm exec -- vitest run test/qualification/manifest.test.ts
@@ -642,7 +642,7 @@ npm run typecheck
 
 Expected: all manifest tests PASS; historical repository evidence hashes remain unchanged.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/qualification/types.ts src/qualification/manifest.ts test/qualification/manifest.test.ts
