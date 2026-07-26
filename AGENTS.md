@@ -62,6 +62,7 @@
 - [当前官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)
 - [十门禁原子重认证设计](docs/superpowers/specs/2026-07-26-gate-requalification-design.md)
 - [Gemini 退役与四模型资格认证设计](docs/superpowers/specs/2026-07-26-gemini-retirement-and-four-llm-qualification-design.md)
+- [Gemini 退役与四模型资格认证实施计划](docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md)
 - [十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md)
 - [官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)
 - [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)
