@@ -94,6 +94,19 @@ export interface QualificationVerifierMainOptions {
   verify?: typeof verifyProduction;
 }
 
+function serializeVerificationResult(
+  result: QualificationVerificationResult,
+): string {
+  return JSON.stringify({
+    verified: result.verified,
+    mode: result.mode,
+    batchId: result.batchId,
+    qualificationPlanId: result.qualificationPlanId,
+    status: result.status,
+    promotionEligible: result.promotionEligible,
+  });
+}
+
 export async function main(
   options: QualificationVerifierMainOptions = {},
 ): Promise<number> {
@@ -123,7 +136,7 @@ export async function main(
       manifestPath: path.resolve(repositoryRoot, command.manifestPath),
       mode: command.mode,
     });
-    writeStdout(`${JSON.stringify(result)}\n`);
+    writeStdout(`${serializeVerificationResult(result)}\n`);
     return 0;
   } catch {
     writeStderr("Qualification verification failed\n");

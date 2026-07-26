@@ -3,18 +3,25 @@ import { lstat, open } from "node:fs/promises";
 import path from "node:path";
 import { types as nodeUtilTypes } from "node:util";
 
-import { resolveLlm } from "../llms/registry.js";
 import {
   freezePreflightRecord,
   inspectQualificationTerminal,
   QualificationLedgerError,
 } from "./manifest.js";
-import { LEGACY_QUALIFICATION_CASES } from "./protocol.js";
+import {
+  ACTIVE_QUALIFICATION_CASES,
+  ACTIVE_QUALIFICATION_PLAN_ID,
+  LEGACY_QUALIFICATION_CASES,
+  LEGACY_QUALIFICATION_PLAN_ID,
+  type QualificationPlanId,
+} from "./protocol.js";
 import type {
   BuildArtifactIdentity,
   FrozenCredentialMatch,
   FrozenLogicalLlmIdentity,
   FrozenPreflightRecord,
+  QualificationCaseIdentity,
+  QualificationManifestStatus,
 } from "./types.js";
 
 const MAX_VERIFIER_FILE_BYTES = 1_048_576;
@@ -57,7 +64,36 @@ export interface QualificationVerificationResult {
   verified: true;
   mode: QualificationVerificationMode;
   batchId: string;
-  promotionEligible: true;
+  qualificationPlanId: QualificationPlanId;
+  status: QualificationManifestStatus;
+  promotionEligible: boolean;
+}
+
+interface VerifierProtocol {
+  readonly planId: QualificationPlanId;
+  readonly manifestSchemaVersion: 1 | 2;
+  readonly evidenceSchemaVersion: 2 | 3;
+  readonly schedule: readonly Readonly<QualificationCaseIdentity>[];
+}
+
+const LEGACY_VERIFIER_PROTOCOL: VerifierProtocol = Object.freeze({
+  planId: LEGACY_QUALIFICATION_PLAN_ID,
+  manifestSchemaVersion: 1,
+  evidenceSchemaVersion: 2,
+  schedule: LEGACY_QUALIFICATION_CASES,
+});
+
+const CURRENT_VERIFIER_PROTOCOL: VerifierProtocol = Object.freeze({
+  planId: ACTIVE_QUALIFICATION_PLAN_ID,
+  manifestSchemaVersion: 2,
+  evidenceSchemaVersion: 3,
+  schedule: ACTIVE_QUALIFICATION_CASES,
+});
+
+function verifierProtocol(planId: QualificationPlanId): VerifierProtocol {
+  return planId === LEGACY_QUALIFICATION_PLAN_ID
+    ? LEGACY_VERIFIER_PROTOCOL
+    : CURRENT_VERIFIER_PROTOCOL;
 }
 
 export class QualificationVerificationError extends Error {
@@ -184,40 +220,63 @@ function resolveManifestLocation(options: VerifyQualificationOptions): {
   return { manifestPath, batchId };
 }
 
-function validatePassedManifest(
+function validateTerminalManifest(
   value: unknown,
   batchId: string,
+  protocol: VerifierProtocol,
+  mode: QualificationVerificationMode,
 ): Record<string, unknown> {
   const manifest = plainRecord(value);
+  const cases = Array.isArray(manifest.cases) ? manifest.cases : [];
+  const notRun = Array.isArray(manifest.notRun) ? manifest.notRun : [];
+  const status = manifest.status;
   if (
-    manifest.schemaVersion !== 1 ||
+    manifest.schemaVersion !== protocol.manifestSchemaVersion ||
+    (protocol === LEGACY_VERIFIER_PROTOCOL
+      ? Object.hasOwn(manifest, "qualificationPlanId")
+      : manifest.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID) ||
     manifest.batchId !== batchId ||
-    manifest.status !== "passed" ||
-    manifest.promotionEligible !== true ||
-    manifest.stopReason !== null ||
+    (status !== "passed" &&
+      status !== "blocked" &&
+      status !== "interrupted") ||
     !Array.isArray(manifest.cases) ||
-    manifest.cases.length !== LEGACY_QUALIFICATION_CASES.length ||
     !Array.isArray(manifest.notRun) ||
-    manifest.notRun.length !== 0 ||
-    manifest.uncommittedEvidence !== null
+    typeof manifest.promotionEligible !== "boolean"
   ) {
     throw new QualificationVerificationError();
   }
-  for (
-    let index = 0;
-    index < LEGACY_QUALIFICATION_CASES.length;
-    index += 1
-  ) {
-    const expected = LEGACY_QUALIFICATION_CASES[index]!;
-    const actual = plainRecord(manifest.cases[index]);
+  for (let index = 0; index < cases.length; index += 1) {
+    const expected = protocol.schedule[index];
+    const actual = plainRecord(cases[index]);
     if (
+      expected === undefined ||
       actual.ordinal !== expected.ordinal ||
       actual.llm !== expected.llm ||
-      actual.task !== expected.task ||
-      actual.result !== "passed"
+      actual.task !== expected.task
     ) {
       throw new QualificationVerificationError();
     }
+  }
+  if (mode === "frozen-candidate") {
+    if (
+      protocol !== CURRENT_VERIFIER_PROTOCOL ||
+      status !== "passed" ||
+      manifest.promotionEligible !== true ||
+      manifest.stopReason !== null ||
+      cases.length !== protocol.schedule.length ||
+      cases.some((entry) => plainRecord(entry).result !== "passed") ||
+      notRun.length !== 0 ||
+      manifest.uncommittedEvidence !== null
+    ) {
+      throw new QualificationVerificationError();
+    }
+  } else if (
+    status === "passed" &&
+    (manifest.promotionEligible !== true ||
+      cases.length !== protocol.schedule.length ||
+      notRun.length !== 0)
+  ) {
+    throw new QualificationVerificationError();
   }
   return manifest;
 }
@@ -225,7 +284,7 @@ function validatePassedManifest(
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 
 function expectedChecks(
-  identity: (typeof LEGACY_QUALIFICATION_CASES)[number],
+  identity: Readonly<QualificationCaseIdentity>,
   runtime: FrozenLogicalLlmIdentity["runtime"],
 ): readonly string[] {
   const processCheck =
@@ -253,26 +312,45 @@ function expectedChecks(
 }
 
 function expectedResultLine(
-  identity: (typeof LEGACY_QUALIFICATION_CASES)[number],
+  protocol: VerifierProtocol,
+  identity: Readonly<QualificationCaseIdentity>,
 ): string {
   if (identity.llm === "kimi-k3") return "KIMI_SMOKE_OK";
-  if (identity.llm === "gemini-3.5-flash") return "PI_SMOKE_OK";
+  if (
+    protocol === LEGACY_VERIFIER_PROTOCOL &&
+    identity.llm === "gemini-3.5-flash"
+  ) {
+    return "PI_SMOKE_OK";
+  }
   return `ARK_SMOKE_OK:${identity.llm}`;
 }
 
-function validateTaskAcceptance(
+function validateTaskCheckShape(
   evidence: Record<string, unknown>,
-  identity: (typeof LEGACY_QUALIFICATION_CASES)[number],
+  identity: Readonly<QualificationCaseIdentity>,
   runtime: FrozenLogicalLlmIdentity["runtime"],
-): void {
+): Record<string, unknown> {
   const checks = plainRecord(evidence.checks);
   const actualKeys = Object.keys(checks).sort();
   const requiredKeys = expectedChecks(identity, runtime);
   if (
     actualKeys.length !== requiredKeys.length ||
     actualKeys.some((key, index) => key !== requiredKeys[index]) ||
-    requiredKeys.some((key) => checks[key] !== true)
+    requiredKeys.some((key) => typeof checks[key] !== "boolean")
   ) {
+    throw new QualificationVerificationError();
+  }
+  return checks;
+}
+
+function validatePassedTaskAcceptance(
+  evidence: Record<string, unknown>,
+  protocol: VerifierProtocol,
+  identity: Readonly<QualificationCaseIdentity>,
+  runtime: FrozenLogicalLlmIdentity["runtime"],
+): void {
+  const checks = validateTaskCheckShape(evidence, identity, runtime);
+  if (Object.values(checks).some((value) => value !== true)) {
     throw new QualificationVerificationError();
   }
   if (identity.task === "review") {
@@ -291,7 +369,7 @@ function validateTaskAcceptance(
     return;
   }
   const expectedHash = createHash("sha256")
-    .update(expectedResultLine(identity))
+    .update(expectedResultLine(protocol, identity))
     .digest("hex");
   if (
     evidence.resultFileReadStatus !== "read" ||
@@ -312,21 +390,44 @@ function validateTaskAcceptance(
 
 function validateQualificationIdentity(
   evidence: Record<string, unknown>,
-  identity: (typeof LEGACY_QUALIFICATION_CASES)[number],
+  protocol: VerifierProtocol,
+  identity: Readonly<QualificationCaseIdentity>,
   preflight: FrozenPreflightRecord,
   authorizationReferenceSha256: unknown,
   batchId: string,
 ): void {
   const qualification = plainRecord(evidence.qualification);
   const qualificationKeys = Object.keys(qualification).sort();
-  const expectedQualificationKeys = [
-    "authorizationReferenceSha256",
-    "batchId",
-    "buildIdentitySha256",
-    "orchestratorFallbackUsed",
-    "ordinal",
-    "repositoryCommit",
-  ];
+  const expectedQualificationKeys =
+    protocol === LEGACY_VERIFIER_PROTOCOL
+      ? [
+          "authorizationReferenceSha256",
+          "batchId",
+          "buildIdentitySha256",
+          "orchestratorFallbackUsed",
+          "ordinal",
+          "repositoryCommit",
+        ]
+      : [
+          "authorizationReferenceSha256",
+          "batchId",
+          "frozenBuildIdentity",
+          "frozenCommit",
+          "llm",
+          "orchestratorFallbackUsed",
+          "ordinal",
+          "qualificationPlanId",
+          "task",
+        ];
+  const frozenIdentityMatches =
+    protocol === LEGACY_VERIFIER_PROTOCOL
+      ? qualification.repositoryCommit === preflight.repositoryCommit &&
+        qualification.buildIdentitySha256 === preflight.buildIdentitySha256
+      : qualification.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID &&
+        qualification.llm === identity.llm &&
+        qualification.task === identity.task &&
+        qualification.frozenCommit === preflight.repositoryCommit &&
+        qualification.frozenBuildIdentity === preflight.buildIdentitySha256;
   if (
     qualificationKeys.length !== expectedQualificationKeys.length ||
     qualificationKeys.some(
@@ -334,8 +435,7 @@ function validateQualificationIdentity(
     ) ||
     qualification.batchId !== batchId ||
     qualification.ordinal !== identity.ordinal ||
-    qualification.repositoryCommit !== preflight.repositoryCommit ||
-    qualification.buildIdentitySha256 !== preflight.buildIdentitySha256 ||
+    !frozenIdentityMatches ||
     qualification.authorizationReferenceSha256 !==
       authorizationReferenceSha256 ||
     qualification.orchestratorFallbackUsed !== false
@@ -346,7 +446,9 @@ function validateQualificationIdentity(
 
 function validateEvidenceIdentityAndAcceptance(
   evidenceValue: unknown,
-  identity: (typeof LEGACY_QUALIFICATION_CASES)[number],
+  manifestEntry: Record<string, unknown>,
+  protocol: VerifierProtocol,
+  identity: Readonly<QualificationCaseIdentity>,
   preflight: FrozenPreflightRecord,
   authorizationReferenceSha256: unknown,
   batchId: string,
@@ -363,6 +465,7 @@ function validateEvidenceIdentityAndAcceptance(
   }
   validateQualificationIdentity(
     evidence,
+    protocol,
     identity,
     preflight,
     authorizationReferenceSha256,
@@ -372,34 +475,59 @@ function validateEvidenceIdentityAndAcceptance(
     logicalIdentity.runtime === "kimi-acp"
       ? "kimi-acp-observable"
       : "pi-rpc-observable";
+  const requiresExactTelemetry =
+    protocol === LEGACY_VERIFIER_PROTOCOL ||
+    manifestEntry.result === "passed";
+  const isPassed = manifestEntry.result === "passed";
+  const isCurrentInfrastructureFailure =
+    protocol === CURRENT_VERIFIER_PROTOCOL &&
+    !isPassed &&
+    evidence.failureReason === "infrastructure_failure";
+  const statusMatchesProtocol =
+    isPassed
+      ? evidence.status === "completed"
+      : protocol === LEGACY_VERIFIER_PROTOCOL
+        ? evidence.status === "failed"
+        : true;
   if (
-    evidence.schemaVersion !== 2 ||
+    evidence.schemaVersion !== protocol.evidenceSchemaVersion ||
     evidence.llm !== identity.llm ||
     evidence.task !== identity.task ||
-    evidence.status !== "completed" ||
-    evidence.passed !== true ||
-    evidence.failureReason !== null ||
-    evidence.actualModel !== logicalIdentity.model ||
+    evidence.passed !== isPassed ||
+    evidence.failureReason !== manifestEntry.failureReason ||
+    !statusMatchesProtocol ||
+    (isPassed && evidence.actualModel !== logicalIdentity.model) ||
     evidence.expectedModel !== logicalIdentity.model ||
     evidence.runtime !== logicalIdentity.runtime ||
     evidence.route !== logicalIdentity.route ||
-    evidence.adapterClientInvocationCount !== 1 ||
-    evidence.adapterRetryCount !== 0 ||
-    evidence.runtimeReportedAutoRetryCount !== 0 ||
-    evidence.adapterReportedFallbackUsed !== false ||
-    evidence.orchestratorFallbackUsed !== false ||
-    evidence.executionTelemetrySource !== expectedTelemetrySource
+    (requiresExactTelemetry &&
+      (evidence.adapterClientInvocationCount !== 1 ||
+        evidence.adapterRetryCount !== 0 ||
+        evidence.runtimeReportedAutoRetryCount !== 0 ||
+        evidence.adapterReportedFallbackUsed !== false ||
+        evidence.orchestratorFallbackUsed !== false ||
+        evidence.executionTelemetrySource !== expectedTelemetrySource))
   ) {
     throw new QualificationVerificationError();
   }
   if (logicalIdentity.runtime === "pi-rpc") {
-    const profile = resolveLlm(identity.llm);
     const expectedChildCredentialName =
-      profile.credentialTargetEnv ?? credential.environmentVariableName;
+      identity.llm === "ark-coding-plan"
+        ? "CODEX_AGENT_ARK_CODING_KEY"
+        : identity.llm === "ark-agent-plan" ||
+            identity.llm === "ark-agent-deepseek-v4-flash"
+          ? "CODEX_AGENT_ARK_AGENT_KEY"
+          : credential.environmentVariableName;
     if (
       evidence.provider !== logicalIdentity.provider ||
-      evidence.configSha256 !== preflight.piConfigSha256 ||
-      evidence.credentialEnv !== expectedChildCredentialName
+      (!isCurrentInfrastructureFailure &&
+        (evidence.configSha256 !== preflight.piConfigSha256 ||
+          evidence.credentialEnv !== expectedChildCredentialName)) ||
+      (isCurrentInfrastructureFailure &&
+        ((Object.hasOwn(evidence, "configSha256") &&
+          evidence.configSha256 !== preflight.piConfigSha256) ||
+          (Object.hasOwn(evidence, "credentialEnv") &&
+            evidence.credentialEnv !== expectedChildCredentialName)))
     ) {
       throw new QualificationVerificationError();
     }
@@ -410,15 +538,110 @@ function validateEvidenceIdentityAndAcceptance(
   ) {
     throw new QualificationVerificationError();
   }
-  validateTaskAcceptance(evidence, identity, logicalIdentity.runtime);
+  if (isPassed || protocol === LEGACY_VERIFIER_PROTOCOL) {
+    validatePassedTaskAcceptance(
+      evidence,
+      protocol,
+      identity,
+      logicalIdentity.runtime,
+    );
+  } else {
+    validateCurrentFailedSemantics(
+      evidence,
+      identity,
+      logicalIdentity.runtime,
+    );
+  }
+}
+
+const COMMON_EVIDENCE_STATUSES = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "timed_out",
+  "workspace_changed",
+]);
+
+function validateInfrastructureChecks(
+  evidence: Record<string, unknown>,
+): void {
+  const checks = plainRecord(evidence.checks);
+  const keys = Object.keys(checks).sort();
+  if (
+    keys.length !== 2 ||
+    keys[0] !== "postProcessSnapshot" ||
+    keys[1] !== "processCleanup" ||
+    (checks.postProcessSnapshot !== "unknown" &&
+      checks.postProcessSnapshot !== "not_reached") ||
+    checks.processCleanup !== "unknown"
+  ) {
+    throw new QualificationVerificationError();
+  }
+}
+
+function validateCurrentFailedSemantics(
+  evidence: Record<string, unknown>,
+  identity: Readonly<QualificationCaseIdentity>,
+  runtime: FrozenLogicalLlmIdentity["runtime"],
+): void {
+  const failureReason = evidence.failureReason;
+  if (failureReason === "infrastructure_failure") {
+    if (evidence.status !== "failed") {
+      throw new QualificationVerificationError();
+    }
+    validateInfrastructureChecks(evidence);
+    return;
+  }
+  if (!COMMON_EVIDENCE_STATUSES.has(String(evidence.status))) {
+    throw new QualificationVerificationError();
+  }
+  const checks = validateTaskCheckShape(evidence, identity, runtime);
+  if (failureReason === "acceptance_failed") {
+    if (
+      evidence.status !== "completed" ||
+      Object.values(checks).every((value) => value === true)
+    ) {
+      throw new QualificationVerificationError();
+    }
+    return;
+  }
+  if (failureReason === "process_residual") {
+    if (
+      runtime !== "kimi-acp" ||
+      checks.noNewKimiProcesses !== false
+    ) {
+      throw new QualificationVerificationError();
+    }
+    return;
+  }
+  if (
+    (failureReason === "adapter_auth_or_model_unavailable" &&
+      (runtime !== "kimi-acp" || evidence.status === "completed")) ||
+    (failureReason === "adapter_failure" &&
+      (runtime !== "pi-rpc" || evidence.status === "completed")) ||
+    ((failureReason === "missing_credential" ||
+      failureReason === "account_quota_exceeded") &&
+      runtime !== "pi-rpc")
+  ) {
+    throw new QualificationVerificationError();
+  }
 }
 
 async function validateManifestEvidence(
   repositoryRoot: string,
   batchId: string,
   manifest: Record<string, unknown>,
+  protocol: VerifierProtocol,
 ): Promise<void> {
   const preflight = freezePreflightRecord(manifest.preflight);
+  if (
+    (protocol === LEGACY_VERIFIER_PROTOCOL
+      ? preflight.schemaVersion !== 1
+      : preflight.schemaVersion !== 2 ||
+        preflight.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID)
+  ) {
+    throw new QualificationVerificationError();
+  }
   const batchCasesDirectory = path.resolve(
     repositoryRoot,
     "docs",
@@ -429,12 +652,11 @@ async function validateManifestEvidence(
     "cases",
   );
   const cases = manifest.cases as unknown[];
-  for (
-    let index = 0;
-    index < LEGACY_QUALIFICATION_CASES.length;
-    index += 1
-  ) {
-    const identity = LEGACY_QUALIFICATION_CASES[index]!;
+  for (let index = 0; index < cases.length; index += 1) {
+    const identity = protocol.schedule[index];
+    if (identity === undefined) {
+      throw new QualificationVerificationError();
+    }
     const entry = plainRecord(cases[index]);
     const reference = plainRecord(entry.evidence);
     if (
@@ -459,6 +681,8 @@ async function validateManifestEvidence(
     }
     validateEvidenceIdentityAndAcceptance(
       loaded.value,
+      entry,
+      protocol,
       identity,
       preflight,
       manifest.authorizationReferenceSha256,
@@ -585,6 +809,32 @@ function normalizeCurrentCandidate(value: unknown): FrozenCandidateSnapshot {
   return snapshotPlainJson(record) as FrozenCandidateSnapshot;
 }
 
+async function assertTerminalStable(options: {
+  repositoryRoot: string;
+  location: { readonly manifestPath: string; readonly batchId: string };
+  qualificationPlanId: QualificationPlanId;
+  authorizationReferenceSha256: string;
+  manifestSha256: string;
+}): Promise<void> {
+  const finalInspection = await inspectQualificationTerminal({
+    repositoryRoot: options.repositoryRoot,
+    batchId: options.location.batchId,
+  });
+  if (
+    finalInspection.state !== "valid" ||
+    finalInspection.batchId !== options.location.batchId ||
+    finalInspection.authorizationReferenceSha256 !==
+      options.authorizationReferenceSha256 ||
+    finalInspection.qualificationPlanId !== options.qualificationPlanId
+  ) {
+    throw new QualificationVerificationError();
+  }
+  const finalManifest = await readImmutableJson(options.location.manifestPath);
+  if (finalManifest.sha256 !== options.manifestSha256) {
+    throw new QualificationVerificationError();
+  }
+}
+
 export async function verifyQualification(
   options: VerifyQualificationOptions,
   dependencies: QualificationVerifierDependencies = {},
@@ -604,22 +854,27 @@ export async function verifyQualification(
     if (firstInspection.state !== "valid") {
       throw new QualificationVerificationError();
     }
-    const manifest = validatePassedManifest(
-      (await readImmutableJson(location.manifestPath)).value,
+    const protocol = verifierProtocol(firstInspection.qualificationPlanId);
+    const manifestFile = await readImmutableJson(location.manifestPath);
+    const manifest = validateTerminalManifest(
+      manifestFile.value,
       location.batchId,
+      protocol,
+      options.mode,
     );
+    if (
+      firstInspection.batchId !== location.batchId ||
+      manifest.authorizationReferenceSha256 !==
+        firstInspection.authorizationReferenceSha256
+    ) {
+      throw new QualificationVerificationError();
+    }
     await validateManifestEvidence(
       options.repositoryRoot,
       location.batchId,
       manifest,
+      protocol,
     );
-    const secondInspection = await inspectQualificationTerminal({
-      repositoryRoot: options.repositoryRoot,
-      batchId: location.batchId,
-    });
-    if (secondInspection.state !== "valid") {
-      throw new QualificationVerificationError();
-    }
     if (options.mode === "frozen-candidate") {
       if (
         dependencies.assertFrozenCandidate === undefined ||
@@ -648,11 +903,21 @@ export async function verifyQualification(
         throw new QualificationVerificationError();
       }
     }
+    await assertTerminalStable({
+      repositoryRoot: options.repositoryRoot,
+      location,
+      qualificationPlanId: protocol.planId,
+      authorizationReferenceSha256:
+        firstInspection.authorizationReferenceSha256,
+      manifestSha256: manifestFile.sha256,
+    });
     return Object.freeze({
       verified: true,
       mode: options.mode,
       batchId: location.batchId,
-      promotionEligible: true,
+      qualificationPlanId: protocol.planId,
+      status: manifest.status as QualificationManifestStatus,
+      promotionEligible: manifest.promotionEligible as boolean,
     });
   } catch (error) {
     if (

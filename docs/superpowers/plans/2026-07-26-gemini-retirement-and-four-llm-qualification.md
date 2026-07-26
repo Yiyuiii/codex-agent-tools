@@ -804,7 +804,7 @@ git commit -m "feat: run the four-llm qualification schedule"
 - Modify: `scripts/verify-qualification.ts`
 - Modify: `test/qualification/verifier.test.ts`
 
-- [ ] **Step 1: Add verifier RED cases**
+- [x] **Step 1: Add verifier RED cases**
 
 Tests must prove:
 
@@ -823,7 +823,7 @@ expect(verifyFrozenQualificationBatch({ batchPath: currentPassedPath }))
 
 Reject legacy manifests from frozen-candidate promotion, mixed evidence schemas, unknown plan IDs, ordinal drift, and tampered hashes.
 
-- [ ] **Step 2: Observe RED**
+- [x] **Step 2: Observe RED**
 
 ```powershell
 npm exec -- vitest run test/qualification/verifier.test.ts
@@ -831,11 +831,11 @@ npm exec -- vitest run test/qualification/verifier.test.ts
 
 Expected: FAIL because verifier uses the global ten-case schedule and current registry.
 
-- [ ] **Step 3: Implement verifier protocol dispatch**
+- [x] **Step 3: Implement verifier protocol dispatch**
 
 All verifier entrypoints must call the manifest envelope dispatcher first. Legacy immutable verification uses frozen historical identities and never compares old build artifacts to the current tree. Current frozen-candidate verification requires `four-llm-v1`, eight schema v3 cases, current HEAD/build/preflight identity, and exact telemetry. `expectedResultLine()` receives a plan-bound identity; only the legacy codec knows `PI_SMOKE_OK`.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 ```powershell
 npm exec -- vitest run test/qualification/verifier.test.ts
@@ -844,7 +844,7 @@ npm run typecheck
 
 Expected: verifier tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/qualification/verifier.ts scripts/verify-qualification.ts test/qualification/verifier.test.ts

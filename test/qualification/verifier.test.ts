@@ -1,16 +1,19 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resolveLlm } from "../../src/llms/registry.js";
+import { main as verifierMain } from "../../scripts/verify-qualification.js";
 import {
   createQualificationLedger,
   freezePreflightRecord,
 } from "../../src/qualification/manifest.js";
-import { LEGACY_QUALIFICATION_CASES } from "../../src/qualification/protocol.js";
+import {
+  ACTIVE_QUALIFICATION_CASES,
+  ACTIVE_QUALIFICATION_PLAN_ID,
+} from "../../src/qualification/protocol.js";
 import {
   type FrozenPreflightRecord,
   type QualificationCaseIdentity,
@@ -25,7 +28,8 @@ const roots: string[] = [];
 const batchId = "batch-verifier-2026-07-26";
 const authorizationHash = "a".repeat(64);
 const repositoryCommit = "b".repeat(40);
-const buildIdentitySha256 = "c".repeat(64);
+const historicalBatchId =
+  "2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f";
 
 function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
@@ -48,24 +52,25 @@ afterEach(async () => {
 });
 
 function frozenPreflight(): FrozenPreflightRecord {
+  const buildArtifacts = [
+    { path: "dist/ark-smoke.js", sha256: "1".repeat(64) },
+    { path: "dist/kimi-smoke.js", sha256: "2".repeat(64) },
+    { path: "dist/smoke-evidence.js", sha256: "3".repeat(64) },
+    {
+      path: "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+      sha256: "4".repeat(64),
+    },
+  ];
   return freezePreflightRecord({
-    schemaVersion: 1,
+    schemaVersion: 2,
+    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     repositoryCommit,
     repositoryBranch: "codex/ark-cutover",
     repositoryDirty: false,
     packageVersion: "0.1.0-alpha.1",
     packageLockSha256: "d".repeat(64),
-    buildArtifacts: [
-      { path: "dist/ark-smoke.js", sha256: "1".repeat(64) },
-      { path: "dist/kimi-smoke.js", sha256: "2".repeat(64) },
-      { path: "dist/pi-smoke.js", sha256: "3".repeat(64) },
-      { path: "dist/smoke-evidence.js", sha256: "4".repeat(64) },
-      {
-        path: "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
-        sha256: "5".repeat(64),
-      },
-    ],
-    buildIdentitySha256,
+    buildArtifacts,
+    buildIdentitySha256: sha256(JSON.stringify(buildArtifacts)),
     runtimeVersions: {
       node: "v24.0.0",
       codex: "codex-cli 0.135.0",
@@ -96,13 +101,6 @@ function frozenPreflight(): FrozenPreflightRecord {
         route: "direct",
       },
       {
-        llm: "gemini-3.5-flash",
-        runtime: "pi-rpc",
-        model: "gemini-3.5-flash",
-        provider: "google",
-        route: "proxy-10808",
-      },
-      {
         llm: "kimi-k3",
         runtime: "kimi-acp",
         model: "kimi-code/k3",
@@ -123,17 +121,8 @@ function frozenPreflight(): FrozenPreflightRecord {
         llm: "ark-coding-plan",
         environmentVariableName: "API_KEY_DOUBAO_CODING",
       },
-      {
-        llm: "gemini-3.5-flash",
-        environmentVariableName: "GEMINI_API_KEY",
-      },
       { llm: "kimi-k3", environmentVariableName: null },
     ],
-    proxy10808: {
-      host: "127.0.0.1",
-      port: 10808,
-      listening: true,
-    },
     targetProcesses: {
       kimi: { count: 0 },
       piRpc: { count: 0 },
@@ -160,8 +149,23 @@ function frozenCandidate(
 
 function expectedResultLine(identity: QualificationCaseIdentity): string {
   if (identity.llm === "kimi-k3") return "KIMI_SMOKE_OK";
-  if (identity.llm === "gemini-3.5-flash") return "PI_SMOKE_OK";
   return `ARK_SMOKE_OK:${identity.llm}`;
+}
+
+async function copyHistoricalBatch(repositoryRoot: string): Promise<string> {
+  const relative = path.join(
+    "docs",
+    "smoke",
+    "evidence",
+    "batches",
+    historicalBatchId,
+  );
+  const destination = path.join(repositoryRoot, relative);
+  await mkdir(path.dirname(destination), { recursive: true });
+  await cp(path.join(process.cwd(), relative), destination, {
+    recursive: true,
+  });
+  return path.join(destination, "manifest.json");
 }
 
 function acceptanceChecks(identity: QualificationCaseIdentity) {
@@ -212,17 +216,17 @@ function evidenceForCase(
   const logicalIdentity = preflight.logicalLlms.find(
     (candidate) => candidate.llm === identity.llm,
   )!;
-  const credential = preflight.credentialMatches.find(
-    (candidate) => candidate.llm === identity.llm,
-  )!;
   const expectedLine = expectedResultLine(identity);
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     qualification: {
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       batchId,
       ordinal: identity.ordinal,
-      repositoryCommit,
-      buildIdentitySha256,
+      llm: identity.llm,
+      task: identity.task,
+      frozenCommit: repositoryCommit,
+      frozenBuildIdentity: preflight.buildIdentitySha256,
       authorizationReferenceSha256: authorizationHash,
       orchestratorFallbackUsed: false,
     },
@@ -241,8 +245,9 @@ function evidenceForCase(
       ? {
           configSha256: preflight.piConfigSha256,
           credentialEnv:
-            resolveLlm(identity.llm).credentialTargetEnv ??
-            credential.environmentVariableName,
+            identity.llm === "ark-coding-plan"
+              ? "CODEX_AGENT_ARK_CODING_KEY"
+              : "CODEX_AGENT_ARK_AGENT_KEY",
         }
       : {}),
     passed: true,
@@ -289,7 +294,7 @@ async function createPassedBatch(
     preflight,
     recordedAt: "2026-07-26T00:00:00.000Z",
   });
-  for (const identity of LEGACY_QUALIFICATION_CASES) {
+  for (const identity of ACTIVE_QUALIFICATION_CASES) {
     await ledger.publishCaseRunning({
       ...identity,
       recordedAt: "2026-07-26T00:00:00.000Z",
@@ -336,6 +341,69 @@ async function createPassedBatch(
     ),
     preflight,
   };
+}
+
+async function createCurrentBlockedBatch(
+  repositoryRoot: string,
+  mutateEvidence?: (evidence: Record<string, unknown>) => void,
+): Promise<string> {
+  const preflight = frozenPreflight();
+  const ledger = createQualificationLedger({ repositoryRoot, batchId });
+  await ledger.publishBatchStarted({
+    authorizationReferenceSha256: authorizationHash,
+    preflight,
+    recordedAt: "2026-07-26T00:00:00.000Z",
+  });
+  const identity = ACTIVE_QUALIFICATION_CASES[0];
+  await ledger.publishCaseRunning({
+    ...identity,
+    recordedAt: "2026-07-26T00:00:00.000Z",
+  });
+  const evidence = evidenceForCase(identity, preflight);
+  evidence.status = "completed";
+  evidence.passed = false;
+  evidence.failureReason = "acceptance_failed";
+  evidence.checks = {
+    ...acceptanceChecks(identity),
+    resultFileValid: false,
+  };
+  mutateEvidence?.(evidence);
+  const evidencePath = path.join(
+    repositoryRoot,
+    "docs",
+    "smoke",
+    "evidence",
+    "batches",
+    batchId,
+    "cases",
+    "01.json",
+  );
+  await mkdir(path.dirname(evidencePath), { recursive: true });
+  await writeFile(evidencePath, `${JSON.stringify(evidence)}\n`, {
+    encoding: "utf8",
+    flag: "wx",
+  });
+  await ledger.publishCaseCompleted({
+    ...identity,
+    result: "failed",
+    evidencePath,
+    recordedAt: "2026-07-26T00:00:00.000Z",
+  });
+  await ledger.publishTerminalManifest({
+    status: "blocked",
+    stopReason: "case_failed",
+    notRun: ACTIVE_QUALIFICATION_CASES.slice(1),
+    completedAt: "2026-07-26T00:00:00.000Z",
+  });
+  return path.join(
+    repositoryRoot,
+    "docs",
+    "smoke",
+    "evidence",
+    "batches",
+    batchId,
+    "manifest.json",
+  );
 }
 
 async function readJson(filePath: string): Promise<Record<string, unknown>> {
@@ -435,6 +503,261 @@ async function expectVerificationFailure(
 }
 
 describe("qualification verifier", () => {
+  it("prints protocol identity and terminal state in verifier CLI output", async () => {
+    let stdout = "";
+
+    await expect(
+      verifierMain({
+        args: [
+          "--mode",
+          "immutable-evidence",
+          "--manifest",
+          `docs/smoke/evidence/batches/${historicalBatchId}/manifest.json`,
+        ],
+        repositoryRoot: process.cwd(),
+        writeStdout: (text) => {
+          stdout += text;
+        },
+        verify: async () => ({
+          verified: true,
+          mode: "immutable-evidence",
+          batchId: historicalBatchId,
+          qualificationPlanId: "five-llm-v1",
+          status: "blocked",
+          promotionEligible: false,
+        }),
+      }),
+    ).resolves.toBe(0);
+    expect(JSON.parse(stdout)).toEqual({
+      verified: true,
+      mode: "immutable-evidence",
+      batchId: historicalBatchId,
+      qualificationPlanId: "five-llm-v1",
+      status: "blocked",
+      promotionEligible: false,
+    });
+  });
+
+  it("verifies the real historical blocked batch as immutable five-llm-v1 evidence", async () => {
+    const repositoryRoot = process.cwd();
+    const manifestPath = path.join(
+      repositoryRoot,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      historicalBatchId,
+      "manifest.json",
+    );
+
+    await expect(
+      verifyQualification({
+        repositoryRoot,
+        manifestPath,
+        mode: "immutable-evidence",
+      }),
+    ).resolves.toMatchObject({
+      verified: true,
+      qualificationPlanId: "five-llm-v1",
+      status: "blocked",
+      promotionEligible: false,
+    });
+  });
+
+  it("never admits a legacy batch to frozen-candidate promotion", async () => {
+    const repositoryRoot = process.cwd();
+    const manifestPath = path.join(
+      repositoryRoot,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      historicalBatchId,
+      "manifest.json",
+    );
+    let candidateCalls = 0;
+
+    await expect(
+      verifyQualification(
+        {
+          repositoryRoot,
+          manifestPath,
+          mode: "frozen-candidate",
+        },
+        {
+          assertFrozenCandidate: async () => {
+            candidateCalls += 1;
+          },
+          collectCurrentCandidate: async () => {
+            candidateCalls += 1;
+            return frozenCandidate();
+          },
+        },
+      ),
+    ).rejects.toBeInstanceOf(QualificationVerificationError);
+    expect(candidateCalls).toBe(0);
+  });
+
+  it("keeps exact telemetry locked for coherently rewritten legacy failed evidence", async () => {
+    const repositoryRoot = await tempRepository();
+    const manifestPath = await copyHistoricalBatch(repositoryRoot);
+    const manifest = await readJson(manifestPath);
+    const caseEntry = (
+      manifest.cases as Array<Record<string, unknown>>
+    )[0]!;
+    const evidenceReference = caseEntry.evidence as Record<string, unknown>;
+    const evidencePath = path.resolve(
+      repositoryRoot,
+      evidenceReference.path as string,
+    );
+    const evidence = await readJson(evidencePath);
+    evidence.adapterRetryCount = 1;
+    await overwriteJson(evidencePath, evidence);
+    const evidenceSha256 = sha256(await readFile(evidencePath));
+    evidenceReference.sha256 = evidenceSha256;
+    caseEntry.adapterRetryCount = 1;
+
+    const checkpointPath = path.join(
+      path.dirname(manifestPath),
+      "checkpoints",
+      "000002.json",
+    );
+    const checkpoint = await readJson(checkpointPath);
+    (checkpoint.evidence as Record<string, unknown>).sha256 = evidenceSha256;
+    checkpoint.adapterRetryCount = 1;
+    await overwriteJson(checkpointPath, checkpoint);
+    (
+      (manifest.checkpoints as Array<Record<string, unknown>>)[2]!
+    ).sha256 = sha256(await readFile(checkpointPath));
+    await overwriteJson(manifestPath, manifest);
+
+    await expectVerificationFailure(repositoryRoot, manifestPath);
+  });
+
+  it("accepts a current blocked delegate whose failure checks correctly contain false", async () => {
+    const repositoryRoot = await tempRepository();
+    const manifestPath = await createCurrentBlockedBatch(repositoryRoot);
+
+    await expect(
+      verifyQualification({
+        repositoryRoot,
+        manifestPath,
+        mode: "immutable-evidence",
+      }),
+    ).resolves.toMatchObject({
+      verified: true,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      status: "blocked",
+      promotionEligible: false,
+    });
+  });
+
+  it("rejects current non-infrastructure failed evidence without task checks", async () => {
+    const repositoryRoot = await tempRepository();
+    const manifestPath = await createCurrentBlockedBatch(
+      repositoryRoot,
+      (evidence) => {
+        delete evidence.checks;
+      },
+    );
+
+    await expectVerificationFailure(repositoryRoot, manifestPath);
+  });
+
+  it("rejects current Pi failed evidence with a drifted config identity", async () => {
+    const repositoryRoot = await tempRepository();
+    const manifestPath = await createCurrentBlockedBatch(
+      repositoryRoot,
+      (evidence) => {
+        evidence.configSha256 = "9".repeat(64);
+      },
+    );
+
+    await expectVerificationFailure(repositoryRoot, manifestPath);
+  });
+
+  it("rejects current Pi failed evidence with a source credential instead of the child target", async () => {
+    const repositoryRoot = await tempRepository();
+    const manifestPath = await createCurrentBlockedBatch(repositoryRoot);
+    await coherentlyRewriteEvidenceReference({
+      repositoryRoot,
+      manifestPath,
+      ordinal: 1,
+      mutateEvidence: (evidence) => {
+        evidence.credentialEnv = "ARK_API_KEY";
+      },
+    });
+
+    await expectVerificationFailure(repositoryRoot, manifestPath);
+  });
+
+  it("accepts a current common-evidence missing credential failure with exact Pi identity and boolean task checks", async () => {
+    const repositoryRoot = await tempRepository();
+    const manifestPath = await createCurrentBlockedBatch(
+      repositoryRoot,
+      (evidence) => {
+        evidence.status = "failed";
+        evidence.failureReason = "missing_credential";
+      },
+    );
+
+    await expect(
+      verifyQualification({
+        repositoryRoot,
+        manifestPath,
+        mode: "immutable-evidence",
+      }),
+    ).resolves.toMatchObject({
+      status: "blocked",
+      promotionEligible: false,
+    });
+  });
+
+  it("accepts current infrastructure wrapper checks without Pi config or credential fields", async () => {
+    const repositoryRoot = await tempRepository();
+    const manifestPath = await createCurrentBlockedBatch(
+      repositoryRoot,
+      (evidence) => {
+        evidence.status = "failed";
+        evidence.actualModel = null;
+        evidence.failureReason = "infrastructure_failure";
+        evidence.adapterClientInvocationCount = null;
+        evidence.adapterRetryCount = null;
+        evidence.runtimeReportedAutoRetryCount = null;
+        evidence.adapterReportedFallbackUsed = null;
+        evidence.executionTelemetrySource = null;
+        evidence.checks = {
+          postProcessSnapshot: "not_reached",
+          processCleanup: "unknown",
+        };
+        delete evidence.configSha256;
+        delete evidence.credentialEnv;
+        for (const key of [
+          "expectedResultNormalizedSha256",
+          "resultFileByteLength",
+          "resultFileContainsExpectedLine",
+          "resultFileNormalizedLineCount",
+          "resultFileNormalizedSha256",
+          "resultFileRawSha256",
+          "resultFileReadStatus",
+        ]) {
+          delete evidence[key];
+        }
+      },
+    );
+
+    await expect(
+      verifyQualification({
+        repositoryRoot,
+        manifestPath,
+        mode: "immutable-evidence",
+      }),
+    ).resolves.toMatchObject({
+      status: "blocked",
+      promotionEligible: false,
+    });
+  });
+
   it("accepts a valid passed ledger in immutable-evidence mode without collecting current state", async () => {
     const repositoryRoot = await tempRepository();
     const { manifestPath } = await createPassedBatch(repositoryRoot);
@@ -458,6 +781,8 @@ describe("qualification verifier", () => {
       verified: true,
       mode: "immutable-evidence",
       batchId,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      status: "passed",
       promotionEligible: true,
     });
     expect(currentStateCalls).toBe(0);
@@ -492,10 +817,41 @@ describe("qualification verifier", () => {
       },
     );
 
-    expect(result.verified).toBe(true);
-    expect(result.mode).toBe("frozen-candidate");
+    expect(result).toMatchObject({
+      verified: true,
+      mode: "frozen-candidate",
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      status: "passed",
+      promotionEligible: true,
+    });
     expect(currentStateCalls).toBe(1);
     expect(frozenCandidateChecks).toBe(2);
+  });
+
+  it("rejects a same-plan manifest byte replacement during frozen candidate callbacks", async () => {
+    const repositoryRoot = await tempRepository();
+    const { manifestPath, preflight } = await createPassedBatch(repositoryRoot);
+
+    await expect(
+      verifyQualification(
+        {
+          repositoryRoot,
+          manifestPath,
+          mode: "frozen-candidate",
+        },
+        {
+          assertFrozenCandidate: async () => {},
+          collectCurrentCandidate: async () => {
+            await writeFile(
+              manifestPath,
+              `${await readFile(manifestPath, "utf8")} `,
+              "utf8",
+            );
+            return frozenCandidate(preflight);
+          },
+        },
+      ),
+    ).rejects.toBeInstanceOf(QualificationVerificationError);
   });
 
   it("fails frozen verification closed when the repository write-set assertion is unavailable", async () => {
@@ -708,7 +1064,7 @@ describe("qualification verifier", () => {
     await expectVerificationFailure(repositoryRoot, manifestPath);
   });
 
-  it("rejects old v1 evidence even when its references are recomputed", async () => {
+  it("rejects mixed legacy v2 evidence in a current v3 batch even when its references are recomputed", async () => {
     const repositoryRoot = await tempRepository();
     const { manifestPath } = await createPassedBatch(repositoryRoot);
     await coherentlyRewriteEvidenceReference({
@@ -716,7 +1072,7 @@ describe("qualification verifier", () => {
       manifestPath,
       ordinal: 1,
       mutateEvidence: (evidence) => {
-        evidence.schemaVersion = 1;
+        evidence.schemaVersion = 2;
       },
     });
 
@@ -744,9 +1100,9 @@ describe("qualification verifier", () => {
     await coherentlyRewriteEvidenceReference({
       repositoryRoot,
       manifestPath,
-      ordinal: 3,
+      ordinal: 1,
       mutateEvidence: (evidence) => {
-        evidence.credentialEnv = "API_KEY_DOUBAO_CODING";
+        evidence.credentialEnv = "ARK_API_KEY";
       },
     });
 
@@ -758,7 +1114,8 @@ describe("qualification verifier", () => {
     const { manifestPath } = await createPassedBatch(repositoryRoot);
     const manifest = await readJson(manifestPath);
     const evidenceReference = (
-      (manifest.cases as Array<Record<string, unknown>>)[9]!.evidence as Record<
+      (manifest.cases as Array<Record<string, unknown>>).at(-1)!
+        .evidence as Record<
         string,
         unknown
       >
@@ -792,6 +1149,16 @@ describe("qualification verifier", () => {
     const manifest = await readJson(manifestPath);
     const cases = manifest.cases as Array<Record<string, unknown>>;
     cases[1] = structuredClone(cases[0]!);
+    await overwriteJson(manifestPath, manifest);
+
+    await expectVerificationFailure(repositoryRoot, manifestPath);
+  });
+
+  it("rejects an unknown recorded qualification plan before evidence interpretation", async () => {
+    const repositoryRoot = await tempRepository();
+    const { manifestPath } = await createPassedBatch(repositoryRoot);
+    const manifest = await readJson(manifestPath);
+    manifest.qualificationPlanId = "unknown-plan";
     await overwriteJson(manifestPath, manifest);
 
     await expectVerificationFailure(repositoryRoot, manifestPath);
