@@ -651,6 +651,8 @@ git commit -m "feat: orchestrate fail-fast gate requalification"
 
 规格审阅逐条核对批准设计 §5/§6；质量审阅重点攻击参数旁路、partial promotion、锁恢复、case 身份、构建漂移、preflight 写仓库和 secret 泄漏。
 
+完成状态（2026-07-26）：实现由 `61e4879` 提交。Preflight 以固定顺序执行六项确定性门禁，在门禁后再次闭合仓库 HEAD、clean 状态、五项受 32 MiB 上限保护的构建身份与 10808，并逐祖先拒绝 artifact 路径中的 junction/symlink；Codex 版本只在全新临时 `CODEX_HOME` 中探测。隔离 lifecycle 新增字节精确的 `--check-report`，比较不一致时不写报告。协调器只接受固定十项串行批次，授权引用统一大小写后仅持久化 SHA-256，规定入口使用 `npm run --silent` 防 npm 回显；case 前后及所有终态发布前检查 owner，owner 丢失或终态提交结果不确定时保留锁并交显式恢复，不重试 case 或终态。Ark preflight 记录父环境中实际命中的 source credential 名称，evidence 则核对注入子进程的固定 target 名称。两个 verifier 分离当前冻结候选与晋升后不可变证据语义，均只读。独立规格与质量复审最终均为 PASS；主线程最终相关验证为 191 passed / 1 个平台权限条件 skip，类型检查、完整构建、help、diff check 与格式检查全绿。未运行生产 preflight、真实资格批次、外部模型、真实网络或活动配置。
+
 ---
 
 ## Task 6：冻结候选版本并完成确定性验收
