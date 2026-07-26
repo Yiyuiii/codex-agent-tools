@@ -14,13 +14,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   acquireQualificationLock,
   defaultQualificationLockReleaseOperations,
+  qualificationPlanForOwner,
   qualificationLockLocation,
   QualificationLockError,
+  readQualificationLockOwner,
   recoverQualificationLock,
   releaseQualificationLock,
   inspectProcessIdentityForPlatform,
   type ProcessIdentityInspector,
 } from "../../src/qualification/lock.js";
+import type { QualificationRecoveryReference } from "../../src/qualification/types.js";
 
 const roots: string[] = [];
 const authHash = "a".repeat(64);
@@ -120,7 +123,8 @@ describe("qualification lock", () => {
       await readFile(path.join(location.lockDirectory, "owner.json"), "utf8"),
     );
     expect(owner).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
+      qualificationPlanId: "four-llm-v1",
       repositoryRealpathSha256: location.repositoryRealpathSha256,
       processId: 123,
       processStartTime: startedAt,
@@ -141,6 +145,55 @@ describe("qualification lock", () => {
         processIdentityInspector: liveInspector,
       }),
     ).rejects.toThrow("Qualification lock operation failed");
+  });
+
+  it("maps legacy owners only to five-llm-v1 and requires the exact current plan on v2", async () => {
+    const fixture = await tempFixture();
+    const handle = await acquireQualificationLock({
+      repositoryRoot: fixture.repository,
+      tempDirectory: fixture.temp,
+      batchId: "batch-1",
+      authorizationReferenceSha256: authHash,
+      processId: 123,
+      processIdentityInspector: liveInspector,
+      nonce: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(qualificationPlanForOwner(handle.owner)).toBe("four-llm-v1");
+    if (handle.owner.schemaVersion !== 2) {
+      throw new Error("expected a current lock owner");
+    }
+
+    const ownerPath = path.join(handle.lockDirectory, "owner.json");
+    const { qualificationPlanId: _removed, ...currentWithoutPlan } =
+      handle.owner;
+    await rm(ownerPath);
+    await writeFile(
+      ownerPath,
+      `${JSON.stringify({ ...currentWithoutPlan, schemaVersion: 1 })}\n`,
+      "utf8",
+    );
+    const legacy = await readQualificationLockOwner(handle.lockDirectory);
+    expect(qualificationPlanForOwner(legacy)).toBe("five-llm-v1");
+
+    for (const invalid of [
+      {
+        ...currentWithoutPlan,
+        schemaVersion: 1,
+        qualificationPlanId: "five-llm-v1",
+      },
+      { ...currentWithoutPlan, schemaVersion: 2 },
+      {
+        ...currentWithoutPlan,
+        schemaVersion: 2,
+        qualificationPlanId: "five-llm-v1",
+      },
+    ]) {
+      await rm(ownerPath);
+      await writeFile(ownerPath, `${JSON.stringify(invalid)}\n`, "utf8");
+      await expect(
+        readQualificationLockOwner(handle.lockDirectory),
+      ).rejects.toThrow("Qualification lock operation failed");
+    }
   });
 
   it("rejects a prebuilt lock-root directory link without writing through it", async () => {
@@ -228,6 +281,31 @@ describe("qualification lock", () => {
     await expect(
       readFile(path.join(handle.lockDirectory, "owner.json")),
     ).rejects.toThrow();
+  });
+
+  it("includes the current plan identity in exact-owner release equality", async () => {
+    const fixture = await tempFixture();
+    const handle = await acquireQualificationLock({
+      repositoryRoot: fixture.repository,
+      tempDirectory: fixture.temp,
+      batchId: "batch-1",
+      authorizationReferenceSha256: authHash,
+      processId: 123,
+      processIdentityInspector: liveInspector,
+    });
+
+    await expect(
+      releaseQualificationLock({
+        ...handle,
+        owner: {
+          ...handle.owner,
+          qualificationPlanId: "five-llm-v1",
+        },
+      } as never),
+    ).rejects.toThrow("Qualification lock operation failed");
+    await expect(
+      readFile(path.join(handle.lockDirectory, "owner.json"), "utf8"),
+    ).resolves.toContain('"qualificationPlanId": "four-llm-v1"');
   });
 
   it("rejects a lock directory replaced by a directory link before release", async () => {
@@ -486,23 +564,21 @@ describe("qualification lock", () => {
           state: "valid";
           batchId: string;
           authorizationReferenceSha256: string;
+          qualificationPlanId: "four-llm-v1";
         } = { state: "missing" };
-    const publisher = vi.fn(
-      async (request: {
-        batchId: string;
-        authorizationReferenceSha256: string;
-      }) => {
-        expect(request).toEqual({
-          batchId: "batch-1",
-          authorizationReferenceSha256: authHash,
-        });
-        terminal = {
-          state: "valid",
-          batchId: "batch-1",
-          authorizationReferenceSha256: authHash,
-        };
-      },
-    );
+    const publisher = vi.fn(async (request: QualificationRecoveryReference) => {
+      expect(request).toEqual({
+        batchId: "batch-1",
+        authorizationReferenceSha256: authHash,
+        qualificationPlanId: "four-llm-v1",
+      });
+      terminal = {
+        state: "valid",
+        batchId: "batch-1",
+        authorizationReferenceSha256: authHash,
+        qualificationPlanId: "four-llm-v1",
+      };
+    });
 
     await recoverQualificationLock({
       repositoryRoot: fixture.repository,
@@ -562,6 +638,7 @@ describe("qualification lock", () => {
           state: "valid",
           batchId: "batch-1",
           authorizationReferenceSha256: authHash,
+          qualificationPlanId: "four-llm-v1",
         }),
         publishInterruptedManifest: async () => {},
       }),
@@ -597,11 +674,50 @@ describe("qualification lock", () => {
         state: "valid",
         batchId: "batch-1",
         authorizationReferenceSha256: authHash,
+        qualificationPlanId: "four-llm-v1",
       }),
       publishInterruptedManifest: publisher,
     });
 
     expect(publisher).not.toHaveBeenCalled();
+  });
+
+  it("retains a stale current lock when an existing terminal reports the legacy plan", async () => {
+    const fixture = await tempFixture();
+    const handle = await acquireQualificationLock({
+      repositoryRoot: fixture.repository,
+      tempDirectory: fixture.temp,
+      batchId: "batch-1",
+      authorizationReferenceSha256: authHash,
+      processId: 123,
+      processIdentityInspector: liveInspector,
+    });
+    const publisher = vi.fn();
+
+    await expect(
+      recoverQualificationLock({
+        repositoryRoot: fixture.repository,
+        tempDirectory: fixture.temp,
+        batchId: "batch-1",
+        processIdentityInspector: deadInspector,
+        inspectTargetProcesses: async () => ({
+          kimi: { count: 0 },
+          piRpc: { count: 0 },
+          realSmoke: { count: 0 },
+        }),
+        inspectTerminalManifest: async () => ({
+          state: "valid",
+          batchId: "batch-1",
+          authorizationReferenceSha256: authHash,
+          qualificationPlanId: "five-llm-v1",
+        }),
+        publishInterruptedManifest: publisher,
+      }),
+    ).rejects.toThrow("Qualification lock operation failed");
+    expect(publisher).not.toHaveBeenCalled();
+    await expect(
+      readFile(path.join(handle.lockDirectory, "owner.json"), "utf8"),
+    ).resolves.toContain(handle.owner.nonce);
   });
 
   it.each(["existing", "after_publish"] as const)(
@@ -634,6 +750,7 @@ describe("qualification lock", () => {
                   state: "valid",
                   batchId: "batch-1",
                   authorizationReferenceSha256: "b".repeat(64),
+                  qualificationPlanId: "four-llm-v1" as const,
                 }
               : { state: "missing" },
           publishInterruptedManifest: async () => {
@@ -680,6 +797,7 @@ describe("qualification lock", () => {
           state: "valid" as const,
           batchId: "batch-1",
           authorizationReferenceSha256: authHash,
+          qualificationPlanId: "four-llm-v1" as const,
         };
       });
 

@@ -26,12 +26,14 @@ import {
 } from "../../src/qualification/manifest.js";
 import {
   acquireQualificationLock,
+  qualificationLockLocation,
   recoverQualificationLock,
 } from "../../src/qualification/lock.js";
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
+  LEGACY_QUALIFICATION_PLAN_ID,
 } from "../../src/qualification/protocol.js";
 import { publishImmutableJson } from "../../src/smoke/evidence.js";
 import type {
@@ -71,15 +73,16 @@ type DeepReadonly<T> = {
     : T[Key];
 };
 
-type TypeEqual<Left, Right> = (<Value>() => Value extends Left ? 1 : 2) extends <
-  Value,
->() => Value extends Right ? 1 : 2
-  ? (<Value>() => Value extends Right ? 1 : 2) extends <
-      Value,
-    >() => Value extends Left ? 1 : 2
-    ? true
-    : false
-  : false;
+type TypeEqual<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <
+    Value,
+  >() => Value extends Right ? 1 : 2
+    ? (<Value>() => Value extends Right ? 1 : 2) extends <
+        Value,
+      >() => Value extends Left ? 1 : 2
+      ? true
+      : false
+    : false;
 
 async function tempRepository(): Promise<string> {
   const root = path.join(
@@ -213,7 +216,9 @@ function currentPreflightRecord(): CurrentFrozenPreflightRecord {
 }
 
 function preflight(): CurrentFrozenPreflightRecord {
-  return freezePreflightRecord(currentPreflightRecord()) as CurrentFrozenPreflightRecord;
+  return freezePreflightRecord(
+    currentPreflightRecord(),
+  ) as CurrentFrozenPreflightRecord;
 }
 
 function sparseCopy(values: readonly unknown[]): unknown[] {
@@ -327,9 +332,7 @@ describe("frozen qualification preflight", () => {
 
     const frozen = freezePreflightRecord(checkpoint.preflight);
     expect(frozen).toEqual(checkpoint.preflight);
-    expect(hashFrozenPreflightRecord(frozen)).toBe(
-      checkpoint.preflightSha256,
-    );
+    expect(hashFrozenPreflightRecord(frozen)).toBe(checkpoint.preflightSha256);
   });
 
   it("validates the checked-out historical blocked terminal in place", async () => {
@@ -363,8 +366,8 @@ describe("frozen qualification preflight", () => {
     ).resolves.toEqual({
       state: "valid",
       batchId: historicalBatchId,
-      authorizationReferenceSha256:
-        manifest.authorizationReferenceSha256,
+      authorizationReferenceSha256: manifest.authorizationReferenceSha256,
+      qualificationPlanId: LEGACY_QUALIFICATION_PLAN_ID,
     });
   });
 
@@ -391,9 +394,7 @@ describe("frozen qualification preflight", () => {
     const manifest = JSON.parse(
       await readFile(path.join(destination, "manifest.json"), "utf8"),
     ) as {
-      cases: readonly [
-        { evidence: { path: string; sha256: string } },
-      ];
+      cases: readonly [{ evidence: { path: string; sha256: string } }];
     };
     const evidencePath = path.resolve(
       repository,
@@ -439,58 +440,56 @@ describe("frozen qualification preflight", () => {
     ).toThrow("Qualification ledger operation failed");
   });
 
-  it.each([
-    "buildArtifacts",
-    "logicalLlms",
-    "credentialMatches",
-  ] as const)("rejects sparse legacy and current %s arrays", (field) => {
-    const legacy = legacyPreflight();
-    const current = currentPreflightRecord();
+  it.each(["buildArtifacts", "logicalLlms", "credentialMatches"] as const)(
+    "rejects sparse legacy and current %s arrays",
+    (field) => {
+      const legacy = legacyPreflight();
+      const current = currentPreflightRecord();
 
-    expect(() =>
-      freezePreflightRecord({
-        ...legacy,
-        [field]: sparseCopy(legacy[field]),
-      }),
-    ).toThrow("Qualification ledger operation failed");
-    expect(() =>
-      freezePreflightRecord({
-        ...current,
-        [field]: sparseCopy(current[field]),
-      }),
-    ).toThrow("Qualification ledger operation failed");
-  });
+      expect(() =>
+        freezePreflightRecord({
+          ...legacy,
+          [field]: sparseCopy(legacy[field]),
+        }),
+      ).toThrow("Qualification ledger operation failed");
+      expect(() =>
+        freezePreflightRecord({
+          ...current,
+          [field]: sparseCopy(current[field]),
+        }),
+      ).toThrow("Qualification ledger operation failed");
+    },
+  );
 
-  it.each([
-    "buildArtifacts",
-    "logicalLlms",
-    "credentialMatches",
-  ] as const)("rejects proxied legacy and current %s arrays", (field) => {
-    let trapCalls = 0;
-    const proxy = (values: readonly unknown[]) =>
-      new Proxy([...values], {
-        get() {
-          trapCalls += 1;
-          throw new Error("array proxy trap must not execute");
-        },
-      });
-    const legacy = legacyPreflight();
-    const current = currentPreflightRecord();
+  it.each(["buildArtifacts", "logicalLlms", "credentialMatches"] as const)(
+    "rejects proxied legacy and current %s arrays",
+    (field) => {
+      let trapCalls = 0;
+      const proxy = (values: readonly unknown[]) =>
+        new Proxy([...values], {
+          get() {
+            trapCalls += 1;
+            throw new Error("array proxy trap must not execute");
+          },
+        });
+      const legacy = legacyPreflight();
+      const current = currentPreflightRecord();
 
-    expect(() =>
-      freezePreflightRecord({
-        ...legacy,
-        [field]: proxy(legacy[field]),
-      }),
-    ).toThrow("Qualification ledger operation failed");
-    expect(() =>
-      freezePreflightRecord({
-        ...current,
-        [field]: proxy(current[field]),
-      }),
-    ).toThrow("Qualification ledger operation failed");
-    expect(trapCalls).toBe(0);
-  });
+      expect(() =>
+        freezePreflightRecord({
+          ...legacy,
+          [field]: proxy(legacy[field]),
+        }),
+      ).toThrow("Qualification ledger operation failed");
+      expect(() =>
+        freezePreflightRecord({
+          ...current,
+          [field]: proxy(current[field]),
+        }),
+      ).toThrow("Qualification ledger operation failed");
+      expect(trapCalls).toBe(0);
+    },
+  );
 
   it("rejects array index accessors and extra symbol properties without invoking them", () => {
     let getterCalls = 0;
@@ -603,14 +602,15 @@ describe("frozen qualification preflight", () => {
       },
     },
     {
-      credentialMatches: legacyPreflight().credentialMatches.map((match, index) =>
-        index === 0 ? { ...match, value: "SECRET_VALUE" } : match,
+      credentialMatches: legacyPreflight().credentialMatches.map(
+        (match, index) =>
+          index === 0 ? { ...match, value: "SECRET_VALUE" } : match,
       ),
     },
   ])("fails closed for malformed frozen input %#", (patch) => {
-    expect(() => freezePreflightRecord({ ...legacyPreflight(), ...patch })).toThrow(
-      "Qualification ledger operation failed",
-    );
+    expect(() =>
+      freezePreflightRecord({ ...legacyPreflight(), ...patch }),
+    ).toThrow("Qualification ledger operation failed");
   });
 
   it.each(["schemaVersion", "repositoryBranch"] as const)(
@@ -719,6 +719,7 @@ describe("immutable qualification ledger", () => {
       state: "valid",
       batchId,
       authorizationReferenceSha256: authHash,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     });
     await expect(
       ledger.publishTerminalManifest({
@@ -966,11 +967,7 @@ describe("immutable qualification ledger", () => {
     const evidenceSha256 = createHash("sha256")
       .update(evidenceBytes)
       .digest("hex");
-    const completedPath = path.join(
-      destination,
-      "checkpoints",
-      "000002.json",
-    );
+    const completedPath = path.join(destination, "checkpoints", "000002.json");
     const completed = JSON.parse(await readFile(completedPath, "utf8"));
     await rm(completedPath);
     const completedBytes = Buffer.from(
@@ -1506,6 +1503,7 @@ describe("immutable qualification ledger", () => {
       state: "valid",
       batchId,
       authorizationReferenceSha256: authHash,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     });
   });
 
@@ -1577,6 +1575,44 @@ describe("immutable qualification ledger", () => {
     );
   });
 
+  it.each(["empty ledger", "current checkpoint"] as const)(
+    "rejects %s recovery without an explicit plan and publishes no terminal",
+    async (scenario) => {
+      const repository = await tempRepository();
+      if (scenario === "current checkpoint") {
+        const ledger = createQualificationLedger({
+          repositoryRoot: repository,
+          batchId,
+        });
+        await ledger.publishBatchStarted({
+          authorizationReferenceSha256: authHash,
+          preflight: preflight(),
+          recordedAt: "2026-07-26T02:00:00.000Z",
+        });
+      }
+
+      await expect(
+        recoverInterruptedQualificationBatch({
+          repositoryRoot: repository,
+          batchId,
+          authorizationReferenceSha256: authHash,
+          completedAt: "2026-07-26T02:03:00.000Z",
+        }),
+      ).rejects.toThrow("Qualification ledger operation failed");
+      await expect(
+        readFile(
+          path.join(
+            repository,
+            "docs/smoke/evidence/batches",
+            batchId,
+            "manifest.json",
+          ),
+          "utf8",
+        ),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+    },
+  );
+
   it("recovers all crash windows and treats evidence without completion as interrupted", async () => {
     for (const crashWindow of [
       "before_started",
@@ -1610,6 +1646,7 @@ describe("immutable qualification ledger", () => {
         repositoryRoot: repository,
         batchId,
         authorizationReferenceSha256: authHash,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
         completedAt: "2026-07-26T02:03:00.000Z",
       });
       expect(manifest).toMatchObject({
@@ -1646,8 +1683,224 @@ describe("immutable qualification ledger", () => {
         state: "valid",
         batchId,
         authorizationReferenceSha256: authHash,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       });
     }
+  });
+
+  it("recovers a pre-start stale v2 owner with the current eight-case plan and consumes authorization", async () => {
+    const repository = await tempRepository();
+    const tempDirectory = await tempRepository();
+    const handle = await acquireQualificationLock({
+      repositoryRoot: repository,
+      batchId,
+      authorizationReferenceSha256: authHash,
+      tempDirectory,
+      processId: 4242,
+      processIdentityInspector: async () => ({
+        alive: true,
+        startTime: "2026-07-26T01:00:00.000Z",
+      }),
+      nonce: "11111111-1111-4111-8111-111111111111",
+      now: () => new Date("2026-07-26T01:00:01.000Z"),
+    });
+
+    await recoverQualificationLock({
+      repositoryRoot: repository,
+      batchId,
+      tempDirectory,
+      processIdentityInspector: async () => ({
+        alive: false,
+        startTime: null,
+      }),
+      inspectTargetProcesses: async () => ({
+        kimi: { count: 0 },
+        piRpc: { count: 0 },
+        realSmoke: { count: 0 },
+      }),
+      inspectTerminalManifest: (expectedBatchId) =>
+        inspectQualificationTerminal({
+          repositoryRoot: repository,
+          batchId: expectedBatchId,
+        }),
+      publishInterruptedManifest: async (reference) => {
+        expect(reference).toMatchObject({
+          batchId,
+          authorizationReferenceSha256: authHash,
+          qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+        });
+        const recovered = await recoverInterruptedQualificationBatch({
+          ...reference,
+          repositoryRoot: repository,
+          completedAt: "2026-07-26T02:03:00.000Z",
+        });
+        expect(recovered).toMatchObject({
+          schemaVersion: 2,
+          qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+          status: "interrupted",
+        });
+        expect(recovered.notRun).toEqual(cases());
+      },
+    });
+
+    await expect(
+      assertAuthorizationReferenceUnused({
+        repositoryRoot: repository,
+        authorizationReferenceSha256: authHash,
+      }),
+    ).rejects.toThrow("Qualification ledger operation failed");
+    await expect(
+      readFile(path.join(handle.lockDirectory, "owner.json"), "utf8"),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("recovers a pre-start stale v1 owner with the legacy ten-case plan", async () => {
+    const repository = await tempRepository();
+    const tempDirectory = await tempRepository();
+    const location = await qualificationLockLocation(repository, tempDirectory);
+    await mkdir(location.lockDirectory, { recursive: true });
+    await writeFile(
+      path.join(location.lockDirectory, "owner.json"),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        repositoryRealpathSha256: location.repositoryRealpathSha256,
+        processId: 4242,
+        processStartTime: "2026-07-26T01:00:00.000Z",
+        nonce: "11111111-1111-4111-8111-111111111111",
+        batchId,
+        authorizationReferenceSha256: authHash,
+        acquiredAt: "2026-07-26T01:00:01.000Z",
+      })}\n`,
+      "utf8",
+    );
+
+    await recoverQualificationLock({
+      repositoryRoot: repository,
+      batchId,
+      tempDirectory,
+      processIdentityInspector: async () => ({
+        alive: false,
+        startTime: null,
+      }),
+      inspectTargetProcesses: async () => ({
+        kimi: { count: 0 },
+        piRpc: { count: 0 },
+        realSmoke: { count: 0 },
+      }),
+      inspectTerminalManifest: (expectedBatchId) =>
+        inspectQualificationTerminal({
+          repositoryRoot: repository,
+          batchId: expectedBatchId,
+        }),
+      publishInterruptedManifest: async (reference) => {
+        expect(reference).toMatchObject({
+          batchId,
+          authorizationReferenceSha256: authHash,
+          qualificationPlanId: LEGACY_QUALIFICATION_PLAN_ID,
+        });
+        const recovered = await recoverInterruptedQualificationBatch({
+          ...reference,
+          repositoryRoot: repository,
+          completedAt: "2026-07-26T02:03:00.000Z",
+        });
+        expect(recovered).toMatchObject({
+          schemaVersion: 1,
+          status: "interrupted",
+        });
+        expect("qualificationPlanId" in recovered).toBe(false);
+        expect(recovered.notRun).toEqual(legacyCases());
+      },
+    });
+
+    await expect(
+      assertAuthorizationReferenceUnused({
+        repositoryRoot: repository,
+        authorizationReferenceSha256: authHash,
+      }),
+    ).rejects.toThrow("Qualification ledger operation failed");
+    await expect(
+      readFile(path.join(location.lockDirectory, "owner.json"), "utf8"),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("retains a current owner and publishes no terminal when its checkpoint plan is legacy", async () => {
+    const repository = await tempRepository();
+    const tempDirectory = await tempRepository();
+    const handle = await acquireQualificationLock({
+      repositoryRoot: repository,
+      batchId,
+      authorizationReferenceSha256: authHash,
+      tempDirectory,
+      processId: 4242,
+      processIdentityInspector: async () => ({
+        alive: true,
+        startTime: "2026-07-26T01:00:00.000Z",
+      }),
+      nonce: "11111111-1111-4111-8111-111111111111",
+      now: () => new Date("2026-07-26T01:00:01.000Z"),
+    });
+    const frozenLegacyPreflight = legacyPreflight();
+    await publishImmutableJson(
+      path.join(
+        repository,
+        "docs/smoke/evidence/batches",
+        batchId,
+        "checkpoints/000000.json",
+      ),
+      {
+        schemaVersion: 1,
+        sequence: 0,
+        kind: "batch_started",
+        batchId,
+        recordedAt: "2026-07-26T02:00:00.000Z",
+        authorizationReferenceSha256: authHash,
+        preflightSha256: hashFrozenPreflightRecord(frozenLegacyPreflight),
+        preflight: frozenLegacyPreflight,
+      },
+    );
+
+    await expect(
+      recoverQualificationLock({
+        repositoryRoot: repository,
+        batchId,
+        tempDirectory,
+        processIdentityInspector: async () => ({
+          alive: false,
+          startTime: null,
+        }),
+        inspectTargetProcesses: async () => ({
+          kimi: { count: 0 },
+          piRpc: { count: 0 },
+          realSmoke: { count: 0 },
+        }),
+        inspectTerminalManifest: (expectedBatchId) =>
+          inspectQualificationTerminal({
+            repositoryRoot: repository,
+            batchId: expectedBatchId,
+          }),
+        publishInterruptedManifest: async (reference) => {
+          await recoverInterruptedQualificationBatch({
+            ...reference,
+            repositoryRoot: repository,
+            completedAt: "2026-07-26T02:03:00.000Z",
+          });
+        },
+      }),
+    ).rejects.toThrow("Qualification lock operation failed");
+    await expect(
+      readFile(path.join(handle.lockDirectory, "owner.json"), "utf8"),
+    ).resolves.toContain(handle.owner.nonce);
+    await expect(
+      readFile(
+        path.join(
+          repository,
+          "docs/smoke/evidence/batches",
+          batchId,
+          "manifest.json",
+        ),
+        "utf8",
+      ),
+    ).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("recovers a completed case without a manifest and never reissues it", async () => {
@@ -1676,6 +1929,7 @@ describe("immutable qualification ledger", () => {
       repositoryRoot: repository,
       batchId,
       authorizationReferenceSha256: authHash,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       notRun: cases().slice(1),
       completedAt: "2026-07-26T02:03:00.000Z",
     });
@@ -1713,6 +1967,7 @@ describe("immutable qualification ledger", () => {
       batchId: historicalBatchId,
       authorizationReferenceSha256:
         historicalManifest.authorizationReferenceSha256,
+      qualificationPlanId: LEGACY_QUALIFICATION_PLAN_ID,
       completedAt: "2026-07-26T10:00:00.000Z",
     });
 
@@ -1734,6 +1989,7 @@ describe("immutable qualification ledger", () => {
       batchId: historicalBatchId,
       authorizationReferenceSha256:
         historicalManifest.authorizationReferenceSha256,
+      qualificationPlanId: LEGACY_QUALIFICATION_PLAN_ID,
     });
   });
 
@@ -1802,6 +2058,7 @@ describe("immutable qualification ledger", () => {
         repositoryRoot: repository,
         batchId,
         authorizationReferenceSha256: authHash,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
         notRun: cases().slice(1),
         completedAt: "2026-07-26T02:03:00.000Z",
       });
@@ -1840,6 +2097,7 @@ describe("immutable qualification ledger", () => {
         state: "valid",
         batchId,
         authorizationReferenceSha256: authHash,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       });
     },
   );
@@ -1887,6 +2145,7 @@ describe("immutable qualification ledger", () => {
       state: "valid",
       batchId,
       authorizationReferenceSha256: authHash,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     });
   });
 
@@ -1939,6 +2198,7 @@ describe("immutable qualification ledger", () => {
       state: "valid",
       batchId,
       authorizationReferenceSha256: authHash,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     });
   });
 
@@ -1966,6 +2226,7 @@ describe("immutable qualification ledger", () => {
         repositoryRoot: repository,
         batchId,
         authorizationReferenceSha256: authHash,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
         notRun: cases().slice(1),
         completedAt: "2026-07-26T02:03:00.000Z",
       });
@@ -2057,6 +2318,7 @@ describe("immutable qualification ledger", () => {
           repositoryRoot: repository,
           batchId: reference.batchId,
           authorizationReferenceSha256: reference.authorizationReferenceSha256,
+          qualificationPlanId: reference.qualificationPlanId,
           notRun: cases().slice(1),
           completedAt: "2026-07-26T02:03:00.000Z",
         });
@@ -2076,6 +2338,7 @@ describe("immutable qualification ledger", () => {
       state: "valid",
       batchId,
       authorizationReferenceSha256: authHash,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     });
     await expect(
       readFile(path.join(handle.lockDirectory, "owner.json"), "utf8"),
@@ -2114,6 +2377,7 @@ describe("immutable qualification ledger", () => {
           repositoryRoot: repository,
           batchId,
           authorizationReferenceSha256: authHash,
+          qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
           notRun: scenario === "unpaired" ? cases() : cases().slice(1),
           completedAt: "2026-07-26T02:03:00.000Z",
         }),
@@ -2403,6 +2667,7 @@ describe("authorization reuse index", () => {
       repositoryRoot: repository,
       batchId,
       authorizationReferenceSha256: authHash,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       notRun: cases(),
       completedAt: "2026-07-26T02:03:00.000Z",
     });

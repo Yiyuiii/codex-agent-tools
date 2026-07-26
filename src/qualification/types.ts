@@ -1,7 +1,7 @@
 import type { AgentProcessCounts } from "../runtime/agent-processes.js";
+import type { QualificationPlanId } from "./protocol.js";
 
-export interface QualificationLockOwner {
-  schemaVersion: 1;
+interface QualificationLockOwnerCommon {
   repositoryRealpathSha256: string;
   processId: number;
   processStartTime: string;
@@ -11,6 +11,18 @@ export interface QualificationLockOwner {
   acquiredAt: string;
 }
 
+export interface LegacyQualificationLockOwner extends QualificationLockOwnerCommon {
+  schemaVersion: 1;
+}
+
+export interface CurrentQualificationLockOwner extends QualificationLockOwnerCommon {
+  schemaVersion: 2;
+  qualificationPlanId: "four-llm-v1";
+}
+
+export type QualificationLockOwner =
+  LegacyQualificationLockOwner | CurrentQualificationLockOwner;
+
 export interface QualificationLockHandle {
   lockDirectory: string;
   owner: QualificationLockOwner;
@@ -19,6 +31,7 @@ export interface QualificationLockHandle {
 export interface QualificationRecoveryReference {
   batchId: string;
   authorizationReferenceSha256: string;
+  qualificationPlanId: QualificationPlanId;
 }
 
 export type QualificationTerminalInspection =
@@ -27,6 +40,7 @@ export type QualificationTerminalInspection =
       state: "valid";
       batchId: string;
       authorizationReferenceSha256: string;
+      qualificationPlanId: QualificationPlanId;
     }>;
 
 export type TargetAgentProcessCounts = AgentProcessCounts;
@@ -73,8 +87,7 @@ interface FrozenPreflightRecordCommon {
   }>;
 }
 
-export interface LegacyFrozenPreflightRecord
-  extends FrozenPreflightRecordCommon {
+export interface LegacyFrozenPreflightRecord extends FrozenPreflightRecordCommon {
   readonly schemaVersion: 1;
   readonly proxy10808: Readonly<{
     readonly host: "127.0.0.1";
@@ -83,15 +96,13 @@ export interface LegacyFrozenPreflightRecord
   }>;
 }
 
-export interface CurrentFrozenPreflightRecord
-  extends FrozenPreflightRecordCommon {
+export interface CurrentFrozenPreflightRecord extends FrozenPreflightRecordCommon {
   readonly schemaVersion: 2;
   readonly qualificationPlanId: "four-llm-v1";
 }
 
 export type FrozenPreflightRecord =
-  | LegacyFrozenPreflightRecord
-  | CurrentFrozenPreflightRecord;
+  LegacyFrozenPreflightRecord | CurrentFrozenPreflightRecord;
 
 export type QualificationTask = "review" | "delegate";
 export type QualificationCaseResult = "passed" | "failed";
@@ -107,8 +118,7 @@ export interface CurrentQualificationProtocolIdentity {
 }
 
 export type QualificationProtocolIdentity =
-  | LegacyQualificationProtocolIdentity
-  | CurrentQualificationProtocolIdentity;
+  LegacyQualificationProtocolIdentity | CurrentQualificationProtocolIdentity;
 
 export interface QualificationEvidenceReference {
   path: string;
@@ -148,11 +158,9 @@ export type CurrentQualificationFailureReason =
   | null;
 
 export type LegacyQualificationFailureReason =
-  | CurrentQualificationFailureReason
-  | "google_free_tier_quota";
+  CurrentQualificationFailureReason | "google_free_tier_quota";
 
-export type QualificationFailureReason =
-  LegacyQualificationFailureReason;
+export type QualificationFailureReason = LegacyQualificationFailureReason;
 
 export interface QualificationValidUncommittedEvidence
   extends QualificationCaseIdentity, QualificationExecutionTelemetry {
@@ -219,5 +227,4 @@ export type CurrentQualificationTerminalManifest =
     }>;
 
 export type QualificationTerminalManifest =
-  | LegacyQualificationTerminalManifest
-  | CurrentQualificationTerminalManifest;
+  LegacyQualificationTerminalManifest | CurrentQualificationTerminalManifest;

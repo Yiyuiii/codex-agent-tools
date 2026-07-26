@@ -324,6 +324,12 @@ function protocolForEnvelope(value: unknown): QualificationProtocol {
   throw new QualificationLedgerError();
 }
 
+function protocolForPlanId(planId: unknown): QualificationProtocol {
+  if (planId === LEGACY_QUALIFICATION_PLAN_ID) return LEGACY_PROTOCOL;
+  if (planId === ACTIVE_QUALIFICATION_PLAN_ID) return CURRENT_PROTOCOL;
+  throw new QualificationLedgerError();
+}
+
 function protocolEnvelope(
   protocol: QualificationProtocol,
 ): Readonly<
@@ -349,9 +355,7 @@ function keysForProtocol(
   protocol: QualificationProtocol,
   keys: readonly string[],
 ): readonly string[] {
-  return protocol === LEGACY_PROTOCOL
-    ? keys
-    : [...keys, "qualificationPlanId"];
+  return protocol === LEGACY_PROTOCOL ? keys : [...keys, "qualificationPlanId"];
 }
 
 function densePlainArray(value: unknown): readonly unknown[] {
@@ -1351,15 +1355,12 @@ function validateEvidenceForIdentity(
   const qualificationIdentityMatches =
     protocol === LEGACY_PROTOCOL
       ? qualification.repositoryCommit === preflight.repositoryCommit &&
-        qualification.buildIdentitySha256 ===
-          preflight.buildIdentitySha256
-      : qualification.qualificationPlanId ===
-          ACTIVE_QUALIFICATION_PLAN_ID &&
+        qualification.buildIdentitySha256 === preflight.buildIdentitySha256
+      : qualification.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID &&
         qualification.llm === identity.llm &&
         qualification.task === identity.task &&
         qualification.frozenCommit === preflight.repositoryCommit &&
-        qualification.frozenBuildIdentity ===
-          preflight.buildIdentitySha256;
+        qualification.frozenBuildIdentity === preflight.buildIdentitySha256;
   if (
     evidence.schemaVersion !== protocol.evidenceSchemaVersion ||
     qualification.batchId !== batchId ||
@@ -1726,9 +1727,7 @@ function buildManifest(
       ? 1
       : 0);
   const expectedNotRun =
-    options.status === "passed"
-      ? []
-      : protocol.schedule.slice(notRunStart);
+    options.status === "passed" ? [] : protocol.schedule.slice(notRunStart);
   if (
     JSON.stringify(notRun) !== JSON.stringify(expectedNotRun) ||
     (options.status === "blocked" &&
@@ -2317,6 +2316,10 @@ export async function inspectQualificationTerminal(options: {
       state: "valid",
       batchId: manifest.batchId,
       authorizationReferenceSha256: manifest.authorizationReferenceSha256,
+      qualificationPlanId:
+        manifest.schemaVersion === 1
+          ? LEGACY_QUALIFICATION_PLAN_ID
+          : manifest.qualificationPlanId,
     });
   } catch {
     throw new QualificationLedgerError();
@@ -2415,6 +2418,7 @@ export async function recoverInterruptedQualificationBatch(options: {
   repositoryRoot: string;
   batchId: string;
   authorizationReferenceSha256: string;
+  qualificationPlanId?: QualificationPlanId;
   notRun?: readonly QualificationCaseIdentity[];
   completedAt: string;
 }): Promise<QualificationTerminalManifest> {
@@ -2425,12 +2429,17 @@ export async function recoverInterruptedQualificationBatch(options: {
     ) {
       throw new QualificationLedgerError();
     }
+    if (options.qualificationPlanId === undefined) {
+      throw new QualificationLedgerError();
+    }
+    const expectedProtocol = protocolForPlanId(options.qualificationPlanId);
     const terminal = await inspectQualificationTerminal(options);
     if (terminal.state === "valid") {
       if (
         terminal.batchId !== options.batchId ||
         terminal.authorizationReferenceSha256 !==
-          options.authorizationReferenceSha256
+          options.authorizationReferenceSha256 ||
+        terminal.qualificationPlanId !== expectedProtocol.planId
       ) {
         throw new QualificationLedgerError();
       }
@@ -2442,8 +2451,9 @@ export async function recoverInterruptedQualificationBatch(options: {
     const state = await loadLedgerState(
       options.repositoryRoot,
       options.batchId,
+      expectedProtocol,
     );
-    const protocol = state.protocol ?? CURRENT_PROTOCOL;
+    const protocol = state.protocol ?? expectedProtocol;
     if (
       state.started !== null &&
       state.started.authorizationReferenceSha256 !==

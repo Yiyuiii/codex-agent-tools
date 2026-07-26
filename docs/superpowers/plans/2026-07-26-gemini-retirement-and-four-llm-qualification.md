@@ -659,7 +659,7 @@ git commit -m "feat: support versioned qualification ledgers"
 - Modify: `test/qualification/lock.test.ts`
 - Modify: `test/qualification/manifest.test.ts`
 
-- [ ] **Step 1: Add lock/recovery RED cases**
+- [x] **Step 1: Add lock/recovery RED cases**
 
 Specify the owner union:
 
@@ -689,7 +689,7 @@ Tests must prove:
 - stale v1 owner selects ten historical cases;
 - owner/checkpoint/manifest plan conflict retains the lock and publishes nothing.
 
-- [ ] **Step 2: Observe RED**
+- [x] **Step 2: Observe RED**
 
 ```powershell
 npm exec -- vitest run test/qualification/lock.test.ts test/qualification/manifest.test.ts
@@ -697,7 +697,7 @@ npm exec -- vitest run test/qualification/lock.test.ts test/qualification/manife
 
 Expected: FAIL because owner schema v1 has no plan-aware dispatch.
 
-- [ ] **Step 3: Implement owner v2 and plan-aware recovery**
+- [x] **Step 3: Implement owner v2 and plan-aware recovery**
 
 Use:
 
@@ -717,7 +717,7 @@ export function qualificationPlanForOwner(
 
 `acquireQualificationLock()` must create only v2/current owners. `normalizeOwner()`, `ownersEqual()`, release, stale inspection, and recovery must validate plan identity. Recovery may choose a schedule only after owner/checkpoint/manifest identity agreement. Unknown or conflicting identity must fail closed without releasing a lock or writing a second terminal.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 ```powershell
 npm exec -- vitest run test/qualification/lock.test.ts test/qualification/manifest.test.ts
@@ -726,7 +726,7 @@ npm run typecheck
 
 Expected: lock and recovery tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/qualification/types.ts src/qualification/lock.ts src/qualification/manifest.ts test/qualification/lock.test.ts test/qualification/manifest.test.ts

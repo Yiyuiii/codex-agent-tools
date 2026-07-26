@@ -17,6 +17,11 @@ import { types as nodeUtilTypes } from "node:util";
 import { execa } from "execa";
 
 import type { AgentProcessCounts } from "../runtime/agent-processes.js";
+import {
+  ACTIVE_QUALIFICATION_PLAN_ID,
+  LEGACY_QUALIFICATION_PLAN_ID,
+  type QualificationPlanId,
+} from "./protocol.js";
 import type {
   QualificationLockHandle,
   QualificationLockOwner,
@@ -30,13 +35,24 @@ const UUID_PATTERN =
 const BATCH_ID_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9_-])?$/u;
 const LOCK_ROOT_NAME = "codex-agent-tools-qualification-locks";
-const OWNER_KEYS = [
+const LEGACY_OWNER_KEYS = [
   "acquiredAt",
   "authorizationReferenceSha256",
   "batchId",
   "nonce",
   "processId",
   "processStartTime",
+  "repositoryRealpathSha256",
+  "schemaVersion",
+] as const;
+const CURRENT_OWNER_KEYS = [
+  "acquiredAt",
+  "authorizationReferenceSha256",
+  "batchId",
+  "nonce",
+  "processId",
+  "processStartTime",
+  "qualificationPlanId",
   "repositoryRealpathSha256",
   "schemaVersion",
 ] as const;
@@ -237,14 +253,21 @@ function plainRecord(value: unknown): Record<string, unknown> {
 function normalizeOwner(value: unknown): QualificationLockOwner {
   const record = plainRecord(value);
   const keys = Object.keys(record).sort();
+  const expectedKeys =
+    record.schemaVersion === 1 && !Object.hasOwn(record, "qualificationPlanId")
+      ? LEGACY_OWNER_KEYS
+      : record.schemaVersion === 2 &&
+          record.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID
+        ? CURRENT_OWNER_KEYS
+        : null;
   if (
-    keys.length !== OWNER_KEYS.length ||
-    keys.some((key, index) => key !== OWNER_KEYS[index])
+    expectedKeys === null ||
+    keys.length !== expectedKeys.length ||
+    keys.some((key, index) => key !== expectedKeys[index])
   ) {
     throw new QualificationLockError();
   }
   if (
-    record.schemaVersion !== 1 ||
     typeof record.repositoryRealpathSha256 !== "string" ||
     !SHA256_PATTERN.test(record.repositoryRealpathSha256) ||
     typeof record.processId !== "number" ||
@@ -264,6 +287,15 @@ function normalizeOwner(value: unknown): QualificationLockOwner {
     throw new QualificationLockError();
   }
   return freezeOwner(record as unknown as QualificationLockOwner);
+}
+
+export function qualificationPlanForOwner(
+  owner: QualificationLockOwner,
+): QualificationPlanId {
+  const normalized = normalizeOwner(owner);
+  return normalized.schemaVersion === 1
+    ? LEGACY_QUALIFICATION_PLAN_ID
+    : normalized.qualificationPlanId;
 }
 
 async function readOwner(
@@ -330,7 +362,17 @@ function ownersEqual(
   left: QualificationLockOwner,
   right: QualificationLockOwner,
 ): boolean {
-  return OWNER_KEYS.every((key) => left[key] === right[key]);
+  return (
+    left.schemaVersion === right.schemaVersion &&
+    qualificationPlanForOwner(left) === qualificationPlanForOwner(right) &&
+    left.repositoryRealpathSha256 === right.repositoryRealpathSha256 &&
+    left.processId === right.processId &&
+    left.processStartTime === right.processStartTime &&
+    left.nonce === right.nonce &&
+    left.batchId === right.batchId &&
+    left.authorizationReferenceSha256 === right.authorizationReferenceSha256 &&
+    left.acquiredAt === right.acquiredAt
+  );
 }
 
 export async function qualificationLockLocation(
@@ -484,7 +526,8 @@ export async function acquireQualificationLock(
     const nonce = options.nonce ?? randomUUID();
     const acquiredAt = (options.now ?? (() => new Date()))().toISOString();
     const owner = normalizeOwner({
-      schemaVersion: 1,
+      schemaVersion: 2,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       repositoryRealpathSha256: location.repositoryRealpathSha256,
       processId,
       processStartTime: identity.startTime,
@@ -701,20 +744,24 @@ function normalizeTerminalInspection(
     return Object.freeze({ state: "missing" });
   }
   if (
-    keys.length === 3 &&
+    keys.length === 4 &&
     keys[0] === "authorizationReferenceSha256" &&
     keys[1] === "batchId" &&
-    keys[2] === "state" &&
+    keys[2] === "qualificationPlanId" &&
+    keys[3] === "state" &&
     record.state === "valid" &&
     typeof record.batchId === "string" &&
     validBatchId(record.batchId) &&
     typeof record.authorizationReferenceSha256 === "string" &&
-    SHA256_PATTERN.test(record.authorizationReferenceSha256)
+    SHA256_PATTERN.test(record.authorizationReferenceSha256) &&
+    (record.qualificationPlanId === LEGACY_QUALIFICATION_PLAN_ID ||
+      record.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID)
   ) {
     return Object.freeze({
       state: "valid",
       batchId: record.batchId,
       authorizationReferenceSha256: record.authorizationReferenceSha256,
+      qualificationPlanId: record.qualificationPlanId,
     });
   }
   throw new QualificationLockError();
@@ -728,7 +775,8 @@ function terminalMatchesOwner(
     inspection.state === "valid" &&
     inspection.batchId === owner.batchId &&
     inspection.authorizationReferenceSha256 ===
-      owner.authorizationReferenceSha256
+      owner.authorizationReferenceSha256 &&
+    inspection.qualificationPlanId === qualificationPlanForOwner(owner)
   );
 }
 
@@ -791,6 +839,7 @@ export async function recoverQualificationLock(
       await options.publishInterruptedManifest({
         batchId: owner.batchId,
         authorizationReferenceSha256: owner.authorizationReferenceSha256,
+        qualificationPlanId: qualificationPlanForOwner(owner),
       });
       const published = normalizeTerminalInspection(
         await options.inspectTerminalManifest(owner.batchId),
