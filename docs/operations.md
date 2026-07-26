@@ -1,6 +1,6 @@
 # 官方插件运维流程
 
-本文只描述 `codex_external_agents` 的官方插件候选构建、隔离验收、逐动作授权安装与官方回滚。它不是当前真实安装授权；活动 Codex 尚未安装本插件，本轮因十项真实模型门禁未全部通过而处于 `blocked / not ready`。
+本文只描述 `codex_external_agents` 的官方插件候选构建、隔离验收、逐动作授权安装与官方回滚。它不是当前真实安装授权；活动 Codex 尚未安装本插件，四模型八项能力当前为 6 passed / 2 pending，新的 `four-llm-v1` 8/8 批次尚未执行，因此处于 `blocked / not ready`。
 
 项目代码和维护者都不得直接读取、写入、备份、恢复或手工编辑活动 `~/.codex/config.toml`。Codex 官方插件命令可能由官方机制更新该状态文件，因此真实 add/remove 每次都必须先准备权限包并取得针对该次动作的明确许可。
 
@@ -37,8 +37,8 @@ npm run acceptance:plugin:isolated
 - 临时 `CODEX_HOME` 隔离边界成立；
 - 官方安装器接受插件 manifest、直接 server-map `.mcp.json` 与自包含 bundle；
 - 缓存副本只公开 `external_review` 与 `external_delegate`，且 `llm` 必填；
-- 隔离验收先证明 pending 的 Gemini 会被已安装 MCP 明确拒绝，再用 qualified 的 Ark Agent profile 与 fake Pi 证明固定模型、direct 路由、父进程代理清除、Agent 凭据规范化和进程清理门禁通过；
-- Gemini 固定 `proxy-10808` 的环境替换由确定性环境测试与真实 smoke evidence 覆盖；当前隔离 fake Pi 验收不声称成功调用 pending Gemini；
+- 隔离验收先证明已退役的 Gemini 被已安装 MCP 以 unknown logical LLM 明确拒绝，错误列出精确四项活动 LLM，且没有启动 Pi 或返回伪造的结构化成功结果；
+- 再用 qualified 的 `ark-agent-deepseek-v4-flash` 与 fake Pi 证明恰好一次调用、固定模型、direct 路由、父进程代理清除、只注入目标 Agent 凭据和进程清理门禁通过；
 - 官方 remove 后列表语义回滚，残留状态可解释；
 - 报告结论没有被扩张成真实 Codex App 已通过。
 
@@ -46,7 +46,7 @@ npm run acceptance:plugin:isolated
 
 ## 5. 准备真实安装权限包
 
-只有五项逻辑 LLM 的 review/delegate 十项真实门禁全部 passed，才能准备可供授权的 ready 权限包。2026-07-25 完整批次为 8 passed / 2 failed，成对注册表为 6 passed / 4 pending；2026-07-26 原子重认证又在首项 Gemini delegate 因免费层额度失败后立即停止，后九项未运行，没有晋升或重试。因此本阶段只保持 `blocked / not ready` 状态包，记录失败证据和下一次必须重新授权、从第一项开始的条件；不提出真实安装授权问题，也不接受固定授权语句作为越过门禁的依据。
+只有四个活动逻辑 LLM 的 review/delegate 在同一个 `four-llm-v1` 批次中 8/8 passed，才能准备可供授权的 ready 权限包。当前过渡注册表为 6 passed / 2 pending，只有 Ark Coding Plan 的 review/delegate pending；历史五模型十项结果和 Gemini blocked 批次不能参与当前晋级。因此本阶段只保持 `blocked / not ready` 状态包，记录历史证据、新批次前提和下一次失败即停的条件；不提出真实安装授权问题，也不接受固定授权语句作为越过门禁的依据。
 
 权限包必须列出：
 
@@ -93,4 +93,4 @@ if ($LASTEXITCODE -ne 0) { throw "Codex marketplace remove 失败，停止回滚
 - 每次真实安装、升级或独立卸载都是新的外部状态变更，必须重新逐动作授权。
 - 永远不以手工编辑活动 `config.toml` 代替官方插件机制。
 - 本轮不移除旧 `codex_cc_tools`，不调用或修改 Claude Code，不执行 `npm publish`。
-- 只有确定性检查、隔离生命周期、五项十门禁和真实 Codex App 宿主门禁全部通过后，才可说新插件具备替代旧工具的条件。
+- 只有确定性检查、隔离生命周期、`four-llm-v1` 四模型八门禁和真实 Codex App 宿主门禁全部通过后，才可说新插件具备替代旧工具的条件。

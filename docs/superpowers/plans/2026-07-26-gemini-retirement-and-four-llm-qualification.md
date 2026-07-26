@@ -1082,7 +1082,7 @@ git commit -m "test: align plugin acceptance with four llms"
 - Modify: `docs/superpowers/plans/2026-07-25-official-plugin-integration.md`
 - Modify: `docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md`
 
-- [ ] **Step 1: Establish documentation RED**
+- [x] **Step 1: Establish documentation RED**
 
 After script changes but before regenerating the isolated report:
 
@@ -1093,7 +1093,7 @@ npm run acceptance:plugin:isolated -- --check-report
 
 Expected: FAIL with report drift and no report write.
 
-- [ ] **Step 2: Update current-state documents**
+- [x] **Step 2: Update current-state documents**
 
 Current-facing documents must consistently state:
 
@@ -1107,7 +1107,7 @@ Current-facing documents must consistently state:
 
 Historical specs/plans receive only a concise superseded note and keep their original narrative. `docs/smoke/pi-gemini.md` becomes the retired-history page while retaining every historical evidence link/hash.
 
-- [ ] **Step 3: Regenerate and check isolated lifecycle evidence**
+- [x] **Step 3: Regenerate and check isolated lifecycle evidence**
 
 ```powershell
 npm run acceptance:plugin:isolated
@@ -1116,13 +1116,13 @@ npm run acceptance:plugin:isolated -- --check-report
 
 Expected: first command completes the temporary official add/list/remove lifecycle and updates the tracked report; second command confirms byte equality. Neither command uses active Codex home or real models.
 
-- [ ] **Step 4: Verify historical evidence bytes**
+- [x] **Step 4: Verify historical evidence bytes**
 
 Record and compare SHA-256 for the nine standalone Gemini files plus five blocked-batch files against the complete 14-file table in “Historical evidence hash baseline”. Additionally, compare each file's bytes with `git show e24b942:<path>` so a mistaken table edit cannot silently become the new baseline.
 
 Expected: all historical hashes unchanged.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add README.md AGENTS.md docs scripts/plugin-isolated-acceptance.mjs

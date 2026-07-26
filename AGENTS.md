@@ -14,6 +14,7 @@
 - 2026-07-24：用户反馈自动修改 `~/.codex/config.toml` 后 Codex 无法正常运行，并已恢复原始配置。后续默认不得写入、替换或恢复该文件；优先使用只读检查、独立测试配置和生成候选配置。若未来确实无法绕开，必须先说明必要性、精确差异、验证与回滚方案，并取得用户针对该次写入的明确许可。
 - 2026-07-25：用户同意改用 Codex 官方插件机制管理插件状态，但项目代码仍不得直接读写活动 `~/.codex/config.toml`。官方文档明确说明插件开关状态存储在该文件中，因此真实官方安装或升级属于可能触碰活动配置的操作；执行前必须先在隔离 `CODEX_HOME` 取证，再展示预计精确差异、验证与回滚，并取得针对该次操作的明确许可。
 - 2026-07-25：目标模型面调整为 `kimi-k3`、`gemini-3.5-flash`、两个固定使用 `ark-code-latest` 的 Ark Plan 路线，以及 Ark Agent Plan 内的 `deepseek-v4-flash` 快速经济档。
+- 2026-07-26：用户因 Gemini 免费额度实际不可用，明确批准将 `gemini-3.5-flash` 从当前产品面完整移除，同时保留既有 Gemini evidence、blocked 批次和历史说明；当前目标面改为 Kimi K3 与三条 Ark 路线。
 
 ## 当前事实状态
 
@@ -21,7 +22,7 @@
 - 本机 Kimi Code 0.27.0 通过官方 ACP SDK 接入；当前公开面只保留 `kimi-k3`，2026-07-25 串行复跑的 review/delegate 两项真实门禁均通过并生成新证据。`kimi-k2.7` 与 `kimi-k2.7-highspeed` 的四项 passed 证据只作为历史记录保留，不再属于当前公开面，详见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
 - 本机 `@earendil-works/pi-coding-agent` 0.80.10 通过严格 RPC JSONL 接入。版本化隔离配置位于应用自有缓存，不读取或修改用户 `~/.pi/agent`，也不保存真实凭据。
 - Pi 桥覆盖命令关联、最终完成语义、工具证据、脱敏、心跳、取消/超时和 Windows 进程树清理。review 一旦出现 bash/edit/write 事件即以 `review_policy_violation` 失败；委派不自动重试，避免重复写入。
-- `gemini-3.5-flash` 固定绑定 Pi/Google/同名模型/`proxy-10808`。2026-07-25 串行复跑中 review passed、delegate 因 `google_free_tier_quota` failed；依据成对门禁策略，注册表两项当前均为 pending，证据见 [Pi / Gemini 真实能力门禁](docs/smoke/pi-gemini.md)。
+- `gemini-3.5-flash` 已从活动注册表、Pi 配置、Google 凭据继承、网络策略、doctor、standalone smoke 和资格执行入口退役；旧 Google / `proxy-10808` 路由、额度失败与 blocked 批次只作为历史审计材料保留，见 [Pi / Gemini 退役历史](docs/smoke/pi-gemini.md)。
 - 当前 Ark 公开面为三项固定 Pi/direct 路线：`ark-coding-plan` 使用 provider `ark-coding-plan` 与模型 `ark-code-latest`，2026-07-25 复跑中 review passed、delegate 因结果文件内容不符 failed，因此注册表两项均为 pending；`ark-agent-plan` 与 `ark-agent-deepseek-v4-flash` 共享 provider `ark-agent-plan` 和并发上限 1，分别固定使用 `ark-code-latest` 与 `deepseek-v4-flash`，两者的 review/delegate 精确门禁均通过并晋级。旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 证据只作为历史记录保留，不能用于新路线晋级，详见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
 - Ark Coding 凭据候选依次为 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING`；本机用户环境实际命中第三项。Agent Plan 使用 `OPENAI_API_KEY_DOUBAO`。MCP 只转发候选白名单，运行时再向 Pi 注入单个项目私有变量，doctor 只报告变量名而不报告值。
 - 真实 Pi smoke 的残留进程检查使用全机快照，因此不同 smoke 必须串行执行。并行执行会把其它仍在运行的 smoke 进程误判为泄漏；2026-07-20 的最终门禁只采用串行证据。
@@ -29,8 +30,10 @@
 - 2026-07-25 官方插件实施任务 1 已由提交 `db60c67` 完成：公开 CLI 只保留只读 `doctor`，不再接受 `--config`，历史 install/uninstall/restore/cutover 源码与测试已删除，doctor 不再读取 Codex 配置或报告 MCP registration。该提交经独立规格与代码质量审阅通过，当前基线为 147 项测试和类型检查全绿。
 - 2026-07-20：157 项测试、类型检查、构建、release smoke 和真实 stdio MCP 验收全绿；验收摘要 SHA-256 为 `0e4aca2d35c4e124a5f3b6ca60e8df440bfad27253d3e710334ba0fe29169d04`。
 - 2026-07-20 的自动 cutover 当时通过文件级、MCP initialize/listTools 和 strict doctor 检查，但重启后的真实 Codex App 运行异常。用户已于 2026-07-24 恢复原始 `~/.codex/config.toml`。因此“新 MCP 已在活动配置中完全替代旧 MCP”的结论已撤销；当前真实配置内容以用户恢复结果为准，未经许可不读取或修改。
-- 当前代码公开五个固定逻辑 LLM：`ark-agent-deepseek-v4-flash`、`ark-agent-plan`、`ark-coding-plan`、`gemini-3.5-flash`、`kimi-k3`。2026-07-25 十项真实门禁的原始结果为 8 passed / 2 failed；执行成对门禁策略后，Kimi K3 与两个 Agent Plan profile 的 6 项注册表能力为 passed，Gemini 与 Ark Coding Plan 的 4 项注册表能力为 pending。pending 能力不会复用旧证据、单项通过结果或回退到其它 LLM。网络策略只保留 `direct` 与 `proxy-10808`，仅 Gemini 使用后者。
+- 当前代码公开四个固定逻辑 LLM：`ark-agent-deepseek-v4-flash`、`ark-agent-plan`、`ark-coding-plan`、`kimi-k3`，八项 review/delegate 能力的过渡状态为 6 passed / 2 pending，只有 Ark Coding Plan 两项 pending。四个活动 LLM 全部 direct，并清除父进程继承代理。新的资格来源必须是一个完整的 `four-llm-v1` 同批 8/8 结果；不能只补跑 Ark Coding Plan、复用旧证据或回退到其它 LLM。活动安装保持 `blocked / not ready`。
 - `codex-agent-tools` 在设计时没有同名 npm 包；发布前必须重新检查。当前不执行 `npm publish`。
+
+### 五模型历史实施记录
 - 2026-07-25：官方插件集成目标设计已经 Kimi K3 与 Ark Coding Plan 外部审阅收敛并由用户书面复核通过，见 [官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)；逐任务方案见 [官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)。任务 1 的只读 CLI 基线保持不变；任务 2 由 `c1ed473` 完成五项模型面，并由 `9c14d4e` 加固独立、不可变且强制 evidence 的质量门禁；任务 3 由 `74d3bc7` 创建仓库内 marketplace、官方插件 manifest 与自包含 MCP bundle，`a47c993` 把无 `node_modules` 临时目录内的 MCP initialize/listTools 固化为回归测试，`f8090bb` 隔离了测试所用 tsup 配置。各任务的独立规格审阅与代码质量审阅最终均通过；任务 3 阶段基线为 159 项测试、类型检查和构建全绿。
 - 2026-07-25：本机 `plugin-creator` 自带校验脚本仍只接受旧式顶层 `mcpServers` 包装，但当前 Codex 官方插件文档明确允许 `.mcp.json` 使用直接 server map 或 `mcp_servers` 包装。仓库按官方文档采用直接 server map；任务 3 证明 bundle 自包含和 MCP 契约，任务 4 又用临时 `CODEX_HOME` 下的真实 Codex `plugin` CLI 证明官方安装器实际接受该格式。旧校验器报错不代表官方宿主失败。
 - 2026-07-25：官方插件实施任务 4 已在 Codex CLI 0.135.0 和唯一临时 `CODEX_HOME` 中完成真实 marketplace add/list、plugin add/list、缓存副本 MCP 启动、plugin remove/list 与 marketplace remove/list，官方安装器接受直接 server map。实测缓存末级是 manifest 版本目录 `plugins/cache/<marketplace>/<plugin>/<version>/`，不是设计时预估的 `local/`；卸载后可保留空缓存父目录和官方状态文件，验收以官方列表语义回滚与残留可解释为准。脱敏、可重复取证见 [官方插件隔离状态报告](docs/release/plugin-isolated-state.md)；该报告明确不代表活动 Codex App 验收。
@@ -55,16 +58,17 @@
 - 2026-07-26：原子重认证实施 Task 6 已完成冻结验收。全库 fresh verification 为 43 文件、494 passed / 1 个平台权限条件 skip，类型检查、完整 build、release smoke、隔离官方 plugin lifecycle、qualification help、diff check 与 clean tree 均通过；隔离报告无字节漂移，系统实查 Kimi ACP、Pi RPC、real-smoke 目标进程全为 0。最终规格与质量双审阅对 `e09c12f` 均为 PASS，无可复现 Critical/Important/Minor。全局模型协作记忆已记录 Kimi K3 聚焦设计审阅的有效表现、Ark Agent Plan `EPIPE` 无正文不计通过，以及零修改只读外审应串行并把临时输出放在 workspace 外。本阶段没有运行生产 preflight、真实资格批次、外部模型/网络、活动配置、Claude Code 或 `codex_cc_tools`；冻结提交后源码不再修改，Task 7 只能通过固定维护者入口消费当前“继续”的一次授权，任一失败立即停止且不得重开。
 - 2026-07-26：原子重认证 Task 7 已在冻结 commit `f7209cd5744bad12fd27fbb3f5b6cd6fc42c3521` 上消费当前“继续”授权，只启动批次 `2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f` 一次。完整 preflight 通过；第 1 项 Gemini delegate 固定走 Pi RPC / Google / `gemini-3.5-flash` / `proxy-10808`，单次调用因 `google_free_tier_quota` failed。其模型、凭据隔离、结果文件、命令与工作区检查均通过，telemetry 为 `1 / 0 / 0 / false / false`；evidence SHA-256 `ed2e5c79c4cfbf851c7901aeeee5be885055ef244aefcf4ee11dca6ccbccf484`。协调器立即发布 `blocked` manifest（SHA-256 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`），后九项全部 not run；没有 retry、fallback、resume、跳项或第二批。冻结 verifier 按预期拒绝晋升，批次后 Kimi ACP、Pi RPC、real-smoke 目标进程为 0。注册表仍为 6 passed / 4 pending，状态包保持 `blocked / not ready`，Task 8 不执行。blocked evidence 首次进入 npm pack 后，release smoke 暴露 npm JSON 展示会把 batch UUID 段脱敏为 `***`、旧检查器误用展示路径读文件；现已 TDD 改为安全的唯一本地匹配，缺失/歧义均 fail closed，release smoke 复跑通过。该包装修复不改冻结 evidence，也不允许重试资格批次；未来重入必须获得新的明确授权并从第一项开始。
 - 2026-07-26：用户因 Gemini 免费额度实际不可用，批准按 [Gemini 退役与四模型资格认证设计](docs/superpowers/specs/2026-07-26-gemini-retirement-and-four-llm-qualification-design.md) 将 `gemini-3.5-flash` 从当前产品面完整移除，同时保留既有 Gemini evidence、blocked 批次和历史说明。新活动面是 Kimi K3、Ark Coding Plan、Ark Agent Plan `ark-code-latest` 与 Agent Plan `deepseek-v4-flash`，共四个逻辑 LLM、八项 review/delegate，全部子进程 direct；过渡注册表为 6 passed / 2 pending。Ark Coding Plan 历史 delegate 的实际模型、provider、endpoint、凭据隔离、文件范围、命令和进程清理均正确，唯一失败是结果文件严格内容验收；同路线曾通过，因此不改路由、不放宽验收、不增加重试，只用新证据协议复核。旧五模型十项批次保持 schema v1/历史计划只读验真，新四模型批次使用显式 `four-llm-v1`、新 manifest/checkpoint/evidence schema 和风险优先八项顺序；用户“没有问题，请你继续”只授权冻结候选上的一个新八项批次，不授权失败重开、活动安装、发布、旧工具移除或配置编辑。独立规格复核发现并闭合两个版本化缺口：legacy preflight 必须用冻结 codec 脱离活动 registry/退役构建产物，新 lock owner 必须携带 planId 并让崩溃恢复按 owner/checkpoint/manifest 一致身份选择八项或十项 schedule；复审最终 PASS。
+- 2026-07-27：Gemini 退役实施 Tasks 8–11 已将活动 registry、环境、doctor、Pi runtime、standalone smoke、acceptance、release assurance 和当前文档收敛到四个全直连 LLM；隔离官方插件生命周期在临时 `CODEX_HOME` 中重新通过，报告先以 check-only 精确证明漂移，再由脚本原子更新并以 byte-equality 复核。当前仍是 6 passed / 2 pending、只有 Ark Coding Plan pending，新的 `four-llm-v1` 8/8 批次尚未执行，安装保持 `blocked / not ready`。九份 standalone Gemini evidence 和五份旧 blocked-batch 文件的 SHA-256 与 `e24b942` blob 双校验均为 14/14；没有调用真实模型、活动安装、发布或配置操作。
 
 ## 架构与计划索引
 
 - [产品设计历史基线](docs/superpowers/specs/2026-07-18-codex-external-agents-design.md)
-- [当前官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)
-- [十门禁原子重认证设计](docs/superpowers/specs/2026-07-26-gate-requalification-design.md)
+- [历史：五模型官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)
+- [历史：十门禁原子重认证设计](docs/superpowers/specs/2026-07-26-gate-requalification-design.md)
 - [Gemini 退役与四模型资格认证设计](docs/superpowers/specs/2026-07-26-gemini-retirement-and-four-llm-qualification-design.md)
 - [Gemini 退役与四模型资格认证实施计划](docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md)
-- [十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md)
-- [官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)
+- [历史：十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md)
+- [历史：五模型官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)
 - [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)
 - [Pi/Gemini 适配实施计划](docs/superpowers/plans/2026-07-18-pi-gemini-adapter.md)
 - [Ark 迁移与本机切换实施计划](docs/superpowers/plans/2026-07-18-ark-migration-and-cutover.md)

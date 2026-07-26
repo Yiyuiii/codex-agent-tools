@@ -1,5 +1,7 @@
 # 十门禁原子重认证实施计划
 
+> **历史状态：** 本文记录已完成并终止的五模型 `five-llm-v1` 实施，现已由 [Gemini 退役与四模型资格认证实施计划](2026-07-26-gemini-retirement-and-four-llm-qualification.md) 取代。下文 Gemini、`proxy-10808`、十项批次与旧授权只用于历史审计，不得作为当前执行入口。
+
 > **执行要求：** 使用 `superpowers:subagent-driven-development` 逐任务实现；每个行为任务都必须遵守 `superpowers:test-driven-development`，先观察正确的 RED，再写最小实现。每个任务完成后依次做独立规格审阅、代码质量审阅和主代理 fresh verification。
 
 **目标：** 补齐真实模型资格认证的安全诊断、可观测重试统计、不可变批次记录和 fail-fast 协调器，然后只执行一次全新十门禁批次；仅当同批 10/10 全过且磁盘重验通过时才晋升 pending 能力并准备 `ready` 审阅包。

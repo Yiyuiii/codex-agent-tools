@@ -1,5 +1,7 @@
 # Official Plugin Integration Implementation Plan
 
+> **历史状态：** 本文记录五模型官方插件集成的原始实施过程，当前执行已转入 [Gemini 退役与四模型资格认证实施计划](2026-07-26-gemini-retirement-and-four-llm-qualification.md)。下文 Gemini、`proxy-10808` 与五模型门禁只描述历史实现，不得据此恢复当前能力。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 把现有 `codex-agent-tools` 收敛为可由 Codex 官方插件机制安装的本地插件，公开五个固定路由逻辑 LLM，并在不直接读写活动 `~/.codex/config.toml`、不调用 Claude Code、不移除旧工具的前提下完成隔离取证、真实模型门禁和真实宿主验收准备。

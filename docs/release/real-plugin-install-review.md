@@ -1,8 +1,8 @@
 # 真实插件安装审阅状态包 — blocked / not ready
 
-日期：2026-07-26
+日期：2026-07-27
 
-分支：`codex/ark-cutover`
+分支：`codex/gemini-retirement`
 
 候选包版本：`0.1.0-alpha.1`
 
@@ -10,10 +10,11 @@
 
 本状态包为 **blocked / not ready**，不是当前有效的安装权限包。
 
-- 第 1 层确定性检查和第 2 层隔离官方插件生命周期已经通过。
-- 第 3 层十项真实模型门禁的原始调用结果是 **8 passed / 2 failed**。
-- 按同一逻辑 LLM 的 review/delegate 必须成对通过的规则，当前注册表结果是 **6 passed / 4 pending**。
-- 2026-07-26 的一次原子重认证在首项 Gemini delegate 因免费层额度失败后立即停止，后九项未运行，未产生任何晋升；当前授权已经消费，不得重试或重开。
+- 当前候选的第 1 层尚待 Task 12 fresh verification，未复核为 passed。
+- 第 2 层隔离官方插件生命周期已经通过。
+- 当前活动产品面是四个逻辑 LLM、八项 review/delegate 能力，全部固定使用 direct。
+- 按同一逻辑 LLM 的 review/delegate 必须成对通过的规则，当前过渡注册表是 **6 passed / 2 pending**；只有 Ark Coding Plan 的两项能力 pending。
+- 新的 `four-llm-v1` 同批 8/8 资格认证尚未执行；历史五模型证据和 Gemini blocked 批次不能参与当前晋级。
 - 第 4 层真实 Codex App 宿主门禁尚未执行。
 - 当前没有执行活动 Codex 的 marketplace/plugin add 或 remove，也没有读取、写入、备份或恢复活动 `~/.codex/config.toml`。
 
@@ -25,7 +26,7 @@
 
 当前的[隔离状态报告](plugin-isolated-state.md)只证明 Codex CLI 0.135.0 在唯一临时 `CODEX_HOME` 中可以添加 marketplace、安装缓存副本、启动 MCP、卸载插件并按官方列表语义回滚。它不证明活动 Codex App 已安装或可用，也不能代替真实宿主门禁。
 
-## 最新原子重认证停止事实
+## 历史五模型原子重认证停止事实
 
 - 批次：`2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f`；冻结 commit：`f7209cd5744bad12fd27fbb3f5b6cd6fc42c3521`。
 - 第 1 项 `gemini-3.5-flash delegate` 因 `google_free_tier_quota` failed；模型、provider、`proxy-10808`、凭据隔离、文件/命令检查和 `1 / 0 / 0 / false / false` 可观测统计均符合契约。
@@ -33,23 +34,22 @@
 - blocked manifest：[JSON](../smoke/evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json)，SHA-256 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`；`promotionEligible=false`，后九项 not run。
 - 冻结候选 verifier 按预期拒绝晋升，批次后 Kimi ACP、Pi RPC、real-smoke 目标进程均为 0。没有 retry、fallback、resume、跳项或第二批。
 
-该失败批次没有替换 2026-07-25 的完整十项证据，也没有撤销或增加既有注册表能力；它只证明当前这次重认证未通过。未来重入必须由用户重新明确授权、生成新的授权引用，并从十项第一项开始。
+该失败批次没有替换 2026-07-25 的完整十项证据，也没有撤销或增加当时的注册表能力。Gemini 现已退役，该批次及授权消费事实只用于历史审计；它不是当前 `four-llm-v1` 的资格来源，也不提供新批次的可复用授权。
 
-## 十项门禁：原始结果与注册表结果
+## 当前四模型过渡状态
 
-“原始结果”描述本轮实际调用；“注册表结果”执行成对晋级规则。因此 Gemini 与 Ark Coding Plan 各自通过的 review 也不能单独启用。
+当前四个活动 LLM 全部直连。下表描述新八项资格批次执行前的过渡注册表；只有 Ark Coding Plan 的 review/delegate pending。
 
-| 逻辑 LLM | 固定后端 / 模型 / 路由 | review 原始结果 | delegate 原始结果 | 注册表 review | 注册表 delegate |
-| --- | --- | --- | --- | --- | --- |
-| `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | passed | passed | passed | passed |
-| `gemini-3.5-flash` | Pi / Google / `gemini-3.5-flash` / `proxy-10808` | passed | failed | pending | pending |
-| `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | passed | failed | pending | pending |
-| `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | passed | passed | passed | passed |
-| `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | passed | passed | passed | passed |
+| 逻辑 LLM | 固定后端 / 模型 / 路由 | 注册表 review | 注册表 delegate |
+| --- | --- | --- | --- |
+| `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | passed | passed |
+| `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | pending | pending |
+| `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | passed | passed |
+| `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | passed | passed |
 
-精确通过证据和全部十项 SHA-256 见 [Kimi](../smoke/kimi.md)、[Gemini](../smoke/pi-gemini.md)与 [Ark](../smoke/ark.md)索引。
+既有精确证据和 SHA-256 见 [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)与 [Gemini 退役历史](../smoke/pi-gemini.md)索引。新资格仍必须由一个完整的 `four-llm-v1` 8/8 批次提供，不能把这些既有证据拼接为当前资格。
 
-### 当前两个阻断证据
+### 历史五模型阻断证据
 
 1. Gemini delegate 因 Google 免费层额度失败：
    - evidence：[2026-07-25T15-48-28.600Z-gemini-3.5-flash-delegate-pi.json](../smoke/evidence/2026-07-25T15-48-28.600Z-gemini-3.5-flash-delegate-pi.json)
@@ -62,31 +62,26 @@
    - `failureReason`：`acceptance_failed`
    - 实际模型、provider、direct 路由、环境隔离、变更范围、命令证据和进程清理均正确，但 `resultFileValid` 为 false；没有重试或 fallback。
 
-两项失败都保留为失败事实；不能用同 profile 的单项 review passed、旧 evidence 或其它 LLM 替代。
+两项失败都保留为历史事实；其中只有 Ark Coding Plan 仍对应当前 pending profile。Gemini 的失败不再阻断当前 provider，因为该 provider 已退役，但其 evidence、SHA 和失败类别仍不得改写或删除。不能用单项 review passed、旧 evidence 或其它 LLM 替代 Ark Coding Plan 的当前资格。
 
-## 重入授权准备的必要条件
+## 当前四模型资格与授权准备的必要条件
 
 未来只有同时满足以下全部条件，才能把本文件重新收敛为 `ready` 并开始准备某一次真实安装许可：
 
-1. 严格串行重新完成以下十个精确组合，全部生成新的、脱敏的 `passed` evidence：
-   - `kimi-k3` review 与 delegate；
-   - `gemini-3.5-flash` review 与 delegate；
-   - `ark-coding-plan` review 与 delegate；
-   - `ark-agent-plan` review 与 delegate；
-   - `ark-agent-deepseek-v4-flash` review 与 delegate。
+1. 在一个新的 `four-llm-v1` 批次中严格串行完成四个活动 LLM 的八个精确组合，全部生成新的、脱敏的 `passed` evidence；固定顺序从 Ark Coding Plan delegate/review 开始，再执行 Kimi K3、Ark Agent Plan 和 Ark Agent DeepSeek V4 Flash 的 review/delegate。
 2. 每次实际 backend、模型、provider 和 route 与上表固定身份精确一致；不并行运行 Pi smoke，不重用旧证据，不自动 retry 或 fallback。
 3. review 找到预置缺陷且工作区零变化；delegate 只产生预期变化并观测到验证命令；每次结束后都没有新增 Kimi/Pi RPC 进程。
-4. 三份 smoke 索引、`docs/smoke/evidence/`、内置注册表、README、运维文档与四层发布清单重新收敛为十项全部 passed，不保留 pending 或自相矛盾的状态。
-5. 确定性检查、`npm run smoke:release` 与隔离官方插件生命周期在当时版本上重新通过。
+4. Kimi/Ark smoke 索引、`docs/smoke/evidence/`、内置注册表、README、运维文档与四层发布清单重新收敛为八项全部 passed，不保留 pending 或自相矛盾的当前状态；Gemini 页面继续只作为退役历史。
+5. Task 12 对当前候选完成确定性测试、类型检查、构建与 `npm run smoke:release` 的 fresh verification；全部通过后才能把第 1 层更新为 passed。第 2 层隔离官方插件生命周期当前已经通过；若候选随后变化，仍须在当时版本重新确认。
 6. 本状态包改写为 `ready`，以当时的构建产物、隔离状态差异和官方命令行为重新独立审阅。
 
-在这些条件全部成立前，不生成真实安装授权问题，也不进入任务 9。
+在这些条件全部成立前，不生成真实安装授权问题，也不进入真实安装执行。
 
 ## 外部只读审阅证据
 
 - Kimi K3 的 `adversarial_review` 未发现阻断项，只指出发布清单仍把本文件写成“计划中”的 Minor；该措辞已经修正。
 - Ark Agent Plan 的 `review_doc` 未发现 Critical 或 Important，只指出 `docs/operations.md` 顶部硬编码的 as-of 日期会漂移这一项 Minor；该硬编码日期已经从运维文档删除，活动 Codex 尚未安装且本轮被阻断的事实保留。
-- 随后的独立质量复审另行发现发布清单顶部没有区分建立日期与最近复核日期；`docs/release/checklist.md` 现已分别标注建立日期 2026-07-25 与最近复核日期 2026-07-26。该修复不归因于 Ark Agent Plan 外审。
+- 随后的独立质量复审另行发现发布清单顶部没有区分建立日期与最近复核日期；`docs/release/checklist.md` 现已分别标注建立日期 2026-07-25 与最近复核日期 2026-07-27。该修复不归因于 Ark Agent Plan 外审。
 - 两次完成审阅的 `filesChanged` 都是 `[]`。本状态包不保存原始长输出、会话 ID 或秘密值，只保留上述可复核结论。
 - 当前会话暴露的旧 MCP 状态拒绝 Ark Agent Plan 后，按实施计划从已构建的最新 bundle 启动临时 stdio 客户端并成功完成审阅；这不是插件安装，也没有改变活动 Codex 配置。
 - Kimi 首轮等待 300 秒后超时，未形成审阅结论、未改变文件且没有残留进程；随后用聚焦后的同一只读任务完成审阅。任务 7 真实模型门禁的“不重试”边界不适用于任务 8 的只读文档审阅。

@@ -16,14 +16,13 @@
 | 外部来源或用途 | 新逻辑 LLM | 固定路由 | 当前门禁 |
 | --- | --- | --- | --- |
 | Kimi Code 审阅/委派 | `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | review/delegate passed |
-| Gemini 审阅/委派 | `gemini-3.5-flash` | Pi / Google / 同名模型 / `proxy-10808` | review/delegate pending（delegate 额度失败） |
 | Ark Coding Plan | `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | review/delegate pending（delegate 验收失败） |
 | Ark Agent Plan 主档 | `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | review/delegate passed |
 | Ark Agent Plan 经济档 | `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | review/delegate passed |
 | Anthropic Claude / Claude Code 后端 | 无 | 不进入新产品面 | 不迁移 |
 | OpenAI/Codex 模型家族 | 无 | 顶层已经是 Codex | 不作为外部来源 |
 
-当前 Kimi 只公开 K3；旧 Kimi 与旧 Agent Plan 模型记录只作为历史证据保留，不属于当前注册表。任一 pending 或失败能力都会明确拒绝，不会复用历史证据或静默切换到其它 LLM。
+当前 Kimi 只公开 K3；旧 Kimi、旧 Agent Plan 模型和 Gemini 记录只作为历史证据保留，不属于当前注册表。Gemini 的历史 Google / `proxy-10808` 路由与额度失败见 [退役历史页](smoke/pi-gemini.md)，不构成当前 provider 或 pending 能力。任一 pending 或失败能力都会明确拒绝，不会复用历史证据或静默切换到其它 LLM。
 
 ## 具备替代条件的门槛
 
@@ -31,7 +30,7 @@
 
 1. 确定性单测、类型检查、构建和 release smoke 通过；
 2. 官方 marketplace/plugin 的 add、list、缓存副本 MCP 启动与 remove 在临时 `CODEX_HOME` 中通过；
-3. 五个当前逻辑 LLM 的 review/delegate 十项精确真实门禁全部 passed；
+3. 四个当前逻辑 LLM 的 review/delegate 在同一个 `four-llm-v1` 批次中八项全部 passed；
 4. 获得逐动作许可后完成真实官方安装；
 5. 真实 Codex App 只发现两个批准工具，且二者 `llm` 必填；
 6. 真实宿主代表性 review/delegate、长任务取消和 Windows 进程树清理通过；

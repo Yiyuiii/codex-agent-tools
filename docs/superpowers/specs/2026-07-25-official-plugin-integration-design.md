@@ -1,5 +1,7 @@
 # Codex External Agents 官方插件集成设计
 
+> **历史状态：** 本文记录五模型官方插件集成的原始设计，当前产品面已由 [Gemini 退役与四模型资格认证设计](2026-07-26-gemini-retirement-and-four-llm-qualification-design.md) 收缩为四个全直连 LLM。下文 Gemini 与 `proxy-10808` 内容保留为当时决策，不是当前支持承诺。
+
 状态：维护者书面复核通过，进入实施计划
 
 日期：2026-07-25
