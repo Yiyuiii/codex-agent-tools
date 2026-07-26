@@ -17,12 +17,17 @@ import {
   publishImmutableJson,
 } from "../smoke/evidence.js";
 import { readQualificationLockOwner } from "./lock.js";
-import { LEGACY_QUALIFICATION_CASES } from "./protocol.js";
+import {
+  ACTIVE_QUALIFICATION_PLAN_ID,
+  LEGACY_QUALIFICATION_CASES,
+} from "./protocol.js";
 import type {
   BuildArtifactIdentity,
+  CurrentFrozenPreflightRecord,
   FrozenCredentialMatch,
   FrozenLogicalLlmIdentity,
   FrozenPreflightRecord,
+  LegacyFrozenPreflightRecord,
   QualificationCaseIdentity,
   QualificationCaseManifestEntry,
   QualificationCaseResult,
@@ -43,14 +48,20 @@ const BATCH_ID_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9_-])?$/u;
 const SAFE_RELATIVE_SEGMENT = /^[A-Za-z0-9._-]+$/u;
 const MAX_LEDGER_FILE_BYTES = 1_048_576;
-const REQUIRED_BUILD_ARTIFACTS = [
+const LEGACY_REQUIRED_BUILD_ARTIFACTS = [
   "dist/ark-smoke.js",
   "dist/kimi-smoke.js",
   "dist/pi-smoke.js",
   "dist/smoke-evidence.js",
   "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
 ] as const;
-const PREFLIGHT_KEYS = [
+const CURRENT_REQUIRED_BUILD_ARTIFACTS = [
+  "dist/ark-smoke.js",
+  "dist/kimi-smoke.js",
+  "dist/smoke-evidence.js",
+  "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+] as const;
+const COMMON_PREFLIGHT_KEYS = [
   "buildArtifacts",
   "buildIdentitySha256",
   "credentialMatches",
@@ -58,14 +69,135 @@ const PREFLIGHT_KEYS = [
   "packageLockSha256",
   "packageVersion",
   "piConfigSha256",
-  "proxy10808",
   "repositoryBranch",
   "repositoryCommit",
   "repositoryDirty",
   "runtimeVersions",
-  "schemaVersion",
   "targetProcesses",
 ] as const;
+const LEGACY_PREFLIGHT_KEYS = [
+  ...COMMON_PREFLIGHT_KEYS,
+  "proxy10808",
+  "schemaVersion",
+] as const;
+const CURRENT_PREFLIGHT_KEYS = [
+  ...COMMON_PREFLIGHT_KEYS,
+  "qualificationPlanId",
+  "schemaVersion",
+] as const;
+
+const LEGACY_LOGICAL_LLMS = Object.freeze([
+  Object.freeze({
+    llm: "ark-agent-deepseek-v4-flash",
+    runtime: "pi-rpc",
+    model: "deepseek-v4-flash",
+    provider: "ark-agent-plan",
+    route: "direct",
+  }),
+  Object.freeze({
+    llm: "ark-agent-plan",
+    runtime: "pi-rpc",
+    model: "ark-code-latest",
+    provider: "ark-agent-plan",
+    route: "direct",
+  }),
+  Object.freeze({
+    llm: "ark-coding-plan",
+    runtime: "pi-rpc",
+    model: "ark-code-latest",
+    provider: "ark-coding-plan",
+    route: "direct",
+  }),
+  Object.freeze({
+    llm: "gemini-3.5-flash",
+    runtime: "pi-rpc",
+    model: "gemini-3.5-flash",
+    provider: "google",
+    route: "proxy-10808",
+  }),
+  Object.freeze({
+    llm: "kimi-k3",
+    runtime: "kimi-acp",
+    model: "kimi-code/k3",
+    provider: null,
+    route: "direct",
+  }),
+] as const satisfies readonly FrozenLogicalLlmIdentity[]);
+const CURRENT_LOGICAL_LLMS = Object.freeze([
+  Object.freeze({
+    llm: "ark-agent-deepseek-v4-flash",
+    runtime: "pi-rpc",
+    model: "deepseek-v4-flash",
+    provider: "ark-agent-plan",
+    route: "direct",
+  }),
+  Object.freeze({
+    llm: "ark-agent-plan",
+    runtime: "pi-rpc",
+    model: "ark-code-latest",
+    provider: "ark-agent-plan",
+    route: "direct",
+  }),
+  Object.freeze({
+    llm: "ark-coding-plan",
+    runtime: "pi-rpc",
+    model: "ark-code-latest",
+    provider: "ark-coding-plan",
+    route: "direct",
+  }),
+  Object.freeze({
+    llm: "kimi-k3",
+    runtime: "kimi-acp",
+    model: "kimi-code/k3",
+    provider: null,
+    route: "direct",
+  }),
+] as const satisfies readonly FrozenLogicalLlmIdentity[]);
+
+interface PreflightCredentialRule {
+  readonly llm: string;
+  readonly environmentVariableNames: readonly (string | null)[];
+}
+
+function frozenCredentialRule(
+  llm: string,
+  environmentVariableNames: readonly (string | null)[],
+): PreflightCredentialRule {
+  return Object.freeze({
+    llm,
+    environmentVariableNames: Object.freeze([...environmentVariableNames]),
+  });
+}
+
+const LEGACY_CREDENTIAL_ENVIRONMENT_NAMES = Object.freeze([
+  frozenCredentialRule("ark-agent-deepseek-v4-flash", [
+    "OPENAI_API_KEY_DOUBAO",
+  ]),
+  frozenCredentialRule("ark-agent-plan", ["OPENAI_API_KEY_DOUBAO"]),
+  frozenCredentialRule("ark-coding-plan", [
+    "ARK_API_KEY",
+    "VOLCENGINE_API_KEY",
+    "API_KEY_DOUBAO_CODING",
+  ]),
+  frozenCredentialRule("gemini-3.5-flash", [
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GOOGLE_GENERATIVE_AI_API_KEY",
+  ]),
+  frozenCredentialRule("kimi-k3", [null]),
+]);
+const CURRENT_CREDENTIAL_ENVIRONMENT_NAMES = Object.freeze([
+  frozenCredentialRule("ark-agent-deepseek-v4-flash", [
+    "OPENAI_API_KEY_DOUBAO",
+  ]),
+  frozenCredentialRule("ark-agent-plan", ["OPENAI_API_KEY_DOUBAO"]),
+  frozenCredentialRule("ark-coding-plan", [
+    "ARK_API_KEY",
+    "VOLCENGINE_API_KEY",
+    "API_KEY_DOUBAO_CODING",
+  ]),
+  frozenCredentialRule("kimi-k3", [null]),
+]);
 
 export class QualificationLedgerError extends Error {
   readonly category = "infrastructure";
@@ -145,6 +277,47 @@ function plainRecord(
   return record;
 }
 
+function densePlainArray(value: unknown): readonly unknown[] {
+  if (
+    !Array.isArray(value) ||
+    nodeUtilTypes.isProxy(value) ||
+    Object.getPrototypeOf(value) !== Array.prototype ||
+    Object.getOwnPropertySymbols(value).length !== 0
+  ) {
+    throw new QualificationLedgerError();
+  }
+  const ownKeys = Reflect.ownKeys(value);
+  if (
+    ownKeys.length !== value.length + 1 ||
+    ownKeys.some(
+      (key) =>
+        key !== "length" &&
+        (typeof key !== "string" ||
+          !/^(?:0|[1-9]\d*)$/u.test(key) ||
+          Number(key) >= value.length),
+    )
+  ) {
+    throw new QualificationLedgerError();
+  }
+  const dense: unknown[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const key = String(index);
+    if (!Object.hasOwn(value, key)) throw new QualificationLedgerError();
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (
+      descriptor === undefined ||
+      descriptor.enumerable !== true ||
+      !Object.hasOwn(descriptor, "value") ||
+      descriptor.get !== undefined ||
+      descriptor.set !== undefined
+    ) {
+      throw new QualificationLedgerError();
+    }
+    dense.push(descriptor.value);
+  }
+  return dense;
+}
+
 function safeText(value: unknown, maximum = 256): value is string {
   return (
     typeof value === "string" &&
@@ -170,7 +343,10 @@ function normalizeArtifact(value: unknown): BuildArtifactIdentity {
   });
 }
 
-function normalizeLogicalIdentity(value: unknown): FrozenLogicalLlmIdentity {
+function normalizeLogicalIdentity(
+  value: unknown,
+  expected: FrozenLogicalLlmIdentity,
+): FrozenLogicalLlmIdentity {
   const record = plainRecord(value, [
     "llm",
     "model",
@@ -187,12 +363,12 @@ function normalizeLogicalIdentity(value: unknown): FrozenLogicalLlmIdentity {
   ) {
     throw new QualificationLedgerError();
   }
-  const profile = resolveLlm(record.llm);
   if (
-    record.runtime !== profile.runtime ||
-    record.model !== profile.model ||
-    record.provider !== (profile.provider ?? null) ||
-    record.route !== profile.network
+    record.llm !== expected.llm ||
+    record.runtime !== expected.runtime ||
+    record.model !== expected.model ||
+    record.provider !== expected.provider ||
+    record.route !== expected.route
   ) {
     throw new QualificationLedgerError();
   }
@@ -205,27 +381,26 @@ function normalizeLogicalIdentity(value: unknown): FrozenLogicalLlmIdentity {
   });
 }
 
-function normalizeCredentialMatch(value: unknown): FrozenCredentialMatch {
+function normalizeCredentialMatchForProtocol(
+  value: unknown,
+  expected: {
+    readonly llm: string;
+    readonly environmentVariableNames: readonly (string | null)[];
+  },
+): FrozenCredentialMatch {
   const record = plainRecord(value, ["environmentVariableName", "llm"]);
   if (
-    typeof record.llm !== "string" ||
+    record.llm !== expected.llm ||
     (record.environmentVariableName !== null &&
-      typeof record.environmentVariableName !== "string")
-  ) {
-    throw new QualificationLedgerError();
-  }
-  const profile = resolveLlm(record.llm);
-  if (
-    (profile.credentialEnv.length === 0 &&
-      record.environmentVariableName !== null) ||
-    (profile.credentialEnv.length > 0 &&
-      (typeof record.environmentVariableName !== "string" ||
-        !profile.credentialEnv.includes(record.environmentVariableName)))
+      typeof record.environmentVariableName !== "string") ||
+    !expected.environmentVariableNames.some(
+      (name) => name === record.environmentVariableName,
+    )
   ) {
     throw new QualificationLedgerError();
   }
   return Object.freeze({
-    llm: record.llm,
+    llm: expected.llm,
     environmentVariableName: record.environmentVariableName,
   });
 }
@@ -244,101 +419,162 @@ function normalizeTargetProcesses(value: unknown) {
   });
 }
 
+function freezePreflightCommon(
+  record: Record<string, unknown>,
+  expectedArtifacts: readonly string[],
+  expectedLogicalLlms: readonly FrozenLogicalLlmIdentity[],
+  expectedCredentialMatches: readonly {
+    readonly llm: string;
+    readonly environmentVariableNames: readonly (string | null)[];
+  }[],
+) {
+  if (
+    typeof record.repositoryCommit !== "string" ||
+    !COMMIT_PATTERN.test(record.repositoryCommit) ||
+    !safeText(record.repositoryBranch) ||
+    record.repositoryDirty !== false ||
+    !safeText(record.packageVersion, 128) ||
+    typeof record.packageLockSha256 !== "string" ||
+    !SHA256_PATTERN.test(record.packageLockSha256) ||
+    typeof record.buildIdentitySha256 !== "string" ||
+    !SHA256_PATTERN.test(record.buildIdentitySha256) ||
+    typeof record.piConfigSha256 !== "string" ||
+    !SHA256_PATTERN.test(record.piConfigSha256) ||
+    record.logicalLlms === undefined ||
+    record.credentialMatches === undefined
+  ) {
+    throw new QualificationLedgerError();
+  }
+  const buildArtifacts = densePlainArray(record.buildArtifacts).map(
+    normalizeArtifact,
+  );
+  if (
+    buildArtifacts.length !== expectedArtifacts.length ||
+    buildArtifacts.some(
+      (artifact, index) => artifact.path !== expectedArtifacts[index],
+    ) ||
+    sha256(JSON.stringify(buildArtifacts)) !== record.buildIdentitySha256
+  ) {
+    throw new QualificationLedgerError();
+  }
+  const runtimeVersions = plainRecord(record.runtimeVersions, [
+    "codex",
+    "kimi",
+    "node",
+    "pi",
+  ]);
+  if (
+    !safeText(runtimeVersions.node, 128) ||
+    !safeText(runtimeVersions.codex, 128) ||
+    !safeText(runtimeVersions.kimi, 128) ||
+    !safeText(runtimeVersions.pi, 128)
+  ) {
+    throw new QualificationLedgerError();
+  }
+  const rawLogicalLlms = densePlainArray(record.logicalLlms);
+  if (rawLogicalLlms.length !== expectedLogicalLlms.length) {
+    throw new QualificationLedgerError();
+  }
+  const logicalLlms = rawLogicalLlms.map((identity, index) =>
+    normalizeLogicalIdentity(identity, expectedLogicalLlms[index]!),
+  );
+  const rawCredentialMatches = densePlainArray(record.credentialMatches);
+  if (rawCredentialMatches.length !== expectedCredentialMatches.length) {
+    throw new QualificationLedgerError();
+  }
+  const credentialMatches = rawCredentialMatches.map((match, index) =>
+    normalizeCredentialMatchForProtocol(
+      match,
+      expectedCredentialMatches[index]!,
+    ),
+  );
+  return Object.freeze({
+    repositoryCommit: record.repositoryCommit,
+    repositoryBranch: record.repositoryBranch,
+    repositoryDirty: false as const,
+    packageVersion: record.packageVersion,
+    packageLockSha256: record.packageLockSha256,
+    buildArtifacts: Object.freeze(buildArtifacts),
+    buildIdentitySha256: record.buildIdentitySha256,
+    runtimeVersions: Object.freeze({
+      node: runtimeVersions.node,
+      codex: runtimeVersions.codex,
+      kimi: runtimeVersions.kimi,
+      pi: runtimeVersions.pi,
+    }),
+    piConfigSha256: record.piConfigSha256,
+    logicalLlms: Object.freeze(logicalLlms),
+    credentialMatches: Object.freeze(credentialMatches),
+    targetProcesses: normalizeTargetProcesses(record.targetProcesses),
+  });
+}
+
+function freezeLegacyPreflightRecord(
+  value: unknown,
+): LegacyFrozenPreflightRecord {
+  const record = plainRecord(value, LEGACY_PREFLIGHT_KEYS);
+  if (record.schemaVersion !== 1) throw new QualificationLedgerError();
+  const proxy = plainRecord(record.proxy10808, ["host", "listening", "port"]);
+  if (
+    proxy.host !== "127.0.0.1" ||
+    proxy.port !== 10808 ||
+    proxy.listening !== true
+  ) {
+    throw new QualificationLedgerError();
+  }
+  const { targetProcesses, ...common } = freezePreflightCommon(
+    record,
+    LEGACY_REQUIRED_BUILD_ARTIFACTS,
+    LEGACY_LOGICAL_LLMS,
+    LEGACY_CREDENTIAL_ENVIRONMENT_NAMES,
+  );
+  return Object.freeze({
+    schemaVersion: 1,
+    ...common,
+    proxy10808: Object.freeze({
+      host: "127.0.0.1",
+      port: 10808,
+      listening: true,
+    }),
+    targetProcesses,
+  });
+}
+
+function freezeCurrentPreflightRecord(
+  value: unknown,
+): CurrentFrozenPreflightRecord {
+  const record = plainRecord(value, CURRENT_PREFLIGHT_KEYS);
+  if (
+    record.schemaVersion !== 2 ||
+    record.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID
+  ) {
+    throw new QualificationLedgerError();
+  }
+  return Object.freeze({
+    schemaVersion: 2,
+    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+    ...freezePreflightCommon(
+      record,
+      CURRENT_REQUIRED_BUILD_ARTIFACTS,
+      CURRENT_LOGICAL_LLMS,
+      CURRENT_CREDENTIAL_ENVIRONMENT_NAMES,
+    ),
+  });
+}
+
 export function freezePreflightRecord(value: unknown): FrozenPreflightRecord {
   try {
-    const record = plainRecord(value, PREFLIGHT_KEYS);
-    if (
-      record.schemaVersion !== 1 ||
-      typeof record.repositoryCommit !== "string" ||
-      !COMMIT_PATTERN.test(record.repositoryCommit) ||
-      !safeText(record.repositoryBranch) ||
-      record.repositoryDirty !== false ||
-      !safeText(record.packageVersion, 128) ||
-      typeof record.packageLockSha256 !== "string" ||
-      !SHA256_PATTERN.test(record.packageLockSha256) ||
-      !Array.isArray(record.buildArtifacts) ||
-      typeof record.buildIdentitySha256 !== "string" ||
-      !SHA256_PATTERN.test(record.buildIdentitySha256) ||
-      typeof record.piConfigSha256 !== "string" ||
-      !SHA256_PATTERN.test(record.piConfigSha256) ||
-      !Array.isArray(record.logicalLlms) ||
-      !Array.isArray(record.credentialMatches)
-    ) {
-      throw new QualificationLedgerError();
+    const envelope = plainRecord(value);
+    if (envelope.schemaVersion === 1) {
+      return freezeLegacyPreflightRecord(value);
     }
-    const buildArtifacts = record.buildArtifacts.map(normalizeArtifact);
     if (
-      buildArtifacts.length !== REQUIRED_BUILD_ARTIFACTS.length ||
-      buildArtifacts.some(
-        (artifact, index) => artifact.path !== REQUIRED_BUILD_ARTIFACTS[index],
-      )
+      envelope.schemaVersion === 2 &&
+      envelope.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID
     ) {
-      throw new QualificationLedgerError();
+      return freezeCurrentPreflightRecord(value);
     }
-    const runtimeVersions = plainRecord(record.runtimeVersions, [
-      "codex",
-      "kimi",
-      "node",
-      "pi",
-    ]);
-    if (
-      !safeText(runtimeVersions.node, 128) ||
-      !safeText(runtimeVersions.codex, 128) ||
-      !safeText(runtimeVersions.kimi, 128) ||
-      !safeText(runtimeVersions.pi, 128)
-    ) {
-      throw new QualificationLedgerError();
-    }
-    const logicalLlms = record.logicalLlms.map(normalizeLogicalIdentity);
-    const expectedIds = supportedLlmIds();
-    if (
-      logicalLlms.length !== expectedIds.length ||
-      logicalLlms.some((identity, index) => identity.llm !== expectedIds[index])
-    ) {
-      throw new QualificationLedgerError();
-    }
-    const credentialMatches = record.credentialMatches.map(
-      normalizeCredentialMatch,
-    );
-    if (
-      credentialMatches.length !== expectedIds.length ||
-      credentialMatches.some((match, index) => match.llm !== expectedIds[index])
-    ) {
-      throw new QualificationLedgerError();
-    }
-    const proxy = plainRecord(record.proxy10808, ["host", "listening", "port"]);
-    if (
-      proxy.host !== "127.0.0.1" ||
-      proxy.port !== 10808 ||
-      proxy.listening !== true
-    ) {
-      throw new QualificationLedgerError();
-    }
-    return Object.freeze({
-      schemaVersion: 1,
-      repositoryCommit: record.repositoryCommit,
-      repositoryBranch: record.repositoryBranch,
-      repositoryDirty: false,
-      packageVersion: record.packageVersion,
-      packageLockSha256: record.packageLockSha256,
-      buildArtifacts: Object.freeze(buildArtifacts),
-      buildIdentitySha256: record.buildIdentitySha256,
-      runtimeVersions: Object.freeze({
-        node: runtimeVersions.node,
-        codex: runtimeVersions.codex,
-        kimi: runtimeVersions.kimi,
-        pi: runtimeVersions.pi,
-      }),
-      piConfigSha256: record.piConfigSha256,
-      logicalLlms: Object.freeze(logicalLlms),
-      credentialMatches: Object.freeze(credentialMatches),
-      proxy10808: Object.freeze({
-        host: "127.0.0.1",
-        port: 10808,
-        listening: true,
-      }),
-      targetProcesses: normalizeTargetProcesses(record.targetProcesses),
-    });
+    throw new QualificationLedgerError();
   } catch {
     throw new QualificationLedgerError();
   }

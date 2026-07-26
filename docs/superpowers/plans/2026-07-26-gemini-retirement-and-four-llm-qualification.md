@@ -310,7 +310,7 @@ git commit -m "feat: add versioned qualification protocols"
 - Modify: `test/qualification/preflight.test.ts`
 - Modify: `test/qualification/manifest.test.ts`
 
-- [ ] **Step 1: Add RED fixtures for legacy and current preflight**
+- [x] **Step 1: Add RED fixtures for legacy and current preflight**
 
 Tests must assert:
 
@@ -341,7 +341,7 @@ expect(currentRecord.buildArtifacts.map(({ path }) => path)).not.toContain(
 
 Use the real historical `000000.json` fixture to prove the legacy codec accepts its embedded v1 preflight without calling active registry helpers.
 
-- [ ] **Step 2: Observe RED**
+- [x] **Step 2: Observe RED**
 
 ```powershell
 npm exec -- vitest run test/qualification/preflight.test.ts test/qualification/manifest.test.ts
@@ -349,7 +349,7 @@ npm exec -- vitest run test/qualification/preflight.test.ts test/qualification/m
 
 Expected: FAIL because only schema v1 exists and current parsing uses global active identities.
 
-- [ ] **Step 3: Implement versioned preflight types and codecs**
+- [x] **Step 3: Implement versioned preflight types and codecs**
 
 Define:
 
@@ -393,7 +393,7 @@ export function freezePreflightRecord(value: unknown): FrozenPreflightRecord {
 
 `runQualificationPreflight()` must emit only schema v2/current records, omit the proxy listener stage, and freeze exactly the new artifact set. Keep clean-HEAD, build identity, credential-source, isolated Pi config, and zero-process checks.
 
-- [ ] **Step 4: Verify both codecs**
+- [x] **Step 4: Verify both codecs**
 
 ```powershell
 npm exec -- vitest run test/qualification/preflight.test.ts test/qualification/manifest.test.ts
@@ -402,7 +402,7 @@ npm run typecheck
 
 Expected: historical fixture and new current record tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/qualification/types.ts src/qualification/preflight.ts src/qualification/manifest.ts test/qualification/preflight.test.ts test/qualification/manifest.test.ts

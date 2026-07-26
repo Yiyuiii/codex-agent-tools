@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { lstat, mkdtemp, open, realpath, rm } from "node:fs/promises";
-import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
@@ -9,7 +8,7 @@ import { execa } from "execa";
 import { locateKimi } from "../adapters/kimi/locator.js";
 import { buildIsolatedPiConfig } from "../adapters/pi/config.js";
 import { locatePi } from "../adapters/pi/locator.js";
-import { resolveLlm, supportedLlmIds } from "../llms/registry.js";
+import { resolveLlm } from "../llms/registry.js";
 import {
   classifyAgentProcesses,
   type AgentProcessCounts,
@@ -19,8 +18,10 @@ import {
   assertAuthorizationReferenceUnused,
   freezePreflightRecord,
 } from "./manifest.js";
+import { ACTIVE_QUALIFICATION_PLAN_ID } from "./protocol.js";
 import type {
   BuildArtifactIdentity,
+  CurrentFrozenPreflightRecord,
   FrozenCredentialMatch,
   FrozenLogicalLlmIdentity,
   FrozenPreflightRecord,
@@ -36,9 +37,14 @@ const BATCH_ID_PATTERN =
 export const QUALIFICATION_BUILD_ARTIFACT_PATHS = Object.freeze([
   "dist/ark-smoke.js",
   "dist/kimi-smoke.js",
-  "dist/pi-smoke.js",
   "dist/smoke-evidence.js",
   "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+] as const);
+const CURRENT_QUALIFICATION_LLM_IDS = Object.freeze([
+  "ark-agent-deepseek-v4-flash",
+  "ark-agent-plan",
+  "ark-coding-plan",
+  "kimi-k3",
 ] as const);
 export const QUALIFICATION_MAX_BUILD_ARTIFACT_BYTES = 32 * 1_048_576;
 
@@ -49,7 +55,6 @@ export type QualificationPreflightStage =
   | "build_initial"
   | "runtime_versions"
   | "pi_config"
-  | "proxy_10808"
   | "credentials"
   | "target_processes"
   | "authorization"
@@ -113,7 +118,6 @@ export interface QualificationPreflightDependencies {
   buildQualificationPiConfig?: () => Promise<{
     contentSha256: string;
   }>;
-  checkProxy10808?: () => Promise<boolean>;
   classifyTargetProcesses?: () => Promise<AgentProcessCounts>;
   assertAuthorizationUnused?: (options: {
     repositoryRoot: string;
@@ -447,26 +451,6 @@ async function defaultRemoveTemporaryCodexHome(
   await rm(directory, { recursive: true, force: true });
 }
 
-async function defaultCheckProxy10808(): Promise<boolean> {
-  return new Promise<boolean>((resolve) => {
-    const socket = net.createConnection({
-      host: "127.0.0.1",
-      port: 10808,
-    });
-    let settled = false;
-    const finish = (listening: boolean) => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      resolve(listening);
-    };
-    socket.setTimeout(3_000);
-    socket.once("connect", () => finish(true));
-    socket.once("error", () => finish(false));
-    socket.once("timeout", () => finish(false));
-  });
-}
-
 async function inStage<T>(
   stage: QualificationPreflightStage,
   operation: () => Promise<T>,
@@ -727,7 +711,7 @@ function collectFixedIdentities(environment: NodeJS.ProcessEnv): {
   const logicalLlms: FrozenLogicalLlmIdentity[] = [];
   const credentialMatches: FrozenCredentialMatch[] = [];
   let missingCredentials = 0;
-  for (const llm of supportedLlmIds()) {
+  for (const llm of CURRENT_QUALIFICATION_LLM_IDS) {
     const profile = resolveLlm(llm);
     logicalLlms.push(
       Object.freeze({
@@ -1022,7 +1006,7 @@ export async function collectQualificationCurrentSnapshot(
 export async function runQualificationPreflight(
   options: QualificationPreflightOptions,
   dependencies: QualificationPreflightDependencies = {},
-): Promise<FrozenPreflightRecord> {
+): Promise<CurrentFrozenPreflightRecord> {
   validateInput(options);
   const repositoryRoot = path.resolve(options.repositoryRoot);
   const environment = dependencies.environment ?? process.env;
@@ -1058,14 +1042,6 @@ export async function runQualificationPreflight(
       dependencies.removeTemporaryCodexHome ?? defaultRemoveTemporaryCodexHome,
   });
   const piConfigSha256 = await collectQualificationPiConfigSha256(dependencies);
-  await inStage("proxy_10808", async () => {
-    const listening = await (
-      dependencies.checkProxy10808 ?? defaultCheckProxy10808
-    )();
-    if (listening !== true) {
-      throw new QualificationPreflightError("proxy_10808");
-    }
-  });
   const fixedIdentities = await inStage("credentials", async () =>
     collectFixedIdentities(environment),
   );
@@ -1125,21 +1101,14 @@ export async function runQualificationPreflight(
   if (closedRepository.commit !== initialRepository.commit) {
     throw new QualificationPreflightError("repository_final");
   }
-  await inStage("proxy_10808", async () => {
-    const listening = await (
-      dependencies.checkProxy10808 ?? defaultCheckProxy10808
-    )();
-    if (listening !== true) {
-      throw new QualificationPreflightError("proxy_10808");
-    }
-  });
   const finalProcesses = await inStage("target_processes", async () =>
     normalizeZeroTargetProcesses(await inspectTargets()),
   );
 
-  return inStage("record", async () =>
-    freezePreflightRecord({
-      schemaVersion: 1,
+  return inStage("record", async () => {
+    const preflight = freezePreflightRecord({
+      schemaVersion: 2,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       repositoryCommit: initialRepository.commit,
       repositoryBranch: initialRepository.branch,
       repositoryDirty: false,
@@ -1151,12 +1120,11 @@ export async function runQualificationPreflight(
       piConfigSha256,
       logicalLlms: fixedIdentities.logicalLlms,
       credentialMatches: fixedIdentities.credentialMatches,
-      proxy10808: {
-        host: "127.0.0.1",
-        port: 10808,
-        listening: true,
-      },
       targetProcesses: finalProcesses,
-    }),
-  );
+    });
+    if (preflight.schemaVersion !== 2) {
+      throw new QualificationPreflightError("record");
+    }
+    return preflight;
+  });
 }

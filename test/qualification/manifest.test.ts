@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   mkdir,
   rename,
@@ -9,13 +10,14 @@ import {
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import { resolveLlm } from "../../src/llms/registry.js";
 import {
   assertAuthorizationReferenceUnused,
   createQualificationLedger,
   freezePreflightRecord,
+  hashFrozenPreflightRecord,
   inspectQualificationTerminal,
   QualificationLedgerError,
   recoverInterruptedQualificationBatch,
@@ -26,15 +28,25 @@ import {
 } from "../../src/qualification/lock.js";
 import { publishImmutableJson } from "../../src/smoke/evidence.js";
 import type {
+  CurrentFrozenPreflightRecord,
   FrozenPreflightRecord,
+  LegacyFrozenPreflightRecord,
   QualificationCaseIdentity,
 } from "../../src/qualification/types.js";
 
 const roots: string[] = [];
 const batchId = "batch-2026-07-26";
+const historicalBatchId =
+  "2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f";
+const historicalBatchFiles = [
+  "cases/2026-07-26T09-01-07.689Z-gemini-3.5-flash-delegate-pi.json",
+  "checkpoints/000000.json",
+  "checkpoints/000001.json",
+  "checkpoints/000002.json",
+  "manifest.json",
+] as const;
 const authHash = "a".repeat(64);
 const commit = "b".repeat(40);
-const buildHash = "c".repeat(64);
 const artifacts = [
   "dist/ark-smoke.js",
   "dist/kimi-smoke.js",
@@ -45,6 +57,25 @@ const artifacts = [
   path: artifactPath,
   sha256: String(index + 1).repeat(64),
 }));
+const buildHash = createHash("sha256")
+  .update(JSON.stringify(artifacts))
+  .digest("hex");
+
+type DeepReadonly<T> = {
+  readonly [Key in keyof T]: T[Key] extends object
+    ? DeepReadonly<T[Key]>
+    : T[Key];
+};
+
+type TypeEqual<Left, Right> = (<Value>() => Value extends Left ? 1 : 2) extends <
+  Value,
+>() => Value extends Right ? 1 : 2
+  ? (<Value>() => Value extends Right ? 1 : 2) extends <
+      Value,
+    >() => Value extends Left ? 1 : 2
+    ? true
+    : false
+  : false;
 
 async function tempRepository(): Promise<string> {
   const root = path.join(
@@ -54,6 +85,34 @@ async function tempRepository(): Promise<string> {
   await mkdir(root, { recursive: true });
   roots.push(root);
   return root;
+}
+
+async function copyHistoricalBatch(repositoryRoot: string): Promise<void> {
+  const source = path.join(
+    process.cwd(),
+    "docs",
+    "smoke",
+    "evidence",
+    "batches",
+    historicalBatchId,
+  );
+  const destination = path.join(
+    repositoryRoot,
+    "docs",
+    "smoke",
+    "evidence",
+    "batches",
+    historicalBatchId,
+  );
+  for (const relativePath of historicalBatchFiles) {
+    const target = path.join(destination, ...relativePath.split("/"));
+    await mkdir(path.dirname(target), { recursive: true });
+    const text = await readFile(
+      path.join(source, ...relativePath.split("/")),
+      "utf8",
+    );
+    await writeFile(target, text.replaceAll("\r\n", "\n"), "utf8");
+  }
 }
 
 afterEach(async () => {
@@ -146,6 +205,43 @@ function preflight(): FrozenPreflightRecord {
       realSmoke: { count: 0 },
     },
   });
+}
+
+function currentPreflightRecord() {
+  const legacy = preflight();
+  const buildArtifacts = legacy.buildArtifacts.filter(
+    ({ path: artifactPath }) => artifactPath !== "dist/pi-smoke.js",
+  );
+  return {
+    schemaVersion: 2,
+    qualificationPlanId: "four-llm-v1",
+    repositoryCommit: legacy.repositoryCommit,
+    repositoryBranch: legacy.repositoryBranch,
+    repositoryDirty: legacy.repositoryDirty,
+    packageVersion: legacy.packageVersion,
+    packageLockSha256: legacy.packageLockSha256,
+    buildArtifacts,
+    buildIdentitySha256: createHash("sha256")
+      .update(JSON.stringify(buildArtifacts))
+      .digest("hex"),
+    runtimeVersions: legacy.runtimeVersions,
+    piConfigSha256: legacy.piConfigSha256,
+    logicalLlms: legacy.logicalLlms.filter(
+      ({ llm }) => llm !== "gemini-3.5-flash",
+    ),
+    credentialMatches: legacy.credentialMatches.filter(
+      ({ llm }) => llm !== "gemini-3.5-flash",
+    ),
+    targetProcesses: legacy.targetProcesses,
+  };
+}
+
+function sparseCopy(values: readonly unknown[]): unknown[] {
+  const sparse = new Array<unknown>(values.length);
+  values.forEach((value, index) => {
+    if (index !== 1) sparse[index] = value;
+  });
+  return sparse;
 }
 
 function cases(): QualificationCaseIdentity[] {
@@ -243,6 +339,206 @@ async function publishEvidence(
 }
 
 describe("frozen qualification preflight", () => {
+  it("decodes and preserves the hash of the real historical preflight", async () => {
+    const checkpoint = JSON.parse(
+      await readFile(
+        path.join(
+          process.cwd(),
+          "docs",
+          "smoke",
+          "evidence",
+          "batches",
+          historicalBatchId,
+          "checkpoints",
+          "000000.json",
+        ),
+        "utf8",
+      ),
+    ) as { preflight: unknown; preflightSha256: string };
+
+    const frozen = freezePreflightRecord(checkpoint.preflight);
+    expect(frozen).toEqual(checkpoint.preflight);
+    expect(hashFrozenPreflightRecord(frozen)).toBe(
+      checkpoint.preflightSha256,
+    );
+  });
+
+  it("validates the real historical blocked terminal manifest", async () => {
+    const repositoryRoot = await tempRepository();
+    await copyHistoricalBatch(repositoryRoot);
+    const manifest = JSON.parse(
+      await readFile(
+        path.join(
+          repositoryRoot,
+          "docs",
+          "smoke",
+          "evidence",
+          "batches",
+          historicalBatchId,
+          "manifest.json",
+        ),
+        "utf8",
+      ),
+    ) as {
+      status: string;
+      authorizationReferenceSha256: string;
+    };
+
+    expect(manifest.status).toBe("blocked");
+    await expect(
+      inspectQualificationTerminal({
+        repositoryRoot,
+        batchId: historicalBatchId,
+      }),
+    ).resolves.toEqual({
+      state: "valid",
+      batchId: historicalBatchId,
+      authorizationReferenceSha256:
+        manifest.authorizationReferenceSha256,
+    });
+  });
+
+  it("accepts only the current schema and matching four-LLM plan identity", () => {
+    const current = currentPreflightRecord();
+
+    expect(freezePreflightRecord(current)).toEqual(current);
+    expect(() =>
+      freezePreflightRecord({
+        ...preflight(),
+        qualificationPlanId: "four-llm-v1",
+      }),
+    ).toThrow("Qualification ledger operation failed");
+    const { qualificationPlanId: _omitted, ...withoutPlan } = current;
+    expect(() => freezePreflightRecord(withoutPlan)).toThrow(
+      "Qualification ledger operation failed",
+    );
+    expect(() =>
+      freezePreflightRecord({
+        ...current,
+        qualificationPlanId: "five-llm-v1",
+      }),
+    ).toThrow("Qualification ledger operation failed");
+    expect(() =>
+      freezePreflightRecord({ ...current, schemaVersion: 3 }),
+    ).toThrow("Qualification ledger operation failed");
+    expect(() =>
+      freezePreflightRecord({ ...current, extra: "forbidden" }),
+    ).toThrow("Qualification ledger operation failed");
+  });
+
+  it.each([
+    "buildArtifacts",
+    "logicalLlms",
+    "credentialMatches",
+  ] as const)("rejects sparse legacy and current %s arrays", (field) => {
+    const legacy = preflight();
+    const current = currentPreflightRecord();
+
+    expect(() =>
+      freezePreflightRecord({
+        ...legacy,
+        [field]: sparseCopy(legacy[field]),
+      }),
+    ).toThrow("Qualification ledger operation failed");
+    expect(() =>
+      freezePreflightRecord({
+        ...current,
+        [field]: sparseCopy(current[field]),
+      }),
+    ).toThrow("Qualification ledger operation failed");
+  });
+
+  it.each([
+    "buildArtifacts",
+    "logicalLlms",
+    "credentialMatches",
+  ] as const)("rejects proxied legacy and current %s arrays", (field) => {
+    let trapCalls = 0;
+    const proxy = (values: readonly unknown[]) =>
+      new Proxy([...values], {
+        get() {
+          trapCalls += 1;
+          throw new Error("array proxy trap must not execute");
+        },
+      });
+    const legacy = preflight();
+    const current = currentPreflightRecord();
+
+    expect(() =>
+      freezePreflightRecord({
+        ...legacy,
+        [field]: proxy(legacy[field]),
+      }),
+    ).toThrow("Qualification ledger operation failed");
+    expect(() =>
+      freezePreflightRecord({
+        ...current,
+        [field]: proxy(current[field]),
+      }),
+    ).toThrow("Qualification ledger operation failed");
+    expect(trapCalls).toBe(0);
+  });
+
+  it("rejects array index accessors and extra symbol properties without invoking them", () => {
+    let getterCalls = 0;
+    const logicalLlms = [...preflight().logicalLlms];
+    Object.defineProperty(logicalLlms, "1", {
+      enumerable: true,
+      configurable: true,
+      get() {
+        getterCalls += 1;
+        return preflight().logicalLlms[1];
+      },
+    });
+    expect(() =>
+      freezePreflightRecord({ ...preflight(), logicalLlms }),
+    ).toThrow("Qualification ledger operation failed");
+    expect(getterCalls).toBe(0);
+
+    const current = currentPreflightRecord();
+    const credentialMatches = [...current.credentialMatches];
+    Object.defineProperty(credentialMatches, Symbol("forbidden"), {
+      enumerable: true,
+      value: "forbidden",
+    });
+    expect(() =>
+      freezePreflightRecord({ ...current, credentialMatches }),
+    ).toThrow("Qualification ledger operation failed");
+  });
+
+  it("binds legacy and current build identity hashes to normalized artifacts", () => {
+    const legacy = preflight();
+    const current = currentPreflightRecord();
+
+    expect(() =>
+      freezePreflightRecord({
+        ...legacy,
+        buildIdentitySha256: "f".repeat(64),
+      }),
+    ).toThrow("Qualification ledger operation failed");
+    expect(() =>
+      freezePreflightRecord({
+        ...current,
+        buildIdentitySha256: "f".repeat(64),
+      }),
+    ).toThrow("Qualification ledger operation failed");
+  });
+
+  it("exposes deeply readonly legacy and current preflight records", () => {
+    expectTypeOf<
+      TypeEqual<
+        LegacyFrozenPreflightRecord,
+        DeepReadonly<LegacyFrozenPreflightRecord>
+      >
+    >().toEqualTypeOf<true>();
+    expectTypeOf<
+      TypeEqual<
+        CurrentFrozenPreflightRecord,
+        DeepReadonly<CurrentFrozenPreflightRecord>
+      >
+    >().toEqualTypeOf<true>();
+  });
+
   it("deep-freezes and rejects drift in fixed identities or zero baseline", () => {
     const frozen = preflight();
     expect(Object.isFrozen(frozen)).toBe(true);
@@ -304,7 +600,24 @@ describe("frozen qualification preflight", () => {
     );
   });
 
-  it("rejects proxy/accessor/extra input without executing getters", () => {
+  it.each(["schemaVersion", "repositoryBranch"] as const)(
+    "rejects a non-enumerable %s preflight field",
+    (field) => {
+      const candidate = { ...preflight() };
+      Object.defineProperty(candidate, field, {
+        configurable: true,
+        enumerable: false,
+        value: candidate[field],
+        writable: true,
+      });
+
+      expect(() => freezePreflightRecord(candidate)).toThrow(
+        "Qualification ledger operation failed",
+      );
+    },
+  );
+
+  it("rejects preflight accessors without executing getters", () => {
     let getterCalls = 0;
     const accessor = {
       ...preflight(),
@@ -317,9 +630,23 @@ describe("frozen qualification preflight", () => {
       "Qualification ledger operation failed",
     );
     expect(getterCalls).toBe(0);
-    expect(() => freezePreflightRecord(new Proxy(preflight(), {}))).toThrow(
+  });
+
+  it("rejects preflight proxies without executing traps", () => {
+    let trapCalls = 0;
+    const proxy = new Proxy(preflight(), {
+      getPrototypeOf() {
+        trapCalls += 1;
+        throw new Error("preflight proxy trap must not execute");
+      },
+    });
+    expect(() => freezePreflightRecord(proxy)).toThrow(
       "Qualification ledger operation failed",
     );
+    expect(trapCalls).toBe(0);
+  });
+
+  it("rejects extra preflight fields", () => {
     expect(() =>
       freezePreflightRecord({ ...preflight(), extra: "forbidden" }),
     ).toThrow("Qualification ledger operation failed");

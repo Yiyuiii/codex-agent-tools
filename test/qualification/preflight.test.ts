@@ -11,7 +11,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   assertQualificationFrozenCandidate,
@@ -72,8 +72,6 @@ interface HarnessOptions {
   commitSnapshots?: readonly string[];
   failCommandStage?: string;
   failCommandOutput?: string;
-  proxyListening?: boolean;
-  proxySnapshots?: readonly boolean[];
   missingCredential?: string;
   processSnapshots?: readonly {
     kimi: { count: number };
@@ -142,14 +140,12 @@ async function harness(
   let processCalls = 0;
   let authorizationChecks = 0;
   let buildMutated = false;
-  let proxyCalls = 0;
   const activeCodexHome = path.join(repositoryRoot, "must-not-be-used");
   const environment: NodeJS.ProcessEnv = {
     PATH: process.env.PATH,
     CODEX_HOME: activeCodexHome,
     ARK_API_KEY: "ARK_SECRET_VALUE",
     OPENAI_API_KEY_DOUBAO: "AGENT_SECRET_VALUE",
-    GEMINI_API_KEY: "GEMINI_SECRET_VALUE",
   };
   if (options.missingCredential !== undefined) {
     delete environment[options.missingCredential];
@@ -174,14 +170,6 @@ async function harness(
     buildQualificationPiConfig: async () => ({
       contentSha256: piConfigSha256,
     }),
-    checkProxy10808: async () => {
-      const snapshots = options.proxySnapshots ?? [
-        options.proxyListening ?? true,
-      ];
-      const result = snapshots[Math.min(proxyCalls, snapshots.length - 1)]!;
-      proxyCalls += 1;
-      return result;
-    },
     classifyTargetProcesses: async () => {
       const snapshots = options.processSnapshots ?? [
         zeroProcesses,
@@ -305,14 +293,16 @@ function run(
 }
 
 describe("qualification build identity", () => {
-  it("hashes the exact five frozen artifacts in canonical order", async () => {
+  it("hashes the exact four current artifacts in canonical order", async () => {
     const repositoryRoot = await tempRepository();
     const identity = await collectQualificationBuildIdentity(repositoryRoot);
 
     expect(identity.buildArtifacts.map((artifact) => artifact.path)).toEqual(
       QUALIFICATION_BUILD_ARTIFACT_PATHS,
     );
-    expect(identity.buildArtifacts).toHaveLength(5);
+    expect(identity.buildArtifacts).toHaveLength(4);
+    expect(identity.buildArtifacts.map(({ path: artifactPath }) => artifactPath))
+      .not.toContain("dist/pi-smoke.js");
     expect(identity.buildIdentitySha256).toBe(
       createHash("sha256")
         .update(JSON.stringify(identity.buildArtifacts))
@@ -364,7 +354,8 @@ describe("qualification preflight", () => {
     const record = await run(repositoryRoot, state.dependencies);
 
     expect(record).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
+      qualificationPlanId: "four-llm-v1",
       repositoryCommit: commit,
       repositoryBranch: "codex/ark-cutover",
       repositoryDirty: false,
@@ -377,20 +368,18 @@ describe("qualification preflight", () => {
         pi: "0.80.10",
       },
       piConfigSha256,
-      proxy10808: {
-        host: "127.0.0.1",
-        port: 10808,
-        listening: true,
-      },
       targetProcesses: zeroProcesses,
     });
+    expect(record).not.toHaveProperty("proxy10808");
     expect(record.logicalLlms.map((identity) => identity.llm)).toEqual([
       "ark-agent-deepseek-v4-flash",
       "ark-agent-plan",
       "ark-coding-plan",
-      "gemini-3.5-flash",
       "kimi-k3",
     ]);
+    expect(record.logicalLlms.every(({ route }) => route === "direct")).toBe(
+      true,
+    );
     expect(record.credentialMatches).toEqual([
       {
         llm: "ark-agent-deepseek-v4-flash",
@@ -404,12 +393,10 @@ describe("qualification preflight", () => {
         llm: "ark-coding-plan",
         environmentVariableName: "ARK_API_KEY",
       },
-      {
-        llm: "gemini-3.5-flash",
-        environmentVariableName: "GEMINI_API_KEY",
-      },
       { llm: "kimi-k3", environmentVariableName: null },
     ]);
+    expect(record.buildArtifacts.map(({ path: artifactPath }) => artifactPath))
+      .not.toContain("dist/pi-smoke.js");
     expect(
       state.commands.map(commandStage).filter((stage) => stage !== "other"),
     ).toEqual([
@@ -443,7 +430,6 @@ describe("qualification preflight", () => {
     const serialized = JSON.stringify(record);
     expect(serialized).not.toContain("ARK_SECRET_VALUE");
     expect(serialized).not.toContain("AGENT_SECRET_VALUE");
-    expect(serialized).not.toContain("GEMINI_SECRET_VALUE");
     expect(serialized).not.toContain(repositoryRoot);
   });
 
@@ -489,15 +475,9 @@ describe("qualification preflight", () => {
     ["dirty final tree", { finalDirty: true }, "repository_final"],
     ["commit drift", { finalCommit: "d".repeat(40) }, "repository_final"],
     ["build drift", { mutateBuildOnBuild: true }, "build_final"],
-    ["10808 not listening", { proxyListening: false }, "proxy_10808"],
-    [
-      "10808 disappears after deterministic gates",
-      { proxySnapshots: [true, false] },
-      "proxy_10808",
-    ],
     [
       "credential missing",
-      { missingCredential: "GEMINI_API_KEY" },
+      { missingCredential: "ARK_API_KEY" },
       "credentials",
     ],
     [
@@ -618,7 +598,6 @@ describe("qualification preflight", () => {
     expect(serialized).not.toContain(repositoryRoot);
     expect(serialized).not.toContain("ARK_SECRET_VALUE");
     expect(serialized).not.toContain("AGENT_SECRET_VALUE");
-    expect(serialized).not.toContain("GEMINI_SECRET_VALUE");
   });
 
   it("rejects a target process appearing after deterministic gates", async () => {
@@ -881,7 +860,7 @@ describe("frozen candidate integration helpers", () => {
     expect(commitCalls).toBe(2);
   });
 
-  it("collects the verifier current snapshot without gates, authorization, proxy, or process checks", async () => {
+  it("collects the verifier current snapshot without gates, authorization, or process checks", async () => {
     const repositoryRoot = await tempRepository();
     const state = await harness(repositoryRoot);
     const forbidden = async () => {
@@ -891,7 +870,6 @@ describe("frozen candidate integration helpers", () => {
       { repositoryRoot },
       {
         ...state.dependencies,
-        checkProxy10808: forbidden,
         classifyTargetProcesses: forbidden,
         assertAuthorizationUnused: forbidden,
       },
@@ -911,13 +889,21 @@ describe("frozen candidate integration helpers", () => {
     expect(snapshot.buildArtifacts.map((artifact) => artifact.path)).toEqual(
       QUALIFICATION_BUILD_ARTIFACT_PATHS,
     );
-    expect(snapshot.logicalLlms).toHaveLength(5);
-    expect(snapshot.credentialMatches).toHaveLength(5);
+    expect(snapshot.logicalLlms).toHaveLength(4);
+    expect(snapshot.credentialMatches).toHaveLength(4);
     expect(
       state.commands.map(commandStage).filter((stage) => stage !== "other"),
     ).toEqual([]);
     expect(state.authorizationChecks).toBe(0);
     expect(state.removedCodexHomes).toEqual(state.codexHomes);
     expect(Object.isFrozen(snapshot)).toBe(true);
+  });
+
+  it("does not expose a dead proxy preflight dependency", () => {
+    type HasProxyDependency =
+      "checkProxy10808" extends keyof QualificationPreflightDependencies
+        ? true
+        : false;
+    expectTypeOf<HasProxyDependency>().toEqualTypeOf<false>();
   });
 });

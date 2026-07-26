@@ -32,48 +32,66 @@ export type QualificationTerminalInspection =
 export type TargetAgentProcessCounts = AgentProcessCounts;
 
 export interface BuildArtifactIdentity {
-  path: string;
-  sha256: string;
+  readonly path: string;
+  readonly sha256: string;
 }
 
 export interface FrozenLogicalLlmIdentity {
-  llm: string;
-  runtime: "kimi-acp" | "pi-rpc";
-  model: string;
-  provider: string | null;
-  route: "direct" | "proxy-10808";
+  readonly llm: string;
+  readonly runtime: "kimi-acp" | "pi-rpc";
+  readonly model: string;
+  readonly provider: string | null;
+  readonly route: "direct" | "proxy-10808";
 }
 
 export interface FrozenCredentialMatch {
-  llm: string;
-  environmentVariableName: string | null;
+  readonly llm: string;
+  readonly environmentVariableName: string | null;
 }
 
-export interface FrozenPreflightRecord {
-  schemaVersion: 1;
-  repositoryCommit: string;
-  repositoryBranch: string;
-  repositoryDirty: false;
-  packageVersion: string;
-  packageLockSha256: string;
-  buildArtifacts: readonly BuildArtifactIdentity[];
-  buildIdentitySha256: string;
-  runtimeVersions: Readonly<{
-    node: string;
-    codex: string;
-    kimi: string;
-    pi: string;
+interface FrozenPreflightRecordCommon {
+  readonly repositoryCommit: string;
+  readonly repositoryBranch: string;
+  readonly repositoryDirty: false;
+  readonly packageVersion: string;
+  readonly packageLockSha256: string;
+  readonly buildArtifacts: readonly BuildArtifactIdentity[];
+  readonly buildIdentitySha256: string;
+  readonly runtimeVersions: Readonly<{
+    readonly node: string;
+    readonly codex: string;
+    readonly kimi: string;
+    readonly pi: string;
   }>;
-  piConfigSha256: string;
-  logicalLlms: readonly FrozenLogicalLlmIdentity[];
-  credentialMatches: readonly FrozenCredentialMatch[];
-  proxy10808: Readonly<{
-    host: "127.0.0.1";
-    port: 10808;
-    listening: true;
+  readonly piConfigSha256: string;
+  readonly logicalLlms: readonly FrozenLogicalLlmIdentity[];
+  readonly credentialMatches: readonly FrozenCredentialMatch[];
+  readonly targetProcesses: Readonly<{
+    readonly kimi: Readonly<{ readonly count: 0 }>;
+    readonly piRpc: Readonly<{ readonly count: 0 }>;
+    readonly realSmoke: Readonly<{ readonly count: 0 }>;
   }>;
-  targetProcesses: TargetAgentProcessCounts;
 }
+
+export interface LegacyFrozenPreflightRecord
+  extends FrozenPreflightRecordCommon {
+  readonly schemaVersion: 1;
+  readonly proxy10808: Readonly<{
+    readonly host: "127.0.0.1";
+    readonly port: 10808;
+    readonly listening: true;
+  }>;
+}
+
+export interface CurrentFrozenPreflightRecord
+  extends FrozenPreflightRecordCommon {
+  readonly schemaVersion: 2;
+  readonly qualificationPlanId: "four-llm-v1";
+}
+
+export type FrozenPreflightRecord =
+  | LegacyFrozenPreflightRecord
+  | CurrentFrozenPreflightRecord;
 
 export type QualificationTask = "review" | "delegate";
 export type QualificationCaseResult = "passed" | "failed";
