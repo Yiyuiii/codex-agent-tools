@@ -44,10 +44,13 @@ const validKimiTelemetry: AdapterExecutionTelemetry = {
 };
 
 const qualificationContext = {
+  qualificationPlanId: "four-llm-v1" as const,
   batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
-  ordinal: 6,
-  repositoryCommit: "a".repeat(40),
-  buildIdentitySha256: "b".repeat(64),
+  ordinal: 4,
+  llm: "kimi-k3",
+  task: "delegate" as const,
+  frozenCommit: "a".repeat(40),
+  frozenBuildIdentity: "b".repeat(64),
   authorizationReferenceSha256: "c".repeat(64),
   orchestratorFallbackUsed: false as const,
 };
@@ -71,6 +74,20 @@ describe("Kimi real-smoke harness", () => {
         "review",
       ]),
     ).toThrow(/Kimi ACP profile/u);
+  });
+
+  it("rejects a qualification identity for a different active case", async () => {
+    await expect(
+      runKimiSmoke({
+        llm: "kimi-k3",
+        task: "delegate",
+        qualificationContext: {
+          ...qualificationContext,
+          ordinal: 3,
+          task: "review",
+        },
+      }),
+    ).rejects.toThrow("Smoke qualification identity mismatch");
   });
 
   it("validates a read-only review against the known empty-array defect", async () => {
@@ -170,7 +187,7 @@ describe("Kimi real-smoke harness", () => {
     );
 
     expect(evidence).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       qualification: qualificationContext,
       passed: true,
       adapterClientInvocationCount: 1,

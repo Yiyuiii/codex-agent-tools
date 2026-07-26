@@ -9,18 +9,35 @@ import path from "node:path";
 import { types as nodeUtilTypes } from "node:util";
 
 import { resolveLlm } from "../llms/registry.js";
+import {
+  ACTIVE_QUALIFICATION_CASES,
+  ACTIVE_QUALIFICATION_PLAN_ID,
+} from "../qualification/protocol.js";
 
 export type SmokeKind = "kimi" | "pi" | "ark";
 export type SmokeTask = "review" | "delegate";
 
 export interface SmokeQualificationContext {
-  batchId: string;
-  ordinal: number;
-  repositoryCommit: string;
-  buildIdentitySha256: string;
-  authorizationReferenceSha256: string;
-  orchestratorFallbackUsed: false;
+  readonly qualificationPlanId: "four-llm-v1";
+  readonly batchId: string;
+  readonly ordinal: number;
+  readonly llm: string;
+  readonly task: SmokeTask;
+  readonly frozenCommit: string;
+  readonly frozenBuildIdentity: string;
+  readonly authorizationReferenceSha256: string;
+  readonly orchestratorFallbackUsed: false;
 }
+
+export type SmokeEvidenceEnvelope<T extends object> =
+  | (T & {
+      readonly schemaVersion: 2;
+      readonly qualification: null;
+    })
+  | (T & {
+      readonly schemaVersion: 3;
+      readonly qualification: Readonly<SmokeQualificationContext>;
+    });
 
 export type SmokeInfrastructureStage =
   | "runtime_setup"
@@ -99,13 +116,11 @@ interface ParsedSmokeArguments {
   task: SmokeTask;
 }
 
-interface SmokeEvidence {
-  schemaVersion: 2;
+type SmokeEvidence = SmokeEvidenceEnvelope<{
   timestamp: string;
   passed: boolean;
-  qualification: SmokeQualificationContext | null;
   [key: string]: unknown;
-}
+}>;
 
 export interface SmokeEntrypointOptions<
   TOptions extends ParsedSmokeArguments,
@@ -162,10 +177,13 @@ const BATCH_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9_-])?$/u
 const QUALIFICATION_CONTEXT_KEYS = [
   "authorizationReferenceSha256",
   "batchId",
-  "buildIdentitySha256",
+  "frozenBuildIdentity",
+  "frozenCommit",
+  "llm",
   "orchestratorFallbackUsed",
   "ordinal",
-  "repositoryCommit",
+  "qualificationPlanId",
+  "task",
 ] as const;
 
 function plainDataDescriptors(
@@ -199,10 +217,13 @@ function freezeQualificationContext(
   context: SmokeQualificationContext,
 ): SmokeQualificationContext {
   return Object.freeze({
+    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     batchId: context.batchId,
     ordinal: context.ordinal,
-    repositoryCommit: context.repositoryCommit,
-    buildIdentitySha256: context.buildIdentitySha256,
+    llm: context.llm,
+    task: context.task,
+    frozenCommit: context.frozenCommit,
+    frozenBuildIdentity: context.frozenBuildIdentity,
     authorizationReferenceSha256: context.authorizationReferenceSha256,
     orchestratorFallbackUsed: false,
   });
@@ -228,27 +249,38 @@ export function normalizeSmokeQualificationContext(
   ) {
     throw new Error("Invalid smoke qualification context");
   }
+  const qualificationPlanId = descriptors.qualificationPlanId?.value;
   const batchId = descriptors.batchId?.value;
   const ordinal = descriptors.ordinal?.value;
-  const repositoryCommit = descriptors.repositoryCommit?.value;
-  const buildIdentitySha256 = descriptors.buildIdentitySha256?.value;
+  const llm = descriptors.llm?.value;
+  const task = descriptors.task?.value;
+  const frozenCommit = descriptors.frozenCommit?.value;
+  const frozenBuildIdentity = descriptors.frozenBuildIdentity?.value;
   const authorizationReferenceSha256 =
     descriptors.authorizationReferenceSha256?.value;
   const orchestratorFallbackUsed =
     descriptors.orchestratorFallbackUsed?.value;
+  const activeIdentity = ACTIVE_QUALIFICATION_CASES.find(
+    (identity) =>
+      identity.ordinal === ordinal &&
+      identity.llm === llm &&
+      identity.task === task,
+  );
   if (
+    qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID ||
     typeof batchId !== "string" ||
     !BATCH_ID_PATTERN.test(batchId) ||
     batchId === "." ||
     batchId === ".." ||
     typeof ordinal !== "number" ||
     !Number.isInteger(ordinal) ||
-    ordinal < 1 ||
-    ordinal > 10 ||
-    typeof repositoryCommit !== "string" ||
-    !COMMIT_PATTERN.test(repositoryCommit) ||
-    typeof buildIdentitySha256 !== "string" ||
-    !SHA256_PATTERN.test(buildIdentitySha256) ||
+    typeof llm !== "string" ||
+    (task !== "review" && task !== "delegate") ||
+    activeIdentity === undefined ||
+    typeof frozenCommit !== "string" ||
+    !COMMIT_PATTERN.test(frozenCommit) ||
+    typeof frozenBuildIdentity !== "string" ||
+    !SHA256_PATTERN.test(frozenBuildIdentity) ||
     typeof authorizationReferenceSha256 !== "string" ||
     !SHA256_PATTERN.test(authorizationReferenceSha256) ||
     orchestratorFallbackUsed !== false
@@ -256,13 +288,29 @@ export function normalizeSmokeQualificationContext(
     throw new Error("Invalid smoke qualification context");
   }
   return freezeQualificationContext({
+    qualificationPlanId,
     batchId,
     ordinal,
-    repositoryCommit,
-    buildIdentitySha256,
+    llm,
+    task,
+    frozenCommit,
+    frozenBuildIdentity,
     authorizationReferenceSha256,
     orchestratorFallbackUsed,
   });
+}
+
+export function assertSmokeQualificationIdentity(
+  qualification: SmokeQualificationContext | null,
+  llm: string,
+  task: SmokeTask,
+): void {
+  if (
+    qualification !== null &&
+    (qualification.llm !== llm || qualification.task !== task)
+  ) {
+    throw new Error("Smoke qualification identity mismatch");
+  }
 }
 
 function normalizeReportedEvidenceDirectory(value: string): string {
@@ -406,9 +454,7 @@ function infrastructureEvidence(
   qualification: SmokeQualificationContext | null,
 ): SmokeEvidence {
   const profile = resolveLlm(options.llm);
-  return {
-    schemaVersion: 2,
-    qualification,
+  const payload = {
     timestamp,
     llm: options.llm,
     actualModel: null,
@@ -439,6 +485,17 @@ function infrastructureEvidence(
       processCleanup: "unknown",
     },
   };
+  return qualification === null
+    ? {
+        schemaVersion: 2,
+        qualification: null,
+        ...payload,
+      }
+    : {
+        schemaVersion: 3,
+        qualification: freezeQualificationContext(qualification),
+        ...payload,
+      };
 }
 
 export async function publishImmutableJson(
@@ -550,6 +607,11 @@ export async function runSmokeEntrypoint<
   let options: TOptions;
   try {
     options = config.parseArguments(config.args);
+    assertSmokeQualificationIdentity(
+      qualification,
+      options.llm,
+      options.task,
+    );
   } catch {
     writeStderr("Smoke arguments are invalid.\n");
     return 1;
@@ -585,24 +647,32 @@ export async function runSmokeEntrypoint<
     const resultQualification = normalizeSmokeQualificationContext(
       resultRecord.qualification,
     );
+    const expectedSchemaVersion = qualification === null ? 2 : 3;
     if (
-      resultRecord.schemaVersion !== 2 ||
+      resultRecord.schemaVersion !== expectedSchemaVersion ||
       !qualificationContextsEqual(resultQualification, qualification) ||
       resultRecord.orchestratorFallbackUsed !==
         (qualification?.orchestratorFallbackUsed ?? null)
     ) {
       throw new Error("Smoke evidence identity mismatch");
     }
-    evidence = Object.freeze({
+    const authoritativePayload = {
       ...resultRecord,
-      schemaVersion: 2,
-      qualification:
-        qualification === null
-          ? null
-          : freezeQualificationContext(qualification),
       orchestratorFallbackUsed:
         qualification?.orchestratorFallbackUsed ?? null,
-    }) as unknown as SmokeEvidence;
+    };
+    evidence =
+      qualification === null
+        ? (Object.freeze({
+            ...authoritativePayload,
+            schemaVersion: 2,
+            qualification: null,
+          }) as unknown as SmokeEvidence)
+        : (Object.freeze({
+            ...authoritativePayload,
+            schemaVersion: 3,
+            qualification: freezeQualificationContext(qualification),
+          }) as unknown as SmokeEvidence);
   } catch (error) {
     infrastructureFailure = true;
     const sanitized =

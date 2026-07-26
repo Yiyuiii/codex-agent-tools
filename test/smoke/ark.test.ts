@@ -43,10 +43,13 @@ const validPiTelemetry: AdapterExecutionTelemetry = {
 };
 
 const qualificationContext = {
+  qualificationPlanId: "four-llm-v1" as const,
   batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
-  ordinal: 7,
-  repositoryCommit: "a".repeat(40),
-  buildIdentitySha256: "b".repeat(64),
+  ordinal: 5,
+  llm: "ark-agent-plan",
+  task: "review" as const,
+  frozenCommit: "a".repeat(40),
+  frozenBuildIdentity: "b".repeat(64),
   authorizationReferenceSha256: "c".repeat(64),
   orchestratorFallbackUsed: false as const,
 };
@@ -120,7 +123,7 @@ describe("Ark real-smoke harness", () => {
     );
 
     expect(evidence).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       qualification: qualificationContext,
       llm: "ark-agent-plan",
       provider: "ark-agent-plan",

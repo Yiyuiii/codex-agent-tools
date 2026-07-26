@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   defaultSmokeEvidenceFileOperations,
+  normalizeSmokeQualificationContext,
   publishImmutableJson,
   SmokeInfrastructureError,
   runSmokeEntrypoint,
@@ -179,6 +180,40 @@ describe("immutable JSON publication", () => {
   );
 });
 
+describe("qualification evidence identity", () => {
+  const validContext = {
+    qualificationPlanId: "four-llm-v1" as const,
+    batchId: "valid-batch",
+    ordinal: 3,
+    llm: "kimi-k3",
+    task: "review" as const,
+    frozenCommit: "a".repeat(40),
+    frozenBuildIdentity: "b".repeat(64),
+    authorizationReferenceSha256: "c".repeat(64),
+    orchestratorFallbackUsed: false as const,
+  };
+
+  it("normalizes and freezes an exact active schedule identity", () => {
+    const normalized = normalizeSmokeQualificationContext(validContext);
+
+    expect(normalized).toEqual(validContext);
+    expect(Object.isFrozen(normalized)).toBe(true);
+  });
+
+  it.each([
+    { ...validContext, qualificationPlanId: "five-llm-v1" },
+    { ...validContext, qualificationPlanId: "unknown-plan" },
+    { ...validContext, ordinal: 1 },
+    { ...validContext, llm: "ark-coding-plan" },
+    { ...validContext, task: "delegate" },
+    { ...validContext, extra: "forbidden" },
+  ])("rejects a context outside the active plan identity", (context) => {
+    expect(() => normalizeSmokeQualificationContext(context)).toThrow(
+      "Invalid smoke qualification context",
+    );
+  });
+});
+
 describe("real smoke evidence entrypoint", () => {
   it("writes sanitized Kimi infrastructure evidence after arguments parse", async () => {
     const root = await tempRoot();
@@ -255,10 +290,13 @@ describe("real smoke evidence entrypoint", () => {
   it("copies a validated qualification context into infrastructure evidence", async () => {
     const root = await tempRoot();
     const qualificationContext = {
+      qualificationPlanId: "four-llm-v1" as const,
       batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
-      ordinal: 1,
-      repositoryCommit: "a".repeat(40),
-      buildIdentitySha256: "b".repeat(64),
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review" as const,
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: false as const,
     };
@@ -299,7 +337,7 @@ describe("real smoke evidence entrypoint", () => {
       await readFile(path.join(evidenceDirectory, fileName), "utf8"),
     ) as Record<string, unknown>;
     expect(evidence).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       qualification: qualificationContext,
       adapterClientInvocationCount: null,
       adapterRetryCount: null,
@@ -319,9 +357,12 @@ describe("real smoke evidence entrypoint", () => {
     let runnerCalls = 0;
     let stderr = "";
     const qualificationContext = {
-      ordinal: 1,
-      repositoryCommit: "a".repeat(40),
-      buildIdentitySha256: "b".repeat(64),
+      qualificationPlanId: "four-llm-v1",
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review",
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: false,
       get batchId() {
@@ -359,10 +400,13 @@ describe("real smoke evidence entrypoint", () => {
     let runnerCalls = 0;
     const qualificationContext = new Proxy(
       {
+        qualificationPlanId: "four-llm-v1",
         batchId: "valid-batch",
-        ordinal: 1,
-        repositoryCommit: "a".repeat(40),
-        buildIdentitySha256: "b".repeat(64),
+        ordinal: 3,
+        llm: "kimi-k3",
+        task: "review",
+        frozenCommit: "a".repeat(40),
+        frozenBuildIdentity: "b".repeat(64),
         authorizationReferenceSha256: "c".repeat(64),
         orchestratorFallbackUsed: false,
       },
@@ -397,10 +441,13 @@ describe("real smoke evidence entrypoint", () => {
   it("rejects symbol, non-enumerable, and extra qualification fields", async () => {
     const root = await tempRoot();
     const base = {
+      qualificationPlanId: "four-llm-v1",
       batchId: "valid-batch",
-      ordinal: 1,
-      repositoryCommit: "a".repeat(40),
-      buildIdentitySha256: "b".repeat(64),
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review",
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: false,
     };
@@ -440,10 +487,13 @@ describe("real smoke evidence entrypoint", () => {
   it("keeps an authoritative frozen context when the runner attempts mutation then fails", async () => {
     const root = await tempRoot();
     const qualificationContext = {
+      qualificationPlanId: "four-llm-v1" as const,
       batchId: "valid-batch",
-      ordinal: 1,
-      repositoryCommit: "a".repeat(40),
-      buildIdentitySha256: "b".repeat(64),
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review" as const,
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: false as const,
     };
@@ -496,10 +546,13 @@ describe("real smoke evidence entrypoint", () => {
     async (_label, directorySegments) => {
     const root = await tempRoot();
     const qualificationContext = {
+      qualificationPlanId: "four-llm-v1" as const,
       batchId: "valid-batch",
-      ordinal: 1,
-      repositoryCommit: "a".repeat(40),
-      buildIdentitySha256: "b".repeat(64),
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review" as const,
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: false as const,
     };
@@ -532,10 +585,13 @@ describe("real smoke evidence entrypoint", () => {
   it("snapshots runner evidence without executing qualification getters", async () => {
     const root = await tempRoot();
     const qualificationContext = {
+      qualificationPlanId: "four-llm-v1" as const,
       batchId: "valid-batch",
-      ordinal: 1,
-      repositoryCommit: "a".repeat(40),
-      buildIdentitySha256: "b".repeat(64),
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review" as const,
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: false as const,
     };
@@ -551,16 +607,17 @@ describe("real smoke evidence entrypoint", () => {
       kind: "kimi",
       args: ["--llm", "kimi-k3", "--task", "review"],
       parseArguments: parseKimiSmokeArguments,
-      runSmoke: async () => ({
-        schemaVersion: 2,
-        timestamp: "2026-07-25T01:02:03.000Z",
-        passed: true,
-        orchestratorFallbackUsed: false,
-        get qualification() {
-          getterCalls += 1;
-          return getterCalls === 1 ? qualificationContext : null;
-        },
-      }),
+      runSmoke: async () =>
+        ({
+          schemaVersion: 3,
+          timestamp: "2026-07-25T01:02:03.000Z",
+          passed: true,
+          orchestratorFallbackUsed: false,
+          get qualification() {
+            getterCalls += 1;
+            return getterCalls === 1 ? qualificationContext : null;
+          },
+        }) as never,
       evidenceDirectory: caseDirectory,
       qualificationContext,
       now: () => new Date("2026-07-25T01:02:03.000Z"),
@@ -578,7 +635,7 @@ describe("real smoke evidence entrypoint", () => {
       await readFile(path.join(caseDirectory, files[0]!), "utf8"),
     ) as Record<string, unknown>;
     expect(evidence).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       qualification: qualificationContext,
       passed: false,
       failureReason: "infrastructure_failure",
@@ -622,10 +679,13 @@ describe("real smoke evidence entrypoint", () => {
   it("fails a batch closed when a runner returns legacy v1 evidence", async () => {
     const root = await tempRoot();
     const qualificationContext = {
+      qualificationPlanId: "four-llm-v1" as const,
       batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
-      ordinal: 1,
-      repositoryCommit: "a".repeat(40),
-      buildIdentitySha256: "b".repeat(64),
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review" as const,
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: false as const,
     };
@@ -668,7 +728,7 @@ describe("real smoke evidence entrypoint", () => {
       ),
     ) as Record<string, unknown>;
     expect(evidence).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       qualification: qualificationContext,
       passed: false,
       failureReason: "infrastructure_failure",
@@ -676,36 +736,145 @@ describe("real smoke evidence entrypoint", () => {
     });
   });
 
+  it("rejects schema v2 runner evidence with non-null qualification", async () => {
+    const root = await tempRoot();
+    const qualificationContext = {
+      qualificationPlanId: "four-llm-v1" as const,
+      batchId: "valid-batch",
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review" as const,
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
+      authorizationReferenceSha256: "c".repeat(64),
+      orchestratorFallbackUsed: false as const,
+    };
+    const evidenceDirectory = path.join(
+      root,
+      "batches",
+      qualificationContext.batchId,
+      "cases",
+    );
+
+    const exitCode = await runSmokeEntrypoint({
+      kind: "kimi",
+      args: ["--llm", "kimi-k3", "--task", "review"],
+      parseArguments: parseKimiSmokeArguments,
+      runSmoke: async () =>
+        ({
+          schemaVersion: 2,
+          timestamp: "2026-07-25T01:02:03.000Z",
+          qualification: qualificationContext,
+          passed: true,
+          orchestratorFallbackUsed: false,
+        }) as never,
+      evidenceDirectory,
+      qualificationContext,
+      now: () => new Date("2026-07-25T01:02:03.000Z"),
+      writeStdout: () => {},
+      writeStderr: () => {},
+    });
+
+    expect(exitCode).toBe(1);
+    const evidence = JSON.parse(
+      await readFile(
+        path.join(
+          evidenceDirectory,
+          "2026-07-25T01-02-03.000Z-kimi-k3-review.json",
+        ),
+        "utf8",
+      ),
+    ) as Record<string, unknown>;
+    expect(evidence).toMatchObject({
+      schemaVersion: 3,
+      qualification: qualificationContext,
+      passed: false,
+      failureReason: "infrastructure_failure",
+    });
+  });
+
+  it("rejects schema v3 runner evidence with null qualification", async () => {
+    const root = await tempRoot();
+    const evidenceDirectory = path.join(root, "evidence");
+
+    const exitCode = await runSmokeEntrypoint({
+      kind: "kimi",
+      args: ["--llm", "kimi-k3", "--task", "review"],
+      parseArguments: parseKimiSmokeArguments,
+      runSmoke: async () =>
+        ({
+          schemaVersion: 3,
+          timestamp: "2026-07-25T01:02:03.000Z",
+          qualification: null,
+          passed: true,
+          orchestratorFallbackUsed: null,
+        }) as never,
+      evidenceDirectory,
+      now: () => new Date("2026-07-25T01:02:03.000Z"),
+      writeStdout: () => {},
+      writeStderr: () => {},
+    });
+
+    expect(exitCode).toBe(1);
+    const evidence = JSON.parse(
+      await readFile(
+        path.join(
+          evidenceDirectory,
+          "2026-07-25T01-02-03.000Z-kimi-k3-review.json",
+        ),
+        "utf8",
+      ),
+    ) as Record<string, unknown>;
+    expect(evidence).toMatchObject({
+      schemaVersion: 2,
+      qualification: null,
+      passed: false,
+      failureReason: "infrastructure_failure",
+    });
+  });
+
   it.each([
     {
+      qualificationPlanId: "four-llm-v1",
       batchId: "../escape",
-      ordinal: 1,
-      repositoryCommit: "a".repeat(40),
-      buildIdentitySha256: "b".repeat(64),
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review",
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: false as const,
     },
     {
+      qualificationPlanId: "four-llm-v1",
       batchId: "valid-batch",
       ordinal: 0,
-      repositoryCommit: "a".repeat(40),
-      buildIdentitySha256: "b".repeat(64),
+      llm: "kimi-k3",
+      task: "review",
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: false as const,
     },
     {
+      qualificationPlanId: "four-llm-v1",
       batchId: "valid-batch",
-      ordinal: 1,
-      repositoryCommit: "not-a-commit",
-      buildIdentitySha256: "b".repeat(64),
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review",
+      frozenCommit: "not-a-commit",
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: false as const,
     },
     {
+      qualificationPlanId: "four-llm-v1",
       batchId: "valid-batch",
-      ordinal: 1,
-      repositoryCommit: "a".repeat(40),
-      buildIdentitySha256: "b".repeat(64),
+      ordinal: 3,
+      llm: "kimi-k3",
+      task: "review",
+      frozenCommit: "a".repeat(40),
+      frozenBuildIdentity: "b".repeat(64),
       authorizationReferenceSha256: "c".repeat(64),
       orchestratorFallbackUsed: true as const,
     },

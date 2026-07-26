@@ -12,10 +12,13 @@ interface ScriptMainOptions {
   args: string[];
   evidenceDirectory: string;
   qualificationContext?: {
+    qualificationPlanId: "four-llm-v1";
     batchId: string;
     ordinal: number;
-    repositoryCommit: string;
-    buildIdentitySha256: string;
+    llm: string;
+    task: SmokeTask;
+    frozenCommit: string;
+    frozenBuildIdentity: string;
     authorizationReferenceSha256: string;
     orchestratorFallbackUsed: false;
   };
@@ -197,10 +200,13 @@ describe("production real-smoke script entrypoints", () => {
       {
         args: ["--llm", "kimi-k3", "--task", "review"],
         qualificationContext: {
+          qualificationPlanId: "four-llm-v1",
           batchId: "valid-batch",
-          ordinal: 1,
-          repositoryCommit: "a".repeat(40),
-          buildIdentitySha256: "b".repeat(64),
+          ordinal: 3,
+          llm: "kimi-k3",
+          task: "review",
+          frozenCommit: "a".repeat(40),
+          frozenBuildIdentity: "b".repeat(64),
           authorizationReferenceSha256: "c".repeat(64),
           orchestratorFallbackUsed: false,
         },
@@ -295,7 +301,9 @@ describe("production real-smoke script entrypoints", () => {
     },
   );
 
-  it.each(scripts)(
+  const qualificationScripts = [scripts[0], scripts[2]] as const;
+
+  it.each(qualificationScripts)(
     "$name programmatically binds qualification context and a batch case directory",
     async ({ script, llm, task, expectedFile }) => {
       const module = await importSmokeScript(script);
@@ -304,10 +312,13 @@ describe("production real-smoke script entrypoints", () => {
 
       const root = await tempRoot();
       const qualificationContext = {
+        qualificationPlanId: "four-llm-v1" as const,
         batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
-        ordinal: 1,
-        repositoryCommit: "a".repeat(40),
-        buildIdentitySha256: "b".repeat(64),
+        ordinal: llm === "kimi-k3" ? 3 : 5,
+        llm,
+        task,
+        frozenCommit: "a".repeat(40),
+        frozenBuildIdentity: "b".repeat(64),
         authorizationReferenceSha256: "c".repeat(64),
         orchestratorFallbackUsed: false as const,
       };
@@ -353,7 +364,7 @@ describe("production real-smoke script entrypoints", () => {
         await readFile(path.join(caseDirectory, expectedFile), "utf8"),
       ) as Record<string, unknown>;
       expect(evidence).toMatchObject({
-        schemaVersion: 2,
+        schemaVersion: 3,
         qualification: qualificationContext,
         adapterClientInvocationCount: null,
         adapterRetryCount: null,

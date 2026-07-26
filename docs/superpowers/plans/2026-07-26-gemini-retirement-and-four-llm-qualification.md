@@ -488,7 +488,7 @@ git commit -m "test: verify historical evidence in place"
 - Modify: `test/smoke/ark.test.ts`
 - Modify: `test/smoke/script-entrypoints.test.ts`
 
-- [ ] **Step 1: Add RED tests for the evidence union**
+- [x] **Step 1: Add RED tests for the evidence union**
 
 Fix the intended discriminants:
 
@@ -517,7 +517,7 @@ expect(() =>
 
 Also reject schema v2 with non-null qualification, schema v3 with null qualification, unknown plan IDs, extra keys, and an ordinal/LLM/task combination outside the active schedule.
 
-- [ ] **Step 2: Observe RED**
+- [x] **Step 2: Observe RED**
 
 ```powershell
 npm exec -- vitest run test/smoke/evidence.test.ts test/smoke/kimi.test.ts test/smoke/pi.test.ts test/smoke/ark.test.ts test/smoke/script-entrypoints.test.ts
@@ -525,7 +525,7 @@ npm exec -- vitest run test/smoke/evidence.test.ts test/smoke/kimi.test.ts test/
 
 Expected: FAIL because qualification evidence is still schema v2 and has no plan identity.
 
-- [ ] **Step 3: Implement the versioned evidence union**
+- [x] **Step 3: Implement the versioned evidence union**
 
 Add:
 
@@ -552,7 +552,7 @@ export type SmokeEvidenceEnvelope<T> =
 
 Update normalization, descriptor freezing, equality, infrastructure evidence, Kimi evidence, and Pi/Ark evidence so the schema follows qualification presence. Current runtime must never emit legacy qualification v2 evidence.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 ```powershell
 npm exec -- vitest run test/smoke/evidence.test.ts test/smoke/kimi.test.ts test/smoke/pi.test.ts test/smoke/ark.test.ts test/smoke/script-entrypoints.test.ts
@@ -561,7 +561,7 @@ npm run typecheck
 
 Expected: targeted tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/smoke/evidence.ts src/smoke/kimi.ts src/smoke/pi.ts test/smoke/evidence.test.ts test/smoke/kimi.test.ts test/smoke/pi.test.ts test/smoke/ark.test.ts test/smoke/script-entrypoints.test.ts

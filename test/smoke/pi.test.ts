@@ -66,10 +66,13 @@ const validPiTelemetry: AdapterExecutionTelemetry = {
 };
 
 const qualificationContext = {
+  qualificationPlanId: "four-llm-v1" as const,
   batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
-  ordinal: 2,
-  repositoryCommit: "a".repeat(40),
-  buildIdentitySha256: "b".repeat(64),
+  ordinal: 5,
+  llm: "ark-agent-plan",
+  task: "review" as const,
+  frozenCommit: "a".repeat(40),
+  frozenBuildIdentity: "b".repeat(64),
   authorizationReferenceSha256: "c".repeat(64),
   orchestratorFallbackUsed: false as const,
 };
@@ -86,10 +89,7 @@ describe("Pi/Gemini real-smoke harness", () => {
     {
       label: "qualified Ark",
       llm: "ark-agent-plan",
-      qualificationContext: {
-        ...qualificationContext,
-        ordinal: 7,
-      },
+      qualificationContext,
       expectedQualification: true,
       expectedRetryMode: "qualification-single-attempt",
     },
@@ -204,7 +204,6 @@ describe("Pi/Gemini real-smoke harness", () => {
         llm: "gemini-3.5-flash",
         task: "review",
         tempRoot: root,
-        qualificationContext,
       },
       {
         service,
@@ -216,7 +215,7 @@ describe("Pi/Gemini real-smoke harness", () => {
     );
     expect(evidence).toMatchObject({
       schemaVersion: 2,
-      qualification: qualificationContext,
+      qualification: null,
       llm: "gemini-3.5-flash",
       task: "review",
       actualModel: "gemini-3.5-flash",
@@ -228,7 +227,7 @@ describe("Pi/Gemini real-smoke harness", () => {
       adapterRetryCount: 0,
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
-      orchestratorFallbackUsed: false,
+      orchestratorFallbackUsed: null,
       executionTelemetrySource: "pi-rpc-observable",
       checks: {
         actualModelMatches: true,

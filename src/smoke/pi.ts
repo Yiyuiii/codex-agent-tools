@@ -30,8 +30,10 @@ import type {
 import { ExternalAgentService, type TaskExecutionContext } from "../tasks/service.js";
 import { VERSION } from "../version.js";
 import {
+  assertSmokeQualificationIdentity,
   inSmokeInfrastructureStage,
   normalizeSmokeQualificationContext,
+  type SmokeEvidenceEnvelope,
   type SmokeQualificationContext,
 } from "./evidence.js";
 import {
@@ -69,9 +71,7 @@ export interface PiSmokeChecks {
   executionTelemetryValid: boolean;
 }
 
-export interface PiSmokeEvidence {
-  schemaVersion: 2;
-  qualification: SmokeQualificationContext | null;
+interface PiSmokeEvidencePayload {
   timestamp: string;
   piVersion: string;
   llm: string;
@@ -113,6 +113,9 @@ export interface PiSmokeEvidence {
   resultFileNormalizedLineCount?: number;
   resultFileContainsExpectedLine?: boolean;
 }
+
+export type PiSmokeEvidence =
+  SmokeEvidenceEnvelope<PiSmokeEvidencePayload>;
 
 export interface PiSmokeService {
   review(
@@ -180,6 +183,7 @@ export async function createPiSmokeRuntime(
   const normalizedQualification = normalizeSmokeQualificationContext(
     qualification,
   );
+  assertSmokeQualificationIdentity(normalizedQualification, llm, task);
   const base = resolveLlm(llm);
   const profile = {
     ...base,
@@ -469,9 +473,7 @@ function commonEvidence(
         : result.status !== "completed"
           ? "adapter_failure"
           : "acceptance_failed";
-  return {
-    schemaVersion: 2,
-    qualification,
+  const payload: PiSmokeEvidencePayload = {
     timestamp: now.toISOString(),
     piVersion,
     llm: options.llm,
@@ -511,6 +513,17 @@ function commonEvidence(
       ),
     },
   };
+  return qualification === null
+    ? {
+        schemaVersion: 2,
+        qualification: null,
+        ...payload,
+      }
+    : {
+        schemaVersion: 3,
+        qualification,
+        ...payload,
+      };
 }
 
 export async function runPiSmoke(
@@ -519,6 +532,11 @@ export async function runPiSmoke(
 ): Promise<PiSmokeEvidence> {
   const qualification = normalizeSmokeQualificationContext(
     options.qualificationContext,
+  );
+  assertSmokeQualificationIdentity(
+    qualification,
+    options.llm,
+    options.task,
   );
   const profile = resolveLlm(options.llm);
   if (

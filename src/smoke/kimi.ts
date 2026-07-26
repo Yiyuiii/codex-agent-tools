@@ -20,8 +20,10 @@ import type {
   ExternalReviewInput,
 } from "../tasks/schemas.js";
 import {
+  assertSmokeQualificationIdentity,
   inSmokeInfrastructureStage,
   normalizeSmokeQualificationContext,
+  type SmokeEvidenceEnvelope,
   type SmokeQualificationContext,
 } from "./evidence.js";
 import {
@@ -53,9 +55,7 @@ export interface KimiSmokeChecks {
   executionTelemetryValid: boolean;
 }
 
-export interface KimiSmokeEvidence {
-  schemaVersion: 2;
-  qualification: SmokeQualificationContext | null;
+interface KimiSmokeEvidencePayload {
   timestamp: string;
   kimiVersion: string;
   llm: string;
@@ -92,6 +92,9 @@ export interface KimiSmokeEvidence {
   resultFileNormalizedLineCount?: number;
   resultFileContainsExpectedLine?: boolean;
 }
+
+export type KimiSmokeEvidence =
+  SmokeEvidenceEnvelope<KimiSmokeEvidencePayload>;
 
 export interface KimiSmokeService {
   review(
@@ -338,9 +341,7 @@ function commonEvidence(
   qualification: SmokeQualificationContext | null,
 ): KimiSmokeEvidence {
   const output = "review" in result ? result.review : result.summary;
-  return {
-    schemaVersion: 2,
-    qualification,
+  const payload: KimiSmokeEvidencePayload = {
     timestamp: now.toISOString(),
     kimiVersion,
     llm: options.llm,
@@ -376,6 +377,17 @@ function commonEvidence(
     executionTelemetrySource: telemetry?.source ?? null,
     checks,
   };
+  return qualification === null
+    ? {
+        schemaVersion: 2,
+        qualification: null,
+        ...payload,
+      }
+    : {
+        schemaVersion: 3,
+        qualification,
+        ...payload,
+      };
 }
 
 export async function runKimiSmoke(
@@ -384,6 +396,11 @@ export async function runKimiSmoke(
 ): Promise<KimiSmokeEvidence> {
   const qualification = normalizeSmokeQualificationContext(
     options.qualificationContext,
+  );
+  assertSmokeQualificationIdentity(
+    qualification,
+    options.llm,
+    options.task,
   );
   const profile = resolveLlm(options.llm);
   if (profile.runtime !== "kimi-acp" || profile.network !== "direct") {
