@@ -721,6 +721,8 @@ git status --short
 
 Expected：commit 后工作树干净。此 commit 是真实批次的 `repository.commit`；批次开始后不再改源码。
 
+完成状态（2026-07-26）：Task 6 在 Task 5 实现提交 `61e4879` 与记忆提交 `e09c12f` 上完成全库 fresh verification：`npm run typecheck` 通过，`npm test` 为 43 文件、494 passed / 1 个平台权限条件 skip，完整 build、release smoke、隔离官方 plugin lifecycle 和 qualification help 均通过，隔离报告字节未漂移，`git diff --check` 与工作树检查全绿；独立系统快照确认 Kimi ACP、Pi RPC、real-smoke 目标进程均为 0。最终规格 reviewer 与质量 reviewer 对当前提交均给出 PASS，未发现可复现 Critical/Important/Minor。全局模型协作记忆已补充 Kimi K3 聚焦审阅、Ark Agent Plan `EPIPE` 无正文，以及只读外审应严格串行并把临时输出置于 workspace 外的适用经验。本阶段没有运行生产 preflight、真实资格批次、外部模型、真实网络、活动配置或 Claude/`codex_cc_tools` 操作；冻结提交之后只能按 Task 7 入口消费当前一次性授权。
+
 ---
 
 ## Task 7：只执行一次新的十门禁批次
