@@ -1,4 +1,4 @@
-# Qualification carrier rehearsal
+# 资格长时承载离线演练
 
 日期：2026-07-27
 关联线程（非秘密标识）：`019f701d-4dc2-7fd3-b8df-6d7466ab65fb`
