@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>四模型八项资格批次重新授权审阅</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          Inter,
+          "Noto Sans SC",
+          "Microsoft YaHei",
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        --ink: #18212f;
+        --muted: #5f6b7a;
+        --line: #d9e0e8;
+        --surface: #f6f8fb;
+        --navy: #17365d;
+        --blue: #245ea8;
+        --amber: #9a5b00;
+        --amber-bg: #fff8e8;
+        --green: #17734b;
+        --green-bg: #eef9f3;
+        --red: #a23838;
+        --red-bg: #fff3f2;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top right, #eaf1fb 0, transparent 34rem),
+          #edf1f6;
+        line-height: 1.68;
+      }
+
+      main {
+        width: min(1060px, calc(100% - 32px));
+        margin: 28px auto 64px;
+        padding: clamp(24px, 5vw, 54px);
+        border: 1px solid #d7dee8;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.97);
+        box-shadow: 0 18px 48px rgba(26, 46, 75, 0.09);
+      }
+
+      h1,
+      h2 {
+        color: var(--navy);
+        line-height: 1.25;
+      }
+
+      h1 {
+        margin: 0 0 20px;
+        font-size: clamp(1.8rem, 4vw, 2.75rem);
+        letter-spacing: -0.025em;
+      }
+
+      h2 {
+        margin: 38px 0 12px;
+        padding-top: 4px;
+        font-size: clamp(1.25rem, 2.4vw, 1.6rem);
+      }
+
+      p {
+        margin: 0.75rem 0;
+      }
+
+      .status,
+      .note,
+      .decision,
+      .exclusions {
+        margin: 18px 0;
+        padding: 18px 20px;
+        border-radius: 12px;
+      }
+
+      .status {
+        border: 2px solid var(--amber);
+        background: var(--amber-bg);
+        font-size: 1.06rem;
+      }
+
+      .status strong {
+        display: block;
+        margin-bottom: 7px;
+        color: #724500;
+        font-size: 1.12rem;
+      }
+
+      .note {
+        border-left: 4px solid var(--green);
+        background: var(--green-bg);
+      }
+
+      .decision {
+        border: 2px solid var(--blue);
+        background: #eff6ff;
+      }
+
+      .decision strong {
+        color: var(--navy);
+      }
+
+      .exclusions {
+        border-left: 4px solid var(--red);
+        background: var(--red-bg);
+      }
+
+      .timeline {
+        margin: 1rem 0;
+        padding-left: 1.4rem;
+      }
+
+      .timeline li,
+      ul li {
+        margin: 0.5rem 0;
+      }
+
+      .matrix-wrap {
+        overflow-x: auto;
+        margin: 1rem 0;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      table {
+        width: 100%;
+        min-width: 700px;
+        border-collapse: collapse;
+        background: #fff;
+      }
+
+      th,
+      td {
+        padding: 11px 13px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--surface);
+        color: var(--navy);
+        font-weight: 650;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 0.15rem 0.52rem;
+        border-radius: 999px;
+        font-size: 0.86rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .tag.passed {
+        color: #11613e;
+        background: #dff4e9;
+      }
+
+      .tag.pending {
+        color: #7a4900;
+        background: #ffefc2;
+      }
+
+      code {
+        padding: 0.12em 0.34em;
+        border-radius: 4px;
+        background: #edf1f5;
+        overflow-wrap: anywhere;
+      }
+
+      a {
+        color: var(--blue);
+        text-underline-offset: 0.17em;
+      }
+
+      .links {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 24px;
+        padding-left: 1.25rem;
+      }
+
+      footer {
+        margin-top: 38px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.93rem;
+      }
+
+      @media (max-width: 680px) {
+        main {
+          width: min(100% - 20px, 1060px);
+          margin: 10px auto 36px;
+          padding: 22px 18px 30px;
+          border-radius: 13px;
+        }
+
+        .status,
+        .note,
+        .decision,
+        .exclusions {
+          padding: 15px 16px;
+        }
+
+        .links {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>四模型八项资格批次重新授权审阅</h1>
+
+      <div class="status">
+        <strong>105 秒承载演练通过，但未运行任何新模型资格。</strong>
+        当前注册表仍为 <code>6 passed / 2 pending</code>，只有 Ark Coding Plan
+        的 review / delegate 两项 pending；安装状态仍为
+        <code>blocked / not ready</code
+        >。本页只准备下一次人工决策所需证据，不改变该状态。
+      </div>
+
+      <h2>结论先行</h2>
+      <p>
+        上一批不是模型资格失败，而是执行宿主的短时前台 shell
+        超时后，协调器后来中断。仓库既有锁、终态与一次性恢复协议按设计 fail
+        closed，最终没有产生可用于晋级的 case evidence。离线演练证明当前 Codex
+        的 <code>exec / wait</code>
+        组合可以跨过旧的短时阈值并由同一承载单元持续等待；它只修复控制层承载，不改变任何资格语义。
+      </p>
+
+      <div class="note">
+        <strong>不可外推：</strong>105 秒结果不证明 4
+        小时存活，也不证明任何模型、provider（后端来源）、路由、凭据或验收已经通过。未来真实批次仍须从第
+        1 项开始，形成同一新批次完整的 8/8 证据。
+      </div>
+
+      <h2>历史中断时间线</h2>
+      <ol class="timeline">
+        <li>
+          冻结候选完成 clean preflight 后，标准入口只启动一次完整
+          <code>four-llm-v1</code> 八项批次。
+        </li>
+        <li>
+          执行宿主前台 shell 约 14 秒后超时返回；协调器仍继续一段时间，写入
+          <code>batch_started</code> 和第 1 项
+          <code>case_running</code> checkpoint。
+        </li>
+        <li>
+          协调器后来退出并留下 stale owner；没有正常终态、cases 文件或 case
+          evidence，因此不能判断第 1 项是否完成了真实后端请求。
+        </li>
+        <li>
+          确认原 owner 已死、三类目标进程为 0/0/0 后，只对同批执行一次
+          interrupted recovery。恢复不调用模型、不重试、不续跑，也不 fallback。
+        </li>
+        <li>
+          最终 manifest 为
+          <code>interrupted / process_interrupted</code>，不可晋级；其 SHA-256
+          为
+          <code
+            >3e200dca507fe886d4e3a4bbf67cc811cca485120e6969e7632f933537ba902b</code
+          >。历史授权已经消费。
+        </li>
+      </ol>
+
+      <h2>控制层演练事实</h2>
+      <div class="matrix-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>观察项</th>
+              <th>实际结果</th>
+              <th>可证明边界</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>首次让出控制</td>
+              <td>约 1 秒 yield</td>
+              <td>调用端无需用短时前台 shell 阻塞等待。</td>
+            </tr>
+            <tr>
+              <td>持续等待</td>
+              <td>同一承载单元连续 4 次 wait 后完成</td>
+              <td>可以复用同一运行中的承载，不需要启动第二进程。</td>
+            </tr>
+            <tr>
+              <td>输出序列</td>
+              <td>1 个 started、7 个有序 heartbeat、1 个 completed</td>
+              <td>开始、心跳和完成顺序连续可观察。</td>
+            </tr>
+            <tr>
+              <td>结束状态</td>
+              <td>exit code 0；wall time 111.4 秒</td>
+              <td>跨过旧的约 14 秒失效点；不能外推到 4 小时。</td>
+            </tr>
+            <tr>
+              <td>演练后现场</td>
+              <td>目标进程 0/0/0；资格锁 absent（不存在）</td>
+              <td>本次离线演练没有遗留目标进程或资格锁。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>资格语义保持不变</h2>
+      <ul>
+        <li>
+          模型与 provider 绑定、四条逻辑 LLM、八项 review / delegate
+          顺序均不变。
+        </li>
+        <li>
+          所有活动路线继续使用 direct 网络；不继承父进程代理，也不因新承载改变
+          endpoint 或路由。
+        </li>
+        <li>
+          凭据继续按路线隔离，只记录命中的凭据来源名称，不记录任何值或秘密。
+        </li>
+        <li>
+          每项继续是 single-attempt；adapter retry、Pi 明示自动重试和协调器
+          fallback 仍必须为零或 false，不允许失败后补跑、续跑或切换 LLM。
+        </li>
+        <li>
+          evidence 仍须绑定批次、ordinal、精确冻结 commit/build
+          identity、模型/provider/direct route、凭据来源与 telemetry；只有同批
+          8/8 全部通过才允许晋级。
+        </li>
+      </ul>
+
+      <h2>验证矩阵</h2>
+      <div class="matrix-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>门禁</th>
+              <th>当前证据</th>
+              <th>冻结前要求</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>承载离线演练</td>
+              <td><span class="tag passed">已通过</span> 105 秒，事实见上表</td>
+              <td>保留报告与 fail-closed 执行手册。</td>
+            </tr>
+            <tr>
+              <td>release assurance 聚焦测试</td>
+              <td><span class="tag passed">已通过</span> 42/42</td>
+              <td>冻结前与全库测试一并复验。</td>
+            </tr>
+            <tr>
+              <td>类型检查、构建与 release smoke</td>
+              <td>
+                <span class="tag passed">已通过</span>
+                本次页面与 package 闭包完成后均以 exit code 0 结束
+              </td>
+              <td>最终冻结后仍须在精确候选上复验。</td>
+            </tr>
+            <tr>
+              <td>全库测试</td>
+              <td>
+                <span class="tag pending">冻结前复验</span>
+                当前只记录了 release assurance 聚焦测试
+              </td>
+              <td>必须全量通过，且不得以聚焦测试代替。</td>
+            </tr>
+            <tr>
+              <td>隔离插件生命周期与资格命令帮助</td>
+              <td><span class="tag pending">冻结前复验</span></td>
+              <td>只在隔离环境和只读入口验收，不触碰活动配置。</td>
+            </tr>
+            <tr>
+              <td>历史 evidence 不可变校验</td>
+              <td>
+                最新 interrupted manifest 已复算并通过 immutable-evidence
+                verifier
+              </td>
+              <td>冻结前复验当前与历史批次，禁止改写既有证据。</td>
+            </tr>
+            <tr>
+              <td>进程、锁、视觉与 clean tree</td>
+              <td><span class="tag pending">冻结前复验</span></td>
+              <td>
+                桌面/移动页面、控制台、0/0/0、锁 absent 和 clean tree 全部闭合。
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>唯一请求决策</h2>
+      <div class="decision">
+        <strong>请维护者在最终 handoff 后二选一：</strong>
+        对 handoff 中给出的精确 frozen SHA，明确授权一个全新的、完整的
+        <code>four-llm-v1</code> 八项批次；或者继续保持
+        <code>blocked / not ready</code>。没有第三种“只补跑 pending
+        项、复用旧证据或沿用旧授权”的路径。
+      </div>
+      <p>
+        本页不包含尚未产生的 frozen
+        SHA，页面本身、阅读页面、引用页面或同意离线准备工作均不构成真实批次授权。只有维护者在最终
+        handoff 上针对精确 SHA 的明确答复才可成为新批次授权。
+      </p>
+
+      <h2>明确排除</h2>
+      <div class="exclusions">
+        本阶段不访问或修改活动 Codex
+        config，不执行活动插件安装/卸载，不移除旧工具，不调用或修改 Claude
+        Code，不 publish、不 push、不 merge，也不把候选 fast-forward
+        到正式工作树。这些动作均不由重新授权页面隐含许可。
+      </div>
+
+      <h2>最小可追溯材料</h2>
+      <ul class="links">
+        <li>
+          <a href="four-llm-qualification-result-review.html"
+            >上一批中断结果审阅</a
+          >
+        </li>
+        <li><a href="checklist.md">发布门禁检查清单</a></li>
+        <li><a href="../operations.md">运维与资格执行边界</a></li>
+        <li><a href="../smoke/ark.md">Ark 资格状态与证据索引</a></li>
+        <li>
+          <a
+            href="../smoke/evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/manifest.json"
+            >最近中断批次 manifest</a
+          >
+        </li>
+        <li>
+          <a href="four-llm-qualification-authorization-review.html"
+            >历史：已消费的授权审阅</a
+          >
+        </li>
+      </ul>
+
+      <footer>
+        本材料用于压缩人工判断范围：机器可验证项继续由冻结前验收闭合，维护者只需判断是否针对最终精确
+        frozen SHA 开启一个全新的完整八项真实批次。
+      </footer>
+    </main>
+  </body>
+</html>

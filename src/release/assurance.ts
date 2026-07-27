@@ -22,6 +22,7 @@ const EXACT_PUBLIC_FILES = new Set([
   "docs/migration-from-codex-cc-tools.md",
   "docs/release/checklist.md",
   "docs/release/four-llm-qualification-authorization-review.html",
+  "docs/release/four-llm-qualification-reauthorization-review.html",
   "docs/release/four-llm-qualification-result-review.html",
   "docs/release/plugin-isolated-state.md",
   "docs/release/real-plugin-install-review.md",

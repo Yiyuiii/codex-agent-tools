@@ -63,6 +63,7 @@ const retainedHistoricalPackageSources = [
 const reviewPackageSources = [
   "docs/release/four-llm-qualification-result-review.html",
   "docs/release/four-llm-qualification-authorization-review.html",
+  "docs/release/four-llm-qualification-reauthorization-review.html",
   "docs/release/real-plugin-install-review.md",
   "docs/release/plugin-isolated-state.md",
   "docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md",
