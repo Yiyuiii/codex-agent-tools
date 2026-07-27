@@ -108,17 +108,26 @@ function resolveLocalPackageLink(
   rawTarget: string,
 ): string | undefined {
   const trimmed = rawTarget.trim();
+  if (trimmed.startsWith("#") || trimmed.startsWith("//")) {
+    return undefined;
+  }
+  const scheme = /^([a-z][a-z0-9+.-]*):/iu.exec(trimmed)?.[1];
+  if (scheme !== undefined) {
+    if (["http", "https", "mailto"].includes(scheme.toLowerCase())) {
+      return undefined;
+    }
+    throw new Error(`Unsafe package link in ${sourceName}`);
+  }
   if (
     trimmed === "" ||
-    trimmed.startsWith("#") ||
-    trimmed.startsWith("//") ||
-    /^[a-z][a-z0-9+.-]*:/iu.test(trimmed)
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("\\")
   ) {
-    return undefined;
+    throw new Error(`Unsafe package link in ${sourceName}`);
   }
   const withoutQueryOrFragment = trimmed.split(/[?#]/u, 1)[0] ?? "";
   if (withoutQueryOrFragment === "") {
-    return undefined;
+    throw new Error(`Unsafe package link in ${sourceName}`);
   }
   const resolved = normalizePackPath(
     path.posix.join(path.posix.dirname(sourceName), withoutQueryOrFragment),
@@ -235,14 +244,14 @@ function assertPluginBundleContent(entry: ReleaseTextEntry): void {
 
 export function assertAllowedPackFiles(fileNames: readonly string[]): void {
   for (const originalName of fileNames) {
-    const name = normalizePackPath(originalName);
+    const name = assertSafePackPath(originalName);
     const containsNodeModules = name.split("/").includes("node_modules");
     const allowed =
       EXACT_PUBLIC_FILES.has(name) ||
       EXACT_PLUGIN_FILES.has(name) ||
       name.startsWith("dist/") ||
       name.startsWith("docs/smoke/");
-    if (!allowed || containsNodeModules || name.startsWith("../")) {
+    if (!allowed || containsNodeModules) {
       throw new Error(`Unexpected file in npm package: ${originalName}`);
     }
   }

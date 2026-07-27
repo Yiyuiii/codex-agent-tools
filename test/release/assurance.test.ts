@@ -110,6 +110,12 @@ describe("release assurance", () => {
         "docs/superpowers/plans/unreviewed-execution-plan.md",
       ]),
     ).toThrow(/Unexpected file/u);
+    expect(() => assertAllowedPackFiles(["../../secret.md"])).toThrow(
+      /Unsafe npm package path/u,
+    );
+    expect(() => assertAllowedPackFiles(["../../***"])).toThrow(
+      /Unsafe npm package path/u,
+    );
   });
 
   it("accepts closed HTML and Markdown package-local links while ignoring external links", () => {
@@ -129,6 +135,7 @@ describe("release assurance", () => {
               '<a href="../smoke/evidence/batches/current/manifest.json#result">manifest</a>',
               '<a href="https://example.com/reference">web</a>',
               '<a href="mailto:maintainer@example.com">mail</a>',
+              '<a href="//cdn.example.com/reference">cdn</a>',
               '<a href="#decision">section</a>',
             ].join("\n"),
           },
@@ -182,6 +189,38 @@ describe("release assurance", () => {
       ),
     ).toThrow(/Local package link escapes the package/u);
   });
+
+  it.each([
+    ["javascript", "javascript:alert(1)"],
+    ["file", "file:///etc/passwd"],
+    ["data", "data:text/plain,secret"],
+    ["ftp", "ftp://example.com/release"],
+    ["absolute", "/outside.md"],
+  ])(
+    "rejects unsafe %s package links without echoing the target or document body",
+    (_kind, target) => {
+      const secretBody = "unsafe-link-body-secret-sentinel";
+      let failure: unknown;
+      try {
+        assertPackageLocalLinks(
+          [
+            {
+              name: "docs/release/result.html",
+              content: `<a href="${target}">${secretBody}</a>`,
+            },
+          ],
+          ["docs/release/result.html"],
+        );
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(Error);
+      expect((failure as Error).message).toMatch(/Unsafe package link/u);
+      expect((failure as Error).message).not.toContain(target);
+      expect((failure as Error).message).not.toContain(secretBody);
+    },
+  );
 
   it("scans retained historical documents and evidence with the same secret and path policy", () => {
     const options = {

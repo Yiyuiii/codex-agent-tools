@@ -398,6 +398,7 @@ async function checkPackage() {
     throw new Error("npm pack did not return a file list");
   }
   const fileNames = packResult.files.map((entry) => entry.path);
+  assertAllowedPackFiles(fileNames);
 
   for (const required of [
     "package.json",
