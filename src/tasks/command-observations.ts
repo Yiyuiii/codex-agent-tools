@@ -6,9 +6,14 @@ export type CommandObservationSource =
   | "late_update"
   | "unextractable";
 
+export type CommandObservationOrigin = "raw_input" | "title" | null;
+
+export type CommandObservationPolicy = "compatibility" | "raw_only";
+
 export interface CommandObservation {
   readonly source: CommandObservationSource;
   readonly command: string | null;
+  readonly origin: CommandObservationOrigin;
 }
 
 type FieldSource = "initial" | "update";
@@ -162,6 +167,7 @@ function observationFor(
           ? "late_update"
           : "raw_input",
       command: rawCommand,
+      origin: "raw_input",
     };
   }
 
@@ -175,10 +181,11 @@ function observationFor(
           ? "late_update"
           : "title_fallback",
       command: title,
+      origin: "title",
     };
   }
 
-  return { source: "unextractable", command: null };
+  return { source: "unextractable", command: null, origin: null };
 }
 
 export function extractCommandObservations(
@@ -230,10 +237,16 @@ export function extractCommandObservations(
 
 export function commandsFromObservations(
   observations: readonly CommandObservation[],
+  policy: CommandObservationPolicy = "compatibility",
 ): string[] {
   const commands: string[] = [];
   for (const observation of observations) {
-    if (observation.command !== null) commands.push(observation.command);
+    if (
+      observation.command !== null &&
+      (policy === "compatibility" || observation.origin === "raw_input")
+    ) {
+      commands.push(observation.command);
+    }
   }
   return commands;
 }

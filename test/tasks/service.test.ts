@@ -421,11 +421,143 @@ describe("ExternalAgentService", () => {
     );
 
     expect(observed).toEqual([
-      [{ source: "late_update", command: "git status --short" }],
+      [
+        {
+          source: "late_update",
+          command: "git status --short",
+          origin: "raw_input",
+        },
+      ],
     ]);
     expect(result.commandsRun).toEqual(["git status --short"]);
     expect(result).not.toHaveProperty("commandObservations");
     expect(JSON.stringify(result)).not.toContain("commandObservations");
+  });
+
+  it("keeps title fallback commands for ordinary delegate callers", async () => {
+    const service = createService(async () =>
+      completed({
+        events: [
+          {
+            type: "tool_call",
+            toolCallId: "ordinary-title",
+            kind: "execute",
+            title: "git status --short",
+          },
+        ],
+      }),
+    );
+
+    const result = await service.delegate({
+      llm: "kimi-k3",
+      prompt: "Run",
+      cwd,
+    });
+
+    expect(result.commandsRun).toEqual(["git status --short"]);
+  });
+
+  it.each([
+    {
+      name: "an initial exact title",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "initial-title",
+          kind: "execute",
+          title: "git status --short",
+        },
+      ],
+    },
+    {
+      name: "a late exact title",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "late-title",
+          kind: "execute",
+          title: "Run",
+        },
+        {
+          type: "tool_call_update",
+          toolCallId: "late-title",
+          title: "git status --short",
+        },
+      ],
+    },
+    {
+      name: "a late execute kind with an initial exact title",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "late-kind",
+          kind: null,
+          title: "git status --short",
+        },
+        {
+          type: "tool_call_update",
+          toolCallId: "late-kind",
+          kind: "execute",
+        },
+      ],
+    },
+  ])("excludes $name for a raw-only internal caller", async ({ events }) => {
+    const service = createService(async () => completed({ events }));
+
+    const result = await service.delegate(
+      {
+        llm: "kimi-k3",
+        prompt: "Run",
+        cwd,
+      },
+      { commandObservationPolicy: "raw_only" },
+    );
+
+    expect(result.commandsRun).toEqual([]);
+  });
+
+  it.each([
+    {
+      name: "an initial raw command",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "initial-raw",
+          kind: "execute",
+          title: "Run",
+          rawInput: { command: "git status --short" },
+        },
+      ],
+    },
+    {
+      name: "a late raw command",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "late-raw",
+          kind: "execute",
+          title: "Run",
+        },
+        {
+          type: "tool_call_update",
+          toolCallId: "late-raw",
+          rawInput: { command: "git status --short" },
+        },
+      ],
+    },
+  ])("keeps $name for a raw-only internal caller", async ({ events }) => {
+    const service = createService(async () => completed({ events }));
+
+    const result = await service.delegate(
+      {
+        llm: "kimi-k3",
+        prompt: "Run",
+        cwd,
+      },
+      { commandObservationPolicy: "raw_only" },
+    );
+
+    expect(result.commandsRun).toEqual(["git status --short"]);
   });
 
   it("reports one empty command observation batch when delegate emits no execute events", async () => {

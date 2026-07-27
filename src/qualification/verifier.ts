@@ -459,7 +459,7 @@ function validateCommandObservationDiagnostics(
   }
 
   let hasExact = false;
-  let extractableCount = 0;
+  let commandObservationCount = 0;
   for (const key of itemKeys) {
     const observation = plainRecord(descriptors[key]!.value);
     const observationKeys = Object.keys(observation).sort();
@@ -471,18 +471,24 @@ function validateCommandObservationDiagnostics(
       !COMMAND_OBSERVATION_SOURCES.has(observation.source) ||
       typeof observation.match !== "string" ||
       !COMMAND_OBSERVATION_MATCHES.has(observation.match) ||
-      (observation.source === "unextractable" &&
+      ((observation.source === "title_fallback" ||
+        observation.source === "unextractable") &&
         observation.match !== "other")
     ) {
       throw new QualificationVerificationError();
     }
-    if (observation.source !== "unextractable") extractableCount += 1;
+    if (
+      observation.source === "raw_input" ||
+      observation.source === "late_update"
+    ) {
+      commandObservationCount += 1;
+    }
     if (observation.match === "exact") hasExact = true;
   }
 
   const checks = plainRecord(evidence.checks);
   if (
-    extractableCount !== commandCount ||
+    commandObservationCount !== commandCount ||
     typeof checks.requiredCommandObserved !== "boolean" ||
     hasExact !== checks.requiredCommandObserved
   ) {

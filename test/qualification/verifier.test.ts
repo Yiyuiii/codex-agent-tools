@@ -803,6 +803,63 @@ describe("qualification verifier", () => {
       });
     });
 
+    it("accepts title-only diagnostics with zero commands on failed current Kimi evidence", async () => {
+      const repositoryRoot = await tempRepository();
+      const manifestPath = await createCurrentBlockedKimiDelegateBatch(
+        repositoryRoot,
+        (evidence) => {
+          evidence.commandCount = 0;
+          evidence.commandObservations = [
+            { source: "title_fallback", match: "other" },
+          ];
+          const checks = evidence.checks as Record<string, unknown>;
+          checks.requiredCommandObserved = false;
+        },
+      );
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        status: "blocked",
+        promotionEligible: false,
+      });
+    });
+
+    it("counts only raw and late-update observations as commands", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandCount = 2;
+          evidence.commandObservations = [
+            { source: "raw_input", match: "exact" },
+            { source: "late_update", match: "embedded" },
+            { source: "title_fallback", match: "other" },
+            { source: "unextractable", match: "other" },
+          ];
+        },
+      });
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        status: "passed",
+        promotionEligible: true,
+      });
+    });
+
     it("keeps historical evidence without the field compatible", async () => {
       const repositoryRoot = await tempRepository();
       const manifestPath = await copyHistoricalBatch(repositoryRoot);
@@ -994,6 +1051,40 @@ describe("qualification verifier", () => {
           ];
         },
       });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects title fallback paired with exact on passed evidence", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandCount = 0;
+          evidence.commandObservations = [
+            { source: "title_fallback", match: "exact" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects title fallback paired with exact on failed current evidence", async () => {
+      const repositoryRoot = await tempRepository();
+      const manifestPath = await createCurrentBlockedKimiDelegateBatch(
+        repositoryRoot,
+        (evidence) => {
+          evidence.commandCount = 0;
+          evidence.commandObservations = [
+            { source: "title_fallback", match: "exact" },
+          ];
+          const checks = evidence.checks as Record<string, unknown>;
+          checks.requiredCommandObserved = true;
+        },
+      );
 
       await expectVerificationFailure(repositoryRoot, manifestPath);
     });

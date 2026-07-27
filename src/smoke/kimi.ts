@@ -447,6 +447,7 @@ export async function runKimiSmoke(
       executionTelemetry = telemetry;
     };
     if (options.task === "delegate") {
+      context.commandObservationPolicy = "raw_only";
       context.onCommandObservations = (observations) => {
         commandObservationReportCount += 1;
         commandObservations = observations;

@@ -24,7 +24,9 @@ const observationCases: readonly ObservationCase[] = [
         rawInput: { command: "npm test" },
       },
     ],
-    expected: [{ source: "raw_input", command: "npm test" }],
+    expected: [
+      { source: "raw_input", command: "npm test", origin: "raw_input" },
+    ],
   },
   {
     name: "falls back to an initial title",
@@ -36,7 +38,9 @@ const observationCases: readonly ObservationCase[] = [
         title: "Run tests",
       },
     ],
-    expected: [{ source: "title_fallback", command: "Run tests" }],
+    expected: [
+      { source: "title_fallback", command: "Run tests", origin: "title" },
+    ],
   },
   {
     name: "reports an unextractable execute call",
@@ -48,7 +52,7 @@ const observationCases: readonly ObservationCase[] = [
         title: "",
       },
     ],
-    expected: [{ source: "unextractable", command: null }],
+    expected: [{ source: "unextractable", command: null, origin: null }],
   },
   {
     name: "uses a raw command from a late update",
@@ -65,7 +69,13 @@ const observationCases: readonly ObservationCase[] = [
         rawInput: { command: "git status --short" },
       },
     ],
-    expected: [{ source: "late_update", command: "git status --short" }],
+    expected: [
+      {
+        source: "late_update",
+        command: "git status --short",
+        origin: "raw_input",
+      },
+    ],
   },
   {
     name: "folds an update that arrives before its initial call",
@@ -82,7 +92,13 @@ const observationCases: readonly ObservationCase[] = [
         title: "Run",
       },
     ],
-    expected: [{ source: "late_update", command: "git status --short" }],
+    expected: [
+      {
+        source: "late_update",
+        command: "git status --short",
+        origin: "raw_input",
+      },
+    ],
   },
   {
     name: "ignores an orphan update",
@@ -129,7 +145,9 @@ const observationCases: readonly ObservationCase[] = [
         rawInput: { command: "final" },
       },
     ],
-    expected: [{ source: "late_update", command: "final" }],
+    expected: [
+      { source: "late_update", command: "final", origin: "raw_input" },
+    ],
   },
   {
     name: "orders by the first initial call rather than pending updates",
@@ -159,8 +177,16 @@ const observationCases: readonly ObservationCase[] = [
       },
     ],
     expected: [
-      { source: "raw_input", command: "first command" },
-      { source: "late_update", command: "second command" },
+      {
+        source: "raw_input",
+        command: "first command",
+        origin: "raw_input",
+      },
+      {
+        source: "late_update",
+        command: "second command",
+        origin: "raw_input",
+      },
     ],
   },
   {
@@ -178,7 +204,9 @@ const observationCases: readonly ObservationCase[] = [
         kind: "execute",
       },
     ],
-    expected: [{ source: "late_update", command: "Run tests" }],
+    expected: [
+      { source: "late_update", command: "Run tests", origin: "title" },
+    ],
   },
   {
     name: "treats undefined update fields as not provided",
@@ -198,7 +226,9 @@ const observationCases: readonly ObservationCase[] = [
         rawInput: undefined,
       },
     ],
-    expected: [{ source: "raw_input", command: "npm test" }],
+    expected: [
+      { source: "raw_input", command: "npm test", origin: "raw_input" },
+    ],
   },
   {
     name: "treats null update fields as explicit clears",
@@ -216,7 +246,9 @@ const observationCases: readonly ObservationCase[] = [
         rawInput: null,
       },
     ],
-    expected: [{ source: "late_update", command: "Run tests" }],
+    expected: [
+      { source: "late_update", command: "Run tests", origin: "title" },
+    ],
   },
   {
     name: "uses the final title supplied by an update",
@@ -233,7 +265,9 @@ const observationCases: readonly ObservationCase[] = [
         title: "Final title",
       },
     ],
-    expected: [{ source: "late_update", command: "Final title" }],
+    expected: [
+      { source: "late_update", command: "Final title", origin: "title" },
+    ],
   },
   {
     name: "ignores unrelated late fields when the initial command remains final",
@@ -251,7 +285,9 @@ const observationCases: readonly ObservationCase[] = [
         title: "Updated title",
       },
     ],
-    expected: [{ source: "raw_input", command: "npm test" }],
+    expected: [
+      { source: "raw_input", command: "npm test", origin: "raw_input" },
+    ],
   },
 ];
 
@@ -309,7 +345,13 @@ describe("extractCommandObservations", () => {
           rawInput: hostileRawInput,
         },
       ]),
-    ).toEqual([{ source: "title_fallback", command: "Safe fallback" }]);
+    ).toEqual([
+      {
+        source: "title_fallback",
+        command: "Safe fallback",
+        origin: "title",
+      },
+    ]);
     expect(eventTrapCount).toBe(0);
     expect(rawInputTrapCount).toBe(0);
   });
@@ -349,7 +391,9 @@ describe("extractCommandObservations", () => {
           rawInput: hostileRawInput,
         },
       ]),
-    ).toEqual([{ source: "late_update", command: "Safe fallback" }]);
+    ).toEqual([
+      { source: "late_update", command: "Safe fallback", origin: "title" },
+    ]);
     expect(trapCount).toBe(0);
   });
 
@@ -382,7 +426,13 @@ describe("extractCommandObservations", () => {
           rawInput: rawInputWithAccessor,
         },
       ]),
-    ).toEqual([{ source: "title_fallback", command: "Accessor fallback" }]);
+    ).toEqual([
+      {
+        source: "title_fallback",
+        command: "Accessor fallback",
+        origin: "title",
+      },
+    ]);
     expect(eventGetterCount).toBe(0);
     expect(commandGetterCount).toBe(0);
   });
@@ -422,7 +472,13 @@ describe("extractCommandObservations", () => {
           rawInput,
         },
       ]),
-    ).toEqual([{ source: "title_fallback", command: "Safe fallback" }]);
+    ).toEqual([
+      {
+        source: "title_fallback",
+        command: "Safe fallback",
+        origin: "title",
+      },
+    ]);
   });
 
   it("returns unextractable when unsafe raw input has no non-empty title", () => {
@@ -442,7 +498,9 @@ describe("extractCommandObservations", () => {
           rawInput,
         },
       ]),
-    ).toEqual([{ source: "unextractable", command: null }]);
+    ).toEqual([
+      { source: "unextractable", command: null, origin: null },
+    ]);
   });
 });
 
@@ -450,11 +508,100 @@ describe("commandsFromObservations", () => {
   it("keeps non-null commands in order without trimming or deduplicating", () => {
     expect(
       commandsFromObservations([
-        { source: "raw_input", command: "npm test" },
-        { source: "unextractable", command: null },
-        { source: "late_update", command: " npm test " },
-        { source: "title_fallback", command: "npm test" },
+        { source: "raw_input", command: "npm test", origin: "raw_input" },
+        { source: "unextractable", command: null, origin: null },
+        {
+          source: "late_update",
+          command: " npm test ",
+          origin: "raw_input",
+        },
+        { source: "title_fallback", command: "npm test", origin: "title" },
       ]),
     ).toEqual(["npm test", " npm test ", "npm test"]);
+  });
+
+  it.each([
+    {
+      name: "an initial exact title",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "initial-title",
+          kind: "execute",
+          title: "git status --short",
+        },
+      ],
+    },
+    {
+      name: "a late exact title",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "late-title",
+          kind: "execute",
+          title: "Run",
+        },
+        {
+          type: "tool_call_update",
+          toolCallId: "late-title",
+          title: "git status --short",
+        },
+      ],
+    },
+    {
+      name: "a late execute kind with an initial exact title",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "late-kind",
+          kind: null,
+          title: "git status --short",
+        },
+        {
+          type: "tool_call_update",
+          toolCallId: "late-kind",
+          kind: "execute",
+        },
+      ],
+    },
+  ])("excludes $name under the raw-only policy", ({ events }) => {
+    expect(
+      commandsFromObservations(extractCommandObservations(events), "raw_only"),
+    ).toEqual([]);
+  });
+
+  it.each([
+    {
+      name: "an initial raw command",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "initial-raw",
+          kind: "execute",
+          title: "Run",
+          rawInput: { command: "git status --short" },
+        },
+      ],
+    },
+    {
+      name: "a late raw command",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "late-raw",
+          kind: "execute",
+          title: "Run",
+        },
+        {
+          type: "tool_call_update",
+          toolCallId: "late-raw",
+          rawInput: { command: "git status --short" },
+        },
+      ],
+    },
+  ])("keeps $name under the raw-only policy", ({ events }) => {
+    expect(
+      commandsFromObservations(extractCommandObservations(events), "raw_only"),
+    ).toEqual(["git status --short"]);
   });
 });

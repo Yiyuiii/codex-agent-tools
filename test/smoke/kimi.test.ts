@@ -5,13 +5,18 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { AdapterExecutionTelemetry } from "../../src/adapters/adapter.js";
+import type {
+  AdapterExecutionTelemetry,
+  ExternalAgentAdapter,
+} from "../../src/adapters/adapter.js";
+import { createLlmRegistry, resolveLlm } from "../../src/llms/registry.js";
 import {
   parseKimiSmokeArguments,
   runKimiSmoke,
   type KimiSmokeService,
 } from "../../src/smoke/kimi.js";
 import { SmokeInfrastructureError } from "../../src/smoke/evidence.js";
+import { ExternalAgentService } from "../../src/tasks/service.js";
 
 const roots: string[] = [];
 
@@ -97,7 +102,11 @@ describe("Kimi real-smoke harness", () => {
       review: async (_input, context) => {
         context?.onExecutionTelemetry?.(validKimiTelemetry);
         context?.onCommandObservations?.([
-          { source: "raw_input", command: secretCommand },
+          {
+            source: "raw_input",
+            command: secretCommand,
+            origin: "raw_input",
+          },
         ]);
         return {
           ok: true,
@@ -163,7 +172,11 @@ describe("Kimi real-smoke harness", () => {
       delegate: async (input, context) => {
         context?.onExecutionTelemetry?.(validKimiTelemetry);
         context?.onCommandObservations?.([
-          { source: "late_update", command: observedCommand },
+          {
+            source: "late_update",
+            command: observedCommand,
+            origin: "raw_input",
+          },
         ]);
         await writeFile(path.join(input.cwd, "result.txt"), "KIMI_SMOKE_OK\n", "utf8");
         return {
@@ -335,10 +348,18 @@ describe("Kimi real-smoke harness", () => {
       delegate: async (input, context) => {
         context?.onExecutionTelemetry?.(validKimiTelemetry);
         context?.onCommandObservations?.([
-          { source: "late_update", command: "git status --short" },
+          {
+            source: "late_update",
+            command: "git status --short",
+            origin: "raw_input",
+          },
         ]);
         context?.onCommandObservations?.([
-          { source: "raw_input", command: secretCommand },
+          {
+            source: "raw_input",
+            command: secretCommand,
+            origin: "raw_input",
+          },
         ]);
         await writeFile(
           path.join(input.cwd, "result.txt"),
@@ -382,15 +403,22 @@ describe("Kimi real-smoke harness", () => {
   it("uses separate file and exact-command tool calls in the delegate prompt", async () => {
     const root = await tempRoot();
     let capturedPrompt = "";
+    let capturedCommandObservationPolicy: unknown;
     const service: KimiSmokeService = {
       review: async () => {
         throw new Error("not used");
       },
       delegate: async (input, context) => {
         capturedPrompt = input.prompt;
+        capturedCommandObservationPolicy =
+          context?.commandObservationPolicy;
         context?.onExecutionTelemetry?.(validKimiTelemetry);
         context?.onCommandObservations?.([
-          { source: "late_update", command: "git status --short" },
+          {
+            source: "late_update",
+            command: "git status --short",
+            origin: "raw_input",
+          },
         ]);
         await writeFile(
           path.join(input.cwd, "result.txt"),
@@ -437,6 +465,7 @@ describe("Kimi real-smoke harness", () => {
     );
     expect(capturedPrompt).toContain("Do not modify any other file.");
     expect(capturedPrompt).toContain("Report");
+    expect(capturedCommandObservationPolicy).toBe("raw_only");
   });
 
   it("requires the exact git status command and does not persist command text", async () => {
@@ -449,7 +478,7 @@ describe("Kimi real-smoke harness", () => {
       delegate: async (input, context) => {
         context?.onExecutionTelemetry?.(validKimiTelemetry);
         context?.onCommandObservations?.([
-          { source: "late_update", command },
+          { source: "late_update", command, origin: "raw_input" },
         ]);
         await writeFile(
           path.join(input.cwd, "result.txt"),
@@ -489,6 +518,160 @@ describe("Kimi real-smoke harness", () => {
     expect(evidence).not.toHaveProperty("commandsRun");
     expect(JSON.stringify(evidence)).not.toContain(command);
   });
+
+  it.each([
+    {
+      name: "an initial exact title",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "initial-title",
+          kind: "execute",
+          title: "git status --short",
+        },
+      ],
+      expectedPassed: false,
+      expectedObservation: {
+        source: "title_fallback",
+        match: "other",
+      },
+    },
+    {
+      name: "a late exact title",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "late-title",
+          kind: "execute",
+          title: "Run",
+        },
+        {
+          type: "tool_call_update",
+          toolCallId: "late-title",
+          title: "git status --short",
+        },
+      ],
+      expectedPassed: false,
+      expectedObservation: {
+        source: "title_fallback",
+        match: "other",
+      },
+    },
+    {
+      name: "a late execute kind with an initial exact title",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "late-kind",
+          kind: null,
+          title: "git status --short",
+        },
+        {
+          type: "tool_call_update",
+          toolCallId: "late-kind",
+          kind: "execute",
+        },
+      ],
+      expectedPassed: false,
+      expectedObservation: {
+        source: "title_fallback",
+        match: "other",
+      },
+    },
+    {
+      name: "an initial exact raw command",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "initial-raw",
+          kind: "execute",
+          title: "Run",
+          rawInput: { command: "git status --short" },
+        },
+      ],
+      expectedPassed: true,
+      expectedObservation: {
+        source: "raw_input",
+        match: "exact",
+      },
+    },
+    {
+      name: "a late exact raw command",
+      events: [
+        {
+          type: "tool_call",
+          toolCallId: "late-raw",
+          kind: "execute",
+          title: "Run",
+        },
+        {
+          type: "tool_call_update",
+          toolCallId: "late-raw",
+          rawInput: { command: "git status --short" },
+        },
+      ],
+      expectedPassed: true,
+      expectedObservation: {
+        source: "late_update",
+        match: "exact",
+      },
+    },
+  ])(
+    "uses only raw command input for qualification when ACP reports $name",
+    async ({ events, expectedPassed, expectedObservation }) => {
+      const root = await tempRoot();
+      const base = resolveLlm("kimi-k3");
+      const profile = {
+        ...base,
+        capabilities: { ...base.capabilities, delegate: true },
+        qualityGates: {
+          ...base.qualityGates,
+          delegate: { status: "passed" as const, evidence: "test" },
+        },
+      };
+      const adapter: ExternalAgentAdapter = {
+        runtime: "kimi-acp",
+        run: async (request) => {
+          await writeFile(
+            path.join(request.cwd, "result.txt"),
+            "KIMI_SMOKE_OK\n",
+            "utf8",
+          );
+          return {
+            status: "completed",
+            text: "Created and checked result.txt.",
+            actualModel: "kimi-code/k3",
+            elapsedMs: 10,
+            events,
+            diagnostics: [],
+            executionTelemetry: validKimiTelemetry,
+          };
+        },
+      };
+      const service = new ExternalAgentService({
+        registry: createLlmRegistry([profile]),
+        adapters: new Map([["kimi-acp", adapter]]),
+      });
+
+      const evidence = await runKimiSmoke(
+        { llm: "kimi-k3", task: "delegate", tempRoot: root },
+        {
+          service,
+          readKimiVersion: async () => "0.27.0",
+          listKimiProcessIds: async () => [100],
+        },
+      );
+
+      expect(evidence.passed).toBe(expectedPassed);
+      expect(evidence.checks.requiredCommandObserved).toBe(expectedPassed);
+      expect(evidence.commandObservations).toEqual([expectedObservation]);
+      expect(
+        Object.keys(evidence.commandObservations?.[0] ?? {}).sort(),
+      ).toEqual(["match", "source"]);
+      expect(JSON.stringify(evidence)).not.toContain("git status --short");
+      expect(JSON.stringify(evidence)).not.toContain("origin");
+    },
+  );
 
   it("fails the gate when a new Kimi process remains after the task", async () => {
     const root = await tempRoot();

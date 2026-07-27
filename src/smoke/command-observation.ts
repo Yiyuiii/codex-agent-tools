@@ -28,8 +28,15 @@ export function sanitizeCommandObservations(
   observations: readonly CommandObservation[],
   target: string,
 ): SanitizedCommandObservation[] {
-  return observations.map((observation) => ({
-    source: observation.source,
-    match: classifyCommand(observation.command, target),
-  }));
+  return observations.map((observation) =>
+    observation.origin === "title"
+      ? {
+          source: "title_fallback",
+          match: "other",
+        }
+      : {
+          source: observation.source,
+          match: classifyCommand(observation.command, target),
+        },
+  );
 }

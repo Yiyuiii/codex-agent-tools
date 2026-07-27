@@ -39,13 +39,22 @@ describe("sanitizeCommandObservations", () => {
     expect(
       sanitizeCommandObservations(
         [
-          { source: "raw_input", command: "git status --short" },
-          { source: "raw_input", command: " git status --short\n" },
+          {
+            source: "raw_input",
+            command: "git status --short",
+            origin: "raw_input",
+          },
+          {
+            source: "raw_input",
+            command: " git status --short\n",
+            origin: "raw_input",
+          },
           {
             source: "late_update",
             command: "echo ok && git status --short",
+            origin: "raw_input",
           },
-          { source: "unextractable", command: null },
+          { source: "unextractable", command: null, origin: null },
         ],
         "git status --short",
       ),
@@ -55,5 +64,42 @@ describe("sanitizeCommandObservations", () => {
       { source: "late_update", match: "embedded" },
       { source: "unextractable", match: "other" },
     ]);
+  });
+
+  it("downgrades every title-derived observation without leaking its origin or text", () => {
+    const sanitized = sanitizeCommandObservations(
+      [
+        {
+          source: "title_fallback",
+          command: "git status --short",
+          origin: "title",
+        },
+        {
+          source: "late_update",
+          command: "git status --short",
+          origin: "title",
+        },
+        {
+          source: "late_update",
+          command: "git status --short",
+          origin: "raw_input",
+        },
+      ],
+      "git status --short",
+    );
+
+    expect(sanitized).toEqual([
+      { source: "title_fallback", match: "other" },
+      { source: "title_fallback", match: "other" },
+      { source: "late_update", match: "exact" },
+    ]);
+    expect(
+      sanitized.every(
+        (observation) =>
+          Object.keys(observation).sort().join(",") === "match,source",
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(sanitized)).not.toContain("git status --short");
+    expect(JSON.stringify(sanitized)).not.toContain("origin");
   });
 });

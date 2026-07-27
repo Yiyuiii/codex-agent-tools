@@ -20,7 +20,10 @@ import {
   externalDelegateInputSchema,
   externalReviewInputSchema,
 } from "./schemas.js";
-import type { CommandObservation } from "./command-observations.js";
+import type {
+  CommandObservation,
+  CommandObservationPolicy,
+} from "./command-observations.js";
 import {
   commandsFromObservations,
   extractCommandObservations,
@@ -47,6 +50,7 @@ export interface ExternalAgentServiceDependencies {
 export interface TaskExecutionContext {
   signal?: AbortSignal;
   onProgress?: (message: string) => void;
+  commandObservationPolicy?: CommandObservationPolicy;
   onExecutionTelemetry?: (
     telemetry: AdapterExecutionTelemetry | null,
   ) => void;
@@ -282,7 +286,10 @@ export class ExternalAgentService {
       const commandObservations = extractCommandObservations(
         adapterResult.events,
       );
-      const commandsRun = commandsFromObservations(commandObservations);
+      const commandsRun = commandsFromObservations(
+        commandObservations,
+        context.commandObservationPolicy,
+      );
       const commandObservationView: readonly CommandObservation[] =
         Object.freeze(
           commandObservations.map((observation) =>
