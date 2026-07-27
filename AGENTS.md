@@ -72,6 +72,7 @@
 - 2026-07-27：阻断收敛审计同时发现一个独立的发布包文档链接缺口：`docs/release/qualification-carrier-rehearsal.md` 和 `docs/release/four-llm-qualification-execution-runbook.md` 被已打包文档引用，但当前 package 文件面未包含它们；现有 `assertPackageLocalLinks` 只检查固定的 `reviewPackageSources`，不能覆盖所有已打包 Markdown/HTML 的本地链接。最新结果页已避免新增指向未打包手册的链接，但既有缺口仍需后续设计、TDD 和发布面复核，不能在证据收敛提交中顺手修改。
 - 2026-07-27：Kimi delegate 阻断的直接可证事实只到“唯一提取出的命令观察字符串不等于精确 `git status --short`”。当前适配器会在 `rawInput.command` 缺失时回退到 title，并且 `tool_call_update` 只保留 status；这是确定的观测歧义，但现有 evidence 无法证明其为本次原因。AI 推荐但尚未获得用户设计批准的候选路线是：保持精确 validator 不变，强化为两个独立工具调用的资格提示词，同时增加不含命令正文的来源/匹配分类审计；只有 fake ACP 夹具证明 raw input 晚到时，才按 tool-call ID 合并 update 字段。不建议采用 substring、任意命令事件或复合命令通过。批准前不得实现行为或 evidence schema 变更。
 - 2026-07-27：本次阻断结果收敛已完成 fresh 离线验收：44 个测试文件、584 passed / 1 个平台条件 skipped / 0 failed；类型检查、构建、release smoke、临时 `CODEX_HOME` 隔离 check-report、两个资格帮助入口、四个 retained batch immutable verifier、当前阻断证据 5/5、历史证据 14/14、目标进程 0/0/0 与资格锁 absent 均通过。最新结果页在 1440×1000 与 390×844 下无水平溢出，历史重新授权页在 390×844 下无水平溢出，浏览器控制台 0 errors / 0 warnings；独立规格与质量复审均 PASS。当前没有活动配置/插件安装、旧工具移除、Claude Code 调用、发布、推送、合并或正式工作树 fast-forward；后续停在 Kimi 观测设计与发布包闭包方案的人类批准点。
+- 2026-07-27：用户已批准按推荐方案 A 继续推进 Kimi 资格命令观测与发布包闭包：强化为两个独立工具调用的资格提示词，保持精确 validator，按 ACP tool-call ID 保留并归并协议允许晚到的 `kind/title/rawInput`，只持久化 `raw_input / title_fallback / late_update / unextractable` 与 `exact / trim_only / embedded / other` 脱敏分类；同时把资格承载演练和执行手册纳入 npm package，并把本地链接检查扩展到全部实际打包 Markdown/HTML。批准覆盖设计、TDD、独立审阅、离线/隔离验证和重新冻结，不授权新的真实批次、活动安装/配置、旧工具移除、Claude Code、发布、推送或合并。正式设计见[Kimi 资格命令观测与发布包闭包设计](docs/superpowers/specs/2026-07-27-kimi-command-observation-and-package-closure-design.md)。
 
 ## 架构与计划索引
 
@@ -81,6 +82,7 @@
 - [Gemini 退役与四模型资格认证设计](docs/superpowers/specs/2026-07-26-gemini-retirement-and-four-llm-qualification-design.md)
 - [Ark Coding Plan 资格提示词消歧与后续替代路线设计](docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md)
 - [资格长时承载修复与再授权准备设计](docs/superpowers/specs/2026-07-27-qualification-carrier-and-reauthorization-design.md)
+- [Kimi 资格命令观测与发布包闭包设计](docs/superpowers/specs/2026-07-27-kimi-command-observation-and-package-closure-design.md)
 - [Gemini 退役与四模型资格认证实施计划](docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md)
 - [Ark Coding Plan 资格提示词消歧实施计划](docs/superpowers/plans/2026-07-27-ark-coding-qualification-prompt-disambiguation.md)
 - [资格长时承载修复与再授权准备实施计划](docs/superpowers/plans/2026-07-27-qualification-carrier-and-reauthorization.md)
