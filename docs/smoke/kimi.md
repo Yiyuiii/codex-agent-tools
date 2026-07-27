@@ -28,7 +28,7 @@ result.commandsRun.includes("git status --short")
 
 Kimi ACP client 现在保留协议允许晚到的 `kind/title/rawInput`，任务层只在同一次 adapter 结果内按 tool-call ID 归并初始 call 和 update，再形成一个最终命令观测。新产生的 Kimi delegate evidence 将把内部观测映射为 `raw_input / title_fallback / late_update / unextractable` 来源枚举与 `exact / trim_only / embedded / other` 匹配枚举，不保存命令、title、raw input、tool-call ID、路径、输出或模型正文。optional verifier 只在字段存在时严格检查形状、适用范围和 exact 一致性；历史 evidence 可以没有该字段。
 
-这轮实现没有调用真实模型，没有修改任何既有 evidence JSON、`four-llm-v1` manifest/checkpoint schema 或公开任务/MCP 结果。因此最新真实 Kimi delegate evidence 仍只记录原有 `commandCount=1` 与失败检查，不能用新代码反推历史命令内容。最新批次仍为 `blocked / case_failed`，注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；旧授权已经消费，新的完整八项批次尚未授权。fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，代码层独立规格与质量复审均已通过；文档提交后的最终冻结矩阵仍待完成。
+这轮实现没有调用真实模型，没有修改任何既有 evidence JSON、`four-llm-v1` manifest/checkpoint schema 或公开任务/MCP 结果。因此最新真实 Kimi delegate evidence 仍只记录原有 `commandCount=1` 与失败检查，不能用新代码反推历史命令内容。最新批次仍为 `blocked / case_failed`，注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；旧授权已经消费，新的完整八项批次尚未授权。最终离线冻结矩阵为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed；类型检查、构建、release smoke、隔离 check-report、不可变证据、进程/锁和 clean-tree 检查通过，代码层独立规格与质量复审均已通过。
 
 ## 方法与通过标准
 

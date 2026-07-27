@@ -614,6 +614,8 @@ Review follow-up commit: `696bfa6`. It prevents title-derived command text from 
 
 Fresh full verification before documentation commit: 46 test files, 759 passed / 1 platform-conditional skipped / 0 failed; typecheck, focused subsystem tests, build, release smoke and diff check passed.
 
+Final clean-candidate verification after documentation closure also passed: typecheck, 46 test files with 759 passed / 1 skipped / 0 failed, build, release smoke, isolated check-report, qualification help/verifiers, evidence integrity, process/lock, package and clean-tree gates.
+
 - [x] **Step 4: Commit subsystem documentation**
 
 ```powershell

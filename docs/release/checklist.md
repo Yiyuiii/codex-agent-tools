@@ -8,7 +8,7 @@
 
 包版本：`0.1.0-alpha.1`
 
-当前结论：**Ark Coding Plan 提示词分隔歧义、长时执行承载、Kimi 命令观测和 npm package 文档闭包都已完成离线实现；Kimi exact validator、公开结果与历史 evidence/manifest/schema 未改变。fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，代码层独立规格与质量复审均已通过，最终冻结矩阵仍待根代理在文档提交后的 clean tree 上执行。第 3 层四模型八项能力仍处于 6 passed / 2 pending；最新 `four-llm-v1` 批次由同一 execution cell 正常承载到终态，前三项通过，但第 4 项 Kimi delegate 因严格命令证据未满足而以 `blocked / case_failed` 停止，后四项未运行，仍未取得 8/8 资格；第 4 层真实 Codex App 宿主门禁尚未执行。当前仍是 blocked / not ready，不是已安装、已替代旧工具或可公开发布状态。**
+当前结论：**Ark Coding Plan 提示词分隔歧义、长时执行承载、Kimi 命令观测和 npm package 文档闭包都已完成离线实现；Kimi exact validator、公开结果与历史 evidence/manifest/schema 未改变。最终离线冻结矩阵为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，类型检查、构建、release smoke、隔离 check-report、证据完整性、进程/锁与 clean-tree 均通过，代码层独立规格与质量复审也已通过。第 3 层四模型八项能力仍处于 6 passed / 2 pending；最新 `four-llm-v1` 批次由同一 execution cell 正常承载到终态，前三项通过，但第 4 项 Kimi delegate 因严格命令证据未满足而以 `blocked / case_failed` 停止，后四项未运行，仍未取得 8/8 资格；第 4 层真实 Codex App 宿主门禁尚未执行。当前仍是 blocked / not ready，不是已安装、已替代旧工具或可公开发布状态。**
 
 2026-07-27 的 105 秒演练只构成离线基础设施证据；最新真实批次进一步证明同一 `functions.exec` cell 和四小时预算 shell 可持续约 979 秒并取得协调器正常终态，但仍不证明四小时存活或任何未执行模型资格。最新 manifest 为 `blocked / case_failed`、4 completed / 4 notRun、9 checkpoints、`promotionEligible=false`，SHA-256 `d7be5e6ba3884075d80fe399dd3c2d72caaa1a3833f92e529928655e623b7b69`；immutable-evidence verifier 通过，进程 0/0/0、锁 absent。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)，演练事实见[承载演练报告](qualification-carrier-rehearsal.md)。
 
@@ -18,7 +18,7 @@
 
 | 层级 | 验收对象 | 当前状态 | 通过证据路径 |
 | --- | --- | --- | --- |
-| 1 | 确定性单测、类型检查、构建、release smoke | 当前实现基线 passed；最终冻结复跑 pending | Kimi/package 实现后：46 files，759 passed / 1 skipped / 0 failed，代码层双审通过；最终类型检查、构建、release smoke、隔离报告 check-only、资格入口 help、不可变证据、进程/锁与 clean-tree 矩阵仍须在文档提交后重跑 |
+| 1 | 确定性单测、类型检查、构建、release smoke | final offline freeze passed | 46 files，759 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离报告 check-only、资格入口 help、四份不可变 evidence、5/5 与 14/14 完整性、进程 0/0/0、锁 absent、145/15/4 pack 与 clean tree 均通过 |
 | 2 | 临时 `CODEX_HOME` 中的官方插件生命周期 | passed | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs` |
 | 3 | 四个逻辑 LLM 的八项真实模型门禁 | blocked：6 passed / 2 pending；最新 `four-llm-v1` 为 blocked，4 completed / 4 notRun | [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)、[最新 blocked manifest](../smoke/evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/manifest.json)、[结果审阅](four-llm-qualification-result-review.html)、[Gemini 退役历史](../smoke/pi-gemini.md) |
 | 4 | 活动 Codex 的真实 App 宿主门禁 | not run / blocked | [real-plugin-install-review.md](real-plugin-install-review.md) 当前已存在，但只是 `blocked / not ready` 草案；只有 `four-llm-v1` 同批 8/8 passed 后才能重新审阅并改为 `ready`，授权后才可生成 `real-host-acceptance.md` |
@@ -48,7 +48,7 @@ git diff --check
 
 ### 当前证据
 
-任务 5 的旧五模型阶段曾由主线程复验 release assurance 24/24、全量 191/191、类型检查、构建与 release smoke；这些数字只描述当时提交，不能证明当前四模型候选。Task 12 曾对 Gemini 退役候选运行 44 个文件、560 passed / 1 skipped / 0 failed 的完整命令组。阻断结果收敛阶段又以 44 个测试文件、584 passed / 1 skipped / 0 failed 验证了当时的候选；类型检查、完整构建、release smoke、隔离 check-report、两个资格 help、四个 retained batch immutable verifier、旧阻断证据 5/5、历史证据 14/14、目标进程 0/0/0 与锁 absent 均通过。Kimi 命令观测和 package 文档闭包实现后的 fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，代码层独立规格与质量复审均已通过；npm dry-run 为 145 files / 15 Markdown/HTML / 4 plugin files，两份承载文档已打包且全部实际 pack 文档进入链接闭包。实际进入 bundle 的 `fast-uri` 已升级至 3.1.4，生产审计 high/critical 为 0；最新 MCP SDK 固定的 Hono 1.x moderate 不进入本项目 stdio 插件 bundle 或 HTTP/serve-static 路径，按不可达 upstream 风险记录。文档和最终状态提交后仍须再次执行完整冻结矩阵并确认 clean tree；上述实现后基线不替代第 3 层真实模型资格或第 4 层真实 App 宿主门禁。
+任务 5 的旧五模型阶段曾由主线程复验 release assurance 24/24、全量 191/191、类型检查、构建与 release smoke；这些数字只描述当时提交，不能证明当前四模型候选。Task 12 曾对 Gemini 退役候选运行 44 个文件、560 passed / 1 skipped / 0 failed 的完整命令组。阻断结果收敛阶段又以 44 个测试文件、584 passed / 1 skipped / 0 failed 验证了当时的候选；类型检查、完整构建、release smoke、隔离 check-report、两个资格 help、四个 retained batch immutable verifier、旧阻断证据 5/5、历史证据 14/14、目标进程 0/0/0 与锁 absent 均通过。Kimi 命令观测和 package 文档闭包实现后的最终离线冻结矩阵为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed；类型检查、构建、release smoke、隔离 check-report、两个资格 help、四个 retained batch immutable verifier、当前证据 5/5、历史证据 14/14、目标进程 0/0/0、资格锁 absent 与 clean tree 均通过，代码层独立规格与质量复审也已通过。npm dry-run 为 145 files / 15 Markdown/HTML / 4 plugin files，两份承载文档已打包且全部实际 pack 文档进入链接闭包，无持久 `.tgz`。实际进入 bundle 的 `fast-uri` 已升级至 3.1.4，生产审计 high/critical 为 0；最新 MCP SDK 固定的 Hono 1.x moderate 不进入本项目 stdio 插件 bundle 或 HTTP/serve-static 路径，按不可达 upstream 风险记录。上述离线冻结不替代第 3 层真实模型资格或第 4 层真实 App 宿主门禁。
 
 ### 失败停止条件
 

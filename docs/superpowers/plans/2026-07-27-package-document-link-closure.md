@@ -250,6 +250,8 @@ Give reviewers the approved design, this plan, actual pack file list, link-closu
 
 Independent specification and quality/security reviews passed after the CommonMark/HTML follow-up. Fresh pack evidence is 145 files / 15 Markdown-or-HTML documents / 4 exact plugin files, with no retained archive. Commit `4766b6a` also updates the bundled `fast-uri` to 3.1.4; production audit high/critical is zero. The remaining Hono moderate is an upstream MCP SDK dependency whose HTTP/static path is absent from this stdio plugin bundle.
 
+The final clean-candidate matrix repeated the actual pack audit (145/15/4, both carrier documents present, no `.tgz`), release smoke, isolated check-report, full test/build/typecheck, immutable evidence, process/lock and clean-tree checks successfully.
+
 - [x] **Step 4: Commit package documentation**
 
 ```powershell

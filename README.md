@@ -52,7 +52,7 @@ ordinal 1 Ark Coding Plan delegate、ordinal 2 Ark Coding Plan review 与 ordina
 
 要求 Node.js 20+，并已安装、登录本机 Kimi Code。Kimi 使用本机 OAuth 会话，本项目不复制或保存其令牌。
 
-仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。阻断结果收敛阶段曾以 44 个测试文件（584 passed / 1 个平台条件 skipped / 0 failed）完成当时的第 1 层验证；Kimi 观测与 package 闭包实现后的 fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，代码层独立规格与质量复审均已通过。最终冻结矩阵仍须由根代理在文档收口和 clean-tree 候选上重新执行，不能用这组实现后基线替代最终冻结证据。第 2 层隔离官方插件生命周期已经通过：Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。
+仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。阻断结果收敛阶段曾以 44 个测试文件（584 passed / 1 个平台条件 skipped / 0 failed）完成当时的第 1 层验证；Kimi 观测与 package 闭包实现后的最终离线冻结矩阵为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，类型检查、构建、release smoke、隔离 check-report、证据完整性、进程/锁和 clean-tree 检查均通过，代码层独立规格与质量复审也已通过。第 2 层隔离官方插件生命周期已经通过：Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。
 
 当前尚未执行真实官方安装。项目代码绝不直接读取或写入活动 `~/.codex/config.toml`；只有 `four-llm-v1` 同批八项全部 passed、隔离验收完成、阻断状态包重新收敛为 ready 权限包，并取得针对本次动作的明确许可后，维护者才可使用官方 `codex plugin` 命令。当前仍有两项注册表能力 pending，最新批次也以 `blocked / case_failed` 结束，因此真实安装授权准备处于 blocked / not ready。任何真实安装、升级或回滚都必须逐次授权，且不得用手工编辑配置代替官方机制。
 
@@ -94,4 +94,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。Kimi 观测和 package 文档闭包已经离线实现，当前代码全量测试基线与独立规格/质量复审均已通过，最终冻结矩阵仍待完成；第 2 层隔离官方插件生命周期此前已经通过。四模型八项能力仍处于 6 passed / 2 pending；最新 `four-llm-v1` 批次已由同一 execution cell 正常承载到协调器终态，但在第 4 项 Kimi delegate 的严格命令观测验收处形成 `blocked / case_failed`，未产生同批 8/8 资格，新的完整八项批次尚未授权，真实 Codex App 宿主门禁也尚未执行。因此当前仍只能称为“离线候选继续收敛、模型资格被阻断的官方插件候选”，不能称为已安装、已替代旧工具或可公开发布。
+当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。Kimi 观测和 package 文档闭包已经离线实现，最终离线冻结矩阵与独立规格/质量复审均已通过；第 2 层隔离官方插件生命周期此前已经通过。四模型八项能力仍处于 6 passed / 2 pending；最新 `four-llm-v1` 批次已由同一 execution cell 正常承载到协调器终态，但在第 4 项 Kimi delegate 的严格命令观测验收处形成 `blocked / case_failed`，未产生同批 8/8 资格，新的完整八项批次尚未授权，真实 Codex App 宿主门禁也尚未执行。因此当前是“离线候选已冻结、模型资格被阻断的官方插件候选”，不能称为已安装、已替代旧工具或可公开发布。

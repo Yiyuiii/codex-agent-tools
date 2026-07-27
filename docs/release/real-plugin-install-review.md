@@ -10,7 +10,7 @@
 
 本状态包为 **blocked / not ready**，不是当前有效的安装权限包。
 
-- 阻断结果收敛阶段曾以 44 个测试文件、584 passed / 1 个平台条件 skipped / 0 failed 完成当时的第 1 层验证；Kimi 命令观测与 package 闭包实现后的 fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，代码层独立规格与质量复审均已通过，文档提交后的最终冻结矩阵仍待完成。
+- 阻断结果收敛阶段曾以 44 个测试文件、584 passed / 1 个平台条件 skipped / 0 failed 完成当时的第 1 层验证；Kimi 命令观测与 package 闭包实现后的最终离线冻结矩阵为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，类型检查、构建、release smoke、隔离 check-report、证据完整性、进程/锁与 clean tree 均通过，代码层独立规格与质量复审也已通过。
 - 第 2 层隔离官方插件生命周期已经通过。
 - 当前活动产品面是四个逻辑 LLM、八项 review/delegate 能力，全部固定使用 direct。
 - 按同一逻辑 LLM 的 review/delegate 必须成对通过的规则，当前过渡注册表是 **6 passed / 2 pending**；只有 Ark Coding Plan 的两项能力 pending。
@@ -79,7 +79,7 @@ blocked case 的 raw/normalized 双哈希已确定实际文件是 `ARK_SMOKE_OK:
 
 资格承载演练和执行手册已纳入 npm package；release smoke 从实际 pack 文件面选取并扫描全部 Markdown/HTML。当前 dry-run 为 145 files / 15 docs / 4 plugin files，插件面保持精确，不生成持久 `.tgz`。这是 package/release assurance 改进，不是 Kimi 或 Ark 资格，也不代表 npm 发布或插件安装。
 
-fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed；代码层独立规格与质量复审均已通过，文档提交后的最终冻结矩阵和 clean-tree SHA 仍待收口。本轮没有调用真实模型，最新 `four-llm-v1` 仍为 `blocked / case_failed`，注册表仍为 6 passed / 2 pending，安装仍为 **blocked / not ready**；旧授权已经消费，新的完整八项批次尚未授权。
+最终离线冻结矩阵为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed；代码层独立规格与质量复审及其余离线门禁均已通过，精确 clean-tree SHA 由最终 Git 交接提供。本轮没有调用真实模型，最新 `four-llm-v1` 仍为 `blocked / case_failed`，注册表仍为 6 passed / 2 pending，安装仍为 **blocked / not ready**；旧授权已经消费，新的完整八项批次尚未授权。
 
 ## 历史五模型原子重认证停止事实
 
@@ -127,7 +127,7 @@ fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skippe
 2. 每次实际 backend、模型、provider 和 route 与上表固定身份精确一致；不并行运行 Pi smoke，不重用旧证据，不自动 retry 或 fallback。
 3. review 找到预置缺陷且工作区零变化；delegate 只产生预期变化并观测到验证命令；每次结束后都没有新增 Kimi/Pi RPC 进程。
 4. Kimi/Ark smoke 索引、`docs/smoke/evidence/`、内置注册表、README、运维文档与四层发布清单重新收敛为八项全部 passed，不保留 pending 或自相矛盾的当前状态；Gemini 页面继续只作为退役历史。
-5. Ark Coding Plan 提示词离线修复阶段曾完成 44 个测试文件（569 passed / 1 skipped / 0 failed）及当时的完整门禁；Kimi/package 实现后的 fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，代码层独立规格与质量复审均已通过。文档收口后，必须在最终候选上重新运行类型检查、全量测试、构建、`npm run smoke:release`、隔离报告 check-only、资格入口 help、四份不可变 evidence、5/5 与 14/14 完整性、生产进程/锁和 clean-tree 检查。第 2 层隔离官方插件生命周期此前已经通过；若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
+5. Ark Coding Plan 提示词离线修复阶段曾完成 44 个测试文件（569 passed / 1 skipped / 0 failed）及当时的完整门禁；Kimi/package 实现后的最终离线冻结矩阵为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed。类型检查、全量测试、构建、`npm run smoke:release`、隔离报告 check-only、资格入口 help、四份不可变 evidence、5/5 与 14/14 完整性、生产进程/锁和 clean-tree 检查均已通过，代码层独立规格与质量复审也已通过。第 2 层隔离官方插件生命周期此前已经通过；若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
 6. 本状态包改写为 `ready`，以当时的构建产物、隔离状态差异和官方命令行为重新独立审阅。
 
 在这些条件全部成立前，不生成真实安装授权问题，也不进入真实安装执行。
