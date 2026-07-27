@@ -19,6 +19,11 @@ import type {
   ExternalDelegateInput,
   ExternalReviewInput,
 } from "../tasks/schemas.js";
+import type { CommandObservation } from "../tasks/command-observations.js";
+import {
+  sanitizeCommandObservations,
+  type SanitizedCommandObservation,
+} from "./command-observation.js";
 import {
   assertSmokeQualificationIdentity,
   inSmokeInfrastructureStage,
@@ -91,6 +96,7 @@ interface KimiSmokeEvidencePayload {
   expectedResultNormalizedSha256?: string;
   resultFileNormalizedLineCount?: number;
   resultFileContainsExpectedLine?: boolean;
+  commandObservations?: SanitizedCommandObservation[];
 }
 
 export type KimiSmokeEvidence =
@@ -432,12 +438,18 @@ export async function runKimiSmoke(
     );
     let executionTelemetry: AdapterExecutionTelemetry | null | undefined;
     let executionTelemetryReportCount = 0;
+    let commandObservations: readonly CommandObservation[] | undefined;
     const context: TaskExecutionContext = {};
     if (options.onProgress !== undefined) context.onProgress = options.onProgress;
     context.onExecutionTelemetry = (telemetry) => {
       executionTelemetryReportCount += 1;
       executionTelemetry = telemetry;
     };
+    if (options.task === "delegate") {
+      context.onCommandObservations = (observations) => {
+        commandObservations = observations;
+      };
+    }
     const timeoutMs = options.timeoutMs ?? profile.timeoutMs;
 
     if (options.task === "review") {
@@ -507,7 +519,13 @@ export async function runKimiSmoke(
           {
             llm: options.llm,
             prompt:
-              "Create result.txt in the working directory with exactly one line: KIMI_SMOKE_OK. Then run `git status --short` to verify the change and report what you did. Do not modify any other file.",
+              [
+                "Use two separate tool calls for this task.",
+                "First, create result.txt in the working directory with exactly one line: KIMI_SMOKE_OK. Use a file-writing tool call.",
+                "Second, use a separate command-execution tool call. Execute the command line exactly as shown:\n\ngit status --short\n\nDo not place any command before or after it.",
+                "Do not use shell chaining or connectors (including &&, ||, or ;), pipes, redirects, or wrapper commands.",
+                "Do not modify any other file. Report the file creation and the command result.",
+              ].join("\n\n"),
             cwd,
             timeoutMs,
           },
@@ -563,6 +581,10 @@ export async function runKimiSmoke(
         passed,
         executionTelemetry,
         qualification,
+      ),
+      commandObservations: sanitizeCommandObservations(
+        commandObservations ?? [],
+        "git status --short",
       ),
       ...resultFileArtifactFields(resultFile),
     };
