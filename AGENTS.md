@@ -16,6 +16,7 @@
 - 2026-07-25：目标模型面调整为 `kimi-k3`、`gemini-3.5-flash`、两个固定使用 `ark-code-latest` 的 Ark Plan 路线，以及 Ark Agent Plan 内的 `deepseek-v4-flash` 快速经济档。
 - 2026-07-26：用户因 Gemini 免费额度实际不可用，明确批准将 `gemini-3.5-flash` 从当前产品面完整移除，同时保留既有 Gemini evidence、blocked 批次和历史说明；当前目标面改为 Kimi K3 与三条 Ark 路线。
 - 2026-07-27：用户确认 Ark Coding Plan 资格提示词消歧路线，并要求建立长期 `goal` 后持续自主构建，直到预期必须人工干预。本阶段授权覆盖计划、TDD 离线修复、确定性验证、临时 `CODEX_HOME` 隔离生命周期、只读复核、证据完整性校验、新候选冻结和资格批次授权审阅材料；不覆盖真实模型批次、活动插件安装、活动 `config.toml` 访问、旧 `codex_cc_tools` 移除或公共发布。
+- 2026-07-27：最新唯一授权批次中断后，用户要求规划下一轮。当前规划权限只覆盖形成“Codex 原生长时执行承载离线演练 → 执行手册 → 新重新授权审阅页 → 完整离线/隔离验收 → clean candidate 冻结”的设计与实施计划；规划本身不授权实施，不授权生成资格 UUID 或运行真实模型批次。
 
 ## 当前事实状态
 
@@ -32,6 +33,7 @@
 - 2026-07-20：157 项测试、类型检查、构建、release smoke 和真实 stdio MCP 验收全绿；验收摘要 SHA-256 为 `0e4aca2d35c4e124a5f3b6ca60e8df440bfad27253d3e710334ba0fe29169d04`。
 - 2026-07-20 的自动 cutover 当时通过文件级、MCP initialize/listTools 和 strict doctor 检查，但重启后的真实 Codex App 运行异常。用户已于 2026-07-24 恢复原始 `~/.codex/config.toml`。因此“新 MCP 已在活动配置中完全替代旧 MCP”的结论已撤销；当前真实配置内容以用户恢复结果为准，未经许可不读取或修改。
 - 当前代码公开四个固定逻辑 LLM：`ark-agent-deepseek-v4-flash`、`ark-agent-plan`、`ark-coding-plan`、`kimi-k3`，八项 review/delegate 能力的过渡状态为 6 passed / 2 pending，只有 Ark Coding Plan 两项 pending。四个活动 LLM 全部 direct，并清除父进程继承代理。2026-07-27 的最新 `four-llm-v1` 批次因执行宿主超时后协调器进程中断而以 `interrupted / process_interrupted` 结束，没有形成任何 case evidence，不能据此判断模型、路由、凭据或验收结果。当前授权已消费；未来新资格必须取得新的明确授权并从首项产生完整同批 8/8，不能只补跑 Ark Coding Plan、复用旧证据或回退到其它 LLM。活动安装保持 `blocked / not ready`。
+- 2026-07-27 下一轮规划结论：事故位于 Codex 调用层使用了约 10 秒普通前台 shell 承载，而仓库协调器、锁和 interrupted recovery 按既定协议工作。推荐不改资格生产协议，改用当前 Codex 提供的 `functions.exec` yielded cell 与 `functions.wait` 承载长任务；先以固定 105 秒无网络 Node 程序通过至少三个 wait 周期做实机演练，失败则在授权消费前 fail closed。105 秒只证明跨越旧阈值与多次重新等待，不证明 4 小时存活；未来真实批次还必须在 active long-term goal 中运行，内层 shell timeout 不低于 14,400,000 毫秒，并沿用锁/终态恢复链。规划期 Kimi K3 宽审阅约 601.5 秒超时，Ark Agent Plan 窄审阅约 302.7 秒 abort，均无结论、无文件改动且不计 PASS；实施计划据此改为窄外审加独立 Codex 双审。方案、执行合同、替代路线和后续 goal 见[资格长时承载修复与再授权准备设计](docs/superpowers/specs/2026-07-27-qualification-carrier-and-reauthorization-design.md)与[实施计划](docs/superpowers/plans/2026-07-27-qualification-carrier-and-reauthorization.md)。两份文件均为待用户确认的规划材料，不是实施或真实批次授权。
 - 2026-07-27 历史根因补充：上一批 Ark Coding Plan delegate evidence 的 30-byte 原始文件哈希精确对应 `ARK_SMOKE_OK:ark-coding-plan;\n`，规范化哈希精确对应 `ARK_SMOKE_OK:ark-coding-plan;`；生产提示词恰好把分号紧接在期望 payload 后。因此该历史失败已定位为资格夹具的确定性分隔歧义，而不是路由、模型、凭据、网络或重试问题。用户已确认按 [Ark Coding Plan 资格提示词消歧与后续替代路线设计](docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md) 推进：严格验收保持不变，先离线修复并重冻结；新的完整八项批次、活动安装、旧工具移除和公共发布仍分别需要明确授权。
 - 2026-07-27 离线修复补充：实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 已将三个 Ark delegate profile 的资格写入合同统一为精确的 Node + Base64 Bash 命令，并把规范化 payload 放入独立代码块。结果文件 validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、资格 schema/protocol 和全部既有 evidence 均未修改。独立规格与代码质量审阅均 PASS；fresh 验证为 44 个测试文件、569 passed / 1 个平台条件 skipped / 0 failed，类型检查、构建、release smoke、临时 `CODEX_HOME` 隔离 check-report、当时 `four-llm-v1` blocked immutable verifier、当时 evidence 5/5、历史 Gemini 14/14、历史 `five-llm-v1` blocked/non-promotable 和目标进程 0/0/0 均通过。Bash → Node 参数探针精确写入 29 bytes、LF 结尾、SHA-256 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。该离线修复阶段没有新的真实模型调用；后续最新批次因进程中断仍未形成资格证据，注册表继续保持 6 passed / 2 pending，安装继续保持 `blocked / not ready`。
 - `codex-agent-tools` 在设计时没有同名 npm 包；发布前必须重新检查。当前不执行 `npm publish`。
@@ -72,8 +74,10 @@
 - [历史：十门禁原子重认证设计](docs/superpowers/specs/2026-07-26-gate-requalification-design.md)
 - [Gemini 退役与四模型资格认证设计](docs/superpowers/specs/2026-07-26-gemini-retirement-and-four-llm-qualification-design.md)
 - [Ark Coding Plan 资格提示词消歧与后续替代路线设计](docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md)
+- [待确认：资格长时承载修复与再授权准备设计](docs/superpowers/specs/2026-07-27-qualification-carrier-and-reauthorization-design.md)
 - [Gemini 退役与四模型资格认证实施计划](docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md)
 - [Ark Coding Plan 资格提示词消歧实施计划](docs/superpowers/plans/2026-07-27-ark-coding-qualification-prompt-disambiguation.md)
+- [待确认：资格长时承载修复与再授权准备实施计划](docs/superpowers/plans/2026-07-27-qualification-carrier-and-reauthorization.md)
 - [历史：已执行且授权已消费的四模型资格批次与结果收敛实施计划](docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md)
 - [历史：已消费的四模型八项资格批次授权审阅](docs/release/four-llm-qualification-authorization-review.html)
 - [最新：四模型八项资格批次中断结果审阅](docs/release/four-llm-qualification-result-review.html)
