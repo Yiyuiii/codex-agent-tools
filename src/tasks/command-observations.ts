@@ -7,8 +7,8 @@ export type CommandObservationSource =
   | "unextractable";
 
 export interface CommandObservation {
-  source: CommandObservationSource;
-  command: string | null;
+  readonly source: CommandObservationSource;
+  readonly command: string | null;
 }
 
 type FieldSource = "initial" | "update";

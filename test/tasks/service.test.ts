@@ -471,6 +471,166 @@ describe("ExternalAgentService", () => {
     expect(result.commandsRun).toEqual([]);
   });
 
+  it("prevents command observation callback mutation from spoofing commandsRun", async () => {
+    let observed: readonly CommandObservation[] = [];
+    const service = createService(async () =>
+      completed({
+        events: [
+          {
+            type: "tool_call",
+            toolCallId: "call-1",
+            kind: "execute",
+            rawInput: { command: "npm test" },
+          },
+        ],
+      }),
+    );
+
+    const result = await service.delegate(
+      {
+        llm: "kimi-k3",
+        prompt: "Run",
+        cwd,
+      },
+      {
+        onCommandObservations: (value) => {
+          observed = value;
+          const first = value[0];
+          if (first === undefined) throw new Error("missing observation");
+          (first as { command: string | null }).command =
+            "git status --short";
+        },
+      },
+    );
+
+    expect(Object.isFrozen(observed)).toBe(true);
+    expect(Object.isFrozen(observed[0])).toBe(true);
+    expect(result.commandsRun).toEqual(["npm test"]);
+    expect(result.commandsRun).not.toContain("git status --short");
+    expect(result.diagnostics).toContain(
+      "Internal command observation callback failed",
+    );
+  });
+
+  it("isolates throwing command observation callback from delegate completion", async () => {
+    const telemetryObserver = vi.fn();
+    const service = createService(async () => {
+      await writeFile(path.join(cwd, "callback-output.txt"), "created", "utf8");
+      return completed({
+        events: [
+          {
+            type: "tool_call",
+            toolCallId: "call-1",
+            kind: "execute",
+            rawInput: { command: "npm test" },
+          },
+        ],
+      });
+    });
+
+    const result = await service.delegate(
+      {
+        llm: "kimi-k3",
+        prompt: "Run",
+        cwd,
+      },
+      {
+        onCommandObservations: () => {
+          throw new Error(
+            "SENSITIVE callback detail: git status --short",
+          );
+        },
+        onExecutionTelemetry: telemetryObserver,
+      },
+    );
+
+    expect(telemetryObserver).toHaveBeenCalledOnce();
+    expect(result.ok).toBe(true);
+    expect(result.status).toBe("completed");
+    expect(result.filesChanged).toEqual(["callback-output.txt"]);
+    expect(result.commandsRun).toEqual(["npm test"]);
+    expect(result.diagnostics).toEqual([
+      "Internal command observation callback failed",
+    ]);
+    expect(result.diagnostics.join("\n")).not.toContain("SENSITIVE");
+    expect(result.diagnostics.join("\n")).not.toContain("npm test");
+    expect(result.diagnostics.join("\n")).not.toContain("git status");
+  });
+
+  it("isolates throwing execution telemetry callback from delegate completion", async () => {
+    const commandObserver = vi.fn();
+    const service = createService(async () => {
+      await writeFile(path.join(cwd, "telemetry-output.txt"), "created", "utf8");
+      return completed({
+        events: [
+          {
+            type: "tool_call",
+            toolCallId: "call-1",
+            kind: "execute",
+            rawInput: { command: "npm test" },
+          },
+        ],
+      });
+    });
+
+    const result = await service.delegate(
+      {
+        llm: "kimi-k3",
+        prompt: "Run",
+        cwd,
+      },
+      {
+        onCommandObservations: commandObserver,
+        onExecutionTelemetry: () => {
+          throw new Error("SENSITIVE telemetry detail: npm test");
+        },
+      },
+    );
+
+    expect(commandObserver).toHaveBeenCalledOnce();
+    expect(result.ok).toBe(true);
+    expect(result.status).toBe("completed");
+    expect(result.filesChanged).toEqual(["telemetry-output.txt"]);
+    expect(result.commandsRun).toEqual(["npm test"]);
+    expect(result.diagnostics).toEqual([
+      "Internal execution telemetry callback failed",
+    ]);
+    expect(result.diagnostics.join("\n")).not.toContain("SENSITIVE");
+    expect(result.diagnostics.join("\n")).not.toContain("npm test");
+  });
+
+  it("isolates throwing execution telemetry callback from review completion", async () => {
+    const commandObserver = vi.fn();
+    const service = createService(async () => {
+      await writeFile(path.join(cwd, "review-output.txt"), "created", "utf8");
+      return completed();
+    });
+
+    const result = await service.review(
+      {
+        llm: "kimi-k3",
+        task: "review_diff",
+        prompt: "Review",
+        cwd,
+      },
+      {
+        onCommandObservations: commandObserver,
+        onExecutionTelemetry: () => {
+          throw new Error("SENSITIVE telemetry detail");
+        },
+      },
+    );
+
+    expect(commandObserver).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe("workspace_changed");
+    expect(result.filesChanged).toEqual(["review-output.txt"]);
+    expect(result.diagnostics).toEqual([
+      "Internal execution telemetry callback failed",
+    ]);
+    expect(result.diagnostics.join("\n")).not.toContain("SENSITIVE");
+  });
+
   it.each([
     ["cancelled", "cancelled"],
     ["timed_out", "timed_out"],

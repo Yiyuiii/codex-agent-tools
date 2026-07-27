@@ -32,6 +32,11 @@ import type {
   ExternalTaskStatus,
 } from "./results.js";
 
+const INTERNAL_COMMAND_OBSERVATION_CALLBACK_FAILED =
+  "Internal command observation callback failed";
+const INTERNAL_EXECUTION_TELEMETRY_CALLBACK_FAILED =
+  "Internal execution telemetry callback failed";
+
 export interface ExternalAgentServiceDependencies {
   registry: LlmRegistry;
   adapters: ReadonlyMap<RuntimeKind, ExternalAgentAdapter>;
@@ -208,7 +213,17 @@ export class ExternalAgentService {
       } catch (error) {
         adapterResult = failedAdapterResult(error);
       }
-      context.onExecutionTelemetry?.(adapterResult.executionTelemetry);
+      try {
+        context.onExecutionTelemetry?.(adapterResult.executionTelemetry);
+      } catch {
+        adapterResult = {
+          ...adapterResult,
+          diagnostics: [
+            ...adapterResult.diagnostics,
+            INTERNAL_EXECUTION_TELEMETRY_CALLBACK_FAILED,
+          ],
+        };
+      }
       const after = await captureWorkspace(input.cwd);
       const comparison = compareWorkspace(before, after);
       const policyViolations = reviewPolicyViolations(adapterResult.events);
@@ -267,8 +282,35 @@ export class ExternalAgentService {
       const commandObservations = extractCommandObservations(
         adapterResult.events,
       );
-      context.onCommandObservations?.(commandObservations);
-      context.onExecutionTelemetry?.(adapterResult.executionTelemetry);
+      const commandsRun = commandsFromObservations(commandObservations);
+      const commandObservationView: readonly CommandObservation[] =
+        Object.freeze(
+          commandObservations.map((observation) =>
+            Object.freeze({ ...observation }),
+          ),
+        );
+      try {
+        context.onCommandObservations?.(commandObservationView);
+      } catch {
+        adapterResult = {
+          ...adapterResult,
+          diagnostics: [
+            ...adapterResult.diagnostics,
+            INTERNAL_COMMAND_OBSERVATION_CALLBACK_FAILED,
+          ],
+        };
+      }
+      try {
+        context.onExecutionTelemetry?.(adapterResult.executionTelemetry);
+      } catch {
+        adapterResult = {
+          ...adapterResult,
+          diagnostics: [
+            ...adapterResult.diagnostics,
+            INTERNAL_EXECUTION_TELEMETRY_CALLBACK_FAILED,
+          ],
+        };
+      }
       const after = await captureWorkspace(input.cwd);
       const comparison = compareWorkspace(before, after);
       const status = adapterStatus(adapterResult.status);
@@ -281,7 +323,7 @@ export class ExternalAgentService {
           comparison.filesChanged,
         ),
         summary: adapterResult.text,
-        commandsRun: commandsFromObservations(commandObservations),
+        commandsRun,
         verification: [],
         risks: [],
       };
