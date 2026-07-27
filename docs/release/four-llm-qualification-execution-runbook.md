@@ -30,14 +30,16 @@
 
 同一个未来批次必须同时遵守以下不变量：
 
-1. 只创建一个 `functions.exec` cell。
+1. 健康执行期间只创建一个 `functions.exec` cell。
 2. 该 cell 内只启动一个前台 `tools.shell_command`。
 3. 内层 `shell_command.timeout_ms` 必须不低于 `14,400,000` 毫秒（4 小时）。
-4. 标准资格入口只调用一次，且只创建一个 coordinator/owner；不得启动第二 shell、并行 watcher、第二 coordinator 或第二批次。
+4. 标准资格入口只调用一次，且只创建一个 coordinator/owner；健康执行期间不得启动第二个资格承载 shell、第二入口、并行 watcher、第二 coordinator 或第二批次。
 5. `functions.exec` 应在约 1 秒后 yield；之后只用 `functions.wait` 重新进入同一个 cell，绝不因为暂时无输出、用户询问、消息更新或上下文压缩而重调入口。
 6. 每次 `functions.wait` 的 `yield_time_ms` 不得超过 30,000 毫秒；不得使用超过 60 秒的单次阻塞等待。
 7. 只要工具仍在运行，“本轮没有新输出”就只表示暂无新输出，不构成失败、超时或重试理由。
 8. 执行期间每 30–60 秒至少向用户更新一次非秘密状态，任何连续静默不得超过 60 秒。
+
+如果 cell 丢失，one-cell / one-entry 不变量只允许两个受限例外：可以启动一个只读诊断载体，仅观察 lock owner、checkpoint、terminal 和目标进程计数；只有第 4 节的严格条件全部成立时，才可以再启动一个且仅一个 same-batch interrupted recovery 载体。只读诊断载体不得调用标准入口或模型；诊断载体和 recovery 载体都不得创建新 owner、新 batch、调用模型或演变成新的资格承载入口。
 
 active long-term goal、4 小时内层预算、短周期 wait 和现有锁/checkpoint/terminal 恢复协议缺一不可。105 秒演练不能替代其中任何一项。
 
@@ -50,21 +52,22 @@ active long-term goal、4 小时内层预算、短周期 wait 和现有锁/check
 - terminal manifest 是否存在；
 - Kimi ACP / Pi RPC / real-smoke 目标进程计数。
 
-这些观察不得修改候选树、锁、checkpoint、manifest 或 evidence，不得读取活动 `~/.codex/config.toml`，不得读取模型输出正文，也不得启动额外 watcher、shell 或 coordinator。观察结果只用于决定继续等待、验证既有终态或 fail closed，不能推导模型、route、凭据、网络或 acceptance 结论。
+这些观察不得修改候选树、锁、checkpoint、manifest 或 evidence，不得读取活动 `~/.codex/config.toml`，也不得读取模型输出正文。健康执行期间不得启动额外 watcher、shell 或 coordinator；cell 丢失后只能使用第 2 节定义的一个只读诊断载体，以及在第 4 节严格条件成立时使用一次 same-batch interrupted recovery 载体。观察结果只用于决定继续等待、验证既有终态或 fail closed，不能推导模型、route、凭据、网络或 acceptance 结论。
 
 ## 4. cell 丢失或 wait 失败时的唯一处理链
 
 如果 `functions.wait` 无法继续同一个 cell，必须严格按以下顺序处理：
 
 1. 绝不再次调用资格入口。
-2. 只读检查资格锁和 owner。
-3. owner 身份仍存活时，只继续等待并观察 terminal，绝不执行 recovery。
-4. owner 已死但任一目标进程非零时，继续等待其受控超时或退出，绝不执行 recovery。
-5. 只有 owner 已死、Kimi ACP / Pi RPC / real-smoke 均为 0 且 terminal 缺失时，才允许对同一个 batch 执行一次现有的 interrupted recovery。
-6. terminal 已存在时只验证该终态，不发布第二终态，也不执行 recovery。
-7. 无法确认 owner、batch 身份、authorization hash、terminal 身份或目标进程状态时，必须 fail closed，停止并请求人工判断。
+2. 使用一个只读诊断载体，先确认 batch 身份与 authorization hash，再据此确认预期 terminal 的归属身份及其存在或缺失状态；任一身份或存在性无法可信确认时立即 fail closed，停止并请求人工判断。
+3. 可信 terminal 已存在时，只验证该终态并停止；不得再根据 owner 或目标进程状态进入 recovery，不发布第二终态。
+4. 只有可信 terminal 确认缺失时，才只读检查资格锁、owner 存活状态和 Kimi ACP / Pi RPC / real-smoke 目标进程计数。
+5. owner 身份仍存活时，只继续等待并观察 terminal，绝不执行 recovery。
+6. owner 已死但任一目标进程非零时，继续等待其受控超时或退出，绝不执行 recovery。
+7. 只有 owner 已死、Kimi ACP / Pi RPC / real-smoke 均为 0 且可信 terminal 缺失时，才允许对同一个 batch 执行一次现有的 interrupted recovery。
+8. 无法确认 owner 身份、目标进程状态或 terminal 确实缺失时，必须 fail closed，停止并请求人工判断。
 
-唯一允许的 recovery 只负责把同一批次安全冻结为 `interrupted / process_interrupted`；它不得调用模型，不得 resume、retry、fallback、takeover 或启动第二批。一次 recovery 结束后，无论成功、失败还是结果不明，都不得再次 recovery。
+唯一允许的 recovery 载体只负责把同一批次安全冻结为 `interrupted / process_interrupted`；它不得创建新 owner 或新 batch，不得调用标准入口或模型，也不得 resume、retry、fallback、takeover 或启动第二批。一次 recovery 结束后，无论成功、失败还是结果不明，都不得再次 recovery。
 
 ## 5. 成功、失败与歧义停止条件
 
