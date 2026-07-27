@@ -2,7 +2,7 @@
 
 日期：2026-07-26
 
-状态：设计已获用户批准；书面规格自检与独立复核通过，实施进行中
+状态：实施已形成 blocked 终态；后续 Ark Coding Plan 资格夹具修复由 [2026-07-27 消歧设计](2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md) 接续
 
 ## 1. 决策与目标
 
@@ -48,14 +48,16 @@
 
 Pi 配置中 Coding Plan 与 Agent Plan 都使用 `anthropic-messages` 和 `ark-code-latest`，区别是独立 endpoint（`/api/coding` 与 `/api/plan`）、凭据和额度池。Coding Plan 同一路线在 2026-07-20 的 delegate 曾通过，2026-07-25 的 review 也通过；Agent Plan 同模型的 delegate 亦通过。因此现有证据不支持“路由、协议或模型绑定错误”假设。
 
-旧 schema v1 evidence 没有保存失败文件长度、哈希、规范化行数或正文，临时工作区也已经按安全流程删除，所以无法再区分额外说明文字、标点、编码差异或其它内容偏差。当前置信度最高的解释是一次上游指令遵循波动，但该解释不是通过证据。
+旧 schema v1 evidence 没有保存失败文件长度、哈希、规范化行数或正文，临时工作区也已经按安全流程删除，所以当时无法再区分额外说明文字、标点、编码差异或其它内容偏差。本设计据此提出的“一次上游指令遵循波动”只是批次前假设，不是已经证明的事实。
+
+2026-07-27 补充：新 `four-llm-v1` 批次的 schema v3 evidence 保存了 30-byte 原始长度、单行计数、raw SHA-256 与 normalized SHA-256。本地只读复算证明两个哈希分别精确对应 `ARK_SMOKE_OK:ark-coding-plan;\n` 和 `ARK_SMOKE_OK:ark-coding-plan;`；生产提示词又恰好把分号紧接在目标 payload 后。由此可将新失败定位为资格夹具的确定性分隔歧义。后续处理以 [Ark Coding Plan 资格提示词消歧设计](2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md) 为准。
 
 处理原则：
 
 - 保留现有 endpoint、provider、模型、凭据和直连策略；
 - 不放宽精确结果文件验收；
-- 不增加 retry、fallback 或提示词补偿；
-- 用已经实现的 evidence v2 文件诊断和可观测 telemetry 重新认证；
+- 不增加 retry、fallback，不放宽验收；允许修复已经由双哈希证明的提示词分隔歧义；
+- 用已经实现的 schema v3 资格 evidence 文件诊断和可观测 telemetry 重新认证；
 - 新批次若再次失败，按新证据报告事实并立即停止。
 
 ## 4. 当前状态迁移

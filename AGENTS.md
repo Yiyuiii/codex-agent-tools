@@ -31,6 +31,7 @@
 - 2026-07-20：157 项测试、类型检查、构建、release smoke 和真实 stdio MCP 验收全绿；验收摘要 SHA-256 为 `0e4aca2d35c4e124a5f3b6ca60e8df440bfad27253d3e710334ba0fe29169d04`。
 - 2026-07-20 的自动 cutover 当时通过文件级、MCP initialize/listTools 和 strict doctor 检查，但重启后的真实 Codex App 运行异常。用户已于 2026-07-24 恢复原始 `~/.codex/config.toml`。因此“新 MCP 已在活动配置中完全替代旧 MCP”的结论已撤销；当前真实配置内容以用户恢复结果为准，未经许可不读取或修改。
 - 当前代码公开四个固定逻辑 LLM：`ark-agent-deepseek-v4-flash`、`ark-agent-plan`、`ark-coding-plan`、`kimi-k3`，八项 review/delegate 能力的过渡状态为 6 passed / 2 pending，只有 Ark Coding Plan 两项 pending。四个活动 LLM 全部 direct，并清除父进程继承代理。2026-07-27 的最新 `four-llm-v1` 批次在首项 Ark Coding Plan delegate 内容验收失败后 blocked，当前授权已消费；未来新资格必须取得新的明确授权并从首项产生完整同批 8/8，不能只补跑 Ark Coding Plan、复用旧证据或回退到其它 LLM。活动安装保持 `blocked / not ready`。
+- 2026-07-27 根因补充：最新 Ark Coding Plan delegate evidence 的 30-byte 原始文件哈希精确对应 `ARK_SMOKE_OK:ark-coding-plan;\n`，规范化哈希精确对应 `ARK_SMOKE_OK:ark-coding-plan;`；生产提示词恰好把分号紧接在期望 payload 后。因此新失败已定位为资格夹具的确定性分隔歧义，而不是路由、模型、凭据、网络或重试问题。用户已确认按 [Ark Coding Plan 资格提示词消歧与后续替代路线设计](docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md) 推进：严格验收保持不变，先离线修复并重冻结；新的完整八项批次、活动安装、旧工具移除和公共发布仍分别需要明确授权。
 - `codex-agent-tools` 在设计时没有同名 npm 包；发布前必须重新检查。当前不执行 `npm publish`。
 
 ### 五模型历史实施记录
@@ -67,6 +68,7 @@
 - [历史：五模型官方插件集成设计](docs/superpowers/specs/2026-07-25-official-plugin-integration-design.md)
 - [历史：十门禁原子重认证设计](docs/superpowers/specs/2026-07-26-gate-requalification-design.md)
 - [Gemini 退役与四模型资格认证设计](docs/superpowers/specs/2026-07-26-gemini-retirement-and-four-llm-qualification-design.md)
+- [Ark Coding Plan 资格提示词消歧与后续替代路线设计](docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md)
 - [Gemini 退役与四模型资格认证实施计划](docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md)
 - [历史：十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md)
 - [历史：五模型官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)

@@ -10,6 +10,20 @@
 
 ---
 
+## Terminal execution status
+
+This plan has reached its blocked terminal even though the historical task checkboxes below were not rewritten during the evidence-only and terminal-status commits:
+
+- Task 12 froze candidate `b57382ed4f2fddce4946613b5aa5739c6eed5c8f` after full deterministic verification.
+- Task 13 consumed the one authorization in batch `2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d`; ordinal 1 failed `acceptance_failed`, ordinals 2–8 were not run, and no retry/fallback/resume/second batch occurred.
+- Task 13 Step 5 committed immutable evidence as `fb599c8`.
+- Task 14 followed the blocked branch and committed terminal status as `a641be9`.
+- Registry state remains 6 passed / 2 pending and installation remains `blocked / not ready`.
+
+The unchecked boxes are retained as the original execution template, not as current progress tracking. Future remediation is governed by [the 2026-07-27 Ark Coding qualification prompt-disambiguation design](../specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md) and its future implementation plan.
+
+---
+
 ## Source of Truth and Execution Constraints
 
 Design specification:
