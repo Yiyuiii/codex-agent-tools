@@ -370,7 +370,7 @@ describe("ExternalAgentService", () => {
   it("derives commands from protocol tool events instead of model prose", async () => {
     const service = createService(async () =>
       completed({
-        text: "No command mentioned here",
+        text: "Model prose mentions pnpm lint.",
         events: [
           {
             type: "tool_call",
@@ -388,6 +388,7 @@ describe("ExternalAgentService", () => {
       cwd,
     });
     expect(result.commandsRun).toEqual(["npm test"]);
+    expect(result.commandsRun).not.toContain("pnpm lint");
   });
 
   it("reports a late-update command observation once without exposing it publicly", async () => {
