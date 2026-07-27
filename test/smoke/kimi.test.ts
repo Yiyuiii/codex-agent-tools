@@ -227,6 +227,158 @@ describe("Kimi real-smoke harness", () => {
     expect(await readdir(root)).toEqual([]);
   });
 
+  it("fails closed when delegate command observations are not reported", async () => {
+    const root = await tempRoot();
+    const secret = "KIMI_MISSING_OBSERVATION_SECRET";
+    const service: KimiSmokeService = {
+      review: async () => {
+        throw new Error("not used");
+      },
+      delegate: async (input, context) => {
+        context?.onExecutionTelemetry?.(validKimiTelemetry);
+        await writeFile(
+          path.join(input.cwd, "result.txt"),
+          "KIMI_SMOKE_OK\n",
+          "utf8",
+        );
+        return {
+          ok: true,
+          status: "completed",
+          llm: "kimi-k3",
+          actualModel: "kimi-code/k3",
+          elapsedMs: 15,
+          diagnostics: [],
+          filesChanged: ["result.txt"],
+          summary: secret,
+          commandsRun: ["git status --short"],
+          verification: [],
+          risks: [],
+        };
+      },
+    };
+
+    const failure = await runKimiSmoke(
+      { llm: "kimi-k3", task: "delegate", tempRoot: root },
+      {
+        service,
+        readKimiVersion: async () => "0.27.0",
+        listKimiProcessIds: async () => [100],
+      },
+    ).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SmokeInfrastructureError);
+    expect(failure).toMatchObject({
+      message: "Smoke infrastructure failure",
+      stage: "task_execution",
+    });
+    expect(String(failure)).not.toContain(secret);
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  it("accepts exactly one empty command observation report", async () => {
+    const root = await tempRoot();
+    const service: KimiSmokeService = {
+      review: async () => {
+        throw new Error("not used");
+      },
+      delegate: async (input, context) => {
+        context?.onExecutionTelemetry?.(validKimiTelemetry);
+        context?.onCommandObservations?.([]);
+        await writeFile(
+          path.join(input.cwd, "result.txt"),
+          "KIMI_SMOKE_OK\n",
+          "utf8",
+        );
+        return {
+          ok: true,
+          status: "completed",
+          llm: "kimi-k3",
+          actualModel: "kimi-code/k3",
+          elapsedMs: 15,
+          diagnostics: [],
+          filesChanged: ["result.txt"],
+          summary: "Created result.txt without a command event.",
+          commandsRun: [],
+          verification: [],
+          risks: [],
+        };
+      },
+    };
+
+    const evidence = await runKimiSmoke(
+      { llm: "kimi-k3", task: "delegate", tempRoot: root },
+      {
+        service,
+        readKimiVersion: async () => "0.27.0",
+        listKimiProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence).toMatchObject({
+      passed: false,
+      failureReason: "acceptance_failed",
+      commandObservations: [],
+      checks: {
+        requiredCommandObserved: false,
+      },
+    });
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  it("fails closed when delegate command observations are reported twice", async () => {
+    const root = await tempRoot();
+    const secretCommand = "echo repeated-observation-secret";
+    const service: KimiSmokeService = {
+      review: async () => {
+        throw new Error("not used");
+      },
+      delegate: async (input, context) => {
+        context?.onExecutionTelemetry?.(validKimiTelemetry);
+        context?.onCommandObservations?.([
+          { source: "late_update", command: "git status --short" },
+        ]);
+        context?.onCommandObservations?.([
+          { source: "raw_input", command: secretCommand },
+        ]);
+        await writeFile(
+          path.join(input.cwd, "result.txt"),
+          "KIMI_SMOKE_OK\n",
+          "utf8",
+        );
+        return {
+          ok: true,
+          status: "completed",
+          llm: "kimi-k3",
+          actualModel: "kimi-code/k3",
+          elapsedMs: 15,
+          diagnostics: [],
+          filesChanged: ["result.txt"],
+          summary: "Created and verified result.txt.",
+          commandsRun: ["git status --short"],
+          verification: [],
+          risks: [],
+        };
+      },
+    };
+
+    const failure = await runKimiSmoke(
+      { llm: "kimi-k3", task: "delegate", tempRoot: root },
+      {
+        service,
+        readKimiVersion: async () => "0.27.0",
+        listKimiProcessIds: async () => [100],
+      },
+    ).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SmokeInfrastructureError);
+    expect(failure).toMatchObject({
+      message: "Smoke infrastructure failure",
+      stage: "task_execution",
+    });
+    expect(String(failure)).not.toContain(secretCommand);
+    expect(await readdir(root)).toEqual([]);
+  });
+
   it("uses separate file and exact-command tool calls in the delegate prompt", async () => {
     const root = await tempRoot();
     let capturedPrompt = "";

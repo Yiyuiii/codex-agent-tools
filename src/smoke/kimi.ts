@@ -439,6 +439,7 @@ export async function runKimiSmoke(
     let executionTelemetry: AdapterExecutionTelemetry | null | undefined;
     let executionTelemetryReportCount = 0;
     let commandObservations: readonly CommandObservation[] | undefined;
+    let commandObservationReportCount = 0;
     const context: TaskExecutionContext = {};
     if (options.onProgress !== undefined) context.onProgress = options.onProgress;
     context.onExecutionTelemetry = (telemetry) => {
@@ -447,6 +448,7 @@ export async function runKimiSmoke(
     };
     if (options.task === "delegate") {
       context.onCommandObservations = (observations) => {
+        commandObservationReportCount += 1;
         commandObservations = observations;
       };
     }
@@ -512,26 +514,40 @@ export async function runKimiSmoke(
       );
     }
 
-    const result = await inSmokeInfrastructureStage(
-      "task_execution",
-      () =>
-        service.delegate(
-          {
-            llm: options.llm,
-            prompt:
-              [
-                "Use two separate tool calls for this task.",
-                "First, create result.txt in the working directory with exactly one line: KIMI_SMOKE_OK. Use a file-writing tool call.",
-                "Second, use a separate command-execution tool call. Execute the command line exactly as shown:\n\ngit status --short\n\nDo not place any command before or after it.",
-                "Do not use shell chaining or connectors (including &&, ||, or ;), pipes, redirects, or wrapper commands.",
-                "Do not modify any other file. Report the file creation and the command result.",
-              ].join("\n\n"),
-            cwd,
-            timeoutMs,
-          },
-          context,
-        ),
-    );
+    const { result, reportedCommandObservations } =
+      await inSmokeInfrastructureStage(
+        "task_execution",
+        async () => {
+          const delegateResult = await service.delegate(
+            {
+              llm: options.llm,
+              prompt:
+                [
+                  "Use two separate tool calls for this task.",
+                  "First, create result.txt in the working directory with exactly one line: KIMI_SMOKE_OK. Use a file-writing tool call.",
+                  "Second, use a separate command-execution tool call. Execute the command line exactly as shown:\n\ngit status --short\n\nDo not place any command before or after it.",
+                  "Do not use shell chaining or connectors (including &&, ||, or ;), pipes, redirects, or wrapper commands.",
+                  "Do not modify any other file. Report the file creation and the command result.",
+                ].join("\n\n"),
+              cwd,
+              timeoutMs,
+            },
+            context,
+          );
+          if (
+            commandObservationReportCount !== 1 ||
+            commandObservations === undefined
+          ) {
+            throw new Error(
+              "Internal Kimi command observation report contract violated",
+            );
+          }
+          return {
+            result: delegateResult,
+            reportedCommandObservations: commandObservations,
+          };
+        },
+      );
     const resultFile = await inspectResultFile({
       filePath: path.join(cwd, "result.txt"),
       expectedLine: "KIMI_SMOKE_OK",
@@ -583,7 +599,7 @@ export async function runKimiSmoke(
         qualification,
       ),
       commandObservations: sanitizeCommandObservations(
-        commandObservations ?? [],
+        reportedCommandObservations,
         "git status --short",
       ),
       ...resultFileArtifactFields(resultFile),
