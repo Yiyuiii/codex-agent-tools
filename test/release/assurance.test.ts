@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   assertAllowedPackFiles,
   assertNoSensitiveContent,
+  assertPackageDocumentLinkClosure,
   assertPackageLocalLinks,
   resolveAllowedPackInspectionPaths,
   resolvePackInspectionPath,
@@ -211,6 +212,156 @@ describe("release assurance", () => {
         packageFiles,
       ),
     ).not.toThrow();
+  });
+
+  it("requires every packaged Markdown document to be inspected", () => {
+    expect(() =>
+      assertPackageDocumentLinkClosure(
+        [
+          {
+            name: "README.md",
+            content: "[Extra](docs/extra.md)",
+          },
+        ],
+        ["README.md", "docs/extra.md"],
+      ),
+    ).toThrow(/Package document was not inspected/u);
+  });
+
+  it("checks a closed document graph selected from the actual package files", () => {
+    expect(() =>
+      assertPackageDocumentLinkClosure(
+        [
+          {
+            name: "README.md",
+            content: "[Runbook](docs/runbook.md)",
+          },
+          {
+            name: "docs/runbook.md",
+            content: "[Home](../README.md)",
+          },
+        ],
+        ["README.md", "docs/runbook.md", "package.json", "dist/cli.js"],
+      ),
+    ).not.toThrow();
+  });
+
+  it("requires packaged HTML but not packaged JSON or JavaScript to be inspected", () => {
+    expect(() =>
+      assertPackageDocumentLinkClosure(
+        [{ name: "README.md", content: "Release overview." }],
+        ["README.md", "docs/result.html", "package.json", "dist/cli.js"],
+      ),
+    ).toThrow(/Package document was not inspected: docs\/result\.html/u);
+
+    expect(() =>
+      assertPackageDocumentLinkClosure(
+        [{ name: "README.md", content: "Release overview." }],
+        ["README.md", "package.json", "dist/cli.js"],
+      ),
+    ).not.toThrow();
+  });
+
+  it("checks links in every additional packaged Markdown document", () => {
+    expect(() =>
+      assertPackageDocumentLinkClosure(
+        [
+          { name: "README.md", content: "[Extra](docs/extra.md)" },
+          {
+            name: "docs/extra.md",
+            content: "[Missing](missing-target.md)",
+          },
+        ],
+        ["README.md", "docs/extra.md"],
+      ),
+    ).toThrow(/Local package link target is missing for docs\/extra\.md/u);
+  });
+
+  it("recognizes packaged document extensions case-insensitively", () => {
+    expect(() =>
+      assertPackageDocumentLinkClosure(
+        [
+          { name: "README.MD", content: "[Result](docs/result.HTML)" },
+          {
+            name: "docs/result.HTML",
+            content: '<a href="../README.MD">Home</a>',
+          },
+        ],
+        ["README.MD", "docs/result.HTML"],
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects duplicate inspected entries after path normalization", () => {
+    expect(() =>
+      assertPackageDocumentLinkClosure(
+        [
+          { name: "docs/runbook.md", content: "First." },
+          { name: "docs\\runbook.md", content: "Second." },
+        ],
+        ["docs/runbook.md"],
+      ),
+    ).toThrow(/Package entry was inspected more than once: docs\/runbook\.md/u);
+  });
+
+  it("does not let unpackaged document entries expand the package link graph", () => {
+    expect(() =>
+      assertPackageDocumentLinkClosure(
+        [
+          { name: "README.md", content: "Release overview." },
+          {
+            name: "notes/internal.md",
+            content: "[Not packaged](missing-target.md)",
+          },
+        ],
+        ["README.md", "package.json"],
+      ),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ["file", "file:///sensitive-target"],
+    ["data", "data:text/plain,sensitive-target"],
+    ["javascript", "javascript:sensitive-target"],
+    ["absolute", "/sensitive-target.md"],
+    ["escaping", "../../../sensitive-target.md"],
+  ])(
+    "keeps unsafe %s document-closure link failures redacted",
+    (_kind, target) => {
+      const sourceName = "docs/release/result.html";
+      const secretBody = "document-body-secret-sentinel";
+      let failure: unknown;
+      try {
+        assertPackageDocumentLinkClosure(
+          [
+            {
+              name: sourceName,
+              content: `<a href="${target}">${secretBody}</a>`,
+            },
+          ],
+          [sourceName],
+        );
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(Error);
+      expect((failure as Error).message).toContain(sourceName);
+      expect((failure as Error).message).not.toContain(target);
+      expect((failure as Error).message).not.toContain(secretBody);
+    },
+  );
+
+  it("rejects unsafe package and entry paths before checking document closure", () => {
+    expect(() =>
+      assertPackageDocumentLinkClosure([], ["../README.md"]),
+    ).toThrow(/Unsafe npm package path/u);
+    expect(() =>
+      assertPackageDocumentLinkClosure(
+        [{ name: "../README.md", content: "Unsafe source." }],
+        ["README.md"],
+      ),
+    ).toThrow(/Unsafe npm package path/u);
   });
 
   it("fails closed for missing or escaping package-local links without echoing document content", () => {

@@ -216,6 +216,44 @@ export function assertPackageLocalLinks(
   }
 }
 
+function isPackageDocument(fileName: string): boolean {
+  const lowerCaseName = fileName.toLocaleLowerCase("en-US");
+  return lowerCaseName.endsWith(".md") || lowerCaseName.endsWith(".html");
+}
+
+export function assertPackageDocumentLinkClosure(
+  entries: readonly ReleaseTextEntry[],
+  packageFiles: readonly string[],
+): void {
+  const normalizedPackageFiles = packageFiles.map((fileName) =>
+    assertSafePackPath(fileName),
+  );
+  const entriesByName = new Map<string, ReleaseTextEntry>();
+  for (const entry of entries) {
+    const normalizedName = assertSafePackPath(entry.name);
+    if (entriesByName.has(normalizedName)) {
+      throw new Error(
+        `Package entry was inspected more than once: ${normalizedName}`,
+      );
+    }
+    entriesByName.set(normalizedName, {
+      name: normalizedName,
+      content: entry.content,
+    });
+  }
+
+  const documentEntries = [
+    ...new Set(normalizedPackageFiles.filter(isPackageDocument)),
+  ].map((documentName) => {
+    const entry = entriesByName.get(documentName);
+    if (entry === undefined) {
+      throw new Error(`Package document was not inspected: ${documentName}`);
+    }
+    return entry;
+  });
+  assertPackageLocalLinks(documentEntries, normalizedPackageFiles);
+}
+
 function normalizeForSearch(value: string): string {
   return value
     .replaceAll("\\", "/")
