@@ -250,4 +250,3 @@ git commit -m "docs: record package document closure"
 ```
 
 Expected: no evidence JSON, activity configuration or plugin state file is changed.
-

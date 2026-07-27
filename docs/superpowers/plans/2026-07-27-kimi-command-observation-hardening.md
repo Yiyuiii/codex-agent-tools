@@ -608,4 +608,3 @@ git commit -m "docs: record Kimi command observation hardening"
 ```
 
 Expected: the commit contains documentation and memory only; no evidence JSON.
-

@@ -104,4 +104,3 @@ If implementation discovers that correctness requires any of these actions, stop
 ## Completion and next human decision
 
 The goal is complete when implementation, reviews, verification, documentation and clean candidate freeze are all complete. The next human decision must then be limited to whether to authorize a new full eight-case qualification batch on the exact reported frozen HEAD. Offline completion does not itself authorize that batch.
-
