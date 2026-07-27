@@ -216,6 +216,511 @@ describe("release assurance", () => {
     ).not.toThrow();
   });
 
+  it.each([
+    [
+      "Markdown reference link",
+      "docs/release/checklist.md",
+      "[Missing][ref]\n\n[ref]: missing.md",
+    ],
+    [
+      "raw HTML in Markdown",
+      "docs/release/checklist.md",
+      '<a href="missing.md">Missing</a>',
+    ],
+    [
+      "unquoted href in HTML",
+      "docs/release/result.html",
+      "<a href=missing.md>Missing</a>",
+    ],
+  ])("detects a missing local target in a %s", (_kind, name, content) => {
+    expect(() =>
+      assertPackageLocalLinks([{ name, content }], [name]),
+    ).toThrow(/Local package link target is missing/u);
+  });
+
+  it("accepts closed reference, raw HTML, and unquoted HTML links while ignoring external links and fragments", () => {
+    const markdownName = "docs/release/checklist.md";
+    const htmlName = "docs/release/result.html";
+
+    expect(() =>
+      assertPackageLocalLinks(
+        [
+          {
+            name: markdownName,
+            content: [
+              "[Result][result]",
+              "[Angle][angle]",
+              "[Web][web]",
+              "[Section][section]",
+              "",
+              "[result]: result.html#decision",
+              '[angle]: <result.html?view=review#decision> "Result"',
+              "[web]: https://example.com/reference",
+              "[section]: #status",
+              '<a href="result.html">Raw local</a>',
+              "<a href=https://example.com/reference>Raw web</a>",
+              "<a href=#status>Raw section</a>",
+            ].join("\n"),
+          },
+          {
+            name: htmlName,
+            content: [
+              "<a href=checklist.md>Checklist</a>",
+              "<a href=https://example.com/reference>Web</a>",
+              "<a href=#decision>Section</a>",
+            ].join("\n"),
+          },
+        ],
+        [markdownName, htmlName],
+      ),
+    ).not.toThrow();
+  });
+
+  it("ignores Markdown code and escaped link openers while preserving angle destinations", () => {
+    const sourceName = "docs/release/checklist.md";
+
+    expect(() =>
+      assertPackageLocalLinks(
+        [
+          {
+            name: sourceName,
+            content: [
+              "[Result](<result.html>)",
+              "\\[Escaped](missing-escaped.md)",
+              '\\<a href="missing-escaped-html.md">Escaped HTML</a>',
+              "`[Inline code](missing-inline.md)`",
+              "```md",
+              "[Code](missing-code.md)",
+              "[code-ref]: missing-reference.md",
+              '<a href="missing-raw-html.md">Code sample</a>',
+              "```",
+            ].join("\n"),
+          },
+        ],
+        [sourceName, "docs/release/result.html"],
+      ),
+    ).not.toThrow();
+  });
+
+  it.each(
+    ["docs/release/result.html", "docs/release/checklist.md"].flatMap(
+      (name) => [
+        [
+          "data-href attribute",
+          name,
+          "<a data-href=missing-data-attribute.md>Example</a>",
+        ],
+        [
+          "href-like quoted attribute value",
+          name,
+          '<a title="href=missing-title-value.md">Example</a>',
+        ],
+        [
+          "HTML comment",
+          name,
+          "<!-- <a href=missing-comment.md>Commented example</a> -->",
+        ],
+        [
+          "script raw text",
+          name,
+          '<script>const example = "<a href=missing-script.md>";</script>',
+        ],
+        [
+          "style raw text",
+          name,
+          '<style>/* <a href=missing-style.md> */</style>',
+        ],
+        [
+          "textarea RCDATA",
+          name,
+          "<textarea><a href=missing-textarea.md>Example</a></textarea>",
+        ],
+        [
+          "title RCDATA",
+          name,
+          "<title><a href=missing-title.md>Example</a></title>",
+        ],
+      ],
+    ),
+  )("ignores a %s in %s", (_kind, name, content) => {
+    expect(() =>
+      assertPackageLocalLinks([{ name, content }], [name]),
+    ).not.toThrow();
+  });
+
+  it.each([
+    [
+      "raw-text end tag with attributes",
+      "<script>text</script data-x><a href=missing-after-script.md>Real</a>",
+    ],
+    [
+      "RCDATA end tag with attributes",
+      "<textarea>text</textarea data-x><a href=missing-after-textarea.md>Real</a>",
+    ],
+    [
+      "raw-text end tag with a self-closing flag",
+      "<script>text</script/><a href=missing-after-self-closing.md>Real</a>",
+    ],
+  ])("checks a real link after a %s", (_kind, content) => {
+    const sourceName = "docs/release/result.html";
+
+    expect(() =>
+      assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+    ).toThrow(/Local package link target is missing/u);
+  });
+
+  it("ignores link-like text inside a Markdown code span that crosses lines", () => {
+    const sourceName = "docs/release/checklist.md";
+    const content = "`code\n[not a link](missing.md)\n`";
+
+    expect(() =>
+      assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+    ).not.toThrow();
+  });
+
+  it.each([
+    "iframe",
+    "noembed",
+    "noframes",
+    "script",
+    "style",
+    "textarea",
+    "title",
+    "xmp",
+  ])(
+    "does not parse Markdown links inside an inline HTML %s text-only element",
+    (tag) => {
+      const sourceName = "docs/release/checklist.md";
+      const content = `Text <${tag}>[Not a link](missing-inline-${tag}.md)</${tag}> text.`;
+
+      expect(() =>
+        assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+      ).not.toThrow();
+    },
+  );
+
+  it("keeps suppressing Markdown links after a plaintext closing-tag spelling", () => {
+    const sourceName = "docs/release/checklist.md";
+    const content =
+      "Text <plaintext>[First](missing-first.md)</plaintext> [Second](missing-second.md)";
+
+    expect(() =>
+      assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+    ).not.toThrow();
+  });
+
+  it.each(
+    [
+      "iframe",
+      "noembed",
+      "noframes",
+      "plaintext",
+      "script",
+      "style",
+      "textarea",
+      "title",
+      "xmp",
+    ].flatMap((tag) => [
+      [tag, "docs/release/result.html", `<${tag}/><a href=missing-${tag}.md>Not a link</a></${tag}>`],
+      [
+        tag,
+        "docs/release/checklist.md",
+        `Text <${tag}/>[Not a link](missing-${tag}.md)</${tag}> text.`,
+      ],
+    ]),
+  )(
+    "ignores the self-closing flag on a non-void %s start tag in %s",
+    (_tag, name, content) => {
+      expect(() =>
+        assertPackageLocalLinks([{ name, content }], [name]),
+      ).not.toThrow();
+    },
+  );
+
+  it.each([
+    ["Markdown", "docs/release/checklist.md", "[]()"],
+    ["HTML", "docs/release/result.html", '<a href="">Self</a>'],
+  ])("allows an empty %s destination as a same-document link", (_kind, name, content) => {
+    expect(() =>
+      assertPackageLocalLinks([{ name, content }], [name]),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ["Markdown", "docs/release/checklist.md", "[Self](?view=review)"],
+    ["HTML", "docs/release/result.html", '<a href="?view=review">Self</a>'],
+  ])("allows a query-only %s destination as a same-document link", (_kind, name, content) => {
+    expect(() =>
+      assertPackageLocalLinks([{ name, content }], [name]),
+    ).not.toThrow();
+  });
+
+  it("checks a Markdown link in an indented list-item paragraph", () => {
+    const sourceName = "docs/release/checklist.md";
+    const content = "- item\n\n    [Result](result.md)";
+
+    expect(() =>
+      assertPackageLocalLinks(
+        [{ name: sourceName, content }],
+        [sourceName, "docs/release/result.md"],
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+    ).toThrow(/Local package link target is missing/u);
+  });
+
+  it("checks a blockquoted Markdown reference link", () => {
+    const sourceName = "docs/release/checklist.md";
+    const content = "> [Result][ref]\n>\n> [ref]: result.md";
+
+    expect(() =>
+      assertPackageLocalLinks(
+        [{ name: sourceName, content }],
+        [sourceName, "docs/release/result.md"],
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+    ).toThrow(/Local package link target is missing/u);
+  });
+
+  it.each([
+    ["HTML comment", "<!-- [Not a link](missing-comment.md) -->"],
+    [
+      "script raw text",
+      "<script>const example = '[Not a link](missing-script.md)';</script>",
+    ],
+  ])("does not parse Markdown-style links inside %s", (_kind, content) => {
+    const sourceName = "docs/release/checklist.md";
+
+    expect(() =>
+      assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ["balanced parentheses", "[Result](result_(part).md)"],
+    ["escaped parentheses", "[Result](result_\\(part\\).md)"],
+  ])(
+    "accepts an existing inline Markdown destination with %s",
+    (_kind, content) => {
+      const sourceName = "docs/release/checklist.md";
+
+      expect(() =>
+        assertPackageLocalLinks(
+          [{ name: sourceName, content }],
+          [sourceName, "docs/release/result_(part).md"],
+        ),
+      ).not.toThrow();
+    },
+  );
+
+  it.each([
+    [
+      "balanced parentheses",
+      "[Missing](missing_(part).md)",
+      "docs/release/missing_(part",
+    ],
+    [
+      "escaped parentheses",
+      "[Missing](missing_\\(part\\).md)",
+      "docs/release/missing_(part).md.prefix",
+    ],
+  ])(
+    "rejects a missing full inline Markdown destination with %s",
+    (_kind, content, misleadingPrefix) => {
+      const sourceName = "docs/release/checklist.md";
+
+      expect(() =>
+        assertPackageLocalLinks(
+          [{ name: sourceName, content }],
+          [sourceName, misleadingPrefix],
+        ),
+      ).toThrow(/Local package link target is missing/u);
+    },
+  );
+
+  it("checks a reference definition destination after one line ending", () => {
+    const sourceName = "docs/release/checklist.md";
+    const content = "[Result][ref]\n\n[ref]:\n  result.md";
+
+    expect(() =>
+      assertPackageLocalLinks(
+        [{ name: sourceName, content }],
+        [sourceName, "docs/release/result.md"],
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+    ).toThrow(/Local package link target is missing/u);
+  });
+
+  it("rejects and redacts an unsafe reference destination after one line ending", () => {
+    const sourceName = "docs/release/checklist.md";
+    const unsafeTarget = "javascript:reference-target-secret";
+    const content = `[Unsafe][ref]\n\n[ref]:\n  ${unsafeTarget}`;
+    let failure: unknown;
+    try {
+      assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/Unsafe package link/u);
+    expect((failure as Error).message).toContain(sourceName);
+    expect((failure as Error).message).not.toContain(unsafeTarget);
+    expect((failure as Error).message).not.toContain(
+      "reference-target-secret",
+    );
+  });
+
+  it.each([
+    ["escaped closing bracket", "[foo\\]](missing.md)"],
+    ["nested brackets", "[foo [bar]](missing.md)"],
+  ])(
+    "checks an inline Markdown link with %s in its label",
+    (_kind, missingContent) => {
+      const sourceName = "docs/release/checklist.md";
+      const existingContent = missingContent.replace("missing.md", "result.md");
+
+      expect(() =>
+        assertPackageLocalLinks(
+          [{ name: sourceName, content: existingContent }],
+          [sourceName, "docs/release/result.md"],
+        ),
+      ).not.toThrow();
+      expect(() =>
+        assertPackageLocalLinks(
+          [{ name: sourceName, content: missingContent }],
+          [sourceName],
+        ),
+      ).toThrow(/Local package link target is missing/u);
+    },
+  );
+
+  it("does not treat a backtick fence with a backtick in its info string as a code fence", () => {
+    const sourceName = "docs/release/checklist.md";
+    const content = [
+      "``` bad`info",
+      "[Not code](missing.md)",
+      "```",
+    ].join("\n");
+
+    expect(() =>
+      assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+    ).toThrow(/Local package link target is missing/u);
+  });
+
+  it.each([
+    [
+      "unbalanced parenthesis nesting",
+      "[Secret](missing_(target-secret.md)",
+    ],
+    ["unterminated angle destination", "[Secret](<target-secret.md)"],
+    [
+      "more than one line ending before a reference destination",
+      "[ref]:\n\n  target-secret.md",
+    ],
+  ])(
+    "treats CommonMark %s as ordinary text",
+    (_kind, content) => {
+      const sourceName = "docs/release/checklist.md";
+
+      expect(() =>
+        assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+      ).not.toThrow();
+    },
+  );
+
+  it("checks a deeply balanced destination that CommonMark parses as a link", () => {
+    const sourceName = "docs/release/checklist.md";
+    const target = `${"(".repeat(33)}target-secret${")".repeat(33)}`;
+    const content = `[Secret](${target})`;
+    let failure: unknown;
+    try {
+      assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(
+      /Local package link target is missing/u,
+    );
+    expect((failure as Error).message).toContain(sourceName);
+    expect((failure as Error).message).not.toContain(target);
+    expect((failure as Error).message).not.toContain("target-secret");
+  });
+
+  it(
+    "processes many malformed HTML tag openers without repeatedly rescanning the tail",
+    () => {
+      const sourceName = "docs/release/result.html";
+      const content = "<a ".repeat(15_000);
+
+      expect(() =>
+        assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+      ).not.toThrow();
+    },
+    750,
+  );
+
+  it(
+    "skips many non-matching raw-text end-tag candidates in linear time",
+    () => {
+      const sourceName = "docs/release/result.html";
+      const content = `<script>${"</a ".repeat(15_000)}`;
+
+      expect(() =>
+        assertPackageLocalLinks([{ name: sourceName, content }], [sourceName]),
+      ).not.toThrow();
+    },
+    750,
+  );
+
+  it.each([
+    [
+      "Markdown reference definition",
+      "docs/release/checklist.md",
+      "[Unsafe][ref]\n\n[ref]: javascript:sensitive-target",
+      "javascript:sensitive-target",
+    ],
+    [
+      "raw HTML in Markdown",
+      "docs/release/checklist.md",
+      '<a href="../../../sensitive-target.md">document-body-secret-sentinel</a>',
+      "../../../sensitive-target.md",
+    ],
+    [
+      "unquoted href in HTML",
+      "docs/release/result.html",
+      "<a href=data:text/plain,sensitive-target>document-body-secret-sentinel</a>",
+      "data:text/plain,sensitive-target",
+    ],
+  ])(
+    "redacts an unsafe target and document body from a %s failure",
+    (_kind, name, content, target) => {
+      let failure: unknown;
+      try {
+        assertPackageLocalLinks([{ name, content }], [name]);
+      } catch (error) {
+        failure = error;
+      }
+
+      expect(failure).toBeInstanceOf(Error);
+      expect((failure as Error).message).toMatch(
+        /Unsafe package link|Local package link escapes the package/u,
+      );
+      expect((failure as Error).message).not.toContain(target);
+      expect((failure as Error).message).not.toContain(
+        "document-body-secret-sentinel",
+      );
+      expect((failure as Error).message).not.toContain("sensitive-target");
+    },
+  );
+
   it("requires every packaged Markdown document to be inspected", () => {
     expect(() =>
       assertPackageDocumentLinkClosure(

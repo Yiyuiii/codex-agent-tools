@@ -3,7 +3,33 @@ import path from "node:path";
 
 import type * as TypeScript from "typescript";
 
-const ts = createRequire(import.meta.url)("typescript") as typeof TypeScript;
+interface CommonMarkNode {
+  readonly type: string;
+  readonly destination: string | null;
+  readonly literal: string | null;
+  walker(): CommonMarkWalker;
+}
+
+interface CommonMarkWalker {
+  next(): CommonMarkWalkerEvent | null;
+}
+
+interface CommonMarkWalkerEvent {
+  readonly entering: boolean;
+  readonly node: CommonMarkNode;
+}
+
+interface CommonMarkParser {
+  parse(content: string): CommonMarkNode;
+}
+
+interface CommonMarkModule {
+  readonly Parser: new () => CommonMarkParser;
+}
+
+const localRequire = createRequire(import.meta.url);
+const commonmark = localRequire("commonmark") as CommonMarkModule;
+const ts = localRequire("typescript") as typeof TypeScript;
 
 export interface ReleaseTextEntry {
   name: string;
@@ -143,21 +169,348 @@ export async function resolveAllowedPackInspectionPaths(
   return resolved;
 }
 
-function documentLinkTargets(entry: ReleaseTextEntry): string[] {
-  const targets: string[] = [];
-  if (entry.name.toLocaleLowerCase("en-US").endsWith(".html")) {
-    const htmlLink = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/giu;
-    for (const match of entry.content.matchAll(htmlLink)) {
-      targets.push(match[1] ?? match[2] ?? "");
+function isAsciiLetter(character: string | undefined): boolean {
+  if (character === undefined) {
+    return false;
+  }
+  const code = character.charCodeAt(0);
+  return (
+    (code >= "A".charCodeAt(0) && code <= "Z".charCodeAt(0)) ||
+    (code >= "a".charCodeAt(0) && code <= "z".charCodeAt(0))
+  );
+}
+
+function isHtmlWhitespace(character: string | undefined): boolean {
+  return (
+    character === " " ||
+    character === "\t" ||
+    character === "\n" ||
+    character === "\f" ||
+    character === "\r"
+  );
+}
+
+function isHtmlAttributeNameCharacter(
+  character: string | undefined,
+): boolean {
+  return (
+    character !== undefined &&
+    !isHtmlWhitespace(character) &&
+    !['"', "'", ">", "/", "=", "<", "`"].includes(character)
+  );
+}
+
+interface ParsedHtmlTag {
+  readonly nextOffset: number;
+  readonly name: string;
+  readonly closing: boolean;
+  readonly selfClosing: boolean;
+  readonly hrefTargets: readonly string[];
+}
+
+const HTML_TEXT_ONLY_ELEMENTS = new Set([
+  "iframe",
+  "noembed",
+  "noframes",
+  "plaintext",
+  "script",
+  "style",
+  "textarea",
+  "title",
+  "xmp",
+]);
+
+function parseHtmlTag(
+  content: string,
+  start: number,
+): ParsedHtmlTag | undefined {
+  let cursor = start + 1;
+  const closing = content[cursor] === "/";
+  if (closing) {
+    cursor += 1;
+  }
+  if (!isAsciiLetter(content[cursor])) {
+    return undefined;
+  }
+
+  const nameStart = cursor;
+  cursor += 1;
+  while (
+    isAsciiLetter(content[cursor]) ||
+    /[0-9-]/u.test(content[cursor] ?? "")
+  ) {
+    cursor += 1;
+  }
+  const name = content.slice(nameStart, cursor).toLocaleLowerCase("en-US");
+  const hrefTargets: string[] = [];
+
+  while (cursor < content.length) {
+    while (isHtmlWhitespace(content[cursor])) {
+      cursor += 1;
     }
-  } else if (entry.name.toLocaleLowerCase("en-US").endsWith(".md")) {
-    const markdownLink =
-      /!?\[[^\]]*\]\(\s*(?:<([^>\r\n]+)>|([^\s)]+))(?:\s+["'][^)]*["'])?\s*\)/gu;
-    for (const match of entry.content.matchAll(markdownLink)) {
-      targets.push(match[1] ?? match[2] ?? "");
+    if (content[cursor] === ">") {
+      return {
+        nextOffset: cursor + 1,
+        name,
+        closing,
+        selfClosing: false,
+        hrefTargets: closing ? [] : hrefTargets,
+      };
+    }
+    if (content[cursor] === "/" && content[cursor + 1] === ">") {
+      return {
+        nextOffset: cursor + 2,
+        name,
+        closing,
+        selfClosing: true,
+        hrefTargets: closing ? [] : hrefTargets,
+      };
+    }
+
+    const attributeStart = cursor;
+    while (isHtmlAttributeNameCharacter(content[cursor])) {
+      cursor += 1;
+    }
+    if (cursor === attributeStart) {
+      cursor += 1;
+      continue;
+    }
+    const isHref =
+      content
+        .slice(attributeStart, cursor)
+        .toLocaleLowerCase("en-US") === "href";
+    while (isHtmlWhitespace(content[cursor])) {
+      cursor += 1;
+    }
+    if (content[cursor] !== "=") {
+      continue;
+    }
+    cursor += 1;
+    while (isHtmlWhitespace(content[cursor])) {
+      cursor += 1;
+    }
+
+    const quote = content[cursor];
+    if (quote === '"' || quote === "'") {
+      cursor += 1;
+      const valueStart = cursor;
+      while (cursor < content.length && content[cursor] !== quote) {
+        cursor += 1;
+      }
+      if (cursor >= content.length) {
+        return {
+          nextOffset: content.length,
+          name,
+          closing,
+          selfClosing: false,
+          hrefTargets: [],
+        };
+      }
+      if (isHref) {
+        hrefTargets.push(content.slice(valueStart, cursor));
+      }
+      cursor += 1;
+      continue;
+    }
+
+    const valueStart = cursor;
+    while (
+      cursor < content.length &&
+      !isHtmlWhitespace(content[cursor]) &&
+      !['"', "'", "=", "<", ">", "`"].includes(content[cursor]!)
+    ) {
+      cursor += 1;
+    }
+    if (isHref) {
+      hrefTargets.push(content.slice(valueStart, cursor));
+    }
+  }
+
+  return {
+    nextOffset: content.length,
+    name,
+    closing,
+    selfClosing: false,
+    hrefTargets: [],
+  };
+}
+
+function matchesHtmlEndTagName(
+  content: string,
+  candidate: number,
+  tagName: string,
+): boolean {
+  const nameStart = candidate + 2;
+  for (let index = 0; index < tagName.length; index += 1) {
+    const code = content.charCodeAt(nameStart + index);
+    const lowerCode =
+      code >= "A".charCodeAt(0) && code <= "Z".charCodeAt(0)
+        ? code + ("a".charCodeAt(0) - "A".charCodeAt(0))
+        : code;
+    if (lowerCode !== tagName.charCodeAt(index)) {
+      return false;
+    }
+  }
+  const delimiter = content[nameStart + tagName.length];
+  return (
+    isHtmlWhitespace(delimiter) ||
+    delimiter === "/" ||
+    delimiter === ">"
+  );
+}
+
+function htmlTextOnlyClosingOffset(
+  content: string,
+  start: number,
+  tagName: string,
+): number | undefined {
+  if (tagName === "plaintext") {
+    return undefined;
+  }
+  let cursor = start;
+  while (cursor < content.length) {
+    const candidate = content.indexOf("</", cursor);
+    if (candidate < 0) {
+      return undefined;
+    }
+    if (!matchesHtmlEndTagName(content, candidate, tagName)) {
+      cursor = candidate + 2;
+      continue;
+    }
+    const tag = parseHtmlTag(content, candidate);
+    if (tag?.closing === true && tag.name === tagName) {
+      return tag.nextOffset;
+    }
+    cursor = candidate + 2;
+  }
+  return undefined;
+}
+
+function skipHtmlTextOnlyContent(
+  content: string,
+  start: number,
+  tagName: string,
+): number {
+  return htmlTextOnlyClosingOffset(content, start, tagName) ?? content.length;
+}
+
+function htmlLinkTargets(content: string): string[] {
+  const targets: string[] = [];
+  let cursor = 0;
+  while (cursor < content.length) {
+    const start = content.indexOf("<", cursor);
+    if (start < 0) {
+      break;
+    }
+    if (content.startsWith("<!--", start)) {
+      const commentEnd = content.indexOf("-->", start + 4);
+      cursor = commentEnd < 0 ? content.length : commentEnd + 3;
+      continue;
+    }
+
+    const tag = parseHtmlTag(content, start);
+    if (tag === undefined) {
+      cursor = start + 1;
+      continue;
+    }
+    targets.push(...tag.hrefTargets);
+    cursor = tag.nextOffset;
+    if (
+      !tag.closing &&
+      HTML_TEXT_ONLY_ELEMENTS.has(tag.name)
+    ) {
+      cursor = skipHtmlTextOnlyContent(content, cursor, tag.name);
     }
   }
   return targets;
+}
+
+function firstHtmlTextOnlyTag(content: string): ParsedHtmlTag | undefined {
+  const start = content.indexOf("<");
+  if (start < 0) {
+    return undefined;
+  }
+  const tag = parseHtmlTag(content, start);
+  return tag !== undefined && HTML_TEXT_ONLY_ELEMENTS.has(tag.name)
+    ? tag
+    : undefined;
+}
+
+function markdownLinkTargets(
+  content: string,
+  sourceName: string,
+): string[] {
+  try {
+    const targets: string[] = [];
+    let openTextOnlyElement: string | undefined;
+    const walker = new commonmark.Parser().parse(content).walker();
+    for (
+      let event = walker.next();
+      event !== null;
+      event = walker.next()
+    ) {
+      if (!event.entering) {
+        continue;
+      }
+      const node = event.node;
+      if (node.type === "link" || node.type === "image") {
+        if (openTextOnlyElement !== undefined) {
+          continue;
+        }
+        if (typeof node.destination !== "string") {
+          throw new Error("CommonMark link destination is unavailable");
+        }
+        targets.push(node.destination);
+      } else if (
+        node.type === "html_inline" ||
+        node.type === "html_block"
+      ) {
+        if (typeof node.literal !== "string") {
+          throw new Error("CommonMark HTML literal is unavailable");
+        }
+        const textOnlyTag = firstHtmlTextOnlyTag(node.literal);
+        if (openTextOnlyElement !== undefined) {
+          if (
+            openTextOnlyElement !== "plaintext" &&
+            textOnlyTag?.closing === true &&
+            textOnlyTag.name === openTextOnlyElement
+          ) {
+            openTextOnlyElement = undefined;
+          }
+          continue;
+        }
+        targets.push(...htmlLinkTargets(node.literal));
+        if (
+          textOnlyTag !== undefined &&
+          !textOnlyTag.closing &&
+          htmlTextOnlyClosingOffset(
+            node.literal,
+            textOnlyTag.nextOffset,
+            textOnlyTag.name,
+          ) === undefined
+        ) {
+          openTextOnlyElement = textOnlyTag.name;
+        }
+      }
+    }
+    return targets;
+  } catch {
+    throw new Error(`Unable to parse package Markdown in ${sourceName}`);
+  }
+}
+
+function documentLinkTargets(
+  entry: ReleaseTextEntry,
+  sourceName: string,
+): string[] {
+  const lowerCaseName = entry.name.toLocaleLowerCase("en-US");
+  if (lowerCaseName.endsWith(".html")) {
+    return htmlLinkTargets(entry.content);
+  }
+  if (!lowerCaseName.endsWith(".md")) {
+    return [];
+  }
+  return markdownLinkTargets(entry.content, sourceName);
 }
 
 function resolveLocalPackageLink(
@@ -165,7 +518,12 @@ function resolveLocalPackageLink(
   rawTarget: string,
 ): string | undefined {
   const trimmed = rawTarget.trim();
-  if (trimmed.startsWith("#") || trimmed.startsWith("//")) {
+  if (
+    trimmed === "" ||
+    trimmed.startsWith("#") ||
+    trimmed.startsWith("?") ||
+    trimmed.startsWith("//")
+  ) {
     return undefined;
   }
   const scheme = /^([a-z][a-z0-9+.-]*):/iu.exec(trimmed)?.[1];
@@ -176,7 +534,6 @@ function resolveLocalPackageLink(
     throw new Error(`Unsafe package link in ${sourceName}`);
   }
   if (
-    trimmed === "" ||
     trimmed.startsWith("/") ||
     trimmed.startsWith("\\")
   ) {
@@ -208,7 +565,7 @@ export function assertPackageLocalLinks(
   );
   for (const entry of entries) {
     const sourceName = assertSafePackPath(entry.name);
-    for (const rawTarget of documentLinkTargets(entry)) {
+    for (const rawTarget of documentLinkTargets(entry, sourceName)) {
       const target = resolveLocalPackageLink(sourceName, rawTarget);
       if (target !== undefined && !availableFiles.has(target)) {
         throw new Error(
