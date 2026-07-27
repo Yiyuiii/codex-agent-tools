@@ -13,6 +13,7 @@ import type {
 } from "../../src/adapters/adapter.js";
 import type { LlmProfile, TaskKind } from "../../src/domain/types.js";
 import { createLlmRegistry, resolveLlm } from "../../src/llms/registry.js";
+import type { CommandObservation } from "../../src/tasks/command-observations.js";
 import { ExternalAgentService } from "../../src/tasks/service.js";
 
 let cwd: string;
@@ -373,6 +374,7 @@ describe("ExternalAgentService", () => {
         events: [
           {
             type: "tool_call",
+            toolCallId: "call-1",
             kind: "execute",
             title: "Run tests",
             rawInput: { command: "npm test" },
@@ -386,6 +388,86 @@ describe("ExternalAgentService", () => {
       cwd,
     });
     expect(result.commandsRun).toEqual(["npm test"]);
+  });
+
+  it("reports a late-update command observation once without exposing it publicly", async () => {
+    const observed: Array<readonly CommandObservation[]> = [];
+    const service = createService(async () =>
+      completed({
+        events: [
+          {
+            type: "tool_call",
+            toolCallId: "call-1",
+            kind: "execute",
+            title: "Run",
+          },
+          {
+            type: "tool_call_update",
+            toolCallId: "call-1",
+            rawInput: { command: "git status --short" },
+          },
+        ],
+      }),
+    );
+
+    const result = await service.delegate(
+      {
+        llm: "kimi-k3",
+        prompt: "Run",
+        cwd,
+      },
+      { onCommandObservations: (value) => observed.push(value) },
+    );
+
+    expect(observed).toEqual([
+      [{ source: "late_update", command: "git status --short" }],
+    ]);
+    expect(result.commandsRun).toEqual(["git status --short"]);
+    expect(result).not.toHaveProperty("commandObservations");
+    expect(JSON.stringify(result)).not.toContain("commandObservations");
+  });
+
+  it("reports one empty command observation batch when delegate emits no execute events", async () => {
+    const observed: Array<readonly CommandObservation[]> = [];
+    const service = createService(async () =>
+      completed({
+        events: [{ type: "message", text: "No tools needed" }],
+      }),
+    );
+
+    const result = await service.delegate(
+      {
+        llm: "kimi-k3",
+        prompt: "Run",
+        cwd,
+      },
+      { onCommandObservations: (value) => observed.push(value) },
+    );
+
+    expect(observed).toEqual([[]]);
+    expect(result.commandsRun).toEqual([]);
+  });
+
+  it("reports one empty command observation batch when the delegate adapter throws", async () => {
+    const observed: Array<readonly CommandObservation[]> = [];
+    const service = createService(async () => {
+      throw new Error("adapter failed");
+    });
+
+    const result = await service.delegate(
+      {
+        llm: "kimi-k3",
+        prompt: "Run",
+        cwd,
+      },
+      { onCommandObservations: (value) => observed.push(value) },
+    );
+
+    expect(observed).toEqual([[]]);
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe("failed");
+    expect(result.diagnostics).toEqual(["adapter failed"]);
+    expect(result.commandsRun).toEqual([]);
   });
 
   it.each([

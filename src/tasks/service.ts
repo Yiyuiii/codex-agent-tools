@@ -20,6 +20,11 @@ import {
   externalDelegateInputSchema,
   externalReviewInputSchema,
 } from "./schemas.js";
+import type { CommandObservation } from "./command-observations.js";
+import {
+  commandsFromObservations,
+  extractCommandObservations,
+} from "./command-observations.js";
 import type {
   ExternalDelegateResult,
   ExternalReviewResult,
@@ -39,6 +44,9 @@ export interface TaskExecutionContext {
   onProgress?: (message: string) => void;
   onExecutionTelemetry?: (
     telemetry: AdapterExecutionTelemetry | null,
+  ) => void;
+  onCommandObservations?: (
+    observations: readonly CommandObservation[],
   ) => void;
 }
 
@@ -80,26 +88,6 @@ function failedAdapterResult(error: unknown): AdapterRunResult {
 
 function adapterStatus(status: AdapterRunResult["status"]): ExternalTaskStatus {
   return status;
-}
-
-function extractCommands(events: readonly unknown[]): string[] {
-  const commands: string[] = [];
-  for (const event of events) {
-    if (typeof event !== "object" || event === null) continue;
-    const record = event as Record<string, unknown>;
-    if (record.type !== "tool_call" || record.kind !== "execute") continue;
-    const rawInput =
-      typeof record.rawInput === "object" && record.rawInput !== null
-        ? (record.rawInput as Record<string, unknown>)
-        : undefined;
-    const command = rawInput?.command;
-    if (typeof command === "string") {
-      commands.push(command);
-    } else if (typeof record.title === "string") {
-      commands.push(record.title);
-    }
-  }
-  return commands;
 }
 
 function reviewPolicyViolations(events: readonly unknown[]): string[] {
@@ -276,6 +264,10 @@ export class ExternalAgentService {
       } catch (error) {
         adapterResult = failedAdapterResult(error);
       }
+      const commandObservations = extractCommandObservations(
+        adapterResult.events,
+      );
+      context.onCommandObservations?.(commandObservations);
       context.onExecutionTelemetry?.(adapterResult.executionTelemetry);
       const after = await captureWorkspace(input.cwd);
       const comparison = compareWorkspace(before, after);
@@ -289,7 +281,7 @@ export class ExternalAgentService {
           comparison.filesChanged,
         ),
         summary: adapterResult.text,
-        commandsRun: extractCommands(adapterResult.events),
+        commandsRun: commandsFromObservations(commandObservations),
         verification: [],
         risks: [],
       };
