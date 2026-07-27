@@ -922,6 +922,66 @@ describe("qualification verifier", () => {
       await expectVerificationFailure(repositoryRoot, manifestPath);
     });
 
+    it("rejects zero commandCount with an extractable observation", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandCount = 0;
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects commandCount below the extractable observation count", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandCount = 1;
+          evidence.commandObservations = [
+            { source: "raw_input", match: "exact" },
+            { source: "late_update", match: "embedded" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("accepts an unextractable observation beyond commandCount", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandCount = 1;
+          evidence.commandObservations = [
+            { source: "raw_input", match: "exact" },
+            { source: "unextractable", match: "other" },
+          ];
+        },
+      });
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        status: "passed",
+        promotionEligible: true,
+      });
+    });
+
     it("rejects unextractable paired with a non-other match", async () => {
       const repositoryRoot = await tempRepository();
       const { manifestPath } = await createPassedBatch(repositoryRoot, {

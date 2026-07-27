@@ -425,6 +425,7 @@ function validateCommandObservationDiagnostics(
   ) {
     throw new QualificationVerificationError();
   }
+  const commandCount = evidence.commandCount;
   const descriptors = Object.getOwnPropertyDescriptors(observations) as Record<
     string,
     PropertyDescriptor
@@ -449,15 +450,16 @@ function validateCommandObservationDiagnostics(
         descriptor.set !== undefined
       );
     }) ||
-    typeof evidence.commandCount !== "number" ||
-    !Number.isSafeInteger(evidence.commandCount) ||
-    evidence.commandCount < 0 ||
-    observations.length < evidence.commandCount
+    typeof commandCount !== "number" ||
+    !Number.isSafeInteger(commandCount) ||
+    commandCount < 0 ||
+    observations.length < commandCount
   ) {
     throw new QualificationVerificationError();
   }
 
   let hasExact = false;
+  let extractableCount = 0;
   for (const key of itemKeys) {
     const observation = plainRecord(descriptors[key]!.value);
     const observationKeys = Object.keys(observation).sort();
@@ -474,11 +476,13 @@ function validateCommandObservationDiagnostics(
     ) {
       throw new QualificationVerificationError();
     }
+    if (observation.source !== "unextractable") extractableCount += 1;
     if (observation.match === "exact") hasExact = true;
   }
 
   const checks = plainRecord(evidence.checks);
   if (
+    extractableCount !== commandCount ||
     typeof checks.requiredCommandObserved !== "boolean" ||
     hasExact !== checks.requiredCommandObserved
   ) {
