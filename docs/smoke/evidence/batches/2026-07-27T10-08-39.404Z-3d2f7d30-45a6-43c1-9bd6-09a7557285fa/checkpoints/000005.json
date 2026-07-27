@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "qualificationPlanId": "four-llm-v1",
+  "sequence": 5,
+  "kind": "case_running",
+  "batchId": "2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa",
+  "recordedAt": "2026-07-27T10:23:52.461Z",
+  "repositoryCommit": "652e14ac637bfc04d90c448179ecc5838f2f8450",
+  "buildIdentitySha256": "71576ad637f1a9ee9914ebf7294b267abd43421a4df89621f45fd0adfdf034ee",
+  "preflightSha256": "2449bc7c4b30ecb7d447fef8e399a04b1433c084025a4c01ad89a2df9f87d36c",
+  "ordinal": 3,
+  "llm": "kimi-k3",
+  "task": "review"
+}

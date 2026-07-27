@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 2,
+  "qualificationPlanId": "four-llm-v1",
+  "sequence": 6,
+  "kind": "case_completed",
+  "batchId": "2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa",
+  "recordedAt": "2026-07-27T10:24:23.317Z",
+  "repositoryCommit": "652e14ac637bfc04d90c448179ecc5838f2f8450",
+  "buildIdentitySha256": "71576ad637f1a9ee9914ebf7294b267abd43421a4df89621f45fd0adfdf034ee",
+  "preflightSha256": "2449bc7c4b30ecb7d447fef8e399a04b1433c084025a4c01ad89a2df9f87d36c",
+  "ordinal": 3,
+  "llm": "kimi-k3",
+  "task": "review",
+  "result": "passed",
+  "evidence": {
+    "path": "docs/smoke/evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/cases/2026-07-27T10-24-21.919Z-kimi-k3-review.json",
+    "sha256": "3082a3c5e3c6abee8b81bb6c5aec2505ace5af28cfb704d03c933b89bbf2324c"
+  },
+  "adapterClientInvocationCount": 1,
+  "adapterRetryCount": 0,
+  "runtimeReportedAutoRetryCount": 0,
+  "adapterReportedFallbackUsed": false,
+  "orchestratorFallbackUsed": false,
+  "executionTelemetrySource": "kimi-acp-observable",
+  "failureReason": null
+}
