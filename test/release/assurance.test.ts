@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertAllowedPackFiles,
   assertNoSensitiveContent,
+  assertPackageLocalLinks,
   resolvePackInspectionPath,
 } from "../../src/release/assurance.js";
 
@@ -61,6 +62,11 @@ describe("release assurance", () => {
         "docs/operations.md",
         "docs/migration-from-codex-cc-tools.md",
         "docs/release/checklist.md",
+        "docs/release/four-llm-qualification-result-review.html",
+        "docs/release/four-llm-qualification-authorization-review.html",
+        "docs/release/real-plugin-install-review.md",
+        "docs/release/plugin-isolated-state.md",
+        "docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md",
         "docs/smoke/pi-gemini.md",
         "docs/smoke/evidence/gemini-review.json",
         "docs/smoke/evidence/batches/legacy/manifest.json",
@@ -96,6 +102,85 @@ describe("release assurance", () => {
     expect(() =>
       assertAllowedPackFiles([".agents/plugins/another-marketplace.json"]),
     ).toThrow(/Unexpected file/u);
+    expect(() =>
+      assertAllowedPackFiles(["docs/release/unreviewed-status.md"]),
+    ).toThrow(/Unexpected file/u);
+    expect(() =>
+      assertAllowedPackFiles([
+        "docs/superpowers/plans/unreviewed-execution-plan.md",
+      ]),
+    ).toThrow(/Unexpected file/u);
+  });
+
+  it("accepts closed HTML and Markdown package-local links while ignoring external links", () => {
+    const packageFiles = [
+      "docs/release/result.html",
+      "docs/release/checklist.md",
+      "docs/smoke/evidence/batches/current/manifest.json",
+    ];
+
+    expect(() =>
+      assertPackageLocalLinks(
+        [
+          {
+            name: "docs/release/result.html",
+            content: [
+              '<a href="checklist.md?view=review#status">checklist</a>',
+              '<a href="../smoke/evidence/batches/current/manifest.json#result">manifest</a>',
+              '<a href="https://example.com/reference">web</a>',
+              '<a href="mailto:maintainer@example.com">mail</a>',
+              '<a href="#decision">section</a>',
+            ].join("\n"),
+          },
+          {
+            name: "docs/release/checklist.md",
+            content: [
+              "[Result](result.html#decision)",
+              "[Manifest](../smoke/evidence/batches/current/manifest.json?raw=1)",
+              "[Web](http://example.com/reference)",
+              "[Mail](mailto:maintainer@example.com)",
+              "[Section](#status)",
+            ].join("\n"),
+          },
+        ],
+        packageFiles,
+      ),
+    ).not.toThrow();
+  });
+
+  it("fails closed for missing or escaping package-local links without echoing document content", () => {
+    const secretBody = "link-body-secret-sentinel";
+    let missingFailure: unknown;
+    try {
+      assertPackageLocalLinks(
+        [
+          {
+            name: "docs/release/result.html",
+            content: `<a href="missing.md">${secretBody}</a>`,
+          },
+        ],
+        ["docs/release/result.html"],
+      );
+    } catch (error) {
+      missingFailure = error;
+    }
+    expect(missingFailure).toBeInstanceOf(Error);
+    expect((missingFailure as Error).message).toMatch(
+      /Local package link target is missing/u,
+    );
+    expect((missingFailure as Error).message).not.toContain(secretBody);
+
+    expect(() =>
+      assertPackageLocalLinks(
+        [
+          {
+            name: "docs/release/checklist.md",
+            content: "[Escape](../../../outside.md)",
+          },
+        ],
+        ["docs/release/checklist.md"],
+      ),
+    ).toThrow(/Local package link escapes the package/u);
   });
 
   it("scans retained historical documents and evidence with the same secret and path policy", () => {

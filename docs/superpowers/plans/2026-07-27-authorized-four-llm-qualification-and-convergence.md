@@ -1,10 +1,13 @@
 # Authorized Four-LLM Qualification and Convergence Implementation Plan
 
-> **For agentic workers:** This plan is the durable execution source for the single authorized `four-llm-v1` batch and the result-dependent offline convergence. Re-read it after every context compaction. Never persist the raw authorization reference.
+> [!CAUTION]
+> **历史终态——禁止执行。** 本计划对应的唯一批次 `2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde` 已以 `interrupted / process_interrupted` 结束，授权已经消费。本文保留的真实资格入口、恢复和后续晋级命令只用于历史审计；任何 agent 都不得执行、复用或据此启动新批次。
 
-**Goal:** 在精确冻结候选上只运行一次新的四模型八项真实资格批次；若未 8/8 通过，冻结失败事实并停止；若同批 8/8 通过，则完成 Ark Coding Plan 成对晋级、文档与 `ready` 状态收敛，并停在正式仓库切换或活动安装之前。
+> **For agentic workers:** This repository copy is a historical record of the consumed `four-llm-v1` authorization and its result-dependent convergence plan. Do not treat it as an active runbook.
 
-**Architecture:** 真实资格由现有串行协调器负责，固定执行八个 `LLM × task` 案例并发布不可覆盖的 case evidence schema v3、checkpoint schema v2 与终态 manifest schema v2。协调器不改源码；8/8 后由 Codex 先用 frozen-candidate verifier 锁定冻结候选与证据，再单独提交 evidence，随后以 TDD 更新注册表并用 immutable-evidence verifier 复验。失败分支只保存事实和审阅材料，不修改资格协议或重试。
+**历史目标：** 在精确冻结候选上只运行一次新的四模型八项真实资格批次；若未 8/8 通过，冻结失败事实并停止；若同批 8/8 通过，则完成 Ark Coding Plan 成对晋级、文档与 `ready` 状态收敛，并停在正式仓库切换或活动安装之前。
+
+**历史架构：** 真实资格由现有串行协调器负责，固定执行八个 `LLM × task` 案例并发布不可覆盖的 case evidence schema v3、checkpoint schema v2 与终态 manifest schema v2。协调器不改源码；8/8 后由 Codex 先用 frozen-candidate verifier 锁定冻结候选与证据，再单独提交 evidence，随后以 TDD 更新注册表并用 immutable-evidence verifier 复验。失败分支只保存事实和审阅材料，不修改资格协议或重试。
 
 **Tech stack:** TypeScript、Node.js、Vitest、PowerShell、Git、Pi RPC、Kimi Code ACP、Codex 官方插件隔离生命周期测试。
 
@@ -12,13 +15,13 @@
 
 ## 1. 授权、冻结点与硬边界
 
-### 1.1 当前唯一授权
+### 1.1 历史授权边界
 
-- 仓库/工作树：`D:\Codes\codex-agent-tools\.worktrees\gemini-retirement`
+- 仓库/工作树：`<repo-worktree>`
 - 分支：`codex/gemini-retirement`
 - 精确冻结提交：`287b9a8bfa14805f84707adff6c7f2af19065475`
 - 资格计划：`four-llm-v1`
-- 授权范围：一次新的完整八项真实资格批次，以及该批结果允许的离线收敛。
+- 历史授权范围：一次新的完整八项真实资格批次，以及该批结果允许的离线收敛；该授权现已消费，不得复用。
 - 授权引用：运行时在内存中生成一个新 UUID，仅传给标准入口；不得写入本计划、仓库文档、聊天、日志或其它持久文件。
 - 上一条只约束一次性授权 UUID。协调器另行生成的 batch UUID 与 lock nonce 是协议身份；batch UUID 必然进入 batchId、stdout 摘要、evidence 路径、checkpoint 和 manifest，必须按现有协议持久化。不得把 batch UUID 误当授权 UUID 删除或脱敏。
 - 标准入口通过 argv 接收授权引用，因此展开后的授权 UUID 会短暂存在于 `npm`/`tsx` 子进程命令行；批准材料禁止的是文档、聊天和日志持久化，并未要求对同机 OS 进程观察者隐藏。运行期间禁止记录完整命令行，不开启 transcript 或 shell trace。
@@ -46,13 +49,13 @@
 - 不 fast-forward 正式仓库或切换正式安装来源。
 - 不在真实批次运行期间检查或输出目标进程的完整命令行，避免把授权引用从子进程 argv 泄露到日志。
 
-### 1.4 计划文件的临时位置
+### 1.4 计划文件的历史临时位置
 
-冻结候选在运行前必须保持精确 clean，所以本计划暂存于仓库外：
+冻结候选在运行前必须保持精确 clean，所以本计划当时暂存于仓库外：
 
-`C:\Users\Administrator\.codex\agent-memory\codex-agent-tools-authorized-four-llm-execution-2026-07-27.md`
+`$CODEX_HOME/agent-memory/codex-agent-tools-authorized-four-llm-execution-2026-07-27.md`
 
-批次发布终态后，把计划内容迁入仓库的 `docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md`，在 `AGENTS.md` 索引，并删除本临时文件。迁移不得发生在 frozen-candidate verifier 之前。
+计划内容现已迁入仓库并由 `AGENTS.md` 索引。仓库外历史源文件暂不修改，待主线程完成最终验证后处理；本文不授权任何 worker 删除或改写该源文件。
 
 ---
 
@@ -93,9 +96,9 @@ npx tsx -e "import('./src/runtime/agent-processes.ts').then(async ({ classifyAge
 
 ## 3. Task 2：只启动一次标准资格入口
 
-### 3.1 唯一允许的启动形态
+### 3.1 历史启动形态（禁止执行）
 
-在一个 PowerShell 进程内生成授权引用，不打印、不持久化：
+以下命令只记录当时的启动形态，禁止再次执行。在当时的单个 PowerShell 进程内生成授权引用，不打印、不持久化：
 
 ```powershell
 $authorizationReference = [guid]::NewGuid().ToString('D').ToLowerInvariant()
@@ -108,7 +111,7 @@ try {
 exit $code
 ```
 
-执行要求：
+历史执行要求（禁止复用）：
 
 - 命令文本本身不得包含实际 UUID。
 - 使用 `npm run --silent`，防止 npm banner 回显调用参数。

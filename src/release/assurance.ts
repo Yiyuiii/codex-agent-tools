@@ -21,6 +21,11 @@ const EXACT_PUBLIC_FILES = new Set([
   "docs/operations.md",
   "docs/migration-from-codex-cc-tools.md",
   "docs/release/checklist.md",
+  "docs/release/four-llm-qualification-authorization-review.html",
+  "docs/release/four-llm-qualification-result-review.html",
+  "docs/release/plugin-isolated-state.md",
+  "docs/release/real-plugin-install-review.md",
+  "docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md",
   "package.json",
 ]);
 
@@ -79,6 +84,73 @@ export function resolvePackInspectionPath(
     throw new Error(`Unable to resolve redacted npm package path: ${packPath}`);
   }
   return matches[0]!;
+}
+
+function documentLinkTargets(entry: ReleaseTextEntry): string[] {
+  const targets: string[] = [];
+  if (entry.name.toLocaleLowerCase("en-US").endsWith(".html")) {
+    const htmlLink = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')/giu;
+    for (const match of entry.content.matchAll(htmlLink)) {
+      targets.push(match[1] ?? match[2] ?? "");
+    }
+  } else if (entry.name.toLocaleLowerCase("en-US").endsWith(".md")) {
+    const markdownLink =
+      /!?\[[^\]]*\]\(\s*(?:<([^>\r\n]+)>|([^\s)]+))(?:\s+["'][^)]*["'])?\s*\)/gu;
+    for (const match of entry.content.matchAll(markdownLink)) {
+      targets.push(match[1] ?? match[2] ?? "");
+    }
+  }
+  return targets;
+}
+
+function resolveLocalPackageLink(
+  sourceName: string,
+  rawTarget: string,
+): string | undefined {
+  const trimmed = rawTarget.trim();
+  if (
+    trimmed === "" ||
+    trimmed.startsWith("#") ||
+    trimmed.startsWith("//") ||
+    /^[a-z][a-z0-9+.-]*:/iu.test(trimmed)
+  ) {
+    return undefined;
+  }
+  const withoutQueryOrFragment = trimmed.split(/[?#]/u, 1)[0] ?? "";
+  if (withoutQueryOrFragment === "") {
+    return undefined;
+  }
+  const resolved = normalizePackPath(
+    path.posix.join(path.posix.dirname(sourceName), withoutQueryOrFragment),
+  );
+  if (
+    resolved === ".." ||
+    resolved.startsWith("../") ||
+    path.posix.isAbsolute(resolved)
+  ) {
+    throw new Error(`Local package link escapes the package in ${sourceName}`);
+  }
+  return resolved;
+}
+
+export function assertPackageLocalLinks(
+  entries: readonly ReleaseTextEntry[],
+  packageFiles: readonly string[],
+): void {
+  const availableFiles = new Set(
+    packageFiles.map((fileName) => assertSafePackPath(fileName)),
+  );
+  for (const entry of entries) {
+    const sourceName = assertSafePackPath(entry.name);
+    for (const rawTarget of documentLinkTargets(entry)) {
+      const target = resolveLocalPackageLink(sourceName, rawTarget);
+      if (target !== undefined && !availableFiles.has(target)) {
+        throw new Error(
+          `Local package link target is missing for ${sourceName}`,
+        );
+      }
+    }
+  }
 }
 
 function normalizeForSearch(value: string): string {

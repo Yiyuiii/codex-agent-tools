@@ -19,6 +19,7 @@ import { execa } from "execa";
 import {
   assertAllowedPackFiles,
   assertNoSensitiveContent,
+  assertPackageLocalLinks,
   resolvePackInspectionPath,
 } from "../dist/release-assurance.js";
 
@@ -59,6 +60,13 @@ const exactLogicalLlms = [
 const retainedHistoricalPackageSources = [
   "docs/smoke/pi-gemini.md",
   "docs/smoke/evidence",
+];
+const reviewPackageSources = [
+  "docs/release/four-llm-qualification-result-review.html",
+  "docs/release/four-llm-qualification-authorization-review.html",
+  "docs/release/real-plugin-install-review.md",
+  "docs/release/plugin-isolated-state.md",
+  "docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md",
 ];
 const worktreeMarker = `${path.sep}.worktrees${path.sep}`;
 const worktreeMarkerIndex = root
@@ -259,11 +267,11 @@ async function checkPluginArtifact() {
   }
   if (
     !Array.isArray(packageManifest.files) ||
-    !retainedHistoricalPackageSources.every((entry) =>
-      packageManifest.files.includes(entry),
+    ![...retainedHistoricalPackageSources, ...reviewPackageSources].every(
+      (entry) => packageManifest.files.includes(entry),
     )
   ) {
-    throw new Error("package files omit retained Gemini history");
+    throw new Error("package files omit required review or history documents");
   }
 
   if (
@@ -390,7 +398,6 @@ async function checkPackage() {
     throw new Error("npm pack did not return a file list");
   }
   const fileNames = packResult.files.map((entry) => entry.path);
-  assertAllowedPackFiles(fileNames);
 
   for (const required of [
     "package.json",
@@ -399,6 +406,7 @@ async function checkPackage() {
     "docs/operations.md",
     "docs/migration-from-codex-cc-tools.md",
     "docs/smoke/pi-gemini.md",
+    ...reviewPackageSources,
     "dist/cli.js",
     "dist/mcp.js",
     ...exactPluginFiles,
@@ -421,28 +429,33 @@ async function checkPackage() {
 
   const textEntries = [];
   const inspectedPackNames = new Set();
+  const actualPackFileNames = new Set();
   for (const name of fileNames) {
-    if (/\.(?:js|map|ts|json|md)$/iu.test(name) || name === "LICENSE") {
-      let inspectionName = name;
-      if (name.includes("***")) {
-        const normalized = name.replaceAll("\\", "/");
-        const wildcardIndex = normalized.indexOf("***");
-        const candidateDirectory = path.posix.dirname(
-          normalized.slice(0, wildcardIndex),
-        );
-        if (candidateDirectory === ".") {
-          throw new Error("Unable to resolve redacted npm package path");
-        }
-        const entries = await readdir(path.join(root, candidateDirectory), {
-          recursive: true,
-        });
-        inspectionName = resolvePackInspectionPath(
-          normalized,
-          entries.map((entry) =>
-            path.posix.join(candidateDirectory, entry.replaceAll("\\", "/")),
-          ),
-        );
+    let inspectionName = name;
+    if (name.includes("***")) {
+      const normalized = name.replaceAll("\\", "/");
+      const wildcardIndex = normalized.indexOf("***");
+      const candidateDirectory = path.posix.dirname(
+        normalized.slice(0, wildcardIndex),
+      );
+      if (candidateDirectory === ".") {
+        throw new Error("Unable to resolve redacted npm package path");
       }
+      const entries = await readdir(path.join(root, candidateDirectory), {
+        recursive: true,
+      });
+      inspectionName = resolvePackInspectionPath(
+        normalized,
+        entries.map((entry) =>
+          path.posix.join(candidateDirectory, entry.replaceAll("\\", "/")),
+        ),
+      );
+    }
+    actualPackFileNames.add(inspectionName);
+    if (
+      /\.(?:html|js|map|ts|json|md)$/iu.test(inspectionName) ||
+      inspectionName === "LICENSE"
+    ) {
       textEntries.push({
         name: inspectionName,
         content: await readFile(path.join(root, inspectionName), "utf8"),
@@ -450,6 +463,7 @@ async function checkPackage() {
       inspectedPackNames.add(name);
     }
   }
+  assertAllowedPackFiles([...actualPackFileNames]);
   const retainedHistory = fileNames.filter(
     (name) =>
       name === "docs/smoke/pi-gemini.md" ||
@@ -469,6 +483,13 @@ async function checkPackage() {
     forbiddenPaths: forbiddenDevelopmentPaths,
     secrets: releaseSecrets(process.env),
   });
+  const packageLinkEntries = textEntries.filter((entry) =>
+    reviewPackageSources.includes(entry.name),
+  );
+  if (packageLinkEntries.length !== reviewPackageSources.length) {
+    throw new Error("Required review package documents were not inspected");
+  }
+  assertPackageLocalLinks(packageLinkEntries, [...actualPackFileNames]);
 }
 
 await Promise.all([access(cliPath), access(mcpPath), access(pluginBundlePath)]);

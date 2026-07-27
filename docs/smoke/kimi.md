@@ -2,13 +2,15 @@
 
 ## 当前结论
 
-当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。2026-07-25 串行复跑的 review/delegate 两项门禁均为 passed，过渡注册表继续启用两项能力。2026-07-27 的最新 `four-llm-v1` 批次在第 1 项 Ark Coding Plan delegate 失败后立即停止，Kimi 两项均为 not run，因此没有形成新的 Kimi 资格结论；未来仍须在取得新授权后的完整同批 8/8 中重新产生 Kimi 两项 passed evidence，不能拼接本页既有证据。
+当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。2026-07-25 串行复跑的 review/delegate 两项门禁均为 passed，过渡注册表继续启用两项能力。2026-07-27 的最新 `four-llm-v1` 批次 `2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde` 形成 `interrupted / process_interrupted` 终态，0 个 case 完成；Kimi review/delegate 分别为 ordinal 3/4，均为 notRun，没有 case evidence，因此没有形成新的 Kimi 模型或质量结论。未来仍须在取得新授权后的完整同批 8/8 中重新产生 Kimi 两项 passed evidence，不能拼接本页既有证据。
 
 本轮没有回退到其它 Kimi 模型。两次 evidence 内的 `noNewKimiProcesses` 均为 true，且每次 evidence 验收后的独立系统快照也确认 Kimi 与 Pi RPC 进程数均为 0。
 
 2026-07-26 旧五模型 blocked 批次的终态见 [manifest](evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json)，SHA-256 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`。它只记录 Kimi 两项未运行，是 `five-llm-v1` 历史材料，不构成新的 Kimi 质量结论或当前资格来源。
 
-最新四模型 blocked [manifest](evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json) 的 SHA-256 为 `f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c`。它记录 Kimi review/delegate 分别为 ordinal 3/4、均 not run；批次后 Kimi ACP、Pi RPC、real-smoke 进程计数均为 0，没有 retry、fallback、resume 或第二批。
+最新四模型 interrupted [manifest](evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/manifest.json) 的 SHA-256 为 `3e200dca507fe886d4e3a4bbf67cc811cca485120e6969e7632f933537ba902b`。它只证明批次被中断、Kimi 两项未运行，不支持任何新的 Kimi 资格或模型质量判断。
+
+上一轮历史四模型 blocked [manifest](evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json) 的 SHA-256 为 `f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c`。它记录 Kimi review/delegate 分别为 ordinal 3/4、均 not run；批次后 Kimi ACP、Pi RPC、real-smoke 进程计数均为 0，没有 retry、fallback、resume 或第二批。
 
 ## 方法与通过标准
 

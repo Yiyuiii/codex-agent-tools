@@ -74,7 +74,7 @@
 - [Ark Coding Plan 资格提示词消歧与后续替代路线设计](docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md)
 - [Gemini 退役与四模型资格认证实施计划](docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md)
 - [Ark Coding Plan 资格提示词消歧实施计划](docs/superpowers/plans/2026-07-27-ark-coding-qualification-prompt-disambiguation.md)
-- [已审：授权四模型资格批次与结果收敛实施计划](docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md)
+- [历史：已执行且授权已消费的四模型资格批次与结果收敛实施计划](docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md)
 - [历史：已消费的四模型八项资格批次授权审阅](docs/release/four-llm-qualification-authorization-review.html)
 - [最新：四模型八项资格批次中断结果审阅](docs/release/four-llm-qualification-result-review.html)
 - [历史：十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md)

@@ -36,6 +36,9 @@ git diff --check
 `smoke:release` 还必须证明：
 
 - npm pack 精确包含 marketplace、plugin manifest、`.mcp.json` 与单文件 runtime；
+- npm pack 精确包含资格结果与授权审阅两个入口，以及真实插件状态、隔离插件状态和历史执行计划五份依赖文档；
+- 上述五份审阅包文档的包内本地链接必须闭合；缺失目标或越界链接立即失败；
+- HTML 与其它打包文本一并接受秘密值和开发机绝对路径扫描；
 - runtime bundle 不依赖安装目录外生产模块，不泄漏开发机绝对路径或环境凭据值；
 - MCP initialize/listTools 只公开 `external_review` 与 `external_delegate`，且 `llm` 必填；
 - Codex plugin help 只在临时 `CODEX_HOME` 中运行；
