@@ -15,6 +15,7 @@
 - 2026-07-25：用户同意改用 Codex 官方插件机制管理插件状态，但项目代码仍不得直接读写活动 `~/.codex/config.toml`。官方文档明确说明插件开关状态存储在该文件中，因此真实官方安装或升级属于可能触碰活动配置的操作；执行前必须先在隔离 `CODEX_HOME` 取证，再展示预计精确差异、验证与回滚，并取得针对该次操作的明确许可。
 - 2026-07-25：目标模型面调整为 `kimi-k3`、`gemini-3.5-flash`、两个固定使用 `ark-code-latest` 的 Ark Plan 路线，以及 Ark Agent Plan 内的 `deepseek-v4-flash` 快速经济档。
 - 2026-07-26：用户因 Gemini 免费额度实际不可用，明确批准将 `gemini-3.5-flash` 从当前产品面完整移除，同时保留既有 Gemini evidence、blocked 批次和历史说明；当前目标面改为 Kimi K3 与三条 Ark 路线。
+- 2026-07-27：用户确认 Ark Coding Plan 资格提示词消歧路线，并要求建立长期 `goal` 后持续自主构建，直到预期必须人工干预。本阶段授权覆盖计划、TDD 离线修复、确定性验证、临时 `CODEX_HOME` 隔离生命周期、只读复核、证据完整性校验、新候选冻结和资格批次授权审阅材料；不覆盖真实模型批次、活动插件安装、活动 `config.toml` 访问、旧 `codex_cc_tools` 移除或公共发布。
 
 ## 当前事实状态
 
@@ -70,6 +71,7 @@
 - [Gemini 退役与四模型资格认证设计](docs/superpowers/specs/2026-07-26-gemini-retirement-and-four-llm-qualification-design.md)
 - [Ark Coding Plan 资格提示词消歧与后续替代路线设计](docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md)
 - [Gemini 退役与四模型资格认证实施计划](docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md)
+- [Ark Coding Plan 资格提示词消歧实施计划](docs/superpowers/plans/2026-07-27-ark-coding-qualification-prompt-disambiguation.md)
 - [历史：十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md)
 - [历史：五模型官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)
 - [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)
