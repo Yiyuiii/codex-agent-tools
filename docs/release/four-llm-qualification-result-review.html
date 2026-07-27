@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>四模型八项资格批次中断结果审阅</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      body {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+        line-height: 1.65;
+        color: #1f2937;
+      }
+      h1,
+      h2 {
+        color: #111827;
+        line-height: 1.25;
+      }
+      .status,
+      .decision,
+      .verified,
+      .warning {
+        padding: 14px 18px;
+        border-radius: 10px;
+        margin: 1rem 0;
+      }
+      .status {
+        border: 2px solid #b45309;
+        background: #fffbeb;
+      }
+      .decision {
+        border: 2px solid #1d4ed8;
+        background: #eff6ff;
+      }
+      .verified {
+        border-left: 4px solid #047857;
+        background: #ecfdf5;
+      }
+      .warning {
+        border-left: 4px solid #b91c1c;
+        background: #fef2f2;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+      }
+      th,
+      td {
+        border: 1px solid #d1d5db;
+        padding: 9px 11px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #f3f4f6;
+      }
+      code {
+        background: #f3f4f6;
+        padding: 0.1em 0.35em;
+        border-radius: 4px;
+        overflow-wrap: anywhere;
+      }
+      li {
+        margin: 0.35em 0;
+      }
+      a {
+        color: #1d4ed8;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>四模型八项资格批次中断结果审阅</h1>
+    <div class="status">
+      <strong
+        >结论：本轮唯一授权已消费，批次因执行进程中断而未形成资格结果。</strong
+      >
+      当前注册表仍为 6 passed / 2 pending，只有 Ark Coding Plan 两项
+      pending；安装仍为 blocked / not
+      ready。本页只要求一个未来方向判断，不授权现在运行任何真实批次。
+    </div>
+
+    <h2>背景与边界</h2>
+    <p>
+      在 Ark Coding Plan
+      资格提示词完成离线消歧、候选重新冻结并通过预检后，用户只授权一个新的完整
+      <code>four-llm-v1</code> 批次。标准
+      <code>--authorization-ref</code>
+      入口已且只调用一次，绝不重跑。授权不包含活动
+      <code>~/.codex/config.toml</code> 访问、插件 add/remove、旧
+      <code>codex_cc_tools</code> 移除、Claude Code、npm/公共 marketplace
+      发布或正式仓库 fast-forward；这些动作均未执行。
+    </p>
+
+    <h2>精确时间线</h2>
+    <p>以下 checkpoint 与终态时间均为 UTC；“约 14 秒”来自执行宿主返回事实。</p>
+    <ol>
+      <li>
+        冻结候选 commit
+        <code>287b9a8bfa14805f84707adff6c7f2af19065475</code>，分支
+        <code>codex/gemini-retirement</code>，package
+        <code>0.1.0-alpha.1</code>；工作树 clean，preflight 通过。
+      </li>
+      <li>
+        标准入口只调用一次。执行宿主前台 shell 在约 14 秒处返回 timeout
+        124；这不是资格协调器已经终止的证明。
+      </li>
+      <li>
+        协调器子进程随后仍存活：<code>2026-07-27T04:29:36.016Z</code> 发布
+        sequence 0 / <code>batch_started</code>；<code
+          >2026-07-27T04:29:37.360Z</code
+        >
+        发布 sequence 1 / ordinal 1 / <code>ark-coding-plan delegate</code> /
+        <code>case_running</code>。
+      </li>
+      <li>
+        协调器后来退出并留下 stale owner；没有发布 case evidence 或正常终态。
+      </li>
+      <li>
+        确认原进程已死，且 Kimi ACP / Pi RPC / real-smoke 目标进程为 0/0/0
+        后，只对同一 batch 执行一次 <code>--recover-interrupted</code>。
+      </li>
+      <li>
+        恢复没有调用模型、resume、retry 或 fallback，只发布
+        <code>interrupted / process_interrupted</code> manifest
+        并释放锁；manifest 的 <code>completedAt</code> 为
+        <code>2026-07-27T04:30:44.473Z</code>。
+      </li>
+    </ol>
+
+    <h2>原因定位</h2>
+    <div class="warning">
+      <strong
+        >可证实的故障链是：执行宿主前台 shell 超时 → 协调器随后仍运行一段时间 →
+        协调器后来中断并留下 stale owner。</strong
+      >
+      恢复协议将终态归类为
+      <code>process_interrupted</code
+      >。这不是模型质量结论，也没有证据支持把它写成 route、凭据、网络、额度或
+      acceptance 失败。
+    </div>
+    <p>
+      ordinal 1 只证明进入
+      <code>case_running</code
+      >。它是否完成真实后端请求无法由现有证据证明；因此本页不虚构
+      telemetry、失败 case、case evidence SHA 或模型响应。
+    </p>
+
+    <h2>最小充分证据</h2>
+    <table>
+      <tbody>
+        <tr>
+          <th>批次</th>
+          <td>
+            <code
+              >2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde</code
+            >
+          </td>
+        </tr>
+        <tr>
+          <th>冻结候选</th>
+          <td>
+            <code>287b9a8bfa14805f84707adff6c7f2af19065475</code>；branch
+            <code>codex/gemini-retirement</code>；clean
+          </td>
+        </tr>
+        <tr>
+          <th>构建 / preflight</th>
+          <td>
+            build identity SHA-256
+            <code
+              >71576ad637f1a9ee9914ebf7294b267abd43421a4df89621f45fd0adfdf034ee</code
+            >； preflight SHA-256
+            <code
+              >1fdd7273a57309d6f541049493a89ed342ed897c749c5cb3cf043e7e7ca30185</code
+            >
+          </td>
+        </tr>
+        <tr>
+          <th>manifest</th>
+          <td>
+            schema
+            v2；<code>interrupted</code>；<code>process_interrupted</code>；
+            <code>promotionEligible=false</code>；SHA-256
+            <code
+              >3e200dca507fe886d4e3a4bbf67cc811cca485120e6969e7632f933537ba902b</code
+            >
+          </td>
+        </tr>
+        <tr>
+          <th>证据形状</th>
+          <td>
+            0 completed cases；ordinal 2–8 共 7 个 notRun；2 checkpoints：
+            <code>000000 batch_started</code>、<code>000001 case_running</code
+            >（ordinal 1 / Ark Coding Plan / delegate）；没有 cases 文件、case
+            evidence 或
+            <code>uncommittedEvidence</code>
+          </td>
+        </tr>
+        <tr>
+          <th>恢复后现场</th>
+          <td>
+            immutable-evidence verifier 通过；qualification lock
+            已消失；目标进程 0/0/0
+          </td>
+        </tr>
+        <tr>
+          <th>证据提交</th>
+          <td>
+            <code>b76c75d</code>；3 files / 276 insertions；只包含本批 manifest
+            与两个 checkpoints
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>机器已验证的内容</h2>
+    <div class="verified">
+      <ul>
+        <li>
+          manifest 和两个 checkpoint 的 schema、身份、顺序与 SHA 链通过
+          immutable-evidence verifier。
+        </li>
+        <li>manifest 文件 SHA-256 已独立复算匹配。</li>
+        <li>没有 cases 目录、case evidence 或未提交 evidence。</li>
+        <li>
+          只执行一次中断恢复；恢复后锁消失，Kimi ACP / Pi RPC / real-smoke 为
+          0/0/0。
+        </li>
+        <li>
+          注册表未修改，保持 6 passed / 2 pending；安装状态保持 blocked / not
+          ready。
+        </li>
+        <li>
+          已审执行计划的规格与质量复核均为 PASS；计划 SHA-256 为
+          <code
+            >3B9636C9A84DD94FE70A2707A3F6D6393BB67115FAA84626958AB7F1EED6E281</code
+          >。
+        </li>
+      </ul>
+    </div>
+
+    <h2>当前状态与风险</h2>
+    <ul>
+      <li>本轮授权已经消费，不能复用；也不能只补跑 Ark Coding Plan。</li>
+      <li>
+        最新批次没有晋级任何能力，Ark Coding Plan review/delegate 继续 pending。
+      </li>
+      <li>
+        旧 passed 证据继续解释现有 6 项 passed；最新 interrupted
+        记录不替代它们。
+      </li>
+      <li>
+        若不先修正长时命令承载方式，新的长时资格入口仍可能被执行宿主过早超时。
+      </li>
+      <li>
+        任何未来真实批次都必须重新冻结、重新复核、取得新的明确授权，并从 ordinal
+        1 开始；不能复用本批或旧批 evidence。
+      </li>
+    </ul>
+
+    <h2>唯一需要用户判断的问题</h2>
+    <div class="decision">
+      <strong
+        >是否将来在修正长时命令承载方式并重新冻结、复核后，再准备授权一个全新的完整
+        <code>four-llm-v1</code> 八项批次？</strong
+      >
+      此处的回答只决定是否推进离线修正与新审阅准备，不构成真实批次授权。
+    </div>
+
+    <h2>可选回答方式</h2>
+    <ul>
+      <li>
+        <strong>停止：</strong>“暂不推进新批次，保持 blocked / not ready。”
+      </li>
+      <li>
+        <strong>先准备：</strong
+        >“先修正长时命令承载方式并重新冻结、复核；完成后提交新的授权审阅材料，再由我单独决定是否授权真实批次。”
+      </li>
+    </ul>
+
+    <h2>回答后的消化路径</h2>
+    <p>
+      若选择停止，仓库维持当前注册表、证据和 blocked
+      状态，不再调用真实模型。若选择先准备，Codex
+      只推进长时命令承载方式的离线修正、确定性验证、重新冻结和审阅材料；在用户针对新冻结候选另行给出明确授权前，不运行真实模型。即使未来新批次
+      8/8 passed，活动插件安装、旧工具移除、发布和正式仓库 fast-forward
+      仍分别需要后续独立判断。
+    </p>
+
+    <h2>可追溯链接</h2>
+    <ul>
+      <li>
+        <a
+          href="../smoke/evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/manifest.json"
+          >interrupted manifest</a
+        >
+      </li>
+      <li>
+        <a
+          href="../smoke/evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/checkpoints/000000.json"
+          >checkpoint 000000：batch_started</a
+        >
+      </li>
+      <li>
+        <a
+          href="../smoke/evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/checkpoints/000001.json"
+          >checkpoint 000001：case_running</a
+        >
+      </li>
+      <li>
+        <a
+          href="../superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md"
+          >已审执行与收敛计划</a
+        >
+      </li>
+      <li><a href="../smoke/ark.md">Ark 资格证据索引</a></li>
+      <li><a href="checklist.md">四层发布门禁</a></li>
+      <li>
+        <a href="real-plugin-install-review.md"
+          >blocked / not ready 安装状态包</a
+        >
+      </li>
+      <li>
+        <a href="four-llm-qualification-authorization-review.html"
+          >已消费授权历史页</a
+        >
+      </li>
+    </ul>
+  </body>
+</html>

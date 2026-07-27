@@ -14,11 +14,11 @@
 - 第 2 层隔离官方插件生命周期已经通过。
 - 当前活动产品面是四个逻辑 LLM、八项 review/delegate 能力，全部固定使用 direct。
 - 按同一逻辑 LLM 的 review/delegate 必须成对通过的规则，当前过渡注册表是 **6 passed / 2 pending**；只有 Ark Coding Plan 的两项能力 pending。
-- 最新 `four-llm-v1` 批次已在首项 Ark Coding Plan delegate 的结果文件内容验收层失败，形成 `blocked` 终态；后七项未运行，未取得同批 8/8 资格。
+- 最新 `four-llm-v1` 批次因执行宿主超时后的协调器进程中断形成 `interrupted / process_interrupted` 终态；0 个 case 完成，未取得同批 8/8 资格。
 - 第 4 层真实 Codex App 宿主门禁尚未执行。
 - 当前没有执行活动 Codex 的 marketplace/plugin add 或 remove，也没有读取、写入、备份或恢复活动 `~/.codex/config.toml`。
 
-本文件不提出安装授权问题，也不提供当前可立即执行的安装命令。另行准备的[四模型八项资格批次授权审阅](four-llm-qualification-authorization-review.html)只询问一次完整真实资格批次，不能解释为活动安装、回滚或其它外部状态变更的许可。过去对“采用官方插件机制”的原则性同意不能替代未来某次真实 add/remove 的逐动作许可。
+本文件不提出安装授权问题，也不提供当前可立即执行的安装命令。[原四模型八项资格批次授权审阅](four-llm-qualification-authorization-review.html)已经消费且不能复用；[最新中断结果审阅](four-llm-qualification-result-review.html)只询问是否未来先修正长时命令承载方式、重新冻结/复核，再准备一份全新完整批次的授权材料，不能解释为活动安装、回滚或其它外部状态变更的许可。过去对“采用官方插件机制”的原则性同意不能替代未来某次真实 add/remove 的逐动作许可。
 
 ## 为什么最终仍需要官方安装
 
@@ -26,7 +26,20 @@
 
 当前的[隔离状态报告](plugin-isolated-state.md)只证明 Codex CLI 0.135.0 在唯一临时 `CODEX_HOME` 中可以添加 marketplace、安装缓存副本、启动 MCP、卸载插件并按官方列表语义回滚。它不证明活动 Codex App 已安装或可用，也不能代替真实宿主门禁。
 
-## 当前四模型原子资格认证停止事实
+## 最新四模型原子资格认证中断事实
+
+- 冻结 commit：`287b9a8bfa14805f84707adff6c7f2af19065475`；分支：`codex/gemini-retirement`；候选包：`0.1.0-alpha.1`；批次：`2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde`；协议：`four-llm-v1`。
+- preflight clean 且通过；build identity SHA-256 为 `71576ad637f1a9ee9914ebf7294b267abd43421a4df89621f45fd0adfdf034ee`，preflight SHA-256 为 `1fdd7273a57309d6f541049493a89ed342ed897c749c5cb3cf043e7e7ca30185`。
+- 标准 `--authorization-ref` 入口已且只调用一次。执行宿主前台 shell 约 14 秒后返回 timeout 124；协调器子进程随后仍存活，持久化 `batch_started` 与 ordinal 1 `ark-coding-plan/delegate` 的 `case_running` 后退出并留下 stale owner。
+- 确认原进程已死且 Kimi ACP、Pi RPC、real-smoke 为 0/0/0 后，只对同一 batch 执行一次 `--recover-interrupted`；恢复没有调用模型、resume、retry 或 fallback，只发布 `interrupted / process_interrupted` 终态并释放锁。
+- manifest schema v2，`promotionEligible=false`，0 completed cases，ordinal 2–8 共 7 个 notRun，2 个 checkpoints；没有 cases 文件、case evidence 或 `uncommittedEvidence`。
+- ordinal 1 是否完成真实后端请求无法由现有证据证明；因此不得虚构 telemetry 或失败 evidence SHA，也不能把本次中断写成模型、route、凭据或 acceptance 失败。
+- interrupted manifest：[JSON](../smoke/evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/manifest.json)，SHA-256 `3e200dca507fe886d4e3a4bbf67cc811cca485120e6969e7632f933537ba902b`；immutable-evidence verifier 已通过，锁已消失，目标进程为 0/0/0。
+- evidence 已由独立提交 `b76c75d` 保存（3 files / 276 insertions）。当前授权已经消费；未来任何真实批次都需要新的明确授权，并从 ordinal 1 重新开始，不能复用旧证据。
+
+该终态没有改变注册表或安装状态：仍为 6 passed / 2 pending 与 **blocked / not ready**。活动配置、插件 add/remove、`codex_cc_tools` 移除、Claude Code、发布与正式仓库 fast-forward 均未执行。
+
+## 上一轮四模型原子资格认证停止事实
 
 - 冻结 commit：`b57382ed4f2fddce4946613b5aa5739c6eed5c8f`；批次：`2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d`；协议：`four-llm-v1`。
 - 完整 preflight 通过；第 1 项 `ark-coding-plan delegate` 固定使用 Pi RPC / `ark-coding-plan` / `ark-code-latest` / direct。
@@ -42,9 +55,9 @@
 
 blocked case 的 raw/normalized 双哈希已确定实际文件是 `ARK_SMOKE_OK:ark-coding-plan;\n`，即旧提示词中紧邻期望 payload 的自然语言分号进入了文件。实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 已将三个 Ark delegate profile 的写入要求统一为精确 Node + Base64 Bash 命令，并把 payload 放在独立代码块中。
 
-本次改动没有触及严格结果 validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、资格 schema/protocol 或任何既有 evidence。独立规格和代码质量审阅均为 PASS；fresh typecheck、build、release smoke、临时 `CODEX_HOME` 隔离 check-report、44 个测试文件（569 passed / 1 skipped / 0 failed）、当前 blocked immutable verifier、当前 evidence 5/5、历史 Gemini 14/14、历史 `five-llm-v1` blocked/non-promotable 和目标进程 0/0/0 均通过。Node `spawnSync(bash, ["-c", command])` 探针精确写入 29 bytes、LF 结尾，SHA-256 为 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。
+本次改动没有触及严格结果 validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、资格 schema/protocol 或任何既有 evidence。独立规格和代码质量审阅均为 PASS；fresh typecheck、build、release smoke、临时 `CODEX_HOME` 隔离 check-report、44 个测试文件（569 passed / 1 skipped / 0 failed）、当时 blocked immutable verifier、当时 evidence 5/5、历史 Gemini 14/14、历史 `five-llm-v1` blocked/non-promotable 和目标进程 0/0/0 均通过。Node `spawnSync(bash, ["-c", command])` 探针精确写入 29 bytes、LF 结尾，SHA-256 为 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。
 
-这些都是离线证据。本轮没有新的真实模型调用，Ark Coding Plan 仍未重新资格通过，注册表和本安装状态包仍分别保持 6 passed / 2 pending 与 **blocked / not ready**。
+这些都是离线证据；随后的最新批次也没有形成 case evidence。Ark Coding Plan 仍未重新资格通过，注册表和本安装状态包仍分别保持 6 passed / 2 pending 与 **blocked / not ready**。
 
 ## 历史五模型原子重认证停止事实
 
@@ -58,7 +71,7 @@ blocked case 的 raw/normalized 双哈希已确定实际文件是 `ARK_SMOKE_OK:
 
 ## 当前四模型过渡状态
 
-当前四个活动 LLM 全部直连。最新八项资格批次被首项失败阻断后，下表注册表保持不变；只有 Ark Coding Plan 的 review/delegate pending。
+当前四个活动 LLM 全部直连。最新八项资格批次因进程中断而没有形成 case evidence，下表注册表保持不变；只有 Ark Coding Plan 的 review/delegate pending。
 
 | 逻辑 LLM | 固定后端 / 模型 / 路由 | 注册表 review | 注册表 delegate |
 | --- | --- | --- | --- |
@@ -67,7 +80,7 @@ blocked case 的 raw/normalized 双哈希已确定实际文件是 `ARK_SMOKE_OK:
 | `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | passed | passed |
 | `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | passed | passed |
 
-既有精确证据和 SHA-256 见 [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)与 [Gemini 退役历史](../smoke/pi-gemini.md)索引。最新 blocked 证据不能晋级任何 pending 能力；未来新资格仍必须由取得新授权后的完整 `four-llm-v1` 8/8 批次提供，不能把这些既有证据拼接为当前资格。
+既有精确证据和 SHA-256 见 [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)与 [Gemini 退役历史](../smoke/pi-gemini.md)索引。最新 interrupted 证据和旧 blocked 证据都不能晋级任何 pending 能力；未来新资格仍必须由修正长时命令承载方式、重新冻结/复核并取得新授权后的完整 `four-llm-v1` 8/8 批次提供，不能把这些既有证据拼接为当前资格。
 
 ### 历史五模型阻断证据
 
