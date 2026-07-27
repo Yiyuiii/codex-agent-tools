@@ -17,10 +17,9 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { execa } from "execa";
 
 import {
-  assertAllowedPackFiles,
   assertNoSensitiveContent,
   assertPackageLocalLinks,
-  resolvePackInspectionPath,
+  resolveAllowedPackInspectionPaths,
 } from "../dist/release-assurance.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -398,7 +397,17 @@ async function checkPackage() {
     throw new Error("npm pack did not return a file list");
   }
   const fileNames = packResult.files.map((entry) => entry.path);
-  assertAllowedPackFiles(fileNames);
+  const resolvedFileNames = await resolveAllowedPackInspectionPaths(
+    fileNames,
+    async (candidateDirectory) => {
+      const entries = await readdir(path.join(root, candidateDirectory), {
+        recursive: true,
+      });
+      return entries.map((entry) =>
+        path.posix.join(candidateDirectory, entry.replaceAll("\\", "/")),
+      );
+    },
+  );
 
   for (const required of [
     "package.json",
@@ -430,29 +439,12 @@ async function checkPackage() {
 
   const textEntries = [];
   const inspectedPackNames = new Set();
-  const actualPackFileNames = new Set();
-  for (const name of fileNames) {
-    let inspectionName = name;
-    if (name.includes("***")) {
-      const normalized = name.replaceAll("\\", "/");
-      const wildcardIndex = normalized.indexOf("***");
-      const candidateDirectory = path.posix.dirname(
-        normalized.slice(0, wildcardIndex),
-      );
-      if (candidateDirectory === ".") {
-        throw new Error("Unable to resolve redacted npm package path");
-      }
-      const entries = await readdir(path.join(root, candidateDirectory), {
-        recursive: true,
-      });
-      inspectionName = resolvePackInspectionPath(
-        normalized,
-        entries.map((entry) =>
-          path.posix.join(candidateDirectory, entry.replaceAll("\\", "/")),
-        ),
-      );
+  const actualPackFileNames = new Set(resolvedFileNames);
+  for (const [index, name] of fileNames.entries()) {
+    const inspectionName = resolvedFileNames[index];
+    if (inspectionName === undefined) {
+      throw new Error("Resolved npm package file list is incomplete");
     }
-    actualPackFileNames.add(inspectionName);
     if (
       /\.(?:html|js|map|ts|json|md)$/iu.test(inspectionName) ||
       inspectionName === "LICENSE"
@@ -464,7 +456,6 @@ async function checkPackage() {
       inspectedPackNames.add(name);
     }
   }
-  assertAllowedPackFiles([...actualPackFileNames]);
   const retainedHistory = fileNames.filter(
     (name) =>
       name === "docs/smoke/pi-gemini.md" ||

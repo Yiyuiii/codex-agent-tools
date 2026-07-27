@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   assertAllowedPackFiles,
   assertNoSensitiveContent,
   assertPackageLocalLinks,
+  resolveAllowedPackInspectionPaths,
   resolvePackInspectionPath,
 } from "../../src/release/assurance.js";
 
@@ -51,6 +52,62 @@ describe("release assurance", () => {
     expect(() => resolvePackInspectionPath("../***", ["../escape"])).toThrow(
       /Unsafe npm package path/u,
     );
+  });
+
+  it.each([
+    [["../../secret.md"]],
+    [["../../***"]],
+    [["docs/release/unreviewed.md"]],
+    [["docs/smoke/evidence/batches/invalid*/manifest.json"]],
+    [
+      [
+        "docs/smoke/evidence/batches/2026-07-27T04-27-07.245Z-***/manifest.json",
+        "../../secret.md",
+      ],
+    ],
+    [
+      [
+        "docs/smoke/evidence/batches/2026-07-27T04-27-07.245Z-***/manifest.json",
+        "docs/smoke/evidence/batches/invalid*/manifest.json",
+      ],
+    ],
+  ])(
+    "rejects unsafe or unapproved raw package paths before candidate I/O",
+    async (fileNames) => {
+      const listCandidates = vi.fn(async () => [
+        "docs/smoke/evidence/batches/unexpected/manifest.json",
+      ]);
+
+      await expect(
+        resolveAllowedPackInspectionPaths(fileNames, listCandidates),
+      ).rejects.toThrow();
+      expect(listCandidates).not.toHaveBeenCalled();
+    },
+  );
+
+  it("resolves an allowed redacted path with one candidate read", async () => {
+    const redacted =
+      "docs/smoke/evidence/batches/2026-07-27T04-27-07.245Z-***/manifest.json";
+    const actual =
+      "docs/smoke/evidence/batches/2026-07-27T04-27-07.245Z-batch/manifest.json";
+    const listCandidates = vi.fn(async (candidateDirectory: string) => {
+      expect(candidateDirectory).toBe("docs/smoke/evidence/batches");
+      return [actual];
+    });
+
+    await expect(
+      resolveAllowedPackInspectionPaths([redacted], listCandidates),
+    ).resolves.toEqual([actual]);
+    expect(listCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  it("revalidates resolved package paths after candidate I/O", async () => {
+    const listCandidates = vi.fn(async () => ["docs/smoke/node_modules"]);
+
+    await expect(
+      resolveAllowedPackInspectionPaths(["docs/smoke/***"], listCandidates),
+    ).rejects.toThrow(/Unexpected file in npm package/u);
+    expect(listCandidates).toHaveBeenCalledTimes(1);
   });
 
   it("accepts only the documented runtime package surface", () => {

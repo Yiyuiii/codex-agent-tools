@@ -86,6 +86,59 @@ export function resolvePackInspectionPath(
   return matches[0]!;
 }
 
+export async function resolveAllowedPackInspectionPaths(
+  fileNames: readonly string[],
+  listCandidates: (
+    candidateDirectory: string,
+  ) => Promise<readonly string[]>,
+): Promise<string[]> {
+  assertAllowedPackFiles(fileNames);
+  const prepared = fileNames.map((fileName) => {
+    const normalized = assertSafePackPath(fileName);
+    const redactionCount = normalized.split("***").length - 1;
+    if (redactionCount === 0) {
+      if (normalized.includes("*")) {
+        throw new Error(`Unsafe npm package path: ${fileName}`);
+      }
+      return { normalized };
+    }
+    if (
+      redactionCount !== 1 ||
+      normalized.replace("***", "").includes("*")
+    ) {
+      throw new Error(`Unsafe npm package path: ${fileName}`);
+    }
+    const candidateDirectory = path.posix.dirname(
+      normalized.slice(0, normalized.indexOf("***")),
+    );
+    if (
+      candidateDirectory === "." ||
+      candidateDirectory === ".." ||
+      candidateDirectory.startsWith("../") ||
+      path.posix.isAbsolute(candidateDirectory)
+    ) {
+      throw new Error("Unable to resolve redacted npm package path");
+    }
+    return { normalized, candidateDirectory };
+  });
+
+  const resolved: string[] = [];
+  for (const entry of prepared) {
+    if (entry.candidateDirectory === undefined) {
+      resolved.push(entry.normalized);
+      continue;
+    }
+    resolved.push(
+      resolvePackInspectionPath(
+        entry.normalized,
+        await listCandidates(entry.candidateDirectory),
+      ),
+    );
+  }
+  assertAllowedPackFiles(resolved);
+  return resolved;
+}
+
 function documentLinkTargets(entry: ReleaseTextEntry): string[] {
   const targets: string[] = [];
   if (entry.name.toLocaleLowerCase("en-US").endsWith(".html")) {
