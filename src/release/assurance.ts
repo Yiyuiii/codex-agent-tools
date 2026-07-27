@@ -52,6 +52,7 @@ function assertSafePackPath(fileName: string): string {
     normalized === "." ||
     normalized === ".." ||
     normalized.startsWith("../") ||
+    path.win32.isAbsolute(fileName) ||
     path.posix.isAbsolute(normalized)
   ) {
     throw new Error(`Unsafe npm package path: ${fileName}`);

@@ -397,6 +397,55 @@ describe("release assurance", () => {
     expect((failure as Error).message).not.toContain("secret-sentinel");
   });
 
+  it("redacts a Windows absolute package file path from closure errors", () => {
+    const unsafePath = "C:\\package-path-secret-sentinel.md";
+    let failure: unknown;
+    try {
+      assertPackageDocumentLinkClosure([], [unsafePath]);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/Unsafe npm package path/u);
+    expect((failure as Error).message).not.toContain(unsafePath);
+    expect((failure as Error).message).not.toContain("secret-sentinel");
+  });
+
+  it("redacts a Windows absolute entry name from closure errors", () => {
+    const unsafePath = "C:\\entry-path-secret-sentinel.md";
+    let failure: unknown;
+    try {
+      assertPackageDocumentLinkClosure(
+        [{ name: unsafePath, content: "Sensitive document body." }],
+        [],
+      );
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/Unsafe npm package path/u);
+    expect((failure as Error).message).not.toContain(unsafePath);
+    expect((failure as Error).message).not.toContain("secret-sentinel");
+  });
+
+  it.each([
+    ["Windows drive path", "C:\\release\\README.md"],
+    ["slash-normalized Windows drive path", "C:/release/README.md"],
+    ["Windows UNC path", "\\\\server\\share\\README.md"],
+  ])(
+    "rejects a %s at the shared package path safety gate",
+    (_kind, unsafePath) => {
+      expect(() => assertAllowedPackFiles([unsafePath])).toThrow(
+        /Unsafe npm package path/u,
+      );
+      expect(() => resolvePackInspectionPath(unsafePath, [])).toThrow(
+        /Unsafe npm package path/u,
+      );
+    },
+  );
+
   it("fails closed for missing or escaping package-local links without echoing document content", () => {
     const secretBody = "link-body-secret-sentinel";
     let missingFailure: unknown;
