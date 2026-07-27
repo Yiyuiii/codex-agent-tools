@@ -261,6 +261,12 @@ function evidenceForCase(
       logicalIdentity.runtime === "kimi-acp"
         ? "kimi-acp-observable"
         : "pi-rpc-observable",
+    ...(identity.llm === "kimi-k3" && identity.task === "delegate"
+      ? {
+          commandCount: 1,
+          commandObservations: [{ source: "raw_input", match: "exact" }],
+        }
+      : {}),
     checks: acceptanceChecks(identity),
     ...(identity.task === "delegate"
       ? {
@@ -346,6 +352,8 @@ async function createPassedBatch(
 async function createCurrentBlockedBatch(
   repositoryRoot: string,
   mutateEvidence?: (evidence: Record<string, unknown>) => void,
+  failedIdentity: Readonly<QualificationCaseIdentity> =
+    ACTIVE_QUALIFICATION_CASES[0],
 ): Promise<string> {
   const preflight = frozenPreflight();
   const ledger = createQualificationLedger({ repositoryRoot, batchId });
@@ -354,45 +362,52 @@ async function createCurrentBlockedBatch(
     preflight,
     recordedAt: "2026-07-26T00:00:00.000Z",
   });
-  const identity = ACTIVE_QUALIFICATION_CASES[0];
-  await ledger.publishCaseRunning({
-    ...identity,
-    recordedAt: "2026-07-26T00:00:00.000Z",
-  });
-  const evidence = evidenceForCase(identity, preflight);
-  evidence.status = "completed";
-  evidence.passed = false;
-  evidence.failureReason = "acceptance_failed";
-  evidence.checks = {
-    ...acceptanceChecks(identity),
-    resultFileValid: false,
-  };
-  mutateEvidence?.(evidence);
-  const evidencePath = path.join(
-    repositoryRoot,
-    "docs",
-    "smoke",
-    "evidence",
-    "batches",
-    batchId,
-    "cases",
-    "01.json",
-  );
-  await mkdir(path.dirname(evidencePath), { recursive: true });
-  await writeFile(evidencePath, `${JSON.stringify(evidence)}\n`, {
-    encoding: "utf8",
-    flag: "wx",
-  });
-  await ledger.publishCaseCompleted({
-    ...identity,
-    result: "failed",
-    evidencePath,
-    recordedAt: "2026-07-26T00:00:00.000Z",
-  });
+  for (const identity of ACTIVE_QUALIFICATION_CASES.slice(
+    0,
+    failedIdentity.ordinal,
+  )) {
+    await ledger.publishCaseRunning({
+      ...identity,
+      recordedAt: "2026-07-26T00:00:00.000Z",
+    });
+    const evidence = evidenceForCase(identity, preflight);
+    const failed = identity.ordinal === failedIdentity.ordinal;
+    if (failed) {
+      evidence.status = "completed";
+      evidence.passed = false;
+      evidence.failureReason = "acceptance_failed";
+      evidence.checks = {
+        ...acceptanceChecks(identity),
+        resultFileValid: false,
+      };
+      mutateEvidence?.(evidence);
+    }
+    const evidencePath = path.join(
+      repositoryRoot,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      batchId,
+      "cases",
+      `${String(identity.ordinal).padStart(2, "0")}.json`,
+    );
+    await mkdir(path.dirname(evidencePath), { recursive: true });
+    await writeFile(evidencePath, `${JSON.stringify(evidence)}\n`, {
+      encoding: "utf8",
+      flag: "wx",
+    });
+    await ledger.publishCaseCompleted({
+      ...identity,
+      result: failed ? "failed" : "passed",
+      evidencePath,
+      recordedAt: "2026-07-26T00:00:00.000Z",
+    });
+  }
   await ledger.publishTerminalManifest({
     status: "blocked",
     stopReason: "case_failed",
-    notRun: ACTIVE_QUALIFICATION_CASES.slice(1),
+    notRun: ACTIVE_QUALIFICATION_CASES.slice(failedIdentity.ordinal),
     completedAt: "2026-07-26T00:00:00.000Z",
   });
   return path.join(
@@ -404,6 +419,18 @@ async function createCurrentBlockedBatch(
     batchId,
     "manifest.json",
   );
+}
+
+async function createCurrentBlockedKimiDelegateBatch(
+  repositoryRoot: string,
+  mutateEvidence?: (evidence: Record<string, unknown>) => void,
+): Promise<string> {
+  const identity = ACTIVE_QUALIFICATION_CASES.find(
+    (candidate) =>
+      candidate.llm === "kimi-k3" && candidate.task === "delegate",
+  );
+  if (identity === undefined) throw new Error("Missing Kimi delegate case");
+  return createCurrentBlockedBatch(repositoryRoot, mutateEvidence, identity);
 }
 
 async function readJson(filePath: string): Promise<Record<string, unknown>> {
@@ -755,6 +782,306 @@ describe("qualification verifier", () => {
     ).resolves.toMatchObject({
       status: "blocked",
       promotionEligible: false,
+    });
+  });
+
+  describe("command observation diagnostics", () => {
+    it("accepts a valid Kimi delegate array", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot);
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        status: "passed",
+        promotionEligible: true,
+      });
+    });
+
+    it("keeps historical evidence without the field compatible", async () => {
+      const repositoryRoot = await tempRepository();
+      const manifestPath = await copyHistoricalBatch(repositoryRoot);
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        qualificationPlanId: "five-llm-v1",
+        status: "blocked",
+        promotionEligible: false,
+      });
+    });
+
+    it("rejects a non-array field", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandObservations = {
+            source: "raw_input",
+            match: "exact",
+          };
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects an unknown source", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandObservations = [
+            { source: "unknown", match: "exact" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects an unknown match", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandObservations = [
+            { source: "raw_input", match: "unknown" },
+            { source: "late_update", match: "exact" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects extra item keys", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandObservations = [
+            {
+              source: "raw_input",
+              match: "exact",
+              command: "sensitive command",
+            },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects more than 256 items", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandObservations = Array.from({ length: 257 }, () => ({
+            source: "raw_input",
+            match: "exact",
+          }));
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects an array shorter than commandCount", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandCount = 2;
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects unextractable paired with a non-other match", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandObservations = [
+            { source: "unextractable", match: "exact" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects true requiredCommandObserved without an exact item", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandObservations = [
+            { source: "raw_input", match: "embedded" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects exact when failed Kimi checks record false", async () => {
+      const repositoryRoot = await tempRepository();
+      const manifestPath = await createCurrentBlockedKimiDelegateBatch(
+        repositoryRoot,
+        (evidence) => {
+          const checks = evidence.checks as Record<string, unknown>;
+          checks.resultFileValid = true;
+          checks.requiredCommandObserved = false;
+        },
+      );
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("accepts valid diagnostics on failed Kimi evidence", async () => {
+      const repositoryRoot = await tempRepository();
+      const manifestPath =
+        await createCurrentBlockedKimiDelegateBatch(repositoryRoot);
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        status: "blocked",
+        promotionEligible: false,
+      });
+    });
+
+    it("rejects the field on Kimi review evidence", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "review") {
+            return;
+          }
+          evidence.commandCount = 0;
+          evidence.commandObservations = [];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects the field on Pi evidence", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.ordinal !== 1) return;
+          evidence.commandCount = 1;
+          evidence.commandObservations = [
+            { source: "raw_input", match: "exact" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it.each([-1, 1.5, Number.MAX_SAFE_INTEGER + 1, "1"])(
+      "rejects a non-safe non-negative commandCount %s",
+      async (commandCount) => {
+        const repositoryRoot = await tempRepository();
+        const { manifestPath } = await createPassedBatch(repositoryRoot, {
+          mutateEvidence: (evidence, identity) => {
+            if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+              return;
+            }
+            evidence.commandCount = commandCount;
+          },
+        });
+
+        await expectVerificationFailure(repositoryRoot, manifestPath);
+      },
+    );
+
+    it("rejects a non-record array item", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.commandObservations = [
+            { source: "raw_input", match: "exact" },
+            "invalid",
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects infrastructure failure without delegate checks", async () => {
+      const repositoryRoot = await tempRepository();
+      const manifestPath = await createCurrentBlockedKimiDelegateBatch(
+        repositoryRoot,
+        (evidence) => {
+          evidence.status = "failed";
+          evidence.actualModel = null;
+          evidence.failureReason = "infrastructure_failure";
+          evidence.adapterClientInvocationCount = null;
+          evidence.adapterRetryCount = null;
+          evidence.runtimeReportedAutoRetryCount = null;
+          evidence.adapterReportedFallbackUsed = null;
+          evidence.executionTelemetrySource = null;
+          evidence.checks = {
+            postProcessSnapshot: "not_reached",
+            processCleanup: "unknown",
+          };
+          for (const key of [
+            "expectedResultNormalizedSha256",
+            "resultFileByteLength",
+            "resultFileContainsExpectedLine",
+            "resultFileNormalizedLineCount",
+            "resultFileNormalizedSha256",
+            "resultFileRawSha256",
+            "resultFileReadStatus",
+          ]) {
+            delete evidence[key];
+          }
+        },
+      );
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
     });
   });
 

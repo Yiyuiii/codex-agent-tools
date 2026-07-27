@@ -388,6 +388,104 @@ function validatePassedTaskAcceptance(
   }
 }
 
+const COMMAND_OBSERVATION_SOURCES = new Set([
+  "raw_input",
+  "title_fallback",
+  "late_update",
+  "unextractable",
+]);
+const COMMAND_OBSERVATION_MATCHES = new Set([
+  "exact",
+  "trim_only",
+  "embedded",
+  "other",
+]);
+
+function validateCommandObservationDiagnostics(
+  evidence: Record<string, unknown>,
+  identity: Readonly<QualificationCaseIdentity>,
+  runtime: FrozenLogicalLlmIdentity["runtime"],
+): void {
+  if (!Object.hasOwn(evidence, "commandObservations")) return;
+  if (
+    identity.llm !== "kimi-k3" ||
+    identity.task !== "delegate" ||
+    runtime !== "kimi-acp"
+  ) {
+    throw new QualificationVerificationError();
+  }
+
+  const observations = evidence.commandObservations;
+  if (
+    !Array.isArray(observations) ||
+    nodeUtilTypes.isProxy(observations) ||
+    Object.getPrototypeOf(observations) !== Array.prototype ||
+    Object.getOwnPropertySymbols(observations).length !== 0 ||
+    observations.length > 256
+  ) {
+    throw new QualificationVerificationError();
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(observations) as Record<
+    string,
+    PropertyDescriptor
+  >;
+  const lengthDescriptor = descriptors.length;
+  const itemKeys = Object.keys(descriptors).filter((key) => key !== "length");
+  if (
+    lengthDescriptor === undefined ||
+    !Object.hasOwn(lengthDescriptor, "value") ||
+    lengthDescriptor.value !== observations.length ||
+    lengthDescriptor.enumerable !== false ||
+    lengthDescriptor.configurable !== false ||
+    lengthDescriptor.writable !== true ||
+    itemKeys.length !== observations.length ||
+    itemKeys.some((key, index) => key !== String(index)) ||
+    itemKeys.some((key) => {
+      const descriptor = descriptors[key]!;
+      return (
+        descriptor.enumerable !== true ||
+        !Object.hasOwn(descriptor, "value") ||
+        descriptor.get !== undefined ||
+        descriptor.set !== undefined
+      );
+    }) ||
+    typeof evidence.commandCount !== "number" ||
+    !Number.isSafeInteger(evidence.commandCount) ||
+    evidence.commandCount < 0 ||
+    observations.length < evidence.commandCount
+  ) {
+    throw new QualificationVerificationError();
+  }
+
+  let hasExact = false;
+  for (const key of itemKeys) {
+    const observation = plainRecord(descriptors[key]!.value);
+    const observationKeys = Object.keys(observation).sort();
+    if (
+      observationKeys.length !== 2 ||
+      observationKeys[0] !== "match" ||
+      observationKeys[1] !== "source" ||
+      typeof observation.source !== "string" ||
+      !COMMAND_OBSERVATION_SOURCES.has(observation.source) ||
+      typeof observation.match !== "string" ||
+      !COMMAND_OBSERVATION_MATCHES.has(observation.match) ||
+      (observation.source === "unextractable" &&
+        observation.match !== "other")
+    ) {
+      throw new QualificationVerificationError();
+    }
+    if (observation.match === "exact") hasExact = true;
+  }
+
+  const checks = plainRecord(evidence.checks);
+  if (
+    typeof checks.requiredCommandObserved !== "boolean" ||
+    hasExact !== checks.requiredCommandObserved
+  ) {
+    throw new QualificationVerificationError();
+  }
+}
+
 function validateQualificationIdentity(
   evidence: Record<string, unknown>,
   protocol: VerifierProtocol,
@@ -552,6 +650,11 @@ function validateEvidenceIdentityAndAcceptance(
       logicalIdentity.runtime,
     );
   }
+  validateCommandObservationDiagnostics(
+    evidence,
+    identity,
+    logicalIdentity.runtime,
+  );
 }
 
 const COMMON_EVIDENCE_STATUSES = new Set([
