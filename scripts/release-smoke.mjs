@@ -18,7 +18,7 @@ import { execa } from "execa";
 
 import {
   assertNoSensitiveContent,
-  assertPackageLocalLinks,
+  assertPackageDocumentLinkClosure,
   resolveAllowedPackInspectionPaths,
 } from "../dist/release-assurance.js";
 
@@ -60,10 +60,12 @@ const retainedHistoricalPackageSources = [
   "docs/smoke/pi-gemini.md",
   "docs/smoke/evidence",
 ];
-const reviewPackageSources = [
+const requiredReviewPackageSources = [
   "docs/release/four-llm-qualification-result-review.html",
   "docs/release/four-llm-qualification-authorization-review.html",
   "docs/release/four-llm-qualification-reauthorization-review.html",
+  "docs/release/qualification-carrier-rehearsal.md",
+  "docs/release/four-llm-qualification-execution-runbook.md",
   "docs/release/real-plugin-install-review.md",
   "docs/release/plugin-isolated-state.md",
   "docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md",
@@ -267,7 +269,10 @@ async function checkPluginArtifact() {
   }
   if (
     !Array.isArray(packageManifest.files) ||
-    ![...retainedHistoricalPackageSources, ...reviewPackageSources].every(
+    ![
+      ...retainedHistoricalPackageSources,
+      ...requiredReviewPackageSources,
+    ].every(
       (entry) => packageManifest.files.includes(entry),
     )
   ) {
@@ -417,7 +422,7 @@ async function checkPackage() {
     "docs/operations.md",
     "docs/migration-from-codex-cc-tools.md",
     "docs/smoke/pi-gemini.md",
-    ...reviewPackageSources,
+    ...requiredReviewPackageSources,
     "dist/cli.js",
     "dist/mcp.js",
     ...exactPluginFiles,
@@ -476,13 +481,7 @@ async function checkPackage() {
     forbiddenPaths: forbiddenDevelopmentPaths,
     secrets: releaseSecrets(process.env),
   });
-  const packageLinkEntries = textEntries.filter((entry) =>
-    reviewPackageSources.includes(entry.name),
-  );
-  if (packageLinkEntries.length !== reviewPackageSources.length) {
-    throw new Error("Required review package documents were not inspected");
-  }
-  assertPackageLocalLinks(packageLinkEntries, [...actualPackFileNames]);
+  assertPackageDocumentLinkClosure(textEntries, [...actualPackFileNames]);
 }
 
 await Promise.all([access(cliPath), access(mcpPath), access(pluginBundlePath)]);
