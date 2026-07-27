@@ -88,6 +88,30 @@ describe("runKimiAcp", () => {
     ).rejects.toBeDefined();
   });
 
+  it("preserves command input first delivered by a tool-call update", async () => {
+    const result = await runKimiAcp(
+      baseRequest({
+        environment: {
+          ...process.env,
+          FAKE_KIMI_SCENARIO: "late-execute-input",
+        },
+      }),
+    );
+
+    expect(result.status).toBe("completed");
+    expect(
+      result.events.find(
+        (event) =>
+          event.type === "tool_call_update" &&
+          event.toolCallId === "execute-late-1",
+      ),
+    ).toMatchObject({
+      type: "tool_call_update",
+      rawInput: { command: "git status --short" },
+    });
+    expect(result.diagnostics.join("\n")).not.toContain("git status --short");
+  });
+
   it("rejects reverse reads that escape cwd", async () => {
     const result = await runKimiAcp(
       baseRequest({

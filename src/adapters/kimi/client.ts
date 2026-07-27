@@ -35,7 +35,10 @@ export type KimiAcpEvent =
   | {
       type: "tool_call_update";
       toolCallId: string;
-      status?: string;
+      kind?: string | null;
+      status?: string | null;
+      title?: string | null;
+      rawInput?: unknown;
     }
   | { type: "other"; updateType: string };
 
@@ -213,7 +216,10 @@ function collectUpdate(
         type: "tool_call_update",
         toolCallId: update.toolCallId,
       };
-      if (update.status != null) event.status = update.status;
+      if (update.kind !== undefined) event.kind = update.kind;
+      if (update.status !== undefined) event.status = update.status;
+      if (update.title !== undefined) event.title = update.title;
+      if (update.rawInput !== undefined) event.rawInput = update.rawInput;
       events.push(event);
       return;
     }

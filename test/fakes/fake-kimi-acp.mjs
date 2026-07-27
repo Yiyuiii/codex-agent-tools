@@ -84,6 +84,30 @@ const agent = {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
+    if (process.env.FAKE_KIMI_SCENARIO === "late-execute-input") {
+      await client.notify(acp.methods.client.session.update, {
+        sessionId: params.sessionId,
+        update: {
+          sessionUpdate: "tool_call",
+          toolCallId: "execute-late-1",
+          title: "Run verification",
+          kind: "execute",
+          status: "in_progress",
+          locations: [],
+        },
+      });
+      await client.notify(acp.methods.client.session.update, {
+        sessionId: params.sessionId,
+        update: {
+          sessionUpdate: "tool_call_update",
+          toolCallId: "execute-late-1",
+          status: "completed",
+          rawInput: { command: "git status --short" },
+        },
+      });
+      return { stopReason: "end_turn" };
+    }
+
     await client.notify(acp.methods.client.session.update, {
       sessionId: params.sessionId,
       update: {
