@@ -364,6 +364,39 @@ describe("release assurance", () => {
     ).toThrow(/Unsafe npm package path/u);
   });
 
+  it("redacts an unsafe package file path from document-closure errors", () => {
+    const unsafePath = "../package-path-secret-sentinel.md";
+    let failure: unknown;
+    try {
+      assertPackageDocumentLinkClosure([], [unsafePath]);
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/Unsafe npm package path/u);
+    expect((failure as Error).message).not.toContain(unsafePath);
+    expect((failure as Error).message).not.toContain("secret-sentinel");
+  });
+
+  it("redacts an unsafe entry name from document-closure errors", () => {
+    const unsafePath = "../entry-path-secret-sentinel.md";
+    let failure: unknown;
+    try {
+      assertPackageDocumentLinkClosure(
+        [{ name: unsafePath, content: "Sensitive document body." }],
+        ["README.md"],
+      );
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/Unsafe npm package path/u);
+    expect((failure as Error).message).not.toContain(unsafePath);
+    expect((failure as Error).message).not.toContain("secret-sentinel");
+  });
+
   it("fails closed for missing or escaping package-local links without echoing document content", () => {
     const secretBody = "link-body-secret-sentinel";
     let missingFailure: unknown;

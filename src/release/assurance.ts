@@ -221,16 +221,24 @@ function isPackageDocument(fileName: string): boolean {
   return lowerCaseName.endsWith(".md") || lowerCaseName.endsWith(".html");
 }
 
+function assertRedactedSafePackPath(fileName: string): string {
+  try {
+    return assertSafePackPath(fileName);
+  } catch {
+    throw new Error("Unsafe npm package path");
+  }
+}
+
 export function assertPackageDocumentLinkClosure(
   entries: readonly ReleaseTextEntry[],
   packageFiles: readonly string[],
 ): void {
   const normalizedPackageFiles = packageFiles.map((fileName) =>
-    assertSafePackPath(fileName),
+    assertRedactedSafePackPath(fileName),
   );
   const entriesByName = new Map<string, ReleaseTextEntry>();
   for (const entry of entries) {
-    const normalizedName = assertSafePackPath(entry.name);
+    const normalizedName = assertRedactedSafePackPath(entry.name);
     if (entriesByName.has(normalizedName)) {
       throw new Error(
         `Package entry was inspected more than once: ${normalizedName}`,
