@@ -84,6 +84,7 @@ describe("safe smoke result-file evidence", () => {
   it.each([
     ["empty", "", 0, false],
     ["wrong line", "WRONG\n", 1, false],
+    ["natural-language delimiter", "EXPECTED;\n", 1, false],
     ["extra lines", "before\nEXPECTED\nafter\n", 3, true],
   ])(
     "rejects %s content without exposing it",

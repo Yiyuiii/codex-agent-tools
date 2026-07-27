@@ -289,6 +289,51 @@ function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex");
 }
 
+export interface PiDelegateSmokeContract {
+  readonly resultFileName: string;
+  readonly expectedLine: string;
+  readonly writeCommand: string;
+  readonly prompt: string;
+}
+
+export function buildPiDelegateSmokeContract(
+  llm: string,
+): PiDelegateSmokeContract {
+  if (!/^[A-Za-z0-9._-]+$/u.test(llm)) {
+    throw new Error("Unsafe Pi smoke llm id");
+  }
+  const resultFileName = `${llm}-smoke.txt`;
+  const expectedLine = `ARK_SMOKE_OK:${llm}`;
+  const payloadBase64 = Buffer.from(`${expectedLine}\n`, "utf8").toString(
+    "base64",
+  );
+  const writeCommand =
+    `node -e 'require("node:fs").writeFileSync(process.argv[1],Buffer.from(process.argv[2],"base64"))' ` +
+    `'${resultFileName}' '${payloadBase64}'`;
+  return Object.freeze({
+    resultFileName,
+    expectedLine,
+    writeCommand,
+    prompt: [
+      "Both actions below are mandatory before you finish.",
+      "1. Invoke the bash tool with this exact command:",
+      "```bash",
+      writeCommand,
+      "```",
+      "The command must create the result file with this exact normalized payload:",
+      "```text",
+      expectedLine,
+      "```",
+      "The code fences are not part of the file.",
+      "2. Invoke the bash tool with this exact command:",
+      "```bash",
+      "git status --short",
+      "```",
+      "Report both actions. Do not modify any other file. Do not substitute a prose claim for either bash invocation.",
+    ].join("\n"),
+  });
+}
+
 function knownDefectFound(review: string): boolean {
   return /(?:empty|zero|length|nan|division|空数组|空输入|零|长度|除零)/iu.test(
     review,
@@ -603,16 +648,15 @@ export async function runPiSmoke(
       );
     }
 
-    const resultFileName = `${options.llm}-smoke.txt`;
-    const expectedLine = `ARK_SMOKE_OK:${options.llm}`;
+    const { resultFileName, expectedLine, prompt } =
+      buildPiDelegateSmokeContract(options.llm);
     const result = await inSmokeInfrastructureStage(
       "task_execution",
       () =>
         service.delegate(
           {
             llm: options.llm,
-            prompt:
-              `Both actions are mandatory before you finish: (1) create ${resultFileName} in the working directory with exactly one line: ${expectedLine}; (2) invoke the bash tool with the exact command \`git status --short\` to verify the change. Report both actions. Do not modify any other file, and do not substitute a prose claim for the bash invocation.`,
+            prompt,
             cwd,
             timeoutMs,
           },

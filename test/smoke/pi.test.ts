@@ -15,6 +15,7 @@ import type {
   IsolatedPiConfig,
 } from "../../src/adapters/pi/config.js";
 import {
+  buildPiDelegateSmokeContract,
   runPiSmoke,
   type PiSmokeService,
 } from "../../src/smoke/pi.js";
@@ -221,6 +222,90 @@ describe("Ark Pi real-smoke harness", () => {
     expect(await readdir(root)).toEqual([]);
   });
 
+  it.each([
+    {
+      llm: "ark-coding-plan",
+      resultFileName: "ark-coding-plan-smoke.txt",
+      expectedLine: "ARK_SMOKE_OK:ark-coding-plan",
+      payloadBase64: "QVJLX1NNT0tFX09LOmFyay1jb2RpbmctcGxhbgo=",
+    },
+    {
+      llm: "ark-agent-plan",
+      resultFileName: "ark-agent-plan-smoke.txt",
+      expectedLine: "ARK_SMOKE_OK:ark-agent-plan",
+      payloadBase64: "QVJLX1NNT0tFX09LOmFyay1hZ2VudC1wbGFuCg==",
+    },
+    {
+      llm: "ark-agent-deepseek-v4-flash",
+      resultFileName: "ark-agent-deepseek-v4-flash-smoke.txt",
+      expectedLine: "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash",
+      payloadBase64:
+        "QVJLX1NNT0tFX09LOmFyay1hZ2VudC1kZWVwc2Vlay12NC1mbGFzaAo=",
+    },
+  ] as const)(
+    "builds an unambiguous delegate write contract for $llm",
+    ({ llm, resultFileName, expectedLine, payloadBase64 }) => {
+      const writeCommand =
+        `node -e 'require("node:fs").writeFileSync(process.argv[1],Buffer.from(process.argv[2],"base64"))' ` +
+        `'${resultFileName}' '${payloadBase64}'`;
+      const contract = buildPiDelegateSmokeContract(llm);
+
+      expect(contract).toEqual({
+        resultFileName,
+        expectedLine,
+        writeCommand,
+        prompt: [
+          "Both actions below are mandatory before you finish.",
+          "1. Invoke the bash tool with this exact command:",
+          "```bash",
+          writeCommand,
+          "```",
+          "The command must create the result file with this exact normalized payload:",
+          "```text",
+          expectedLine,
+          "```",
+          "The code fences are not part of the file.",
+          "2. Invoke the bash tool with this exact command:",
+          "```bash",
+          "git status --short",
+          "```",
+          "Report both actions. Do not modify any other file. Do not substitute a prose claim for either bash invocation.",
+        ].join("\n"),
+      });
+      expect(contract.prompt).not.toContain(`${expectedLine};`);
+
+      const lines = contract.prompt.split("\n");
+      const payloadIndex = lines.indexOf(expectedLine);
+      expect(lines[payloadIndex - 1]).toBe("```text");
+      expect(lines[payloadIndex + 1]).toBe("```");
+
+      const bashCommands = [
+        ...contract.prompt.matchAll(/```bash\n([^\r\n]+)\n```/gu),
+      ].map((match) => match[1]);
+      expect(bashCommands).toEqual([writeCommand, "git status --short"]);
+
+      const commandParts = writeCommand.split("'");
+      expect(commandParts).toHaveLength(7);
+      expect(commandParts[1]).toBe(
+        'require("node:fs").writeFileSync(process.argv[1],Buffer.from(process.argv[2],"base64"))',
+      );
+      expect(commandParts[3]).toBe(resultFileName);
+      expect(commandParts[5]).toBe(payloadBase64);
+      expect(Buffer.from(commandParts[5] ?? "", "base64")).toEqual(
+        Buffer.from(`${expectedLine}\n`, "utf8"),
+      );
+    },
+  );
+
+  it.each(["ark'unsafe", "ark\nunsafe", "ark unsafe"])(
+    "rejects unsafe delegate smoke token %j",
+    (llm) => {
+      expect(() => buildPiDelegateSmokeContract(llm)).toThrow(
+        "Unsafe Pi smoke llm id",
+      );
+    },
+  );
+
   it("validates delegate file and command evidence", async () => {
     const root = await tempRoot();
     let receivedPrompt = "";
@@ -288,8 +373,10 @@ describe("Ark Pi real-smoke harness", () => {
         noNewPiRpcProcesses: true,
       },
     });
-    expect(receivedPrompt).toContain("Both actions are mandatory");
-    expect(receivedPrompt).toContain("bash tool with the exact command `git status --short`");
+    expect(receivedPrompt).toBe(
+      buildPiDelegateSmokeContract("ark-agent-plan").prompt,
+    );
+    expect(receivedPrompt).not.toContain("ARK_SMOKE_OK:ark-agent-plan;");
     expect(await readdir(root)).toEqual([]);
   });
 

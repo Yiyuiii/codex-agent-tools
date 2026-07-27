@@ -10,7 +10,10 @@ import {
   parseArkSmokeArguments,
   runArkSmoke,
 } from "../../src/smoke/ark.js";
-import type { PiSmokeService } from "../../src/smoke/pi.js";
+import {
+  buildPiDelegateSmokeContract,
+  type PiSmokeService,
+} from "../../src/smoke/pi.js";
 
 const roots: string[] = [];
 
@@ -148,82 +151,105 @@ describe("Ark real-smoke harness", () => {
     expect(await readdir(root)).toEqual([]);
   });
 
-  it("uses a profile-specific delegate file and requires command evidence", async () => {
-    const root = await tempRoot();
-    let requestedFile = "";
-    const service: PiSmokeService = {
-      review: async () => {
-        throw new Error("not used");
-      },
-      delegate: async (input, context) => {
-        context?.onExecutionTelemetry?.(validPiTelemetry);
-        requestedFile = /create ([^ ]+\.txt)/u.exec(input.prompt)?.[1] ?? "";
-        await writeFile(
-          path.join(input.cwd, requestedFile),
-          "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash\n",
-          "utf8",
-        );
-        return {
-          ok: true,
-          status: "completed",
-          llm: "ark-agent-deepseek-v4-flash",
-          actualModel: "deepseek-v4-flash",
-          elapsedMs: 10,
-          diagnostics: [],
-          filesChanged: [requestedFile],
-          summary: "created and verified",
-          commandsRun: ["git status --short"],
-          verification: [],
-          risks: [],
-        };
-      },
-    };
-
-    const evidence = await runArkSmoke(
-      {
-        llm: "ark-agent-deepseek-v4-flash",
-        task: "delegate",
-        tempRoot: root,
-      },
-      {
-        service,
-        runtimeEvidence: {
-          configSha256: "c".repeat(64),
-          childEnvironment: {
-            CODEX_AGENT_ARK_AGENT_KEY: "secret",
-            PI_CODING_AGENT_DIR: "C:\\cache\\pi",
-          },
+  it.each([
+    {
+      llm: "ark-coding-plan",
+      actualModel: "ark-code-latest",
+      provider: "ark-coding-plan",
+      credentialEnv: "CODEX_AGENT_ARK_CODING_KEY",
+    },
+    {
+      llm: "ark-agent-plan",
+      actualModel: "ark-code-latest",
+      provider: "ark-agent-plan",
+      credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+    },
+    {
+      llm: "ark-agent-deepseek-v4-flash",
+      actualModel: "deepseek-v4-flash",
+      provider: "ark-agent-plan",
+      credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+    },
+  ] as const)(
+    "uses the exact delegate contract for $llm",
+    async ({ llm, actualModel, provider, credentialEnv }) => {
+      const root = await tempRoot();
+      const contract = buildPiDelegateSmokeContract(llm);
+      let receivedPrompt = "";
+      const service: PiSmokeService = {
+        review: async () => {
+          throw new Error("not used");
         },
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [],
-      },
-    );
+        delegate: async (input, context) => {
+          context?.onExecutionTelemetry?.(validPiTelemetry);
+          receivedPrompt = input.prompt;
+          await writeFile(
+            path.join(input.cwd, contract.resultFileName),
+            `${contract.expectedLine}\n`,
+            "utf8",
+          );
+          return {
+            ok: true,
+            status: "completed",
+            llm,
+            actualModel,
+            elapsedMs: 10,
+            diagnostics: [],
+            filesChanged: [contract.resultFileName],
+            summary: "created and verified",
+            commandsRun: ["git status --short"],
+            verification: [],
+            risks: [],
+          };
+        },
+      };
 
-    expect(requestedFile).toBe("ark-agent-deepseek-v4-flash-smoke.txt");
-    expect(evidence.passed).toBe(true);
-    expect(evidence).toMatchObject({
-      resultFileReadStatus: "read",
-      resultFileByteLength: Buffer.byteLength(
-        "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash\n",
-      ),
-      resultFileRawSha256: sha256(
-        "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash\n",
-      ),
-      resultFileNormalizedSha256: sha256(
-        "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash",
-      ),
-      expectedResultNormalizedSha256: sha256(
-        "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash",
-      ),
-      resultFileNormalizedLineCount: 1,
-      resultFileContainsExpectedLine: true,
-      checks: {
-        resultFileValid: true,
-        requiredCommandObserved: true,
-      },
-    });
-    expect(evidence.filesChanged).toEqual([requestedFile]);
-  });
+      const evidence = await runArkSmoke(
+        { llm, task: "delegate", tempRoot: root },
+        {
+          service,
+          runtimeEvidence: {
+            configSha256: "c".repeat(64),
+            childEnvironment: {
+              [credentialEnv]: "secret",
+              PI_CODING_AGENT_DIR: "C:\\cache\\pi",
+            },
+          },
+          readPiVersion: async () => "0.80.10",
+          listPiRpcProcessIds: async () => [],
+        },
+      );
+
+      expect(receivedPrompt).toBe(contract.prompt);
+      expect(evidence.passed).toBe(true);
+      expect(evidence).toMatchObject({
+        llm,
+        actualModel,
+        expectedModel: actualModel,
+        provider,
+        credentialEnv,
+        filesChanged: [contract.resultFileName],
+        resultFileReadStatus: "read",
+        resultFileByteLength: Buffer.byteLength(
+          `${contract.expectedLine}\n`,
+        ),
+        resultFileRawSha256: sha256(`${contract.expectedLine}\n`),
+        resultFileNormalizedSha256: sha256(contract.expectedLine),
+        expectedResultNormalizedSha256: sha256(contract.expectedLine),
+        resultFileNormalizedLineCount: 1,
+        resultFileContainsExpectedLine: true,
+        checks: {
+          resultFileValid: true,
+          resultFileObserved: true,
+          onlyExpectedFileChanged: true,
+          requiredCommandObserved: true,
+          environmentIsolated: true,
+          noNewPiRpcProcesses: true,
+        },
+      });
+      expect(await readdir(root)).toEqual([]);
+    },
+  );
 
   it("records a stable quota failure code without persisting raw diagnostics", async () => {
     const root = await tempRoot();
