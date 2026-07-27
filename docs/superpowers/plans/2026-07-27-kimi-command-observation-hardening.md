@@ -51,7 +51,7 @@ Do not change:
 - Modify: `test/adapters/kimi/client.test.ts`
 - Modify: `src/adapters/kimi/client.ts`
 
-- [ ] **Step 1: Add a fake ACP late-input scenario**
+- [x] **Step 1: Add a fake ACP late-input scenario**
 
 Add a branch in `fake-kimi-acp.mjs` that emits:
 
@@ -79,7 +79,7 @@ followed by:
 
 The fixture must return normally and must not write a file or include the command in its message text.
 
-- [ ] **Step 2: Write the failing Kimi client test**
+- [x] **Step 2: Write the failing Kimi client test**
 
 Add a test named `preserves command input first delivered by a tool-call update`:
 
@@ -103,7 +103,7 @@ expect(result.events).toContainEqual({
 expect(result.diagnostics.join("\n")).not.toContain("git status --short");
 ```
 
-- [ ] **Step 3: Run the test and verify RED**
+- [x] **Step 3: Run the test and verify RED**
 
 Run:
 
@@ -113,7 +113,7 @@ npx.cmd vitest run test/adapters/kimi/client.test.ts -t "preserves command input
 
 Expected: FAIL because `tool_call_update` currently drops `rawInput`.
 
-- [ ] **Step 4: Extend the update event type and collector**
+- [x] **Step 4: Extend the update event type and collector**
 
 Change the update branch to:
 
@@ -130,7 +130,7 @@ Change the update branch to:
 
 In `collectUpdate`, copy only `kind`, `status`, `title`, and `rawInput` when the SDK update field is not `undefined`. Preserve explicit `null` for protocol fields that allow it. Do not stringify or log `rawInput`.
 
-- [ ] **Step 5: Run focused client tests and typecheck**
+- [x] **Step 5: Run focused client tests and typecheck**
 
 Run:
 
@@ -141,12 +141,14 @@ npm.cmd run typecheck
 
 Expected: all Kimi client tests pass and typecheck exits 0.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```powershell
 git add -- test/fakes/fake-kimi-acp.mjs test/adapters/kimi/client.test.ts src/adapters/kimi/client.ts
 git commit -m "fix: preserve Kimi ACP late tool inputs"
 ```
+
+Actual commit: `d681f8f`.
 
 ### Task 2: Fold and safely extract command observations
 
@@ -155,7 +157,7 @@ git commit -m "fix: preserve Kimi ACP late tool inputs"
 - Create: `src/tasks/command-observations.ts`
 - Create: `test/tasks/command-observations.test.ts`
 
-- [ ] **Step 1: Write table-driven failing tests**
+- [x] **Step 1: Write table-driven failing tests**
 
 Define tests for these final observations:
 
@@ -217,7 +219,7 @@ Also test:
 - a late `kind="execute"` marks the source `late_update`;
 - Proxy, accessor `command`, inherited `command`, non-string command and non-plain raw input never invoke user code and fall back safely.
 
-- [ ] **Step 2: Run the new test and verify RED**
+- [x] **Step 2: Run the new test and verify RED**
 
 Run:
 
@@ -227,7 +229,7 @@ npx.cmd vitest run test/tasks/command-observations.test.ts
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement the internal types**
+- [x] **Step 3: Implement the internal types**
 
 Create:
 
@@ -256,7 +258,7 @@ export function commandsFromObservations(
 ): string[];
 ```
 
-- [ ] **Step 4: Implement fail-closed folding**
+- [x] **Step 4: Implement fail-closed folding**
 
 Use a `Map<string, FoldedToolCall>` keyed by string `toolCallId`, plus first-seen order. Accept only `tool_call` and `tool_call_update` records. Track whether final `kind`, raw command, or title material was first supplied or replaced by an update.
 
@@ -279,7 +281,7 @@ if (
 
 Do not call getters, `toString`, iterators or serialization methods. A late field material to the final command yields `late_update`; otherwise prefer initial raw input, then initial non-empty title, then `unextractable`.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run:
 
@@ -290,12 +292,14 @@ npm.cmd run typecheck
 
 Expected: all new tests pass and typecheck exits 0.
 
-- [ ] **Step 6: Commit Task 2**
+- [x] **Step 6: Commit Task 2**
 
 ```powershell
 git add -- src/tasks/command-observations.ts test/tasks/command-observations.test.ts
 git commit -m "feat: derive sanitized command observations"
 ```
+
+Actual commit: `6c92cf0`.
 
 ### Task 3: Integrate observations into the task service
 
@@ -304,7 +308,7 @@ git commit -m "feat: derive sanitized command observations"
 - Modify: `src/tasks/service.ts`
 - Modify: `test/tasks/service.test.ts`
 
-- [ ] **Step 1: Write failing service tests**
+- [x] **Step 1: Write failing service tests**
 
 Add tests that:
 
@@ -324,7 +328,7 @@ expect(result).not.toHaveProperty("commandObservations");
 
 Use adapter events containing an initial execute call and a late raw-input update. Add a second test proving the callback fires exactly once with `[]` when adapter execution throws or has no execute events.
 
-- [ ] **Step 2: Run the focused service test and verify RED**
+- [x] **Step 2: Run the focused service test and verify RED**
 
 Run:
 
@@ -334,7 +338,7 @@ npx.cmd vitest run test/tasks/service.test.ts -t "command observation"
 
 Expected: FAIL because `TaskExecutionContext` has no observer and service ignores updates.
 
-- [ ] **Step 3: Add the internal callback and use the extractor**
+- [x] **Step 3: Add the internal callback and use the extractor**
 
 Extend context:
 
@@ -359,7 +363,7 @@ commandsRun: commandsFromObservations(commandObservations)
 
 Remove the old local `extractCommands`. Do not add the internal array to `ExternalDelegateResult`, Zod schemas or MCP structured content.
 
-- [ ] **Step 4: Run service and MCP non-regression tests**
+- [x] **Step 4: Run service and MCP non-regression tests**
 
 Run:
 
@@ -370,12 +374,14 @@ npm.cmd run typecheck
 
 Expected: all tests pass; MCP results still contain no internal observer field.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 ```powershell
 git add -- src/tasks/service.ts test/tasks/service.test.ts
 git commit -m "feat: report internal command observations"
 ```
+
+Actual commits: `86a21ac`, `bc5069e`, `55a7f51`.
 
 ### Task 4: Emit sanitized Kimi qualification evidence
 
@@ -386,7 +392,7 @@ git commit -m "feat: report internal command observations"
 - Modify: `src/smoke/kimi.ts`
 - Modify: `test/smoke/kimi.test.ts`
 
-- [ ] **Step 1: Write classification tests**
+- [x] **Step 1: Write classification tests**
 
 Test:
 
@@ -409,7 +415,7 @@ expect(sanitizeCommandObservations(
 
 Verify returned objects contain only `source` and `match`, and invalid source/command pairs cannot be constructed through the typed API.
 
-- [ ] **Step 2: Run classification test and verify RED**
+- [x] **Step 2: Run classification test and verify RED**
 
 ```powershell
 npx.cmd vitest run test/smoke/command-observation.test.ts
@@ -417,7 +423,7 @@ npx.cmd vitest run test/smoke/command-observation.test.ts
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement classifier**
+- [x] **Step 3: Implement classifier**
 
 Export `CommandMatchClass`, `SanitizedCommandObservation`, and:
 
@@ -430,7 +436,7 @@ export function sanitizeCommandObservations(
 
 Match in exact → trim-only → embedded → other order. Never return the command.
 
-- [ ] **Step 4: Write failing Kimi smoke tests**
+- [x] **Step 4: Write failing Kimi smoke tests**
 
 Extend the delegate fixture to invoke both internal callbacks. Assert:
 
@@ -449,7 +455,7 @@ Add a prompt-capture test requiring:
 
 Keep the existing compound command test and assert it remains `passed=false`, `requiredCommandObserved=false`, with `match="embedded"`.
 
-- [ ] **Step 5: Run Kimi smoke tests and verify RED**
+- [x] **Step 5: Run Kimi smoke tests and verify RED**
 
 ```powershell
 npx.cmd vitest run test/smoke/kimi.test.ts
@@ -457,7 +463,7 @@ npx.cmd vitest run test/smoke/kimi.test.ts
 
 Expected: FAIL because the smoke does not observe or persist classifications and prompt wording is old.
 
-- [ ] **Step 6: Wire the observer and strengthen the prompt**
+- [x] **Step 6: Wire the observer and strengthen the prompt**
 
 Track `commandObservations` and report count through `TaskExecutionContext`. For delegate evidence add:
 
@@ -472,7 +478,7 @@ The prompt must require file creation and the exact command in separate tool cal
 
 Do not include the field for review evidence. Do not add raw commands to diagnostics.
 
-- [ ] **Step 7: Run focused smoke and entrypoint tests**
+- [x] **Step 7: Run focused smoke and entrypoint tests**
 
 ```powershell
 npx.cmd vitest run test/smoke/command-observation.test.ts test/smoke/kimi.test.ts test/smoke/script-entrypoints.test.ts
@@ -481,12 +487,14 @@ npm.cmd run typecheck
 
 Expected: all tests pass and exact-validator regression remains green.
 
-- [ ] **Step 8: Commit Task 4**
+- [x] **Step 8: Commit Task 4**
 
 ```powershell
 git add -- src/smoke/command-observation.ts test/smoke/command-observation.test.ts src/smoke/kimi.ts test/smoke/kimi.test.ts
 git commit -m "feat: record sanitized Kimi command evidence"
 ```
+
+Actual commits: `00e48e2`, `393274e`.
 
 ### Task 5: Validate optional diagnostics without breaking history
 
@@ -495,7 +503,7 @@ git commit -m "feat: record sanitized Kimi command evidence"
 - Modify: `src/qualification/verifier.ts`
 - Modify: `test/qualification/verifier.test.ts`
 
-- [ ] **Step 1: Add valid diagnostic data to generated Kimi delegate evidence**
+- [x] **Step 1: Add valid diagnostic data to generated Kimi delegate evidence**
 
 In `evidenceForCase`, include only for `kimi-k3` delegate:
 
@@ -506,7 +514,7 @@ commandObservations: [{ source: "raw_input", match: "exact" }],
 
 Keep other cases unchanged.
 
-- [ ] **Step 2: Write failing verifier tests**
+- [x] **Step 2: Write failing verifier tests**
 
 Use `createPassedBatch` mutations to assert rejection of:
 
@@ -520,7 +528,7 @@ Use `createPassedBatch` mutations to assert rejection of:
 
 Add a positive test for a valid Kimi delegate array. Keep `copyHistoricalBatch` and the four retained immutable verifier commands as compatibility gates.
 
-- [ ] **Step 3: Run verifier tests and verify RED**
+- [x] **Step 3: Run verifier tests and verify RED**
 
 ```powershell
 npx.cmd vitest run test/qualification/verifier.test.ts -t "command observation"
@@ -528,13 +536,13 @@ npx.cmd vitest run test/qualification/verifier.test.ts -t "command observation"
 
 Expected: invalid diagnostic shapes currently pass.
 
-- [ ] **Step 4: Implement optional strict validation**
+- [x] **Step 4: Implement optional strict validation**
 
 Add `validateCommandObservationDiagnostics(evidence, identity, runtime)`. Return immediately when the field is absent. When present, require Kimi delegate identity, a plain array of at most 256 two-key plain records, allowed enum values, `length >= commandCount`, valid unextractable pairing, and exact-match equivalence with `requiredCommandObserved`.
 
 Call it for both passed and failed current evidence after identity validation. Do not require the field for historical evidence.
 
-- [ ] **Step 5: Run verifier and retained immutable checks**
+- [x] **Step 5: Run verifier and retained immutable checks**
 
 ```powershell
 npx.cmd vitest run test/qualification/verifier.test.ts
@@ -546,12 +554,14 @@ npm.cmd run --silent verify:qualification -- --mode immutable-evidence --manifes
 
 Expected: unit tests pass; all four immutable verifiers return `verified:true` with their original status.
 
-- [ ] **Step 6: Commit Task 5**
+- [x] **Step 6: Commit Task 5**
 
 ```powershell
 git add -- src/qualification/verifier.ts test/qualification/verifier.test.ts
 git commit -m "fix: validate Kimi command audit evidence"
 ```
+
+Actual commits: `03cd172`, `ebb8082`.
 
 ### Task 6: Update Kimi status documentation and verify the subsystem
 
@@ -564,7 +574,7 @@ git commit -m "fix: validate Kimi command audit evidence"
 - Modify: `docs/release/real-plugin-install-review.md`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: Document implementation status without claiming qualification**
+- [x] **Step 1: Document implementation status without claiming qualification**
 
 Record:
 
@@ -577,7 +587,7 @@ Record:
 
 Do not replace historical facts or claim Kimi delegate passed.
 
-- [ ] **Step 2: Run subsystem verification**
+- [x] **Step 2: Run subsystem verification**
 
 ```powershell
 npm.cmd run typecheck
@@ -588,7 +598,7 @@ git diff --check
 
 Expected: all commands exit 0.
 
-- [ ] **Step 3: Request independent specification and quality review**
+- [x] **Step 3: Request independent specification and quality review**
 
 Provide reviewers:
 
@@ -600,7 +610,11 @@ Provide reviewers:
 
 Accept only reproducible findings. Fix Critical/Important items with RED→GREEN tests; technically adjudicate Minor items.
 
-- [ ] **Step 4: Commit subsystem documentation**
+Review follow-up commit: `696bfa6`. It prevents title-derived command text from satisfying the Kimi qualification validator while preserving the compatibility behavior of ordinary delegate results. The final code/specification and quality/security reviews both passed after the follow-up RED→GREEN matrix.
+
+Fresh full verification before documentation commit: 46 test files, 759 passed / 1 platform-conditional skipped / 0 failed; typecheck, focused subsystem tests, build, release smoke and diff check passed.
+
+- [x] **Step 4: Commit subsystem documentation**
 
 ```powershell
 git add -- docs/smoke/kimi.md README.md docs/operations.md docs/release/checklist.md docs/release/real-plugin-install-review.md AGENTS.md

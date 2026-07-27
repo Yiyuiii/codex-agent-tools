@@ -42,7 +42,7 @@ Do not:
 - Modify: `src/release/assurance.ts`
 - Modify: `test/release/assurance.test.ts`
 
-- [ ] **Step 1: Write a failing test for an unlisted packaged Markdown file**
+- [x] **Step 1: Write a failing test for an unlisted packaged Markdown file**
 
 Add:
 
@@ -62,7 +62,7 @@ expect(() =>
 
 This proves the helper cannot silently skip a packaged Markdown file merely because a fixed caller list omitted it.
 
-- [ ] **Step 2: Write closure success and failure tests**
+- [x] **Step 2: Write closure success and failure tests**
 
 Cover:
 
@@ -82,7 +82,7 @@ Also assert:
 - a scanned extra Markdown with a missing target fails;
 - unsafe `file:`, `data:`, absolute and escaping targets retain existing redacted errors.
 
-- [ ] **Step 3: Run release assurance tests and verify RED**
+- [x] **Step 3: Run release assurance tests and verify RED**
 
 ```powershell
 npx.cmd vitest run test/release/assurance.test.ts
@@ -90,7 +90,7 @@ npx.cmd vitest run test/release/assurance.test.ts
 
 Expected: FAIL because `assertPackageDocumentLinkClosure` does not exist.
 
-- [ ] **Step 4: Implement the generalized helper**
+- [x] **Step 4: Implement the generalized helper**
 
 Export:
 
@@ -111,7 +111,7 @@ Implementation rules:
 6. Call `assertPackageLocalLinks(documentEntries, normalizedPackageFiles)`.
 7. Errors identify only the safe source name, never link target or body content.
 
-- [ ] **Step 5: Run focused tests and typecheck**
+- [x] **Step 5: Run focused tests and typecheck**
 
 ```powershell
 npx.cmd vitest run test/release/assurance.test.ts
@@ -120,12 +120,16 @@ npm.cmd run typecheck
 
 Expected: all release assurance tests pass and typecheck exits 0.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```powershell
 git add -- src/release/assurance.ts test/release/assurance.test.ts
 git commit -m "fix: scan every packaged document link"
 ```
+
+Actual commits: `68d59eb`, `0388d89`, `ca74018`, `c416462`.
+
+The review follow-up replaced the growing handwritten Markdown scanner with the exact `commonmark@0.31.2` AST. The remaining HTML tokenizer handles HTML text-only elements, browser-compatible start/end tag edge cases, safe redacted targets and adversarial input in linear time.
 
 ### Task 2: Close the actual npm package file set
 
@@ -135,7 +139,7 @@ git commit -m "fix: scan every packaged document link"
 - Modify: `scripts/release-smoke.mjs`
 - Modify: `test/release/assurance.test.ts`
 
-- [ ] **Step 1: Add failing allowlist tests**
+- [x] **Step 1: Add failing allowlist tests**
 
 Change the existing `assertAllowedPackFiles` positive test to include:
 
@@ -146,7 +150,7 @@ Change the existing `assertAllowedPackFiles` positive test to include:
 
 Expected RED: both files are rejected as unexpected.
 
-- [ ] **Step 2: Run the allowlist test and verify RED**
+- [x] **Step 2: Run the allowlist test and verify RED**
 
 ```powershell
 npx.cmd vitest run test/release/assurance.test.ts -t "package"
@@ -154,7 +158,7 @@ npx.cmd vitest run test/release/assurance.test.ts -t "package"
 
 Expected: FAIL with `Unexpected file in npm package`.
 
-- [ ] **Step 3: Add the exact public files**
+- [x] **Step 3: Add the exact public files**
 
 Add both paths to:
 
@@ -164,7 +168,7 @@ Add both paths to:
 
 Keep the plugin exact file set unchanged.
 
-- [ ] **Step 4: Replace the fixed link-source filter**
+- [x] **Step 4: Replace the fixed link-source filter**
 
 Import and call:
 
@@ -174,7 +178,7 @@ assertPackageDocumentLinkClosure(textEntries, [...actualPackFileNames]);
 
 Remove the `packageLinkEntries` filter and its equality check against `reviewPackageSources`. Keep `reviewPackageSources` only if it remains the fixed required-product-document list; rename it to `requiredReviewPackageSources` so it cannot be mistaken for scan coverage.
 
-- [ ] **Step 5: Run the full release smoke**
+- [x] **Step 5: Run the full release smoke**
 
 ```powershell
 npm.cmd run smoke:release
@@ -188,7 +192,7 @@ Expected:
 - release smoke prints `release smoke passed`;
 - no `.tgz` remains in the repository.
 
-- [ ] **Step 6: Inspect the actual pack document set**
+- [x] **Step 6: Inspect the actual pack document set**
 
 Run a read-only npm pack JSON audit and confirm:
 
@@ -199,12 +203,14 @@ Run a read-only npm pack JSON audit and confirm:
 
 Do not persist the npm archive.
 
-- [ ] **Step 7: Commit Task 2**
+- [x] **Step 7: Commit Task 2**
 
 ```powershell
 git add -- package.json src/release/assurance.ts scripts/release-smoke.mjs test/release/assurance.test.ts
 git commit -m "fix: close qualification document package links"
 ```
+
+Actual commit: `1b38b72`.
 
 ### Task 3: Document the package closure and review it
 
@@ -217,7 +223,7 @@ git commit -m "fix: close qualification document package links"
 - Modify: `docs/smoke/ark.md`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: Replace the known-gap wording**
+- [x] **Step 1: Replace the known-gap wording**
 
 Record that:
 
@@ -227,7 +233,7 @@ Record that:
 - registry and installation status remain blocked;
 - no publish or installation occurred.
 
-- [ ] **Step 2: Run documentation and package verification**
+- [x] **Step 2: Run documentation and package verification**
 
 ```powershell
 npm.cmd run typecheck
@@ -238,11 +244,13 @@ git diff --check
 
 Expected: all commands exit 0.
 
-- [ ] **Step 3: Request independent specification and quality review**
+- [x] **Step 3: Request independent specification and quality review**
 
 Give reviewers the approved design, this plan, actual pack file list, link-closure test output, and diff. Fix reproducible Critical/Important issues with TDD and technically adjudicate Minor issues.
 
-- [ ] **Step 4: Commit package documentation**
+Independent specification and quality/security reviews passed after the CommonMark/HTML follow-up. Fresh pack evidence is 145 files / 15 Markdown-or-HTML documents / 4 exact plugin files, with no retained archive. Commit `4766b6a` also updates the bundled `fast-uri` to 3.1.4; production audit high/critical is zero. The remaining Hono moderate is an upstream MCP SDK dependency whose HTTP/static path is absent from this stdio plugin bundle.
+
+- [x] **Step 4: Commit package documentation**
 
 ```powershell
 git add -- README.md docs/operations.md docs/release/checklist.md docs/release/real-plugin-install-review.md docs/smoke/ark.md AGENTS.md

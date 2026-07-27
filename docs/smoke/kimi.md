@@ -18,13 +18,25 @@
 
 上一轮历史四模型 blocked [manifest](evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json) 的 SHA-256 为 `f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c`。它记录 Kimi review/delegate 分别为 ordinal 3/4、均 not run；批次后 Kimi ACP、Pi RPC、real-smoke 进程计数均为 0，没有 retry、fallback、resume 或第二批。
 
+## 离线命令观测加固状态
+
+用户已经批准并完成 Kimi 资格命令观测的离线实现。delegate 资格提示词现在要求先用一个工具调用写入 `result.txt`，再用另一个独立 execute/shell 工具调用只执行 `git status --short`；管道、重定向、连接符、包装命令和模型正文声明都不能满足该要求。通过判定保持原样，仍只使用：
+
+```ts
+result.commandsRun.includes("git status --short")
+```
+
+Kimi ACP client 现在保留协议允许晚到的 `kind/title/rawInput`，任务层只在同一次 adapter 结果内按 tool-call ID 归并初始 call 和 update，再形成一个最终命令观测。新产生的 Kimi delegate evidence 将把内部观测映射为 `raw_input / title_fallback / late_update / unextractable` 来源枚举与 `exact / trim_only / embedded / other` 匹配枚举，不保存命令、title、raw input、tool-call ID、路径、输出或模型正文。optional verifier 只在字段存在时严格检查形状、适用范围和 exact 一致性；历史 evidence 可以没有该字段。
+
+这轮实现没有调用真实模型，没有修改任何既有 evidence JSON、`four-llm-v1` manifest/checkpoint schema 或公开任务/MCP 结果。因此最新真实 Kimi delegate evidence 仍只记录原有 `commandCount=1` 与失败检查，不能用新代码反推历史命令内容。最新批次仍为 `blocked / case_failed`，注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；旧授权已经消费，新的完整八项批次尚未授权。fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，代码层独立规格与质量复审均已通过；文档提交后的最终冻结矩阵仍待完成。
+
 ## 方法与通过标准
 
 review 仓库包含一个可复现缺陷：`average([])` 因除以数组长度 0 而返回 `NaN`，与测试要求的 0 不符。通过要求为：ACP 报告的实际模型与注册表一致、结果状态为 `completed`、指出该缺陷，并且调用前后文件证据和 Git 状态均无变化。
 
 delegate 要求只创建内容为 `KIMI_SMOKE_OK` 的 `result.txt`，随后执行 `git status --short`。通过要求为：实际模型一致、结果状态为 `completed`、文件内容正确、桥接层只观测到 `result.txt` 变更，并在命令观察数组中存在与 `git status --short` 完全相等的独立数组项；仅有任意命令事件、包含该文本的复合命令或模型文字声明都不满足门禁。两类任务都在调用前后枚举 Kimi PID，要求结束后不存在基线之外的新 Kimi 进程。
 
-证据 JSON 不保存完整提示词、模型回复、OAuth 数据、环境变量或临时绝对路径，只保存非秘密模型身份、耗时、状态、哈希和结构化检查结果。
+证据 JSON 不保存完整提示词、模型回复、OAuth 数据、环境变量或临时绝对路径，只保存非秘密模型身份、耗时、状态、哈希和结构化检查结果。未来新生成的 Kimi delegate evidence 还会保存上述 enum-only 命令观测分类；分类只用于诊断，不能替代 exact validator。
 
 ## 当前 K3 证据
 

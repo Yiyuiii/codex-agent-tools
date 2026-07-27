@@ -10,15 +10,16 @@
 
 本状态包为 **blocked / not ready**，不是当前有效的安装权限包。
 
-- 当前阻断结果收敛候选的第 1 层确定性验证已经新鲜通过：44 个测试文件、584 passed / 1 个平台条件 skipped / 0 failed，类型检查、完整构建、release smoke、隔离报告 check-only、资格入口 help、diff check 与生产进程 0/0/0 基线均通过。
+- 阻断结果收敛阶段曾以 44 个测试文件、584 passed / 1 个平台条件 skipped / 0 failed 完成当时的第 1 层验证；Kimi 命令观测与 package 闭包实现后的 fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，代码层独立规格与质量复审均已通过，文档提交后的最终冻结矩阵仍待完成。
 - 第 2 层隔离官方插件生命周期已经通过。
 - 当前活动产品面是四个逻辑 LLM、八项 review/delegate 能力，全部固定使用 direct。
 - 按同一逻辑 LLM 的 review/delegate 必须成对通过的规则，当前过渡注册表是 **6 passed / 2 pending**；只有 Ark Coding Plan 的两项能力 pending。
 - 最新 `four-llm-v1` 批次由同一 execution cell 正常承载到协调器可信终态；前三项通过，第 4 项 Kimi delegate 因严格命令观测未满足而形成 `blocked / case_failed` 终态，后四项未运行，未取得同批 8/8 资格。
+- Kimi exact validator 保持不变；新 producer/optional verifier 只增加 enum-only 诊断。两份资格承载文档已纳入 package，release smoke 扫描全部实际 pack Markdown/HTML；这些离线改进都没有产生新模型资格。
 - 第 4 层真实 Codex App 宿主门禁尚未执行。
 - 当前没有执行活动 Codex 的 marketplace/plugin add 或 remove，也没有读取、写入、备份或恢复活动 `~/.codex/config.toml`。
 
-本文件不提出安装授权问题，也不提供当前可立即执行的安装命令。[原四模型八项资格批次授权审阅](four-llm-qualification-authorization-review.html)和[重新授权审阅](four-llm-qualification-reauthorization-review.html)都已经消费且不能复用；[最新阻断结果审阅](four-llm-qualification-result-review.html)只询问是否采用离线 Kimi 资格命令观测修复设计，不能解释为新的真实资格批次、活动安装、回滚或其它外部状态变更许可。过去对“采用官方插件机制”的原则性同意不能替代未来某次真实 add/remove 的逐动作许可。
+本文件不提出安装授权问题，也不提供当前可立即执行的安装命令。[原四模型八项资格批次授权审阅](four-llm-qualification-authorization-review.html)和[重新授权审阅](four-llm-qualification-reauthorization-review.html)都已经消费且不能复用；[最新阻断结果审阅](four-llm-qualification-result-review.html)记录的离线设计问题随后已经由用户批准并完成实现，但该历史页面仍不能解释为新的真实资格批次、活动安装、回滚或其它外部状态变更许可。过去对“采用官方插件机制”的原则性同意不能替代未来某次真实 add/remove 的逐动作许可。
 
 ## 为什么最终仍需要官方安装
 
@@ -35,7 +36,7 @@
 - ordinal 4 唯一失败检查为 `requiredCommandObserved=false`，因此以 `acceptance_failed` 停止；ordinal 5–8 均为 notRun。evidence 只保存 `commandCount=1`，不保存原始命令正文，因此只能证明唯一提取出的命令观察字符串不等于精确目标，不能证明命令被省略还是合并，也不得据此放宽 validator。
 - blocked manifest：[JSON](../smoke/evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/manifest.json)，schema v2、4 completed / 4 notRun、9 checkpoints、`uncommittedEvidence=null`、`promotionEligible=false`，SHA-256 `d7be5e6ba3884075d80fe399dd3c2d72caaa1a3833f92e529928655e623b7b69`。
 - immutable-evidence verifier 已通过，资格锁 absent，目标进程为 0/0/0。14 份新证据由独立提交 `4f816f0` 保存。
-- 当前授权已经消费；未来任何真实批次都需要先完成离线设计、实现、重新冻结与复核，再取得新的明确授权并从 ordinal 1 重新开始，不能复用本轮或历史证据。
+- 当前授权已经消费；离线设计与实现现已完成，但未来任何真实批次仍需要完成最终冻结与复核，再取得新的明确授权并从 ordinal 1 重新开始，不能复用本轮或历史证据。
 
 该终态没有改变注册表或安装状态：仍为 6 passed / 2 pending 与 **blocked / not ready**。活动配置、插件 add/remove、`codex_cc_tools` 移除、Claude Code、发布与正式仓库 fast-forward 均未执行。
 
@@ -71,6 +72,14 @@ blocked case 的 raw/normalized 双哈希已确定实际文件是 `ARK_SMOKE_OK:
 本次改动没有触及严格结果 validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、资格 schema/protocol 或任何既有 evidence。独立规格和代码质量审阅均为 PASS；fresh typecheck、build、release smoke、临时 `CODEX_HOME` 隔离 check-report、44 个测试文件（569 passed / 1 skipped / 0 failed）、当时 blocked immutable verifier、当时 evidence 5/5、历史 Gemini 14/14、历史 `five-llm-v1` blocked/non-promotable 和目标进程 0/0/0 均通过。Node `spawnSync(bash, ["-c", command])` 探针精确写入 29 bytes、LF 结尾，SHA-256 为 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。
 
 这些都是离线证据；随后一次 interrupted 批次没有形成 case evidence，而最新 blocked 批次已形成 Ark Coding Plan 两项 passed evidence，但因同批 Kimi delegate failed 仍不能原子晋级。注册表和本安装状态包仍分别保持 6 passed / 2 pending 与 **blocked / not ready**。
+
+## Kimi 命令观测与 package 闭包离线实现
+
+用户已经批准并完成 Kimi 命令观测加固。资格提示词要求写入 `result.txt` 与执行 `git status --short` 使用两个有序、独立的工具调用；Kimi ACP late `kind/title/rawInput` 按 tool-call ID 归并。新产生的 Kimi delegate evidence 将只保存来源与匹配枚举，optional verifier 在字段存在时严格检查适用范围、枚举、长度与 exact 一致性。严格通过判定仍是 `commandsRun.includes("git status --short")`；公开任务/MCP 结果、资格 manifest/checkpoint schema 与既有 evidence JSON 均未修改，历史 evidence 可以没有新字段。
+
+资格承载演练和执行手册已纳入 npm package；release smoke 从实际 pack 文件面选取并扫描全部 Markdown/HTML。当前 dry-run 为 145 files / 15 docs / 4 plugin files，插件面保持精确，不生成持久 `.tgz`。这是 package/release assurance 改进，不是 Kimi 或 Ark 资格，也不代表 npm 发布或插件安装。
+
+fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed；代码层独立规格与质量复审均已通过，文档提交后的最终冻结矩阵和 clean-tree SHA 仍待收口。本轮没有调用真实模型，最新 `four-llm-v1` 仍为 `blocked / case_failed`，注册表仍为 6 passed / 2 pending，安装仍为 **blocked / not ready**；旧授权已经消费，新的完整八项批次尚未授权。
 
 ## 历史五模型原子重认证停止事实
 
@@ -118,7 +127,7 @@ blocked case 的 raw/normalized 双哈希已确定实际文件是 `ARK_SMOKE_OK:
 2. 每次实际 backend、模型、provider 和 route 与上表固定身份精确一致；不并行运行 Pi smoke，不重用旧证据，不自动 retry 或 fallback。
 3. review 找到预置缺陷且工作区零变化；delegate 只产生预期变化并观测到验证命令；每次结束后都没有新增 Kimi/Pi RPC 进程。
 4. Kimi/Ark smoke 索引、`docs/smoke/evidence/`、内置注册表、README、运维文档与四层发布清单重新收敛为八项全部 passed，不保留 pending 或自相矛盾的当前状态；Gemini 页面继续只作为退役历史。
-5. Ark Coding Plan 提示词离线修复候选已完成 44 个测试文件（569 passed / 1 skipped / 0 failed）、类型检查、构建、`npm run smoke:release`、隔离报告 check-only、资格入口 help、diff check、不可变 evidence 和生产进程基线的 fresh verification，第 1 层已经更新为 passed。第 2 层隔离官方插件生命周期也已通过；若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
+5. Ark Coding Plan 提示词离线修复阶段曾完成 44 个测试文件（569 passed / 1 skipped / 0 failed）及当时的完整门禁；Kimi/package 实现后的 fresh 全量基线为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，代码层独立规格与质量复审均已通过。文档收口后，必须在最终候选上重新运行类型检查、全量测试、构建、`npm run smoke:release`、隔离报告 check-only、资格入口 help、四份不可变 evidence、5/5 与 14/14 完整性、生产进程/锁和 clean-tree 检查。第 2 层隔离官方插件生命周期此前已经通过；若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
 6. 本状态包改写为 `ready`，以当时的构建产物、隔离状态差异和官方命令行为重新独立审阅。
 
 在这些条件全部成立前，不生成真实安装授权问题，也不进入真实安装执行。
