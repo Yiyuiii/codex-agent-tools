@@ -14,6 +14,8 @@ Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力，过渡
 
 2026-07-27 只在冻结 commit `b57382ed4f2fddce4946613b5aa5739c6eed5c8f` 上启动一次四模型批次 `2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d`。第 1 项 Ark Coding Plan delegate 的实际模型、provider、direct 路由、凭据隔离、变更范围、命令和进程清理均正确，telemetry 为 `1 / 0 / 0 / false / false`，但安全读取到的 30 字节单行结果文件不含预期行，故以 `acceptance_failed` 停止。case [evidence](evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/cases/2026-07-26T17-23-31.295Z-ark-coding-plan-delegate-ark.json) SHA-256 为 `166947716c19d435155e4ce0d041e4c88b7ef9b79f302787e0c27572eb39e6c9`；blocked [manifest](evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json) SHA-256 为 `f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c`，`promotionEligible=false`，后七项 not run。当前授权已经消费，批次后目标进程为 0/0/0；没有 retry、fallback、resume、跳项或第二批。
 
+该 case 保存的 raw/normalized 双哈希可确定实际文件是 `ARK_SMOKE_OK:ark-coding-plan;\n`，分号来自旧生产提示词紧邻期望 payload 的自然语言分隔符。实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 已把三个 Ark delegate profile 统一到精确 Node + Base64 Bash 写入命令，并把 payload 放在独立代码块中；严格结果 validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、schema/protocol 和全部 evidence 均未修改。独立规格与代码质量审阅均 PASS；fresh 离线验证为 44 个测试文件、569 passed / 1 skipped / 0 failed，类型检查、构建、release smoke、临时 `CODEX_HOME` 隔离 check-report、当前 evidence 5/5、历史 Gemini 14/14、两代 blocked immutable verifier 及进程 0/0/0 均通过。Node `spawnSync(bash, ["-c", command])` 探针精确写入 29 bytes、LF 结尾、SHA-256 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。这些结果只证明离线夹具已修复；本轮没有新的真实模型调用，Ark Coding Plan 两项仍 pending，重新执行完整八项前必须取得[新的明确授权](../release/four-llm-qualification-authorization-review.html)。
+
 2026-07-26 的旧五模型原子重认证批次在第 1 项 Gemini delegate 失败后立即停止，六项 Ark case 均为 not run。该历史批次没有替换下述 2026-07-25 Ark 证据；blocked [manifest](evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json) 的 SHA-256 为 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`，批次后目标进程分类为 0，未重试或另开批次。它现在只作为 `five-llm-v1` 历史审计材料保留，不能参与当前四模型晋级。
 
 2026-07-20 历史 passed evidence 使用的旧隔离配置 SHA-256 为 `ab12536cc03dd368115d71bab6eb65216506717fc63b33c4b8a077d82b3ebbf6`。2026-07-25 本轮三模型配置包含 Agent Plan 的 `ark-code-latest`、`deepseek-v4-flash` 与 Coding Plan 的 `ark-code-latest`；按生成器实际输出计算的 SHA-256 为 `61ffbd4c6ea41adc6a8313f957b732da2b98b8b28b082c52a95226b2a6fb2fe9`。两代配置的 endpoint host 均固定为 `ark.cn-beijing.volces.com`，网络策略均为 direct。
@@ -108,7 +110,7 @@ Pi RPC 桥还覆盖 assistant `errorMessage` 与空内容同时出现的失败�
 
 ## 复跑命令
 
-每项须串行运行：
+以下 standalone 命令会调用真实模型，不构成 `four-llm-v1` 同批资格，也不在当前离线授权内。只有在另有明确目的和授权时才可串行运行：
 
 ```powershell
 npm run smoke:ark -- --llm ark-coding-plan --task review

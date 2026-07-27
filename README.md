@@ -13,6 +13,8 @@
 
 2026-07-27 已在冻结 commit `b57382ed4f2fddce4946613b5aa5739c6eed5c8f` 上只运行一次 `four-llm-v1` 批次。首项 Ark Coding Plan delegate 因结果文件内容验收失败而停止，后七项未运行，当前授权已经消费；没有 retry、fallback、resume 或第二批。未来若重新认证，必须先取得新的明确授权，再从首项开始产生完整的同批 8/8 passed 结果；不能只补跑 Ark Coding Plan，也不能把历史证据拼接成当前资格。
 
+该 blocked evidence 的双哈希已确定实际文件是 `ARK_SMOKE_OK:ark-coding-plan;\n`。实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 已把资格提示词修为精确的 Node + Base64 Bash 写入命令，并将 payload 放入独立代码块；严格 validator、固定 provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、schema/protocol 和既有 evidence 均未改。独立规格与质量审阅均为 PASS，完整离线与隔离验证已经通过，但这不等于 Ark Coding Plan 已重新取得资格。本轮没有进行新的真实模型调用；新的完整八项批次仍须先审阅[四模型八项资格批次授权材料](docs/release/four-llm-qualification-authorization-review.html)并取得明确授权。
+
 项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端。
 
 ## 公开契约
@@ -42,7 +44,7 @@
 
 要求 Node.js 20+，并已安装、登录本机 Kimi Code。Kimi 使用本机 OAuth 会话，本项目不复制或保存其令牌。
 
-仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。当前候选的第 1 层确定性验证已经新鲜通过：类型检查、44 个测试文件（560 passed / 1 个平台条件 skipped）、完整构建、release smoke、隔离报告 check-only、资格入口 help 与 diff check 全部成功，生产进程分类器复核 Kimi ACP、Pi RPC、real-smoke 均为 0。当前候选的第 2 层隔离官方插件生命周期也已经通过：Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。
+仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。当前离线修复候选的第 1 层确定性验证已经新鲜通过：类型检查、44 个测试文件（569 passed / 1 个平台条件 skipped / 0 failed）、完整构建、release smoke、隔离报告 check-only、资格入口 help 与 diff check 全部成功，生产进程分类器复核 Kimi ACP、Pi RPC、real-smoke 均为 0。当前候选的第 2 层隔离官方插件生命周期也已经通过：Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。
 
 当前尚未执行真实官方安装。项目代码绝不直接读取或写入活动 `~/.codex/config.toml`；只有 `four-llm-v1` 同批八项全部 passed、隔离验收完成、阻断状态包重新收敛为 ready 权限包，并取得针对本次动作的明确许可后，维护者才可使用官方 `codex plugin` 命令。当前仍有两项注册表能力 pending，因此真实安装授权准备处于 blocked / not ready。任何真实安装、升级或回滚都必须逐次授权，且不得用手工编辑配置代替官方机制。
 

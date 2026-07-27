@@ -33,6 +33,7 @@
 - 2026-07-20 的自动 cutover 当时通过文件级、MCP initialize/listTools 和 strict doctor 检查，但重启后的真实 Codex App 运行异常。用户已于 2026-07-24 恢复原始 `~/.codex/config.toml`。因此“新 MCP 已在活动配置中完全替代旧 MCP”的结论已撤销；当前真实配置内容以用户恢复结果为准，未经许可不读取或修改。
 - 当前代码公开四个固定逻辑 LLM：`ark-agent-deepseek-v4-flash`、`ark-agent-plan`、`ark-coding-plan`、`kimi-k3`，八项 review/delegate 能力的过渡状态为 6 passed / 2 pending，只有 Ark Coding Plan 两项 pending。四个活动 LLM 全部 direct，并清除父进程继承代理。2026-07-27 的最新 `four-llm-v1` 批次在首项 Ark Coding Plan delegate 内容验收失败后 blocked，当前授权已消费；未来新资格必须取得新的明确授权并从首项产生完整同批 8/8，不能只补跑 Ark Coding Plan、复用旧证据或回退到其它 LLM。活动安装保持 `blocked / not ready`。
 - 2026-07-27 根因补充：最新 Ark Coding Plan delegate evidence 的 30-byte 原始文件哈希精确对应 `ARK_SMOKE_OK:ark-coding-plan;\n`，规范化哈希精确对应 `ARK_SMOKE_OK:ark-coding-plan;`；生产提示词恰好把分号紧接在期望 payload 后。因此新失败已定位为资格夹具的确定性分隔歧义，而不是路由、模型、凭据、网络或重试问题。用户已确认按 [Ark Coding Plan 资格提示词消歧与后续替代路线设计](docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md) 推进：严格验收保持不变，先离线修复并重冻结；新的完整八项批次、活动安装、旧工具移除和公共发布仍分别需要明确授权。
+- 2026-07-27 离线修复补充：实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 已将三个 Ark delegate profile 的资格写入合同统一为精确的 Node + Base64 Bash 命令，并把规范化 payload 放入独立代码块。结果文件 validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、资格 schema/protocol 和全部既有 evidence 均未修改。独立规格与代码质量审阅均 PASS；fresh 验证为 44 个测试文件、569 passed / 1 个平台条件 skipped / 0 failed，类型检查、构建、release smoke、临时 `CODEX_HOME` 隔离 check-report、当前 `four-llm-v1` blocked immutable verifier、当前 evidence 5/5、历史 Gemini 14/14、历史 `five-llm-v1` blocked/non-promotable 和目标进程 0/0/0 均通过。Bash → Node 参数探针精确写入 29 bytes、LF 结尾、SHA-256 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。本轮没有新的真实模型调用；注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`，完整八项批次需通过[四模型八项资格批次授权审阅](docs/release/four-llm-qualification-authorization-review.html)另取明确授权。
 - `codex-agent-tools` 在设计时没有同名 npm 包；发布前必须重新检查。当前不执行 `npm publish`。
 
 ### 五模型历史实施记录
@@ -72,6 +73,7 @@
 - [Ark Coding Plan 资格提示词消歧与后续替代路线设计](docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md)
 - [Gemini 退役与四模型资格认证实施计划](docs/superpowers/plans/2026-07-26-gemini-retirement-and-four-llm-qualification.md)
 - [Ark Coding Plan 资格提示词消歧实施计划](docs/superpowers/plans/2026-07-27-ark-coding-qualification-prompt-disambiguation.md)
+- [四模型八项资格批次授权审阅](docs/release/four-llm-qualification-authorization-review.html)
 - [历史：十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md)
 - [历史：五模型官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)
 - [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)

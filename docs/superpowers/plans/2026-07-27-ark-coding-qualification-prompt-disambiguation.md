@@ -8,6 +8,8 @@
 
 **Tech Stack:** TypeScript 5.9, Node.js 20+, Vitest 4, Pi RPC 0.80.10, Git Bash on Windows, tsup, PowerShell, Git.
 
+**Execution status (2026-07-27):** Tasks 1–5 are complete through implementation commit `76504d7d165366ad291e6ff08026b7236f862fc8`, independent specification/code-quality PASS, full offline verification, immutable-evidence audit, and authorization-review material. The fresh full suite is 44 files / 569 passed / 1 skipped / 0 failed. No new real model call occurred. Task 6 remains pending: commit the documentation surface, create the empty frozen-candidate commit, and rerun the exact post-freeze verification chain before handoff.
+
 ---
 
 ## Source of truth
@@ -49,7 +51,7 @@
 - Modify: `test/smoke/pi.test.ts:16-20,224-294`
 - Modify: `src/smoke/pi.ts:288-294,606-624`
 
-- [ ] **Step 1: Add a strict-validator characterization for the exact historical defect**
+- [x] **Step 1: Add a strict-validator characterization for the exact historical defect**
 
 Extend the existing invalid-content table in `test/smoke/result-file-evidence.test.ts`:
 
@@ -70,7 +72,7 @@ npx vitest run test/smoke/result-file-evidence.test.ts
 
 Expected: PASS without changing `src/smoke/result-file-evidence.ts`. This is a characterization gate, not the behavior RED.
 
-- [ ] **Step 2: Write the RED pure-contract test**
+- [x] **Step 2: Write the RED pure-contract test**
 
 Add `buildPiDelegateSmokeContract` to the existing import from `../../src/smoke/pi.js`:
 
@@ -161,7 +163,7 @@ Insert this test before the existing `"validates delegate file and command evide
   );
 ```
 
-- [ ] **Step 2a: Add unsafe shell-token rejection to the RED contract test**
+- [x] **Step 2a: Add unsafe shell-token rejection to the RED contract test**
 
 Add:
 
@@ -176,7 +178,7 @@ Add:
   );
 ```
 
-- [ ] **Step 2b: Replace the old prose-shape assertions in the delegate integration test**
+- [x] **Step 2b: Replace the old prose-shape assertions in the delegate integration test**
 
 At the end of `"validates delegate file and command evidence"`, replace:
 
@@ -194,7 +196,7 @@ with:
     expect(receivedPrompt).not.toContain("ARK_SMOKE_OK:ark-agent-plan;");
 ```
 
-- [ ] **Step 3: Run the focused test and observe RED**
+- [x] **Step 3: Run the focused test and observe RED**
 
 Run:
 
@@ -204,7 +206,7 @@ npx vitest run test/smoke/pi.test.ts -t "builds an unambiguous delegate write co
 
 Expected: FAIL because `buildPiDelegateSmokeContract` is not exported/implemented. If it passes, stop and inspect whether the intended production change already exists.
 
-- [ ] **Step 4: Implement the minimal pure contract**
+- [x] **Step 4: Implement the minimal pure contract**
 
 Insert after `sha256()` in `src/smoke/pi.ts`:
 
@@ -257,7 +259,7 @@ export function buildPiDelegateSmokeContract(
 
 This helper is exported only from the internal smoke module for direct testing. Do not re-export it from the package root or MCP surface.
 
-- [ ] **Step 5: Wire the existing delegate branch to the contract**
+- [x] **Step 5: Wire the existing delegate branch to the contract**
 
 Replace the inline `resultFileName`, `expectedLine`, and one-sentence prompt in `runPiSmoke` with:
 
@@ -281,7 +283,7 @@ Replace the inline `resultFileName`, `expectedLine`, and one-sentence prompt in 
 
 Leave `inspectResultFile`, `requiredCommandObserved`, telemetry, environment, file-range, and cleanup code byte-for-byte unchanged except for formatter-only wrapping.
 
-- [ ] **Step 6: Run the focused GREEN tests**
+- [x] **Step 6: Run the focused GREEN tests**
 
 Run:
 
@@ -291,7 +293,7 @@ npx vitest run test/smoke/pi.test.ts test/smoke/result-file-evidence.test.ts
 
 Expected: both files PASS; the new contract has three passing cases and the semicolon variant remains invalid.
 
-- [ ] **Step 7: Run type checking and inspect the production diff**
+- [x] **Step 7: Run type checking and inspect the production diff**
 
 Run:
 
@@ -303,7 +305,7 @@ git diff -- src/smoke/pi.ts test/smoke/pi.test.ts test/smoke/result-file-evidenc
 
 Expected: typecheck exits 0; the production diff changes prompt construction only.
 
-- [ ] **Step 8: Keep Task 1 changes uncommitted until the shared Ark integration is GREEN**
+- [x] **Step 8: Keep Task 1 changes uncommitted until the shared Ark integration is GREEN**
 
 Do not commit yet. The old `test/smoke/ark.test.ts` parses the superseded prose shape and would fail against the new production prompt. Continue directly to Task 2 so the first behavior commit is fully GREEN.
 
@@ -313,7 +315,7 @@ Do not commit yet. The old `test/smoke/ark.test.ts` parses the superseded prose 
 
 - Modify: `test/smoke/ark.test.ts:8-12,151-226`
 
-- [ ] **Step 1: Import the pure contract**
+- [x] **Step 1: Import the pure contract**
 
 Replace the Pi smoke type-only import with:
 
@@ -324,7 +326,7 @@ import {
 } from "../../src/smoke/pi.js";
 ```
 
-- [ ] **Step 2: Replace the single DeepSeek delegate test with parameterized integration coverage**
+- [x] **Step 2: Replace the single DeepSeek delegate test with parameterized integration coverage**
 
 Replace `"uses a profile-specific delegate file and requires command evidence"` with:
 
@@ -432,7 +434,7 @@ Replace `"uses a profile-specific delegate file and requires command evidence"` 
 
 This removes the brittle `/create ([^ ]+\.txt)/` prompt parser from the old test.
 
-- [ ] **Step 3: Run the Ark/Pi/validator integration set**
+- [x] **Step 3: Run the Ark/Pi/validator integration set**
 
 Run:
 
@@ -442,7 +444,7 @@ npx vitest run test/smoke/pi.test.ts test/smoke/ark.test.ts test/smoke/result-fi
 
 Expected: PASS for all three Ark profiles; no production file beyond `src/smoke/pi.ts` is needed.
 
-- [ ] **Step 4: Probe the exact Bash → Node argv contract without Pi or a real model**
+- [x] **Step 4: Probe the exact Bash → Node argv contract without Pi or a real model**
 
 Run:
 
@@ -456,10 +458,6 @@ if (-not $probeFull.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCas
 }
 New-Item -ItemType Directory -Path $probeFull | Out-Null
 try {
-  $writeCommand = node --import tsx --input-type=module -e "const { buildPiDelegateSmokeContract } = await import('./src/smoke/pi.ts'); process.stdout.write(buildPiDelegateSmokeContract('ark-coding-plan').writeCommand)"
-  if ($LASTEXITCODE -ne 0) {
-    throw "Failed to construct the probe command"
-  }
   $isWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
   if ($isWindows) {
     $gitExecutable = (Get-Command git -ErrorAction Stop).Source
@@ -471,21 +469,42 @@ try {
   if (-not (Test-Path -LiteralPath $bashExecutable -PathType Leaf)) {
     throw "Bash executable is unavailable"
   }
-  Push-Location $probeFull
-  try {
-    & $bashExecutable -c $writeCommand
-    if ($LASTEXITCODE -ne 0) {
-      throw "Bash probe failed"
-    }
-  } finally {
-    Pop-Location
+  $probeScript = @'
+import { spawnSync } from "node:child_process";
+import { buildPiDelegateSmokeContract } from "./src/smoke/pi.ts";
+
+const [bashExecutable, cwd] = process.argv.slice(2);
+const { writeCommand } = buildPiDelegateSmokeContract("ark-coding-plan");
+const child = spawnSync(bashExecutable, ["-c", writeCommand], {
+  cwd,
+  encoding: "utf8",
+  windowsHide: true,
+  stdio: ["ignore", "pipe", "pipe"],
+});
+if (child.error) {
+  throw child.error;
+}
+if (child.status !== 0) {
+  process.stderr.write(child.stderr ?? "");
+  process.exit(child.status ?? 1);
+}
+'@
+  $probeScript | node --import tsx --input-type=module - $bashExecutable $probeFull
+  if ($LASTEXITCODE -ne 0) {
+    throw "Bash probe failed"
   }
   $resultPath = Join-Path $probeFull "ark-coding-plan-smoke.txt"
-  $actualBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($resultPath))
+  $actualBytes = [IO.File]::ReadAllBytes($resultPath)
+  $actualBase64 = [Convert]::ToBase64String($actualBytes)
   if ($actualBase64 -ne "QVJLX1NNT0tFX09LOmFyay1jb2RpbmctcGxhbgo=") {
     throw "Bash probe produced unexpected bytes"
   }
-  Write-Output "bashNodeArgvProbe=passed"
+  $actualSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $resultPath).Hash.ToLowerInvariant()
+  if ($actualBytes.Length -ne 29 -or $actualBytes[-1] -ne 10 -or
+      $actualSha -ne "7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59") {
+    throw "Bash probe byte contract mismatch"
+  }
+  Write-Output "bashNodeArgvProbe=passed bytes=29 lineEnding=LF sha256=$actualSha"
 } finally {
   if (Test-Path -LiteralPath $probeFull) {
     Remove-Item -LiteralPath $probeFull -Recurse -Force
@@ -493,9 +512,9 @@ try {
 }
 ```
 
-Expected: `bashNodeArgvProbe=passed`; no Pi, Kimi, Ark network, or real-smoke process is launched.
+Expected: `bashNodeArgvProbe=passed bytes=29 lineEnding=LF sha256=7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`; no Pi, Kimi, Ark network, or real-smoke process is launched. Piping the JavaScript module over stdin keeps its quotes out of PowerShell's native-command argument binder, while `spawnSync(bashExecutable, ["-c", writeCommand])` reproduces the production Bash argv boundary.
 
-- [ ] **Step 5: Run the Pi and qualification regression set**
+- [x] **Step 5: Run the Pi and qualification regression set**
 
 Run:
 
@@ -506,7 +525,7 @@ npm run typecheck
 
 Expected: all selected tests and typecheck PASS. `four-llm-v1` and evidence schemas remain unchanged.
 
-- [ ] **Step 6: Commit the single fully GREEN behavior change**
+- [x] **Step 6: Commit the single fully GREEN behavior change**
 
 ```powershell
 git add -- src/smoke/pi.ts test/smoke/pi.test.ts test/smoke/ark.test.ts test/smoke/result-file-evidence.test.ts
@@ -521,7 +540,7 @@ git commit -m "fix: disambiguate Ark delegate smoke prompt"
 
 - No tracked changes expected unless a reproducible defect is found.
 
-- [ ] **Step 1: Run the complete deterministic suite**
+- [x] **Step 1: Run the complete deterministic suite**
 
 Run each command separately and stop at the first non-zero exit:
 
@@ -539,7 +558,7 @@ git status --short
 
 Expected: every command exits 0 and the worktree is clean. None of these commands may carry `--authorization-ref`.
 
-- [ ] **Step 2: Verify the current blocked batch through the immutable verifier**
+- [x] **Step 2: Verify the current blocked batch through the immutable verifier**
 
 ```powershell
 npm run --silent verify:qualification -- --mode immutable-evidence --manifest docs/smoke/evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json
@@ -551,7 +570,7 @@ Expected JSON:
 {"verified":true,"mode":"immutable-evidence","batchId":"2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d","qualificationPlanId":"four-llm-v1","status":"blocked","promotionEligible":false}
 ```
 
-- [ ] **Step 3: Recheck the five-file current batch SHA-256 values and baseline blobs**
+- [x] **Step 3: Recheck the five-file current batch SHA-256 values and baseline blobs**
 
 ```powershell
 $expectedCurrent = [ordered]@{
@@ -578,7 +597,7 @@ git diff --exit-code -- docs/smoke/evidence
 
 Expected: `currentBlockedEvidence=5/5` and Git reports no evidence diff.
 
-- [ ] **Step 4: Recheck all 14 historical evidence SHA-256 values and baseline blobs**
+- [x] **Step 4: Recheck all 14 historical evidence SHA-256 values and baseline blobs**
 
 Run this exact PowerShell block:
 
@@ -616,7 +635,7 @@ Write-Output "historicalEvidence=14/14"
 
 Expected: `historicalEvidence=14/14`.
 
-- [ ] **Step 5: Recheck the historical blocked batch through the immutable verifier**
+- [x] **Step 5: Recheck the historical blocked batch through the immutable verifier**
 
 ```powershell
 npm run --silent verify:qualification -- --mode immutable-evidence --manifest docs/smoke/evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json
@@ -624,7 +643,7 @@ npm run --silent verify:qualification -- --mode immutable-evidence --manifest do
 
 Expected: verified `five-llm-v1` historical blocked evidence with `promotionEligible=false`. Do not use `frozen-candidate` mode because current source/build intentionally differs from that historical freeze.
 
-- [ ] **Step 6: Verify production target-process counts**
+- [x] **Step 6: Verify production target-process counts**
 
 ```powershell
 npx tsx -e "import('./src/runtime/agent-processes.ts').then(async ({ classifyAgentProcesses }) => { const counts = await classifyAgentProcesses(); console.log(JSON.stringify(counts)); if (counts.kimi.count !== 0 || counts.piRpc.count !== 0 || counts.realSmoke.count !== 0) process.exitCode = 1; })"
@@ -636,7 +655,7 @@ Expected:
 {"kimi":{"count":0},"piRpc":{"count":0},"realSmoke":{"count":0}}
 ```
 
-- [ ] **Step 7: Record the fresh command results for the final review brief**
+- [x] **Step 7: Record the fresh command results for the final review brief**
 
 Keep only non-secret facts in execution state:
 
@@ -656,7 +675,7 @@ Do not persist raw environment values, authorization UUIDs, process command line
 
 - Modify only when a reviewer identifies a reproducible issue.
 
-- [ ] **Step 1: Dispatch an independent specification reviewer**
+- [x] **Step 1: Dispatch an independent specification reviewer**
 
 Provide:
 
@@ -669,11 +688,11 @@ Provide:
 
 Ask it to check prompt/payload delimiting, all three Ark profiles, validator invariants, `four-llm-v1` compatibility, authorization boundaries, and documentation accuracy. It must not edit files.
 
-- [ ] **Step 2: Dispatch an independent code-quality reviewer**
+- [x] **Step 2: Dispatch an independent code-quality reviewer**
 
 Ask it to inspect shell quoting, Node argv positions, Base64/newline determinism, test strength, public-surface drift, unchanged validator/qualification paths, secret handling, and cleanup behavior. It must not edit files or invoke a real model.
 
-- [ ] **Step 3: Technically triage every finding**
+- [x] **Step 3: Technically triage every finding**
 
 For each finding:
 
@@ -686,7 +705,7 @@ For each finding:
 
 Do not accept a suggestion that changes provider/model/route/credential/retry/fallback, result validator semantics, qualification schema, or historical evidence without stopping for a new design decision.
 
-- [ ] **Step 4: Require both reviews to reach PASS**
+- [x] **Step 4: Require both reviews to reach PASS**
 
 Expected: no reproducible Critical/Important/Minor issue remains. Advisory style preferences may be documented and rejected without code churn.
 
@@ -704,7 +723,7 @@ Expected: no reproducible Critical/Important/Minor issue remains. Advisory style
 - Modify: `docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md`
 - Modify: `docs/superpowers/plans/2026-07-27-ark-coding-qualification-prompt-disambiguation.md`
 
-- [ ] **Step 1: Update current Markdown facts without changing qualification status**
+- [x] **Step 1: Update current Markdown facts without changing qualification status**
 
 Record these facts consistently:
 
@@ -718,7 +737,7 @@ Record these facts consistently:
 
 Do not claim Ark Coding Plan qualification or installation readiness.
 
-- [ ] **Step 2: Create the complete single-file Chinese HTML review brief**
+- [x] **Step 2: Create the complete single-file Chinese HTML review brief**
 
 Create `docs/release/four-llm-qualification-authorization-review.html` with this content:
 
@@ -810,7 +829,7 @@ The `44 个文件、569 passed / 1 skipped / 0 failed` line is the expected coun
 </html>
 ```
 
-- [ ] **Step 3: Validate the review brief and local links**
+- [x] **Step 3: Validate the review brief and local links**
 
 ```powershell
 $review = "docs/release/four-llm-qualification-authorization-review.html"
@@ -847,7 +866,7 @@ Write-Output "authorizationReview=valid"
 
 Expected: `authorizationReview=valid`.
 
-- [ ] **Step 4: Run documentation consistency checks**
+- [x] **Step 4: Run documentation consistency checks**
 
 ```powershell
 rg -n "ARK_SMOKE_OK:ark-coding-plan;|6 passed / 2 pending|blocked / not ready|four-llm-v1|新.*明确授权" README.md AGENTS.md docs/operations.md docs/smoke/ark.md docs/release/checklist.md docs/release/real-plugin-install-review.md docs/release/four-llm-qualification-authorization-review.html

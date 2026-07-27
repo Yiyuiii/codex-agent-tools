@@ -8,7 +8,7 @@
 
 包版本：`0.1.0-alpha.1`
 
-当前结论：**当前候选的第 1 层确定性验证与第 2 层隔离官方插件生命周期均已通过；第 3 层四模型八项能力处于 6 passed / 2 pending，最新 `four-llm-v1` 批次在首项失败后形成 blocked 终态，未取得 8/8 资格；第 4 层真实 Codex App 宿主门禁尚未执行。当前不是已安装、已替代旧工具或可公开发布状态。**
+当前结论：**Ark Coding Plan 提示词分隔歧义已在离线候选中修复，独立双审阅、第 1 层确定性验证与第 2 层隔离官方插件生命周期均已通过；第 3 层四模型八项能力仍处于 6 passed / 2 pending，最新 `four-llm-v1` 批次仍是首项失败后的 blocked 终态，未取得 8/8 资格；第 4 层真实 Codex App 宿主门禁尚未执行。当前不是已安装、已替代旧工具或可公开发布状态。**
 
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 
@@ -16,7 +16,7 @@
 
 | 层级 | 验收对象 | 当前状态 | 通过证据路径 |
 | --- | --- | --- | --- |
-| 1 | 确定性单测、类型检查、构建、release smoke | passed | Task 12 fresh verification：44 files，560 passed / 1 skipped；类型检查、构建、release smoke、隔离报告 check-only、资格入口 help、diff check 与生产进程 0/0/0 基线均通过 |
+| 1 | 确定性单测、类型检查、构建、release smoke | passed | 提示词离线修复 fresh verification：44 files，569 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离报告 check-only、资格入口 help、diff check 与生产进程 0/0/0 均通过 |
 | 2 | 临时 `CODEX_HOME` 中的官方插件生命周期 | passed | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs` |
 | 3 | 四个逻辑 LLM 的八项真实模型门禁 | blocked：6 passed / 2 pending；最新 `four-llm-v1` 首项 failed、后七项 not run | [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)、[最新 blocked manifest](../smoke/evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json)、[Gemini 退役历史](../smoke/pi-gemini.md) |
 | 4 | 活动 Codex 的真实 App 宿主门禁 | not run / blocked | [real-plugin-install-review.md](real-plugin-install-review.md) 当前已存在，但只是 `blocked / not ready` 草案；只有 `four-llm-v1` 同批 8/8 passed 后才能重新审阅并改为 `ready`，授权后才可生成 `real-host-acceptance.md` |
@@ -43,7 +43,7 @@ git diff --check
 
 ### 当前证据
 
-任务 5 的旧五模型阶段曾由主线程复验 release assurance 24/24、全量 191/191、类型检查、构建与 release smoke；这些数字只描述当时提交，不能证明当前四模型候选。Task 12 已对当前候选新鲜执行完整命令组：类型检查通过；全量测试为 44 个文件、560 passed / 1 个平台条件 skipped、0 failed；完整构建、release smoke、隔离插件报告 `--check-report`、资格入口 `--help`、`git diff --check` 均通过；生产 `classifyAgentProcesses()` 返回 Kimi ACP、Pi RPC、real-smoke 计数 0/0/0。因此第 1 层为 passed。该结论不替代第 3 层真实模型资格或第 4 层真实 App 宿主门禁。
+任务 5 的旧五模型阶段曾由主线程复验 release assurance 24/24、全量 191/191、类型检查、构建与 release smoke；这些数字只描述当时提交，不能证明当前四模型候选。Task 12 曾对 Gemini 退役候选运行 44 个文件、560 passed / 1 skipped / 0 failed 的完整命令组。此后的 Ark Coding Plan 提示词离线修复候选已重新执行完整验证：类型检查通过；全量测试为 44 个文件、569 passed / 1 个平台条件 skipped、0 failed；完整构建、release smoke、隔离插件报告 `--check-report`、资格入口 `--help`、`git diff --check` 均通过；生产 `classifyAgentProcesses()` 返回 Kimi ACP、Pi RPC、real-smoke 计数 0/0/0。当前 blocked batch 的 immutable verifier、5/5 当前文件、14/14 历史 Gemini SHA/blob 与历史 `five-llm-v1` blocked/non-promotable 证据也通过；独立规格和代码质量审阅均为 PASS。因此第 1 层为 passed。该结论不替代第 3 层真实模型资格或第 4 层真实 App 宿主门禁。
 
 ### 失败停止条件
 
@@ -98,6 +98,12 @@ npm run acceptance:plugin:isolated
 2026-07-27 在冻结 commit `b57382ed4f2fddce4946613b5aa5739c6eed5c8f` 上只启动一次 `four-llm-v1` 批次 `2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d`。完整 preflight 通过；第 1 项 Ark Coding Plan delegate 的模型、provider、direct 路由、凭据隔离、文件范围、命令和进程清理均正确，telemetry 为 `1 / 0 / 0 / false / false`，但结果文件内容不含预期行，故以 `acceptance_failed` 停止。case evidence SHA-256 为 `166947716c19d435155e4ce0d041e4c88b7ef9b79f302787e0c27572eb39e6c9`；blocked manifest SHA-256 为 `f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c`，immutable-evidence verifier 通过，`promotionEligible=false`，后七项 not run。当前授权已经消费，批次后 Kimi ACP、Pi RPC、real-smoke 计数为 0/0/0；没有 retry、fallback、resume、跳项或第二批。
 
 未来如需重新认证，必须取得新的明确授权并从第 1 项开始运行完整八项；不得复用本次授权或只补跑失败项。
+
+### 离线消歧候选
+
+blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:ark-coding-plan;\n`。实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 仅将 delegate 资格提示词改成精确 Node + Base64 Bash 写入命令并把 payload 独立分隔；严格 validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、schema/protocol 与既有 evidence 均未改变。Bash → Node 探针精确写入 29 bytes、LF 结尾，SHA-256 为 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。
+
+本轮没有新的真实模型调用，因此这一离线修复不能改变第 3 层的 blocked 状态，也不能把 Ark Coding Plan 改为 passed。新的完整 `four-llm-v1` 八项批次仍需[单独明确授权](four-llm-qualification-authorization-review.html)；该审阅材料自身不是授权。
 
 ### 历史五模型证据
 

@@ -2,6 +2,8 @@
 
 本文只描述 `codex_external_agents` 的官方插件候选构建、隔离验收、逐动作授权安装与官方回滚。它不是当前真实安装授权；活动 Codex 尚未安装本插件，四模型八项能力当前为 6 passed / 2 pending。最新 `four-llm-v1` 批次在首项 Ark Coding Plan delegate 的结果文件内容验收失败后形成 `blocked` 终态，未产生 8/8 资格，因此仍处于 `blocked / not ready`。
 
+该失败文件已通过双哈希确定为 `ARK_SMOKE_OK:ark-coding-plan;\n`。实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 已用精确 Node + Base64 Bash 命令和独立 payload 代码块消除提示词分隔歧义，且 validator、固定 provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、资格 schema/protocol 与既有 evidence 均保持不变。独立双审阅及 44 个测试文件、569 passed / 1 skipped / 0 failed 的完整离线验证已通过，但本轮没有新的真实模型调用；Ark Coding Plan 仍未重新取得资格。新的完整八项批次必须先取得[单独的资格批次授权](release/four-llm-qualification-authorization-review.html)，该授权不包含本页后述的活动安装或回滚。
+
 项目代码和维护者都不得直接读取、写入、备份、恢复或手工编辑活动 `~/.codex/config.toml`。Codex 官方插件命令可能由官方机制更新该状态文件，因此真实 add/remove 每次都必须先准备权限包并取得针对该次动作的明确许可。
 
 ## 1. 安装依赖
@@ -46,7 +48,7 @@ npm run acceptance:plugin:isolated
 
 ## 5. 准备真实安装权限包
 
-只有四个活动逻辑 LLM 的 review/delegate 在同一个 `four-llm-v1` 批次中 8/8 passed，才能准备可供授权的 ready 权限包。当前过渡注册表为 6 passed / 2 pending，只有 Ark Coding Plan 的 review/delegate pending；历史五模型结果和最新 blocked 批次都不能参与当前晋级。最新批次的授权已消费且没有重试；未来重入必须取得新的明确授权，并从首项重新运行完整八项。因此本阶段只保持 `blocked / not ready` 状态包，不提出真实安装授权问题，也不接受固定授权语句作为越过门禁的依据。
+只有四个活动逻辑 LLM 的 review/delegate 在同一个 `four-llm-v1` 批次中 8/8 passed，才能准备可供授权的 ready 权限包。当前过渡注册表为 6 passed / 2 pending，只有 Ark Coding Plan 的 review/delegate pending；历史五模型结果和最新 blocked 批次都不能参与当前晋级。最新批次的授权已消费且没有重试；未来重入必须取得新的明确授权，并从首项重新运行完整八项。因此本阶段只保持 `blocked / not ready` 状态包，不提出真实安装授权问题；资格批次授权材料中的建议回复只覆盖一次八项批次，不能作为越过安装门禁的依据。
 
 权限包必须列出：
 

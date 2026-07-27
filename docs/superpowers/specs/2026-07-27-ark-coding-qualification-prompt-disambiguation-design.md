@@ -2,7 +2,7 @@
 
 日期：2026-07-27
 
-状态：设计已获用户确认；逐任务实施计划已建立，离线执行已获授权
+状态：设计已获用户确认；实现提交、独立规格/质量审阅、全量离线验证和授权审阅材料已完成；待文档提交、空冻结提交与最终 post-freeze 复验
 
 ## 1. 决策摘要
 
@@ -11,6 +11,8 @@
 离线修复与确定性验证完成后，项目停在真实模型调用之前。新的 `four-llm-v1` 完整八项资格批次、活动插件安装、旧 `codex_cc_tools` 移除和公共发布分别属于后续独立授权边界。
 
 本设计取代 [Gemini 退役与四模型资格认证设计](2026-07-26-gemini-retirement-and-four-llm-qualification-design.md) 中对 Ark Coding Plan delegate 内容失败原因的旧推测，但不改写该设计已经完成的 Gemini 退役、四模型协议和历史证据边界。
+
+截至文档阶段，实现提交为 `76504d7d165366ad291e6ff08026b7236f862fc8`。它只把三个 Ark delegate profile 的写入要求改为精确 Node + Base64 Bash 命令并将 payload 放入独立代码块；validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、schema/protocol 与既有 evidence 均未改变。独立规格与代码质量审阅均为 PASS；fresh 离线验证为 44 个测试文件、569 passed / 1 skipped / 0 failed，类型检查、构建、release smoke、临时 `CODEX_HOME` 隔离 check-report、当前 blocked immutable verifier、current evidence 5/5、historical evidence 14/14、历史 `five-llm-v1` blocked/non-promotable 和目标进程 0/0/0 均通过。本轮没有新的真实模型调用；注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`。
 
 ## 2. 当前事实与阻断点
 
@@ -147,6 +149,8 @@ git status --short
 - 形成新的 clean-tree 冻结提交；
 - 在冻结后停止，不运行真实 smoke 或资格批次。
 
+上述实现后、冻结前验证已经完成。Bash → Node 参数边界使用 Node `spawnSync(bash, ["-c", command])` 复现生产 argv：精确写入 29 bytes、LF 结尾，SHA-256 为 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。当前剩余工作只有提交本阶段文档、创建空冻结提交并对该精确 frozen HEAD 重新执行同一验证链；冻结 40 位 SHA 只在最终交接消息中提供，不写入本设计或授权 HTML。
+
 `four-llm-v1` 继续表示固定四模型八项日程。提示词和构建产物由新的 frozen commit 与 frozen build identity 区分，因此本次夹具修复不新建 `four-llm-v2`，也不修改历史 codec。
 
 ## 7. 新资格批次边界
@@ -171,6 +175,8 @@ git status --short
 - 只有同批 8/8 passed 才能成对晋级 Ark Coding Plan。
 
 若修复后的第一项仍以相同内容层失败，本路线停止，不继续通过提示词微调反复消耗额度；下一步转入方案 B 的独立设计。
+
+人类可直接审阅的最小充分材料见[四模型八项资格批次授权审阅](../../release/four-llm-qualification-authorization-review.html)。该 HTML 自身不是授权，也不覆盖活动安装、配置访问、旧工具移除、Claude Code、发布或正式工作树 fast-forward。
 
 ## 8. 通过后的 `ready` 状态
 

@@ -10,7 +10,7 @@
 
 本状态包为 **blocked / not ready**，不是当前有效的安装权限包。
 
-- 当前候选的第 1 层确定性验证已经新鲜通过：44 个测试文件、560 passed / 1 个平台条件 skipped，类型检查、完整构建、release smoke、隔离报告 check-only、资格入口 help、diff check 与生产进程 0/0/0 基线均通过。
+- 当前 Ark Coding Plan 提示词离线修复候选的第 1 层确定性验证已经新鲜通过：44 个测试文件、569 passed / 1 个平台条件 skipped / 0 failed，类型检查、完整构建、release smoke、隔离报告 check-only、资格入口 help、diff check 与生产进程 0/0/0 基线均通过。
 - 第 2 层隔离官方插件生命周期已经通过。
 - 当前活动产品面是四个逻辑 LLM、八项 review/delegate 能力，全部固定使用 direct。
 - 按同一逻辑 LLM 的 review/delegate 必须成对通过的规则，当前过渡注册表是 **6 passed / 2 pending**；只有 Ark Coding Plan 的两项能力 pending。
@@ -18,7 +18,7 @@
 - 第 4 层真实 Codex App 宿主门禁尚未执行。
 - 当前没有执行活动 Codex 的 marketplace/plugin add 或 remove，也没有读取、写入、备份或恢复活动 `~/.codex/config.toml`。
 
-本文件不提出安装授权问题，不规定授权回答方式，也不提供当前可立即执行的安装命令。过去对“采用官方插件机制”的原则性同意不能替代未来某次真实 add/remove 的逐动作许可。
+本文件不提出安装授权问题，也不提供当前可立即执行的安装命令。另行准备的[四模型八项资格批次授权审阅](four-llm-qualification-authorization-review.html)只询问一次完整真实资格批次，不能解释为活动安装、回滚或其它外部状态变更的许可。过去对“采用官方插件机制”的原则性同意不能替代未来某次真实 add/remove 的逐动作许可。
 
 ## 为什么最终仍需要官方安装
 
@@ -37,6 +37,14 @@
 - 当前授权已经消费；批次后 Kimi ACP、Pi RPC、real-smoke 目标进程均为 0。没有 retry、fallback、resume、跳项或第二批。
 
 该终态不允许只补跑失败项，也不允许复用当前授权。未来若重新认证，必须先取得新的明确授权，再从第 1 项开始运行新的完整八项批次。
+
+## 离线修复与验证状态
+
+blocked case 的 raw/normalized 双哈希已确定实际文件是 `ARK_SMOKE_OK:ark-coding-plan;\n`，即旧提示词中紧邻期望 payload 的自然语言分号进入了文件。实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 已将三个 Ark delegate profile 的写入要求统一为精确 Node + Base64 Bash 命令，并把 payload 放在独立代码块中。
+
+本次改动没有触及严格结果 validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、资格 schema/protocol 或任何既有 evidence。独立规格和代码质量审阅均为 PASS；fresh typecheck、build、release smoke、临时 `CODEX_HOME` 隔离 check-report、44 个测试文件（569 passed / 1 skipped / 0 failed）、当前 blocked immutable verifier、当前 evidence 5/5、历史 Gemini 14/14、历史 `five-llm-v1` blocked/non-promotable 和目标进程 0/0/0 均通过。Node `spawnSync(bash, ["-c", command])` 探针精确写入 29 bytes、LF 结尾，SHA-256 为 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。
+
+这些都是离线证据。本轮没有新的真实模型调用，Ark Coding Plan 仍未重新资格通过，注册表和本安装状态包仍分别保持 6 passed / 2 pending 与 **blocked / not ready**。
 
 ## 历史五模型原子重认证停止事实
 
@@ -84,7 +92,7 @@
 2. 每次实际 backend、模型、provider 和 route 与上表固定身份精确一致；不并行运行 Pi smoke，不重用旧证据，不自动 retry 或 fallback。
 3. review 找到预置缺陷且工作区零变化；delegate 只产生预期变化并观测到验证命令；每次结束后都没有新增 Kimi/Pi RPC 进程。
 4. Kimi/Ark smoke 索引、`docs/smoke/evidence/`、内置注册表、README、运维文档与四层发布清单重新收敛为八项全部 passed，不保留 pending 或自相矛盾的当前状态；Gemini 页面继续只作为退役历史。
-5. Task 12 已对当前候选完成确定性测试、类型检查、构建、`npm run smoke:release`、隔离报告 check-only、资格入口 help、diff check 与生产进程基线的 fresh verification，第 1 层已经更新为 passed。第 2 层隔离官方插件生命周期也已通过；若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
+5. Ark Coding Plan 提示词离线修复候选已完成 44 个测试文件（569 passed / 1 skipped / 0 failed）、类型检查、构建、`npm run smoke:release`、隔离报告 check-only、资格入口 help、diff check、不可变 evidence 和生产进程基线的 fresh verification，第 1 层已经更新为 passed。第 2 层隔离官方插件生命周期也已通过；若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
 6. 本状态包改写为 `ready`，以当时的构建产物、隔离状态差异和官方命令行为重新独立审阅。
 
 在这些条件全部成立前，不生成真实安装授权问题，也不进入真实安装执行。
