@@ -10,6 +10,8 @@
 
 当前结论：**Ark Coding Plan 提示词分隔歧义已在离线候选中修复，独立双审阅、第 1 层确定性验证与第 2 层隔离官方插件生命周期均已通过；第 3 层四模型八项能力仍处于 6 passed / 2 pending，最新 `four-llm-v1` 批次因执行宿主超时后的协调器进程中断形成 interrupted 终态，0 个 case 完成，未取得 8/8 资格；第 4 层真实 Codex App 宿主门禁尚未执行。当前仍是 blocked / not ready，不是已安装、已替代旧工具或可公开发布状态。**
 
+2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据：`functions.exec` 约 1 秒 yield，同一 cell 经 4 次 wait 完成，产生 1 个 started / 7 个有序 heartbeat / 1 个 completed，exit code 0，wall time 111.4 秒；演练后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。它不证明 4 小时存活或任何模型资格。最新真实结果仍为 `interrupted / process_interrupted` 且不可晋级（`promotionEligible=false`），注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；未来仍需新的 clean frozen candidate 与明确重新授权，历史授权页已经消费。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)，演练事实见[承载演练报告](qualification-carrier-rehearsal.md)。
+
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 
 ## 状态总览

@@ -17,6 +17,8 @@
 
 上一批 `acceptance_failed` 的双哈希与提示词消歧修复仍作为历史事实保留，但没有晋级 Ark Coding Plan。当前授权已经消费；未来若重新认证，必须先修正长时命令承载方式、重新冻结并复核，再取得新的明确授权，从首项开始产生一个全新、完整的同批 8/8 passed 结果。当前人工判断与最小证据见[四模型八项资格批次中断结果审阅](docs/release/four-llm-qualification-result-review.html)；[原授权材料](docs/release/four-llm-qualification-authorization-review.html)只作为已消费历史记录，不能复用。
 
+2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据：`functions.exec` 约 1 秒 yield，同一 cell 经 4 次 wait 完成，产生 1 个 started / 7 个有序 heartbeat / 1 个 completed，exit code 0，wall time 111.4 秒；演练后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。它不证明 4 小时存活或任何模型资格。最新真实结果仍为 `interrupted / process_interrupted` 且不可晋级（`promotionEligible=false`），注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；未来仍需新的 clean frozen candidate 与明确重新授权，历史授权页已经消费。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
+
 项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端。
 
 ## 公开契约

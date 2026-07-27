@@ -6,6 +6,8 @@
 
 上一批结果文件的双哈希与实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 的提示词消歧修复仍作为历史事实保留，但不能替代新同批资格。当前授权已经消费。未来完整八项批次必须先修正长时命令承载方式、重新冻结与复核，再取得一份新的明确授权；[原资格授权材料](release/four-llm-qualification-authorization-review.html)已经失效，只作历史审计。下一步人工判断见[中断结果审阅](release/four-llm-qualification-result-review.html)，且任何未来资格授权都不包含本页后述的活动安装或回滚。
 
+2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据：`functions.exec` 约 1 秒 yield，同一 cell 经 4 次 wait 完成，产生 1 个 started / 7 个有序 heartbeat / 1 个 completed，exit code 0，wall time 111.4 秒；演练后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。它不证明 4 小时存活或任何模型资格。最新真实结果仍为 `interrupted / process_interrupted` 且不可晋级（`promotionEligible=false`），注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；未来仍需新的 clean frozen candidate 与明确重新授权，历史授权页已经消费。未来另获授权后的唯一承载和 fail-closed 边界见[执行承载手册](release/four-llm-qualification-execution-runbook.md)，演练原始结论见[承载演练报告](release/qualification-carrier-rehearsal.md)。
+
 项目代码和维护者都不得直接读取、写入、备份、恢复或手工编辑活动 `~/.codex/config.toml`。Codex 官方插件命令可能由官方机制更新该状态文件，因此真实 add/remove 每次都必须先准备权限包并取得针对该次动作的明确许可。
 
 ## 1. 安装依赖
