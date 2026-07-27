@@ -222,6 +222,18 @@
         .links {
           grid-template-columns: 1fr;
         }
+
+        table {
+          min-width: 0;
+          table-layout: fixed;
+          font-size: 0.9rem;
+        }
+
+        th,
+        td {
+          padding: 9px 7px;
+          overflow-wrap: anywhere;
+        }
       }
     </style>
   </head>
@@ -377,30 +389,42 @@
             <tr>
               <td>全库测试</td>
               <td>
-                <span class="tag pending">冻结前复验</span>
-                当前只记录了 release assurance 聚焦测试
+                <span class="tag passed">已通过</span>
+                44 个测试文件；584 passed / 1 skipped / 0 failed
               </td>
-              <td>必须全量通过，且不得以聚焦测试代替。</td>
+              <td>最终冻结后仍须在精确候选上复验。</td>
             </tr>
             <tr>
               <td>隔离插件生命周期与资格命令帮助</td>
-              <td><span class="tag pending">冻结前复验</span></td>
-              <td>只在隔离环境和只读入口验收，不触碰活动配置。</td>
+              <td>
+                <span class="tag passed">已通过</span>
+                隔离报告 current；两个帮助入口均为 exit code 0
+              </td>
+              <td>未触碰活动配置，也未携带授权引用运行资格入口。</td>
             </tr>
             <tr>
               <td>历史 evidence 不可变校验</td>
               <td>
-                最新 interrupted manifest 已复算并通过 immutable-evidence
-                verifier
+                <span class="tag passed">已通过</span>
+                三个 retained batch verifier、当前阻断证据 5/5、历史证据 14/14
               </td>
-              <td>冻结前复验当前与历史批次，禁止改写既有证据。</td>
+              <td>所有批次仍不可晋级；既有 evidence 未被改写。</td>
             </tr>
             <tr>
-              <td>进程、锁、视觉与 clean tree</td>
-              <td><span class="tag pending">冻结前复验</span></td>
+              <td>进程、锁与 clean tree</td>
               <td>
-                桌面/移动页面、控制台、0/0/0、锁 absent 和 clean tree 全部闭合。
+                <span class="tag passed">已通过</span>
+                Kimi ACP / Pi RPC / real-smoke 为 0/0/0；资格锁 absent
               </td>
+              <td>最终提交后再次确认 clean tree、0/0/0 与锁 absent。</td>
+            </tr>
+            <tr>
+              <td>桌面与移动视觉</td>
+              <td>
+                <span class="tag passed">已通过</span>
+                1440×1000 与 390×844；无水平溢出；控制台 0 errors / 0 warnings
+              </td>
+              <td>顶部阻断结论、验证矩阵、唯一决策与六个链接均清晰可读。</td>
             </tr>
           </tbody>
         </table>
