@@ -1,12 +1,14 @@
 # 官方插件运维流程
 
-本文只描述 `codex_external_agents` 的官方插件候选构建、隔离验收、逐动作授权安装与官方回滚。它不是当前真实安装授权；活动 Codex 尚未安装本插件，四模型八项能力当前为 6 passed / 2 pending。最新 `four-llm-v1` 批次因执行宿主超时后的协调器进程中断形成 `interrupted / process_interrupted` 终态，未产生 8/8 资格，因此仍处于 `blocked / not ready`。
+本文只描述 `codex_external_agents` 的官方插件候选构建、隔离验收、逐动作授权安装与官方回滚。它不是当前真实安装授权；活动 Codex 尚未安装本插件，四模型八项能力当前为 6 passed / 2 pending。最新 `four-llm-v1` 批次在第 4 项 Kimi delegate 的严格命令证据验收处形成 `blocked / case_failed` 终态，未产生 8/8 资格，因此仍处于 `blocked / not ready`。
 
-冻结候选 commit 为 `287b9a8bfa14805f84707adff6c7f2af19065475`，preflight clean 且通过。标准入口只调用一次；它持久化 `batch_started` 与首项 `case_running` 后中断。对同一 batch 只执行一次 `--recover-interrupted`，没有调用模型、resume、retry 或 fallback。终态为 0 completed cases、7 notRun、2 checkpoints，没有 cases 文件、case evidence、`uncommittedEvidence` 或 telemetry；因此不能判断首项是否完成真实后端请求，也不能得出模型、route、凭据或 acceptance 结论。manifest SHA-256 为 `3e200dca507fe886d4e3a4bbf67cc811cca485120e6969e7632f933537ba902b`，immutable-evidence verifier、锁释放与目标进程 0/0/0 均已验证。
+冻结候选 commit 为 `652e14ac637bfc04d90c448179ecc5838f2f8450`，preflight clean 且通过。标准入口只调用一次，并由一个 `functions.exec` cell 内的单个四小时预算前台 shell 承载约 979 秒到可信终态；没有发生 cell 丢失或 recovery。批次 `2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa` 的 ordinal 1 Ark Coding Plan delegate、ordinal 2 Ark Coding Plan review 与 ordinal 3 Kimi review 通过；ordinal 4 Kimi delegate 因 `requiredCommandObserved=false` 以 `acceptance_failed` 停止，ordinal 5–8 未运行。
 
-上一批结果文件的双哈希与实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 的提示词消歧修复仍作为历史事实保留，但不能替代新同批资格。当前授权已经消费。未来完整八项批次必须先修正长时命令承载方式、重新冻结与复核，再取得一份新的明确授权；[原资格授权材料](release/four-llm-qualification-authorization-review.html)已经失效，只作历史审计。下一步人工判断见[中断结果审阅](release/four-llm-qualification-result-review.html)，且任何未来资格授权都不包含本页后述的活动安装或回滚。
+manifest 为 schema v2、`blocked / case_failed`、4 completed / 4 notRun、9 checkpoints、`uncommittedEvidence=null`、`promotionEligible=false`，SHA-256 为 `d7be5e6ba3884075d80fe399dd3c2d72caaa1a3833f92e529928655e623b7b69`。immutable-evidence verifier、锁释放与目标进程 0/0/0 均已验证；证据由独立提交 `4f816f0` 保存。Kimi delegate 的模型、direct 路由、文件范围、结果内容、进程清理和 `1 / 0 / 0 / false / false` telemetry 全部通过，唯一失败检查是精确命令观测。证据不保存原始命令正文，因此不能进一步推断命令被省略还是合并，也不得放宽 validator。
 
-2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据：`functions.exec` 约 1 秒 yield，同一 cell 经 4 次 wait 完成，产生 1 个 started / 7 个有序 heartbeat / 1 个 completed，exit code 0，wall time 111.4 秒；演练后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。它不证明 4 小时存活或任何模型资格。最新真实结果仍为 `interrupted / process_interrupted` 且不可晋级（`promotionEligible=false`），注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；未来仍需新的 clean frozen candidate 与明确重新授权，历史授权页已经消费。未来另获授权后的唯一承载和 fail-closed 边界见[执行承载手册](release/four-llm-qualification-execution-runbook.md)，演练原始结论见[承载演练报告](release/qualification-carrier-rehearsal.md)。
+同批前三项通过不能与历史证据拼接晋级。当前授权已经消费；下一步先审阅 Kimi 资格命令观测的离线修复设计，完成实现、重新冻结与复核后，任何完整八项批次仍须取得另一份明确授权并从 ordinal 1 开始。[本轮重新授权材料](release/four-llm-qualification-reauthorization-review.html)与[更早授权材料](release/four-llm-qualification-authorization-review.html)都只作已消费历史审计；当前人工判断见[阻断结果审阅](release/four-llm-qualification-result-review.html)。
+
+2026-07-27 的 105 秒演练只构成离线基础设施证据；本轮约 979 秒真实批次进一步证明同一 cell 可以承载到协调器正常终态，但两者都不证明四小时存活或任何未执行模型资格。未来另获授权后的唯一承载和 fail-closed 边界见[执行承载手册](release/four-llm-qualification-execution-runbook.md)，演练原始结论见[承载演练报告](release/qualification-carrier-rehearsal.md)。
 
 项目代码和维护者都不得直接读取、写入、备份、恢复或手工编辑活动 `~/.codex/config.toml`。Codex 官方插件命令可能由官方机制更新该状态文件，因此真实 add/remove 每次都必须先准备权限包并取得针对该次动作的明确许可。
 
@@ -52,7 +54,7 @@ npm run acceptance:plugin:isolated
 
 ## 5. 准备真实安装权限包
 
-只有四个活动逻辑 LLM 的 review/delegate 在同一个 `four-llm-v1` 批次中 8/8 passed，才能准备可供授权的 ready 权限包。当前过渡注册表为 6 passed / 2 pending，只有 Ark Coding Plan 的 review/delegate pending；历史五模型结果、旧 blocked 批次和最新 interrupted 批次都不能参与当前晋级。最新批次的授权已消费，且没有 retry、fallback、resume 或第二批；未来重入必须取得新的明确授权，并从首项重新运行全新的完整八项。因此本阶段只保持 `blocked / not ready` 状态包，不提出真实安装授权问题；已消费的资格授权材料不能作为未来批次或越过安装门禁的依据。
+只有四个活动逻辑 LLM 的 review/delegate 在同一个 `four-llm-v1` 批次中 8/8 passed，才能准备可供授权的 ready 权限包。当前过渡注册表为 6 passed / 2 pending，只有 Ark Coding Plan 的 review/delegate pending；历史五模型结果、旧 blocked/interrupted 批次和本轮只完成四项的 blocked 批次都不能参与当前晋级。本轮前三项通过也不能与历史证据拼接。最新批次的授权已消费，且没有 retry、fallback、resume 或第二批；未来重入必须取得新的明确授权，并从首项重新运行全新的完整八项。因此本阶段只保持 `blocked / not ready` 状态包，不提出真实安装授权问题；已消费的资格授权材料不能作为未来批次或越过安装门禁的依据。
 
 权限包必须列出：
 

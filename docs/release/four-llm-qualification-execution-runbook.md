@@ -4,7 +4,9 @@
 
 ## 当前状态
 
-最新真实 `four-llm-v1` 结果仍是 `interrupted / process_interrupted`，且 `promotionEligible=false`。活动注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`。
+最新真实 `four-llm-v1` 批次 `2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa` 已由一个 `functions.exec` cell 和一个四小时预算的前台 shell 正常承载到可信终态。ordinal 1 Ark Coding Plan delegate、ordinal 2 Ark Coding Plan review 与 ordinal 3 Kimi review 通过；ordinal 4 Kimi delegate 因 `requiredCommandObserved=false` 以 `acceptance_failed` 停止，ordinal 5–8 未运行。终态为 `blocked / case_failed` 且 `promotionEligible=false`；活动注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`。
+
+本轮没有发生 cell 丢失或 recovery，也没有 retry、fallback、resume、补跑或第二批。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。该结果证明本手册的长时承载路径可以取得正常终态，但不允许把同批前三项与历史证据拼接晋级。
 
 105 秒承载演练只构成离线基础设施证据：`functions.exec` 约 1 秒后 yield，同一个 cell 随后经 4 次 `functions.wait` 完成；事件严格为 1 个 `started`、7 个有序 `heartbeat`、1 个 `completed`，shell exit code 为 0，观测 wall time 为 111.4 秒；演练后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。它不证明 cell 可存活 4 小时，不证明任何模型资格，也不授权真实批次。
 
@@ -16,7 +18,7 @@
 
 - 已有精确且 clean 的 frozen candidate，候选内容、构建身份和资格协议已经独立复核；
 - 确定性测试、隔离插件生命周期、package 闭包、不可变证据校验和必要的视觉检查均针对同一候选通过；
-- 最新真实资格状态仍按证据如实标记为 `interrupted`、不可晋级，注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；
+- 最新真实资格状态仍按证据如实标记为 blocked/interrupted 或其它实际不可晋级终态，注册表和安装状态没有被单项结果越过；
 - 维护者已经针对该精确冻结候选，明确授权一次全新的、从 ordinal 1 开始的完整 `four-llm-v1` 八项批次；
 - 历史授权页只作为已消费审计记录，没有被当作本次授权；
 - 已创建并确认 active long-term goal；没有 active goal 时不得生成或消费授权引用；
@@ -98,12 +100,12 @@ cell 无法恢复等待且 owner、batch、authorization hash、terminal 或目�
 
 ## 7. 文档与授权边界
 
-本手册只告诉维护者在未来另获明确授权后如何 fail closed 地承载一个批次。演练报告只记录离线基础设施证据；结果页只记录历史中断；未来重新授权审阅页只提供人工判断材料。任何一份文档、任何文档组合、对设计或计划的确认、以及 active long-term goal 本身，都不生成、替代或暗示真实资格授权。
+本手册只告诉维护者在未来另获明确授权后如何 fail closed 地承载一个批次。演练报告只记录离线基础设施证据；结果页只记录历史终态；已经消费的重新授权审阅页只保留审计材料。任何一份文档、任何文档组合、对设计或计划的确认、以及 active long-term goal 本身，都不生成、替代或暗示真实资格授权。
 
 相关材料：
 
 - [105 秒离线承载演练](qualification-carrier-rehearsal.md)
-- [最新中断结果审阅](four-llm-qualification-result-review.html)
+- [最新阻断结果审阅](four-llm-qualification-result-review.html)
 - [已消费的历史授权材料](four-llm-qualification-authorization-review.html)
 - [发布验收清单](checklist.md)
 - [运维边界](../operations.md)

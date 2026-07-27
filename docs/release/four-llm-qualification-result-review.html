@@ -3,52 +3,94 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>四模型八项资格批次中断结果审阅</title>
+    <title>四模型八项资格批次阻断结果审阅</title>
     <style>
       :root {
         color-scheme: light;
         font-family:
+          Inter,
+          "Noto Sans SC",
+          "Microsoft YaHei",
           system-ui,
           -apple-system,
           BlinkMacSystemFont,
           "Segoe UI",
           sans-serif;
+        --ink: #18212f;
+        --muted: #5f6b7a;
+        --line: #d8dee8;
+        --panel: #f7f9fc;
+        --blocked: #9a3412;
+        --blocked-bg: #fff7ed;
+        --passed: #166534;
+        --passed-bg: #f0fdf4;
+        --decision: #1d4ed8;
+        --decision-bg: #eff6ff;
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
-        max-width: 980px;
-        margin: 0 auto;
-        padding: 32px 20px 64px;
+        margin: 0;
+        background: #eef2f7;
+        color: var(--ink);
         line-height: 1.65;
-        color: #1f2937;
+      }
+      main {
+        width: min(1040px, calc(100% - 32px));
+        margin: 28px auto;
+        padding: 36px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: 0 18px 45px rgb(15 23 42 / 8%);
       }
       h1,
       h2 {
-        color: #111827;
         line-height: 1.25;
+        color: #111827;
+      }
+      h1 {
+        margin-top: 0;
+        font-size: clamp(1.75rem, 4vw, 2.45rem);
+      }
+      h2 {
+        margin-top: 2rem;
+        font-size: 1.3rem;
+      }
+      code {
+        padding: 0.1em 0.35em;
+        border-radius: 4px;
+        background: #eef2f7;
+        overflow-wrap: anywhere;
       }
       .status,
-      .decision,
       .verified,
-      .warning {
-        padding: 14px 18px;
-        border-radius: 10px;
+      .warning,
+      .decision {
         margin: 1rem 0;
+        padding: 16px 18px;
+        border-radius: 12px;
       }
       .status {
-        border: 2px solid #b45309;
-        background: #fffbeb;
-      }
-      .decision {
-        border: 2px solid #1d4ed8;
-        background: #eff6ff;
+        border: 2px solid var(--blocked);
+        background: var(--blocked-bg);
       }
       .verified {
-        border-left: 4px solid #047857;
-        background: #ecfdf5;
+        border-left: 5px solid var(--passed);
+        background: var(--passed-bg);
       }
       .warning {
-        border-left: 4px solid #b91c1c;
+        border-left: 5px solid var(--blocked);
         background: #fef2f2;
+      }
+      .decision {
+        border: 2px solid var(--decision);
+        background: var(--decision-bg);
+      }
+      .table-wrap {
+        width: 100%;
+        overflow-x: auto;
       }
       table {
         width: 100%;
@@ -57,286 +99,299 @@
       }
       th,
       td {
-        border: 1px solid #d1d5db;
-        padding: 9px 11px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
         text-align: left;
         vertical-align: top;
-      }
-      th {
-        background: #f3f4f6;
-      }
-      code {
-        background: #f3f4f6;
-        padding: 0.1em 0.35em;
-        border-radius: 4px;
         overflow-wrap: anywhere;
       }
+      th {
+        background: var(--panel);
+      }
+      .passed {
+        color: var(--passed);
+        font-weight: 700;
+      }
+      .failed,
+      .blocked {
+        color: var(--blocked);
+        font-weight: 700;
+      }
       li {
-        margin: 0.35em 0;
+        margin: 0.4em 0;
       }
       a {
         color: #1d4ed8;
       }
+      footer {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+      }
+      @media (max-width: 680px) {
+        main {
+          width: min(100% - 16px, 1040px);
+          margin: 8px auto;
+          padding: 22px 16px;
+          border-radius: 12px;
+        }
+        table {
+          min-width: 0;
+          table-layout: fixed;
+          font-size: 0.9rem;
+        }
+        th,
+        td {
+          padding: 9px 7px;
+          overflow-wrap: anywhere;
+        }
+      }
     </style>
   </head>
   <body>
-    <h1>四模型八项资格批次中断结果审阅</h1>
-    <div class="status">
-      <strong
-        >结论：本轮唯一授权已消费，批次因执行进程中断而未形成资格结果。</strong
-      >
-      当前注册表仍为 6 passed / 2 pending，只有 Ark Coding Plan 两项
-      pending；安装仍为 blocked / not
-      ready。本页只要求一个未来方向判断，不授权现在运行任何真实批次。
-    </div>
+    <main>
+      <h1>四模型八项资格批次阻断结果审阅</h1>
 
-    <h2>背景与边界</h2>
-    <p>
-      在 Ark Coding Plan
-      资格提示词完成离线消歧、候选重新冻结并通过预检后，用户只授权一个新的完整
-      <code>four-llm-v1</code> 批次。标准
-      <code>--authorization-ref</code>
-      入口已且只调用一次，绝不重跑。授权不包含活动
-      <code>~/.codex/config.toml</code> 访问、插件 add/remove、旧
-      <code>codex_cc_tools</code> 移除、Claude Code、npm/公共 marketplace
-      发布或正式仓库 fast-forward；这些动作均未执行。
-    </p>
-
-    <h2>精确时间线</h2>
-    <p>以下 checkpoint 与终态时间均为 UTC；“约 14 秒”来自执行宿主返回事实。</p>
-    <ol>
-      <li>
-        冻结候选 commit
-        <code>287b9a8bfa14805f84707adff6c7f2af19065475</code>，分支
-        <code>codex/gemini-retirement</code>，package
-        <code>0.1.0-alpha.1</code>；工作树 clean，preflight 通过。
-      </li>
-      <li>
-        标准入口只调用一次。执行宿主前台 shell 在约 14 秒处返回 timeout
-        124；这不是资格协调器已经终止的证明。
-      </li>
-      <li>
-        协调器子进程随后仍存活：<code>2026-07-27T04:29:36.016Z</code> 发布
-        sequence 0 / <code>batch_started</code>；<code
-          >2026-07-27T04:29:37.360Z</code
+      <div class="status">
+        <strong
+          >结论：本轮唯一授权已经消费，批次在第 4 项 Kimi delegate
+          的严格命令证据验收处停止。</strong
         >
-        发布 sequence 1 / ordinal 1 / <code>ark-coding-plan delegate</code> /
-        <code>case_running</code>。
-      </li>
-      <li>
-        协调器后来退出并留下 stale owner；没有发布 case evidence 或正常终态。
-      </li>
-      <li>
-        确认原进程已死，且 Kimi ACP / Pi RPC / real-smoke 目标进程为 0/0/0
-        后，只对同一 batch 执行一次 <code>--recover-interrupted</code>。
-      </li>
-      <li>
-        恢复没有调用模型、resume、retry 或 fallback，只发布
-        <code>interrupted / process_interrupted</code> manifest
-        并释放锁；manifest 的 <code>completedAt</code> 为
-        <code>2026-07-27T04:30:44.473Z</code>。
-      </li>
-    </ol>
+        当前注册表仍为 <code>6 passed / 2 pending</code>，安装仍为
+        <code>blocked / not ready</code>。没有补跑、重试、fallback、resume
+        或第二批。
+      </div>
 
-    <h2>原因定位</h2>
-    <div class="warning">
-      <strong
-        >可证实的故障链是：执行宿主前台 shell 超时 → 协调器随后仍运行一段时间 →
-        协调器后来中断并留下 stale owner。</strong
-      >
-      恢复协议将终态归类为
-      <code>process_interrupted</code
-      >。这不是模型质量结论，也没有证据支持把它写成 route、凭据、网络、额度或
-      acceptance 失败。
-    </div>
-    <p>
-      ordinal 1 只证明进入
-      <code>case_running</code
-      >。它是否完成真实后端请求无法由现有证据证明；因此本页不虚构
-      telemetry、失败 case、case evidence SHA 或模型响应。
-    </p>
+      <h2>发生了什么</h2>
+      <ol>
+        <li>
+          在 frozen commit
+          <code>652e14ac637bfc04d90c448179ecc5838f2f8450</code>
+          上完成 clean preflight，只通过一个标准入口启动一个
+          <code>four-llm-v1</code> 批次。
+        </li>
+        <li>
+          运行由一个 <code>functions.exec</code> cell
+          和一个四小时预算的前台 shell 承载；后续只等待同一 cell。约 979
+          秒后协调器正常返回可信终态，没有发生 cell 丢失或 recovery。
+        </li>
+        <li>
+          ordinal 1 Ark Coding Plan delegate、ordinal 2 Ark Coding Plan
+          review、ordinal 3 Kimi review 依次通过。
+        </li>
+        <li>
+          ordinal 4 Kimi delegate 完成了预期文件写入，但
+          <code>requiredCommandObserved=false</code>，因此以
+          <code>acceptance_failed</code> 停止。
+        </li>
+        <li>
+          ordinal 5–8 全部按协议标记为 notRun；协调器发布
+          <code>blocked / case_failed</code> 终态并释放资格锁。
+        </li>
+      </ol>
 
-    <h2>最小充分证据</h2>
-    <table>
-      <tbody>
-        <tr>
-          <th>批次</th>
-          <td>
-            <code
-              >2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde</code
-            >
-          </td>
-        </tr>
-        <tr>
-          <th>冻结候选</th>
-          <td>
-            <code>287b9a8bfa14805f84707adff6c7f2af19065475</code>；branch
-            <code>codex/gemini-retirement</code>；clean
-          </td>
-        </tr>
-        <tr>
-          <th>构建 / preflight</th>
-          <td>
-            build identity SHA-256
-            <code
-              >71576ad637f1a9ee9914ebf7294b267abd43421a4df89621f45fd0adfdf034ee</code
-            >； preflight SHA-256
-            <code
-              >1fdd7273a57309d6f541049493a89ed342ed897c749c5cb3cf043e7e7ca30185</code
-            >
-          </td>
-        </tr>
-        <tr>
-          <th>manifest</th>
-          <td>
-            schema
-            v2；<code>interrupted</code>；<code>process_interrupted</code>；
-            <code>promotionEligible=false</code>；SHA-256
-            <code
-              >3e200dca507fe886d4e3a4bbf67cc811cca485120e6969e7632f933537ba902b</code
-            >
-          </td>
-        </tr>
-        <tr>
-          <th>证据形状</th>
-          <td>
-            0 completed cases；ordinal 2–8 共 7 个 notRun；2 checkpoints：
-            <code>000000 batch_started</code>、<code>000001 case_running</code
-            >（ordinal 1 / Ark Coding Plan / delegate）；没有 cases 文件、case
-            evidence 或
-            <code>uncommittedEvidence</code>
-          </td>
-        </tr>
-        <tr>
-          <th>恢复后现场</th>
-          <td>
-            immutable-evidence verifier 通过；qualification lock
-            已消失；目标进程 0/0/0
-          </td>
-        </tr>
-        <tr>
-          <th>证据提交</th>
-          <td>
-            <code>b76c75d</code>；3 files / 276 insertions；只包含本批 manifest
-            与两个 checkpoints
-          </td>
-        </tr>
-      </tbody>
-    </table>
+      <h2>关键身份与终态</h2>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr>
+              <th>批次</th>
+              <td>
+                <code
+                  >2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa</code
+                >
+              </td>
+            </tr>
+            <tr>
+              <th>计划与冻结点</th>
+              <td>
+                <code>four-llm-v1</code>；
+                <code>652e14ac637bfc04d90c448179ecc5838f2f8450</code>
+              </td>
+            </tr>
+            <tr>
+              <th>构建身份</th>
+              <td>
+                <code
+                  >71576ad637f1a9ee9914ebf7294b267abd43421a4df89621f45fd0adfdf034ee</code
+                >
+              </td>
+            </tr>
+            <tr>
+              <th>preflight</th>
+              <td>
+                clean / passed；SHA-256
+                <code
+                  >2449bc7c4b30ecb7d447fef8e399a04b1433c084025a4c01ad89a2df9f87d36c</code
+                >
+              </td>
+            </tr>
+            <tr>
+              <th>manifest</th>
+              <td>
+                schema v2；<code>blocked / case_failed</code>；
+                <code>promotionEligible=false</code>；SHA-256
+                <code
+                  >d7be5e6ba3884075d80fe399dd3c2d72caaa1a3833f92e529928655e623b7b69</code
+                >
+              </td>
+            </tr>
+            <tr>
+              <th>证据提交</th>
+              <td>
+                <code>4f816f0</code>；仅包含本轮 14 个新批次 JSON 文件
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-    <h2>机器已验证的内容</h2>
-    <div class="verified">
+      <h2>已执行四项</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>LLM / 任务</th>
+              <th>结果</th>
+              <th>证据摘要</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td><code>ark-coding-plan / delegate</code></td>
+              <td class="passed">passed</td>
+              <td>
+                <code>ark-code-latest</code> / direct；结果、命令、隔离与 telemetry
+                全通过
+              </td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td><code>ark-coding-plan / review</code></td>
+              <td class="passed">passed</td>
+              <td>
+                已识别预置缺陷；工作区不变；隔离与 telemetry 全通过
+              </td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td><code>kimi-k3 / review</code></td>
+              <td class="passed">passed</td>
+              <td>
+                <code>kimi-code/k3</code> / direct；工作区不变；无残留进程
+              </td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td><code>kimi-k3 / delegate</code></td>
+              <td class="failed">failed</td>
+              <td>
+                文件内容与范围正确；唯一失败检查为
+                <code>requiredCommandObserved=false</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="verified">
+        四项 telemetry 均为 <code>1 / 0 / 0 / false / false</code>。所有已执行项
+        的实际模型与固定身份匹配，route 为 direct；批次后 Kimi ACP / Pi RPC /
+        real-smoke 为 0/0/0。
+      </div>
+
+      <h2>失败边界</h2>
+      <p>
+        Kimi delegate 确实只改变了 <code>result.txt</code>；文件可安全读取，14
+        bytes、单行、规范化 SHA-256 与预期完全相同，并包含精确
+        <code>KIMI_SMOKE_OK</code>。模型、路由、文件范围、结果内容、进程清理和
+        telemetry 都不是本次失败点。
+      </p>
+      <div class="warning">
+        可证实的直接原因只有：桥接层观测到 1 条命令事件，但其中没有一个数组项与
+        <code>git status --short</code>
+        完全相等。证据协议故意不保存原始命令正文，因此不能进一步断言 Kimi
+        是完全省略了状态检查，还是把它合并进另一条命令。该不确定性不得用来放宽
+        validator、宣布模型通过或补跑单项。
+      </div>
+
+      <h2>自动验证已经过滤的内容</h2>
       <ul>
+        <li>唯一新增一个批次目录，包含 4 case、9 checkpoint 和 1 manifest。</li>
         <li>
-          manifest 和两个 checkpoint 的 schema、身份、顺序与 SHA 链通过
-          immutable-evidence verifier。
+          <code>immutable-evidence</code> verifier 通过；manifest 与四份
+          evidence 的身份、SHA、顺序和 telemetry 链闭合。
         </li>
-        <li>manifest 文件 SHA-256 已独立复算匹配。</li>
-        <li>没有 cases 目录、case evidence 或未提交 evidence。</li>
+        <li>原 frozen commit 在运行期间未漂移；新 evidence 已独立提交。</li>
+        <li>资格锁 absent；Kimi ACP / Pi RPC / real-smoke 为 0/0/0。</li>
         <li>
-          只执行一次中断恢复；恢复后锁消失，Kimi ACP / Pi RPC / real-smoke 为
-          0/0/0。
-        </li>
-        <li>
-          注册表未修改，保持 6 passed / 2 pending；安装状态保持 blocked / not
-          ready。
-        </li>
-        <li>
-          历史执行计划原规格与质量复核均为 PASS；仓库版本已加入终态防误执行标记；当前计划
-          SHA-256 为
-          <code
-            >EE98AEADB9B19C3C1CE5C90B4500F60C145472F330846603136220F876C236DF</code
-          >。
+          ordinal 5–8 没有运行；没有 retry、fallback、resume、跳项、recovery
+          或第二批。
         </li>
       </ul>
-    </div>
 
-    <h2>当前状态与风险</h2>
-    <ul>
-      <li>本轮授权已经消费，不能复用；也不能只补跑 Ark Coding Plan。</li>
-      <li>
-        最新批次没有晋级任何能力，Ark Coding Plan review/delegate 继续 pending。
-      </li>
-      <li>
-        旧 passed 证据继续解释现有 6 项 passed；最新 interrupted
-        记录不替代它们。
-      </li>
-      <li>
-        若不先修正长时命令承载方式，新的长时资格入口仍可能被执行宿主过早超时。
-      </li>
-      <li>
-        任何未来真实批次都必须重新冻结、重新复核、取得新的明确授权，并从 ordinal
-        1 开始；不能复用本批或旧批 evidence。
-      </li>
-    </ul>
+      <h2>下一步边界</h2>
+      <div class="decision">
+        <strong>当前不请求新的真实批次授权。</strong>
+        推荐的离线设计候选是“强化资格提示词 + 最小脱敏命令观测分类”：要求文件写入与精确
+        <code>git status --short</code>
+        由两个独立工具调用完成；只持久化
+        <code>raw input / title fallback / late update / unextractable</code>
+        等来源类别与
+        <code>exact / trim-only / embedded / other</code>
+        匹配类别，绝不保存命令正文。只有 fake ACP
+        协议夹具证明命令字段确实晚到时，才合并同一 tool-call 的 update 字段。严格
+        validator、模型、路由、凭据、single-attempt 与无 retry/fallback 均保持不变。
+        “只改提示词”改动更小但仍留下观测歧义；放宽成 substring、任意命令事件或复合命令通过不建议采用。任何实现都必须先经设计批准、TDD、独立复核和重新冻结；之后才可另行决定是否授权一个全新的完整八项批次。
+      </div>
 
-    <h2>唯一需要用户判断的问题</h2>
-    <div class="decision">
-      <strong
-        >是否将来在修正长时命令承载方式并重新冻结、复核后，再准备授权一个全新的完整
-        <code>four-llm-v1</code> 八项批次？</strong
-      >
-      此处的回答只决定是否推进离线修正与新审阅准备，不构成真实批次授权。
-    </div>
+      <h2>独立的发布包缺口</h2>
+      <p>
+        本轮只读审计还发现：已有打包文档会链接到资格承载演练和执行手册，但这两份文件
+        当前没有进入 npm package；现有包内链接检查也只覆盖固定审阅页集合。该问题不是本次
+        Kimi 失败原因，最新结果页没有新增指向缺失文件的链接。建议把“纳入两份文档并把链接检查
+        扩展到全部已打包 Markdown/HTML”作为同一离线设计阶段的独立 TDD 子任务，不在证据收敛
+        提交中顺手改变发布面。
+      </p>
 
-    <h2>可选回答方式</h2>
-    <ul>
-      <li>
-        <strong>停止：</strong>“暂不推进新批次，保持 blocked / not ready。”
-      </li>
-      <li>
-        <strong>先准备：</strong
-        >“先修正长时命令承载方式并重新冻结、复核；完成后提交新的授权审阅材料，再由我单独决定是否授权真实批次。”
-      </li>
-    </ul>
+      <h2>明确排除</h2>
+      <p>
+        本轮没有访问活动 <code>config.toml</code>，没有安装或修改活动插件，没有移除
+        <code>codex_cc_tools</code>，没有调用或修改 Claude Code，也没有 publish、
+        push、merge 或 fast-forward 正式工作树。上述动作不由本结果页授权。
+      </p>
 
-    <h2>回答后的消化路径</h2>
-    <p>
-      若选择停止，仓库维持当前注册表、证据和 blocked
-      状态，不再调用真实模型。若选择先准备，Codex
-      只推进长时命令承载方式的离线修正、确定性验证、重新冻结和审阅材料；在用户针对新冻结候选另行给出明确授权前，不运行真实模型。即使未来新批次
-      8/8 passed，活动插件安装、旧工具移除、发布和正式仓库 fast-forward
-      仍分别需要后续独立判断。
-    </p>
+      <h2>最小可追溯材料</h2>
+      <ul>
+        <li>
+          <a
+            href="../smoke/evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/manifest.json"
+            >本轮 blocked manifest</a
+          >
+        </li>
+        <li>
+          <a
+            href="../smoke/evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/cases/2026-07-27T10-24-46.832Z-kimi-k3-delegate.json"
+            >Kimi delegate 失败 evidence</a
+          >
+        </li>
+        <li>
+          <a
+            href="../smoke/evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/cases/2026-07-27T10-23-27.732Z-ark-coding-plan-delegate-ark.json"
+            >Ark Coding Plan delegate 通过 evidence</a
+          >
+        </li>
+        <li><a href="../smoke/kimi.md">Kimi 资格状态与证据索引</a></li>
+        <li><a href="../smoke/ark.md">Ark 资格状态与证据索引</a></li>
+        <li><a href="../operations.md">运维与资格执行边界</a></li>
+      </ul>
 
-    <h2>可追溯链接</h2>
-    <ul>
-      <li>
-        <a
-          href="../smoke/evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/manifest.json"
-          >interrupted manifest</a
-        >
-      </li>
-      <li>
-        <a
-          href="../smoke/evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/checkpoints/000000.json"
-          >checkpoint 000000：batch_started</a
-        >
-      </li>
-      <li>
-        <a
-          href="../smoke/evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/checkpoints/000001.json"
-          >checkpoint 000001：case_running</a
-        >
-      </li>
-      <li>
-        <a
-          href="../superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md"
-          >历史执行与收敛计划（禁止执行）</a
-        >
-      </li>
-      <li><a href="../smoke/ark.md">Ark 资格证据索引</a></li>
-      <li><a href="checklist.md">四层发布门禁</a></li>
-      <li>
-        <a href="real-plugin-install-review.md"
-          >blocked / not ready 安装状态包</a
-        >
-      </li>
-      <li>
-        <a href="four-llm-qualification-authorization-review.html"
-          >已消费授权历史页</a
-        >
-      </li>
-    </ul>
+      <footer>
+        本页记录已消费授权的可信终态和下一步设计边界；它不构成离线修复设计批准、真实批次授权、安装授权或发布授权。
+      </footer>
+    </main>
   </body>
 </html>

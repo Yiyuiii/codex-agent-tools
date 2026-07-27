@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>四模型八项资格批次重新授权审阅</title>
+    <title>历史：已消费的四模型八项资格批次重新授权审阅</title>
     <style>
       :root {
         color-scheme: light;
@@ -239,23 +239,30 @@
   </head>
   <body>
     <main>
-      <h1>四模型八项资格批次重新授权审阅</h1>
+      <h1>历史：已消费的四模型八项资格批次重新授权审阅</h1>
 
       <div class="status">
-        <strong>105 秒承载演练通过，但未运行任何新模型资格。</strong>
-        当前注册表仍为 <code>6 passed / 2 pending</code>，只有 Ark Coding Plan
-        的 review / delegate 两项 pending；安装状态仍为
-        <code>blocked / not ready</code
-        >。本页只准备下一次人工决策所需证据，不改变该状态。
+        <strong>本页对应的重新授权已经消费，不得复用。</strong>
+        维护者针对 frozen commit
+        <code>652e14ac637bfc04d90c448179ecc5838f2f8450</code>
+        的授权只启动了批次
+        <code
+          >2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa</code
+        >。该批次在第 4 项 Kimi delegate 的严格命令证据验收处以
+        <code>blocked / case_failed</code> 停止；当前注册表仍为
+        <code>6 passed / 2 pending</code>，安装仍为
+        <code>blocked / not ready</code>。
       </div>
 
       <h2>结论先行</h2>
       <p>
-        上一批不是模型资格失败，而是执行宿主的短时前台 shell
-        超时后，协调器后来中断。仓库既有锁、终态与一次性恢复协议按设计 fail
-        closed，最终没有产生可用于晋级的 case evidence。离线演练证明当前 Codex
-        的 <code>exec / wait</code>
-        组合可以跨过旧的短时阈值并由同一承载单元持续等待；它只修复控制层承载，不改变任何资格语义。
+        新承载方式已完成它要证明的控制层职责：一个
+        <code>functions.exec</code> cell 持续约 979 秒，只等待同一入口，最终取得
+        协调器正常发布的可信终态，没有发生 cell 丢失或 recovery。批次前三项通过；
+        第 4 项 Kimi delegate 的结果文件、模型、路由、文件范围、进程清理与
+        telemetry 均正确，但没有观测到一个与
+        <code>git status --short</code>
+        完全相等的命令数组项，严格资格因此按设计阻断。
       </p>
 
       <div class="note">
@@ -357,26 +364,26 @@
         </li>
       </ul>
 
-      <h2>验证矩阵</h2>
+      <h2>授权前验证快照</h2>
       <div class="matrix-wrap">
         <table>
           <thead>
             <tr>
               <th>门禁</th>
-              <th>当前证据</th>
-              <th>冻结前要求</th>
+              <th>授权前证据</th>
+              <th>当时冻结条件</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td>承载离线演练</td>
               <td><span class="tag passed">已通过</span> 105 秒，事实见上表</td>
-              <td>保留报告与 fail-closed 执行手册。</td>
+              <td>报告与 fail-closed 执行手册已经保留。</td>
             </tr>
             <tr>
               <td>release assurance 聚焦测试</td>
               <td><span class="tag passed">已通过</span> 42/42</td>
-              <td>冻结前与全库测试一并复验。</td>
+              <td>当时已与全库测试一并复验。</td>
             </tr>
             <tr>
               <td>类型检查、构建与 release smoke</td>
@@ -384,7 +391,7 @@
                 <span class="tag passed">已通过</span>
                 本次页面与 package 闭包完成后均以 exit code 0 结束
               </td>
-              <td>最终冻结后仍须在精确候选上复验。</td>
+              <td>当时已在精确候选上复验。</td>
             </tr>
             <tr>
               <td>全库测试</td>
@@ -392,7 +399,7 @@
                 <span class="tag passed">已通过</span>
                 44 个测试文件；584 passed / 1 skipped / 0 failed
               </td>
-              <td>最终冻结后仍须在精确候选上复验。</td>
+              <td>当时已在精确候选上复验。</td>
             </tr>
             <tr>
               <td>隔离插件生命周期与资格命令帮助</td>
@@ -400,15 +407,15 @@
                 <span class="tag passed">已通过</span>
                 隔离报告 current；两个帮助入口均为 exit code 0
               </td>
-              <td>未触碰活动配置，也未携带授权引用运行资格入口。</td>
+              <td>当时未触碰活动配置，也未携带授权引用运行资格入口。</td>
             </tr>
             <tr>
               <td>历史 evidence 不可变校验</td>
               <td>
                 <span class="tag passed">已通过</span>
-                三个 retained batch verifier、当前阻断证据 5/5、历史证据 14/14
+                三个 retained batch verifier、当时阻断证据 5/5、历史证据 14/14
               </td>
-              <td>所有批次仍不可晋级；既有 evidence 未被改写。</td>
+              <td>当时所有批次均不可晋级；既有 evidence 未被改写。</td>
             </tr>
             <tr>
               <td>进程、锁与 clean tree</td>
@@ -416,7 +423,7 @@
                 <span class="tag passed">已通过</span>
                 Kimi ACP / Pi RPC / real-smoke 为 0/0/0；资格锁 absent
               </td>
-              <td>最终提交后再次确认 clean tree、0/0/0 与锁 absent。</td>
+              <td>当时最终提交后再次确认 clean tree、0/0/0 与锁 absent。</td>
             </tr>
             <tr>
               <td>桌面与移动视觉</td>
@@ -424,24 +431,22 @@
                 <span class="tag passed">已通过</span>
                 1440×1000 与 390×844；无水平溢出；控制台 0 errors / 0 warnings
               </td>
-              <td>顶部阻断结论、验证矩阵、唯一决策与六个链接均清晰可读。</td>
+              <td>当时顶部阻断结论、唯一授权问题与六个链接均清晰可读。</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <h2>唯一请求决策</h2>
+      <h2>授权消费结果</h2>
       <div class="decision">
-        <strong>请维护者在最终 handoff 后二选一：</strong>
-        对 handoff 中给出的精确 frozen SHA，明确授权一个全新的、完整的
-        <code>four-llm-v1</code> 八项批次；或者继续保持
-        <code>blocked / not ready</code>。没有第三种“只补跑 pending
-        项、复用旧证据或沿用旧授权”的路径。
+        <strong>该授权生命周期已经结束。</strong>
+        新批次的 manifest、四份 case evidence、九份 checkpoint
+        与阻断结论已经不可变保存；后四项按协议未运行。没有 retry、fallback、
+        resume、补跑、recovery 或第二批。
       </div>
       <p>
-        本页不包含尚未产生的 frozen
-        SHA，页面本身、阅读页面、引用页面或同意离线准备工作均不构成真实批次授权。只有维护者在最终
-        handoff 上针对精确 SHA 的明确答复才可成为新批次授权。
+        本页现在只作为已消费授权的历史快照。下一步必须先审阅离线修复设计；任何未来真实批次仍须重新冻结、完整复核，并针对新的精确
+        SHA 取得另一份明确授权。
       </p>
 
       <h2>明确排除</h2>
@@ -456,7 +461,7 @@
       <ul class="links">
         <li>
           <a href="four-llm-qualification-result-review.html"
-            >上一批中断结果审阅</a
+            >本次阻断结果审阅</a
           >
         </li>
         <li><a href="checklist.md">发布门禁检查清单</a></li>
@@ -464,8 +469,8 @@
         <li><a href="../smoke/ark.md">Ark 资格状态与证据索引</a></li>
         <li>
           <a
-            href="../smoke/evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/manifest.json"
-            >最近中断批次 manifest</a
+            href="../smoke/evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/manifest.json"
+            >本次 blocked manifest</a
           >
         </li>
         <li>
@@ -476,8 +481,7 @@
       </ul>
 
       <footer>
-        本材料用于压缩人工判断范围：机器可验证项继续由冻结前验收闭合，维护者只需判断是否针对最终精确
-        frozen SHA 开启一个全新的完整八项真实批次。
+        本材料只记录已经消费的重新授权及其终态；它不构成离线修复设计批准、未来真实批次授权、安装授权或发布授权。
       </footer>
     </main>
   </body>

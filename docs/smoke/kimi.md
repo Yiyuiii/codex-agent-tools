@@ -2,13 +2,19 @@
 
 ## 当前结论
 
-当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。2026-07-25 串行复跑的 review/delegate 两项门禁均为 passed，过渡注册表继续启用两项能力。2026-07-27 的最新 `four-llm-v1` 批次 `2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde` 形成 `interrupted / process_interrupted` 终态，0 个 case 完成；Kimi review/delegate 分别为 ordinal 3/4，均为 notRun，没有 case evidence，因此没有形成新的 Kimi 模型或质量结论。未来仍须在取得新授权后的完整同批 8/8 中重新产生 Kimi 两项 passed evidence，不能拼接本页既有证据。
+当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。2026-07-25 串行复跑的 review/delegate 两项门禁均为 passed，过渡注册表继续启用两项能力。
 
-本轮没有回退到其它 Kimi 模型。两次 evidence 内的 `noNewKimiProcesses` 均为 true，且每次 evidence 验收后的独立系统快照也确认 Kimi 与 Pi RPC 进程数均为 0。
+最新 `four-llm-v1` 批次 `2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa` 中，ordinal 3 Kimi review 通过；ordinal 4 Kimi delegate 的实际模型、direct 路由、只变更 `result.txt`、14-byte 单行结果、进程清理与 `1 / 0 / 0 / false / false` telemetry 均正确，但 `requiredCommandObserved=false`，因此以 `acceptance_failed` 停止。证据只保存 `commandCount=1`，不保存原始命令正文，所以不能证明 `git status --short` 是完全省略还是被合并进其它命令，也不得放宽 validator。
+
+该批次以 `blocked / case_failed` 结束，后四项未运行，未形成完整同批 8/8。旧 Kimi 两项 passed 证据仍解释当前注册表中的 Kimi 能力，但不能与本轮或其它批次拼接完成原子资格；过渡注册表继续为 6 passed / 2 pending，安装继续为 `blocked / not ready`。未来完整八项批次必须重新冻结、复核并取得新授权，从 ordinal 1 开始。
+
+本轮没有回退到其它 Kimi 模型。两份新 Kimi evidence 内的 `noNewKimiProcesses` 均为 true，批次终态后的独立系统快照也确认 Kimi ACP、Pi RPC 与 real-smoke 为 0/0/0；没有 retry、fallback、resume、补跑或第二批。
 
 2026-07-26 旧五模型 blocked 批次的终态见 [manifest](evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json)，SHA-256 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`。它只记录 Kimi 两项未运行，是 `five-llm-v1` 历史材料，不构成新的 Kimi 质量结论或当前资格来源。
 
-最新四模型 interrupted [manifest](evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/manifest.json) 的 SHA-256 为 `3e200dca507fe886d4e3a4bbf67cc811cca485120e6969e7632f933537ba902b`。它只证明批次被中断、Kimi 两项未运行，不支持任何新的 Kimi 资格或模型质量判断。
+最新四模型 blocked [manifest](evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/manifest.json) 的 SHA-256 为 `d7be5e6ba3884075d80fe399dd3c2d72caaa1a3833f92e529928655e623b7b69`。它是 schema v2、4 completed / 4 notRun、9 checkpoints、`uncommittedEvidence=null`、`promotionEligible=false`；immutable-evidence verifier 已通过，证据提交为 `4f816f0`。Kimi review [evidence](evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/cases/2026-07-27T10-24-21.919Z-kimi-k3-review.json) SHA-256 为 `3082a3c5e3c6abee8b81bb6c5aec2505ace5af28cfb704d03c933b89bbf2324c`；Kimi delegate [evidence](evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/cases/2026-07-27T10-24-46.832Z-kimi-k3-delegate.json) SHA-256 为 `50ad43971505e90c3b853ac20f446b31e2061d1471948afe6f5a0231a0747ec5`。
+
+上一轮四模型 interrupted [manifest](evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/manifest.json) 的 SHA-256 为 `3e200dca507fe886d4e3a4bbf67cc811cca485120e6969e7632f933537ba902b`。它只证明该历史批次被中断、Kimi 两项未运行，不支持任何新的 Kimi 资格或模型质量判断。
 
 上一轮历史四模型 blocked [manifest](evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json) 的 SHA-256 为 `f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c`。它记录 Kimi review/delegate 分别为 ordinal 3/4、均 not run；批次后 Kimi ACP、Pi RPC、real-smoke 进程计数均为 0，没有 retry、fallback、resume 或第二批。
 
@@ -16,7 +22,7 @@
 
 review 仓库包含一个可复现缺陷：`average([])` 因除以数组长度 0 而返回 `NaN`，与测试要求的 0 不符。通过要求为：ACP 报告的实际模型与注册表一致、结果状态为 `completed`、指出该缺陷，并且调用前后文件证据和 Git 状态均无变化。
 
-delegate 要求只创建内容为 `KIMI_SMOKE_OK` 的 `result.txt`，随后执行 `git status --short`。通过要求为：实际模型一致、结果状态为 `completed`、文件内容正确、桥接层只观测到 `result.txt` 变更，并至少观测到一条真实命令工具事件。两类任务都在调用前后枚举 Kimi PID，要求结束后不存在基线之外的新 Kimi 进程。
+delegate 要求只创建内容为 `KIMI_SMOKE_OK` 的 `result.txt`，随后执行 `git status --short`。通过要求为：实际模型一致、结果状态为 `completed`、文件内容正确、桥接层只观测到 `result.txt` 变更，并在命令观察数组中存在与 `git status --short` 完全相等的独立数组项；仅有任意命令事件、包含该文本的复合命令或模型文字声明都不满足门禁。两类任务都在调用前后枚举 Kimi PID，要求结束后不存在基线之外的新 Kimi 进程。
 
 证据 JSON 不保存完整提示词、模型回复、OAuth 数据、环境变量或临时绝对路径，只保存非秘密模型身份、耗时、状态、哈希和结构化检查结果。
 
