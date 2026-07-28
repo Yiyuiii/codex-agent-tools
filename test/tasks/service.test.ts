@@ -13,6 +13,7 @@ import type {
 } from "../../src/adapters/adapter.js";
 import type { LlmProfile, TaskKind } from "../../src/domain/types.js";
 import { createLlmRegistry, resolveLlm } from "../../src/llms/registry.js";
+import { KeyedLimiter } from "../../src/runtime/limiter.js";
 import type { CommandObservation } from "../../src/tasks/command-observations.js";
 import type { PiCommandLifecycleObservation } from "../../src/tasks/pi-command-lifecycle.js";
 import { ExternalAgentService } from "../../src/tasks/service.js";
@@ -216,42 +217,43 @@ describe("ExternalAgentService", () => {
     expect(maximumActive).toBe(1);
   });
 
-  it("lets Coding Plan and Agent Plan enter their independent pools together", async () => {
+  it("uses independent limiter keys for Coding Plan and Agent Plan", async () => {
     const profiles = [
       enabledProfile("ark-coding-plan"),
       enabledProfile("ark-agent-plan"),
     ];
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const started: string[] = [];
+    const limiter = new KeyedLimiter(() => 1);
+    const limiterRun = vi.spyOn(limiter, "run");
     const run = vi.fn(async (request: AdapterRunRequest) => {
-      started.push(request.profile.id);
-      await gate;
       return completed({ actualModel: request.profile.model });
     });
     const service = new ExternalAgentService({
       registry: createLlmRegistry(profiles),
       adapters: new Map([["pi-rpc", { runtime: "pi-rpc", run }]]),
+      limiter,
     });
 
-    const coding = service.delegate({
-      llm: "ark-coding-plan",
-      prompt: "coding",
-      cwd,
-    });
-    const agent = service.delegate({
-      llm: "ark-agent-plan",
-      prompt: "agent",
-      cwd,
-    });
+    await Promise.all([
+      service.delegate({
+        llm: "ark-coding-plan",
+        prompt: "coding",
+        cwd,
+      }),
+      service.delegate({
+        llm: "ark-agent-plan",
+        prompt: "agent",
+        cwd,
+      }),
+    ]);
 
-    await vi.waitFor(() =>
-      expect(started.sort()).toEqual(["ark-agent-plan", "ark-coding-plan"]),
-    );
-    release();
-    await Promise.all([coding, agent]);
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(
+      run.mock.calls.map(([request]) => request.profile.id).sort(),
+    ).toEqual(["ark-agent-plan", "ark-coding-plan"]);
+    expect(limiterRun.mock.calls.map(([key]) => key).sort()).toEqual([
+      "ark-agent-plan",
+      "ark-coding-plan",
+    ]);
   });
 
   it("rejects retired Gemini before starting any adapter", async () => {
