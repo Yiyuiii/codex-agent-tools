@@ -55,7 +55,7 @@ Codex 汇总、反驳和修正。历史文档里的旧要求只标注为历史�
 npm.cmd run typecheck
 npm.cmd test -- --run
 npm.cmd run build
-npm.cmd run release:smoke
+npm.cmd run smoke:release
 ```
 
 随后使用新临时 `CODEX_HOME` 运行隔离插件 `--check-report`，逐份验证 retained manifests，确认 evidence 文件字节未改变、Kimi ACP / Pi RPC / real-smoke 进程为 0/0/0、资格锁 absent、没有持久 `.tgz`，并检查工作树差异。
@@ -119,3 +119,17 @@ npm.cmd run release:smoke
 
 1. 同批 8/8 通过并完成离线晋级候选；或
 2. 已证明确需维护者完成一个外部动作，且 Codex 已把所有可自动验证和修复的工作收敛完毕。
+
+## 执行结果（2026-07-28）
+
+本计划已到达第 2 类完成条件：
+
+- standing authorization 文档与状态边界由提交 `0113da9` 冻结，完整离线门禁通过；
+- 在 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176` 上只调用一次标准入口，以一个 execution cell 运行批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；
+- ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 以 `account_quota_exceeded` failed；ordinal 7–8 notRun；没有 resume、retry、fallback、补跑、第二入口或第二批；
+- ordinal 1 与 6 的规定写入和规定状态命令均各一次 success，结果文件与变更范围精确通过；本地 Windows shell、命令观测和资格假阳性缺口已由真实证据闭合；
+- 所有已执行项均为一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback；immutable-evidence verifier 通过，进程 0/0/0，资格锁 absent；
+- manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，20 个不可变证据文件由提交 `6b4217d` 保存；
+- 当前已确认且需要维护者处理的阻碍是 `OPENAI_API_KEY_DOUBAO` 所属 Ark Agent Plan 账户额度；ordinal 7–8 尚未运行，不能据此排除后续可能出现其它问题。维护者需补充/恢复该计划额度或等待重置，无需提供密钥值。外部状态变化后，Codex 可按 standing authorization 在新 clean frozen SHA 上从 ordinal 1 自主运行新批。
+
+在额度状态变化前不重复运行；活动配置、活动插件、Claude Code、`codex_cc_tools`、发布、推送、合并和 fast-forward 均保持未触碰。

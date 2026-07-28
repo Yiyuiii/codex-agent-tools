@@ -143,7 +143,7 @@
       </p>
 
       <div class="status">
-        <strong>最新终态：</strong>批次
+        <strong>历史诊断基线：</strong>批次
         <code
           >2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef</code
         >
@@ -157,13 +157,24 @@
         >；证据提交为 <code>b1682cb</code>。
       </div>
 
+      <div class="verified">
+        <strong>后续真实闭环：</strong>最新批次
+        <code
+          >2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c</code
+        >
+        中，ordinal 1 与 6 的规定写入和规定状态命令都各一次 success，
+        结果文件与变更范围精确通过。该诊断方案、Windows shell 修复和资格成功
+        合同已经得到真实验证；当前失败独立归类为 Ark Agent Plan
+        <code>account_quota_exceeded</code>。
+      </div>
+
       <h2>原诊断方案已经回答了什么</h2>
       <p>
         原方案 B 通过 Pi-only 命令生命周期 observer，把每个 execute
         生命周期压缩成
         <code>source / match / outcome</code>
         三个闭合枚举，不保存原始命令、tool-call ID、 路径、Base64
-        payload、模型正文或工具输出。最新真实批次首次把该诊断用于完整资格流程，
+        payload、模型正文或工具输出。上述历史真实批次首次把该诊断用于完整资格流程，
         并成功把问题从“最终文件状态不明”缩小到“规定 bash 已形成，但工具层失败”。
       </p>
 
@@ -188,7 +199,7 @@
         </ul>
       </div>
 
-      <h2>真实批次仍然不能证明什么</h2>
+      <h2>历史诊断批次仍然不能证明什么</h2>
       <div class="warning">
         ordinal 6 同时存在三个独立事实：adapter 分类为
         <code>account_quota_exceeded</code>；18 个 bash 生命周期全部
@@ -235,7 +246,7 @@
         </table>
       </div>
 
-      <h2>真实批次发现的第二个问题：旧资格 gate 假阳性</h2>
+      <h2>历史诊断批次发现的第二个问题：旧资格 gate 假阳性</h2>
       <p>
         ordinal 1 虽然所有 bash
         生命周期都失败，但模型通过其它动作形成了正确目标文件， 旧 gate 仍把该
@@ -315,20 +326,20 @@
       </div>
       <div class="verified">
         typecheck、build、release smoke、隔离插件
-        <code>--check-report</code>、6/6 retained immutable evidence、evidence
+        <code>--check-report</code>、7/7 retained immutable evidence、evidence
         unchanged、Pi resolver 与精确 28 字节命令均通过。
-        <code>npm pack --dry-run</code> 收录 191 个文件；目标进程为
+        <code>npm pack --dry-run</code> 收录 211 个文件；目标进程为
         0/0/0，资格锁 absent， 持久 <code>.tgz</code> 为 0。
       </div>
 
       <h2>当前产品状态与授权边界</h2>
       <p>
         注册表仍为 <code>6 passed / 2 pending</code>，安装仍为
-        <code>blocked / not ready</code>。旧
-        <code>cb9434b4b540e70f5384224e4e98823a3ea2dbae</code>
-        一次性执行引用已经消费。最终离线验证已通过；standing authorization
-        已允许 Codex 完成状态提交和 clean freeze 后，为新 40 位 SHA 生成 fresh
-        内部执行引用并自主运行一次新的完整八项批次，无需维护者逐 SHA 回复。
+        <code>blocked / not ready</code>。standing authorization
+        下的新批已经确认本地缺口闭合，但在 ordinal 6 再次得到
+        <code>account_quota_exceeded</code>。当前需要维护者补充或恢复
+        <code>OPENAI_API_KEY_DOUBAO</code> 所属 Ark Agent Plan
+        额度或等待重置；无外部状态变化时不重复烧批。
       </p>
 
       <h2>未操作的外部状态</h2>
@@ -349,13 +360,13 @@
         <li>
           <a
             href="../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/manifest.json"
-            >最新 blocked manifest</a
+            >历史诊断基线 blocked manifest</a
           >
         </li>
         <li>
           <a
             href="../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/cases/2026-07-28T11-17-16.613Z-ark-agent-plan-delegate-ark.json"
-            >ordinal 6 失败 evidence</a
+            >历史 ordinal 6 shell 失败 evidence</a
           >
         </li>
         <li>
@@ -384,7 +395,7 @@
         </li>
         <li>
           <a href="four-llm-qualification-next-authorization-review.html"
-            >standing authorization 与下一批执行状态</a
+            >当前 Ark Agent Plan 额度处理材料</a
           >
         </li>
       </ul>

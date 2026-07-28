@@ -4,30 +4,21 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:," />
-    <title>长期默认授权：四模型八项真实资格自主执行状态</title>
+    <title>需要维护者处理：Ark Agent Plan 账户额度</title>
     <style>
       :root {
         color-scheme: light;
         font-family:
-          Inter,
-          "Noto Sans SC",
-          "Microsoft YaHei",
-          system-ui,
-          -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          sans-serif;
-        --ink: #1f2937;
+          Inter, "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+        --ink: #172033;
         --muted: #64748b;
-        --line: #d1d5db;
-        --panel: #f8fafc;
-        --amber: #b45309;
-        --amber-bg: #fffbeb;
-        --green: #047857;
-        --green-bg: #ecfdf5;
-        --red: #b91c1c;
-        --red-bg: #fef2f2;
-        --blue: #1d4ed8;
+        --line: #d6dde8;
+        --panel: #f7f9fc;
+        --red: #b42318;
+        --red-bg: #fff1f0;
+        --green: #067647;
+        --green-bg: #ecfdf3;
+        --blue: #175cd3;
         --blue-bg: #eff6ff;
       }
       * {
@@ -35,18 +26,18 @@
       }
       body {
         margin: 0;
-        background: #eef2f7;
         color: var(--ink);
+        background: #edf2f7;
         line-height: 1.65;
       }
       main {
-        width: min(1000px, calc(100% - 28px));
+        width: min(920px, calc(100% - 28px));
         margin: 24px auto;
-        padding: clamp(22px, 4vw, 38px);
+        padding: clamp(22px, 4vw, 40px);
         border: 1px solid var(--line);
         border-radius: 18px;
-        background: #fff;
-        box-shadow: 0 18px 45px rgb(15 23 42 / 8%);
+        background: white;
+        box-shadow: 0 18px 50px rgb(15 23 42 / 8%);
       }
       h1,
       h2 {
@@ -55,72 +46,47 @@
       }
       h1 {
         margin-top: 0;
-        font-size: clamp(1.7rem, 4vw, 2.4rem);
+        font-size: clamp(1.7rem, 4vw, 2.35rem);
       }
       h2 {
         margin-top: 2rem;
-        font-size: 1.3rem;
+        font-size: 1.25rem;
       }
       code {
         padding: 0.1em 0.35em;
         border-radius: 4px;
-        background: #f3f4f6;
+        background: #f1f5f9;
         overflow-wrap: anywhere;
       }
       a {
         color: var(--blue);
       }
-      .status,
-      .ok,
-      .risk,
-      .stop,
-      .reply {
+      .action,
+      .verified,
+      .reply,
+      .boundary {
         margin: 1rem 0;
         padding: 15px 17px;
         border-radius: 11px;
       }
-      .status {
-        border: 2px solid var(--amber);
-        background: var(--amber-bg);
+      .action {
+        border: 2px solid var(--red);
+        background: var(--red-bg);
       }
-      .ok {
+      .verified {
         border-left: 5px solid var(--green);
         background: var(--green-bg);
-      }
-      .risk {
-        border-left: 5px solid var(--amber);
-        background: var(--amber-bg);
-      }
-      .stop {
-        border-left: 5px solid var(--red);
-        background: var(--red-bg);
       }
       .reply {
         border: 2px solid var(--blue);
         background: var(--blue-bg);
       }
-      .table-wrap {
-        width: 100%;
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        margin: 1rem 0;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        padding: 10px 12px;
+      .boundary {
         border: 1px solid var(--line);
-        text-align: left;
-        vertical-align: top;
-        overflow-wrap: anywhere;
-      }
-      th {
         background: var(--panel);
       }
       li {
-        margin: 0.4em 0;
+        margin: 0.42em 0;
       }
       footer {
         margin-top: 2rem;
@@ -130,236 +96,126 @@
       }
       @media (max-width: 640px) {
         main {
-          width: min(100% - 16px, 1000px);
+          width: min(100% - 16px, 920px);
           margin: 8px auto;
           padding: 20px 14px;
           border-radius: 12px;
-        }
-        table {
-          font-size: 0.9rem;
-        }
-        th,
-        td {
-          padding: 8px 7px;
         }
       }
     </style>
   </head>
   <body>
     <main>
-      <h1>长期默认授权：四模型八项真实资格自主执行状态</h1>
+      <h1>需要维护者处理：Ark Agent Plan 账户额度</h1>
 
-      <div class="status">
-        <strong
-          >维护者已默认授权项目内真实资格实验，无需再回复授权句或逐字提供
-          SHA。</strong
-        >
-        上一批 frozen SHA
-        <code>cb9434b4b540e70f5384224e4e98823a3ea2dbae</code>
-        对应的一次性执行引用已经消费。离线修复、独立复审和最终全量矩阵已经完成；
-        当前先把新授权边界提交为 clean frozen candidate，随后由 Codex 自主生成
-        fresh 内部执行引用并启动新批。
+      <div class="action">
+        <strong>当前已确认且需要人工处理的问题：</strong>
+        请补充或恢复 <code>OPENAI_API_KEY_DOUBAO</code> 所属账户的 Ark Agent
+        Plan 计划额度，或者等待额度重置。无需也不应向 Codex 提供密钥值。第 7–8
+        项尚未运行，因此本页不声称后续绝无其它问题。
       </div>
 
-      <h2>为什么仍需要新的 clean frozen candidate</h2>
+      <h2>发生了什么</h2>
       <p>
-        最新批次
+        standing authorization 下的最新 <code>four-llm-v1</code>
+        完整批次绑定 frozen commit
+        <code>0113da97a6b1fef35cc4c45025caa9e36a002176</code>，批次为
         <code
-          >2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef</code
-        >
-        在旧 frozen SHA 上以 one entry / one cell 运行，共 6 completed、5
-        passed。 ordinal 6 <code>ark-agent-plan / delegate</code> 返回
-        <code>account_quota_exceeded</code>，ordinal 7–8 因首错停而 notRun；
-        manifest 终态为 <code>blocked / case_failed</code>，
-        <code>promotionEligible=false</code>。
+          >2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c</code
+        >。它从 ordinal 1 串行运行到首错：第 1–5 项通过，第 6 项
+        <code>ark-agent-plan / delegate</code> 返回
+        <code>account_quota_exceeded</code>，第 7–8 项按协议未运行。
       </p>
       <p>
-        本批没有 retry、resume、fallback、补跑或第二批。manifest SHA-256 为
+        终态是 6 completed / 5 passed、<code>blocked / case_failed</code>、
+        <code>promotionEligible=false</code>。manifest SHA-256 为
         <code
-          >61051a8eb8107759cdd1a10d5d44a7fe6d8a3f2c6b3b8e03773c8db8de4cd88d</code
-        >，证据提交为 <code>b1682cb</code>。
+          >f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7</code
+        >；20 个证据文件由提交 <code>6b4217d</code> 保存。
       </p>
 
-      <h2>批次暴露的两个独立缺口</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>已证缺口</th>
-              <th>真实证据</th>
-              <th>离线修复</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Pi 子环境缺少 Windows Git Bash 发现所需根变量</td>
-              <td>
-                ordinal 6 的 18 个 bash 生命周期全部 error；规定写入为
-                <code>exact / error</code>。ordinal 1 的 5 个 bash
-                生命周期也全部 error
-              </td>
-              <td>
-                <code>2a815c7</code> 只增加 <code>ProgramFiles</code> 与
-                <code>ProgramFiles(x86)</code>；离线 resolver 和精确 Node
-                命令实探成功
-              </td>
-            </tr>
-            <tr>
-              <td>旧资格 gate 会把规定 bash 失败后的正确最终制品误判为通过</td>
-              <td>
-                ordinal 1 的规定写入为 <code>exact / error</code>，旧 gate
-                仍记录 passed
-              </td>
-              <td>
-                <code>e750052</code>、<code>b5a691f</code>、
-                <code>3d85315</code>、<code>ceb8e9c</code>
-                要求写入与状态命令各唯一 success，并由 future terminal passed
-                verifier 重算
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <h2>Codex 已自动排除的事项</h2>
+      <div class="verified">
+        这不是此前的 Windows shell、命令观测、资格假阳性、模型选择、网络代理、
+        凭据路由、重试或 fallback 问题。
       </div>
-
-      <div class="ok">
-        shell 环境与资格成功合同修复均已完成独立规格和代码质量审阅，剩余 P0–P3
-        为 0。代理、凭据、 provider、model、direct
-        route、single-attempt、retry/fallback、公开 MCP 和历史 evidence
-        均未被放宽或重写。
-      </div>
-
-      <h2>全量矩阵另行收敛的既有 Kimi ACP 竞态</h2>
-      <p>
-        最终离线验证还暴露了 Kimi ACP
-        子进程关闭的既有生命周期竞态：旧时序压力复现中 100 次有 98 次晚
-        close。<code>4af8b34</code> 通过显式 child-close barrier
-        与有界清理回归完成修复；独立复审剩余 P0–P3 为
-        0。该工作没有发起新的真实模型调用， 也没有改变
-        provider、model、路由或公开 MCP 合同。
-      </p>
-
-      <h2>当前尚未完成的机器工作</h2>
-      <ul>
-        <li>提交 standing authorization 设计、执行计划和全部当前状态材料。</li>
-        <li>
-          完成完整离线复验，确认工作树 clean，并把提交后的 40 位 HEAD 作为
-          frozen SHA。
-        </li>
-        <li>
-          在 active long-term goal 中自行生成 fresh
-          内部执行引用并运行完整八项批次。
-        </li>
-      </ul>
-      <div class="ok">
-        <strong>最终离线矩阵：</strong>
-        <code>49 个测试文件、853 passed / 1 skipped / 0 failed</code>。
-        typecheck、build、release smoke、隔离插件
-        <code>--check-report</code>、6/6 retained immutable evidence、evidence
-        unchanged、Pi resolver 与精确 28 字节命令均通过；
-        <code>npm pack --dry-run</code> 收录 191 个文件，目标进程 0/0/0，资格锁
-        absent， 持久 <code>.tgz</code> 为 0。
-      </div>
-
-      <h2>standing authorization 下的批次合同</h2>
       <ul>
         <li>
-          每批都必须绑定提交后 clean 的真实 40 位 frozen
-          SHA；无需维护者逐字回复。
+          ordinal 1 与 6 的规定写入和规定
+          <code>git status --short</code> 都各一次 success；结果文件精确通过，
+          文件范围只含预期结果。
         </li>
         <li>
-          每次只运行一个全新的完整 <code>four-llm-v1</code> 八项批次，从 ordinal
-          1 开始。
+          ordinal 6 的实际/预期模型均为 <code>ark-code-latest</code>，provider
+          为 <code>ark-agent-plan</code>，网络为 direct，凭据隔离正确。
         </li>
         <li>
-          single entry / cell；每个 case single-attempt；严格按固定顺序执行。
-        </li>
-        <li>首错立即发布终态并停止。</li>
-        <li>当前批绝不 resume、retry、fallback、补跑、跳项或重开入口。</li>
-        <li>
-          可信终态和不可变证据提交后，只有完成仓库内修复与新 clean
-          freeze，才可自主启动独立新批；
-          没有代码、外部状态或诊断信息变化时不得重复烧额度。
+          所有已执行项均为一次 client invocation、零 adapter/runtime retry、 零
+          adapter/orchestrator fallback。
         </li>
         <li>
-          若最终 preflight 的 SHA、build identity、工作树、凭据、进程、锁或
-          evidence 不满足合同，必须在首次真实调用前 fail closed。
+          immutable-evidence verifier 通过；结束后目标进程 0/0/0，资格锁不存在。
         </li>
       </ul>
 
-      <h2>维护者是否还需要操作</h2>
+      <h2>建议的处理方式</h2>
+      <ol>
+        <li>
+          在火山方舟账户侧核查并补充 Ark Agent Plan
+          的计划额度，或等待其配额周期重置。
+        </li>
+        <li>
+          如果控制台显示仍有额度，请确认查看的是同一账户的 Agent Plan
+          权益、计费与计划状态，而不是 Ark Coding Plan 的独立额度池。
+        </li>
+        <li>不要粘贴或发送 API key；Codex 只需要知道外部状态已经改变。</li>
+      </ol>
+
       <div class="reply">
-        <strong>目前不需要维护者回复或批准实验。</strong>
-        Codex 会继续完成提交、clean freeze、完整 preflight
-        和一个真实批次。只有遇到账户额度、
-        凭据、登录、服务权限、活动系统变更，或 owner/lock/terminal
-        身份无法可靠消歧时， 才会携带最小充分证据请求维护者处理。每批的 fresh
-        UUID 只作为内部执行引用， 规范化后仅把 SHA-256 写入不可变证据。
+        <strong>处理完成后，回复“已处理”即可。</strong>
+        不需要再次批准实验或提供 frozen SHA。Codex 会依据 standing authorization
+        自行完成状态提交、完整复核、新 clean frozen SHA、fresh
+        内部执行引用，并从 ordinal 1 运行新的完整八项批次。
       </div>
 
-      <h2>风险与停止条件</h2>
-      <ul>
-        <li>真实 Kimi/Pi 调用会消耗计划额度，并可能持续较长时间。</li>
-        <li>Ark 外部额度状态可能继续阻断；修复 shell 不等于修复额度。</li>
-        <li>
-          新合同能防止规定 bash
-          失败后的假阳性，但不能保证所有模型都通过，也不能把
-          <code>where.cmd</code> 的未知来源自动归因。
-        </li>
-        <li>
-          若新 SHA 上的批次失败，先记录并提交该终态；仓库内可修缺陷按 TDD
-          修复并重新冻结后可启新批，
-          外部账户/凭据/登录阻碍则停止请求维护者处理。
-        </li>
-      </ul>
+      <h2>为什么现在停止而不重跑</h2>
+      <p>
+        同一正确 Agent Plan 路由在本地缺口闭合后仍返回明确的账户额度错误。
+        外部状态没有变化时再次运行不会增加诊断信息，只会重复消耗其它已通过路线的额度，
+        因此协议要求在这里停止。
+      </p>
 
-      <h2>明确排除的动作</h2>
-      <div class="stop">
-        <ul>
-          <li>不访问或修改活动 <code>~/.codex/config.toml</code>。</li>
-          <li>不安装、升级、卸载或回滚活动 Codex 插件。</li>
-          <li>不移除或修改 <code>codex_cc_tools</code>。</li>
-          <li>不调用、修改或卸载 Claude Code。</li>
-          <li>
-            不执行 npm/marketplace 发布，不推送、不合并、不 fast-forward
-            正式工作树。
-          </li>
-        </ul>
+      <h2>明确未触碰的边界</h2>
+      <div class="boundary">
+        未访问或修改活动
+        <code>~/.codex/config.toml</code>；未安装、升级或卸载活动 Codex
+        插件；未调用或修改 Claude Code；未移除
+        <code>codex_cc_tools</code>；未发布、推送、合并或 fast-forward。
       </div>
 
-      <h2>可追溯材料</h2>
+      <h2>最小证据</h2>
       <ul>
-        <li>
-          <a
-            href="../superpowers/specs/2026-07-28-standing-experiment-authorization-design.md"
-            >真实资格实验长期默认授权设计</a
-          >
-        </li>
         <li>
           <a href="four-llm-qualification-result-review.html"
-            >最新真实批次最小充分结果审阅</a
+            >最新资格批次结果审阅</a
           >
         </li>
         <li>
           <a
-            href="../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/manifest.json"
+            href="../smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json"
             >最新 blocked manifest</a
           >
         </li>
         <li>
-          <a href="pi-write-command-diagnostics-design-review.html"
-            >Pi 命令诊断的真实验证与离线闭环</a
+          <a
+            href="../smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-39-09.502Z-ark-agent-plan-delegate-ark.json"
+            >ordinal 6 原始脱敏 evidence</a
           >
         </li>
         <li>
           <a
-            href="../superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md"
-            >Pi Windows shell 环境闭环设计</a
-          >
-        </li>
-        <li>
-          <a
-            href="../superpowers/specs/2026-07-28-qualification-required-command-success-design.md"
-            >资格规定命令成功语义设计</a
+            href="../superpowers/specs/2026-07-28-standing-experiment-authorization-design.md"
+            >长期默认授权与停止边界</a
           >
         </li>
         <li><a href="checklist.md">四层发布门禁</a></li>
@@ -367,11 +223,9 @@
       </ul>
 
       <footer>
-        当前注册表仍为 6 passed / 2 pending，安装仍为 blocked / not ready。
-        standing authorization
-        只覆盖项目内真实资格实验及其离线收敛；本页记录该边界，
-        不构成活动安装、活动配置、旧工具移除、Claude
-        Code、发布或正式工作树变更许可。
+        本页是当前最小人工处理材料。用户处理额度后，Codex
+        将继续自主推进；本页不请求也不授权任何活动安装、活动配置、旧工具移除、
+        Claude Code、发布或正式工作树变更。
       </footer>
     </main>
   </body>
