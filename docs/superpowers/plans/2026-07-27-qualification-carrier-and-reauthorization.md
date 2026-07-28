@@ -1,5 +1,7 @@
 # Qualification Carrier Hardening and Reauthorization Preparation Implementation Plan
 
+> **Historical authorization note (2026-07-28):** The per-batch human reauthorization stop in this completed plan is superseded by `2026-07-28-standing-experiment-authorization-design.md`. Its carrier, one-entry/one-cell, fail-closed, and evidence-integrity requirements remain applicable.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prove a Codex-native long-running carrier without any model or network call, preserve the qualification production protocol unchanged, freeze a fully verified candidate, and stop with a new Chinese reauthorization review package.

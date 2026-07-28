@@ -18,7 +18,7 @@ Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力，过渡
 
 最新 [manifest](evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/manifest.json) SHA-256 为 `61051a8eb8107759cdd1a10d5d44a7fe6d8a3f2c6b3b8e03773c8db8de4cd88d`；终态为 6 completed / 5 passed、`blocked / case_failed`、`promotionEligible=false`，immutable-evidence verifier 通过，锁 absent，目标进程 0/0/0，证据由提交 `b1682cb` 保存。没有 resume、retry、fallback、补跑、第二入口或第二批。
 
-本批 ordinal 1 Ark Coding Plan delegate 暴露了旧资格门禁假阳性：case passed，但 5 个 bash 生命周期全部为 error，精确写入命令也是 error。离线根因确认为 Pi Windows 子进程环境缺少 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 修复后，生产隔离环境中的 resolver 找到 `C:\Program Files\Git\bin\bash.exe`，两个系统根变量存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`，代理与凭据边界不变。提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 又要求未来资格 Pi delegate 的精确写入与精确 `git status --short` 生命周期各恰好一次且均 success，并由未来整批 passed verifier 重算；历史 blocked/interrupted 证据兼容，schema/plan、公开 MCP、provider/model/route/credential、提示词、validator、retry/fallback 均未改变。独立质量复审为 PASS、无 P0–P3；当前 fresh 全量为 49 files / 853 passed / 1 skipped / 0 failed，typecheck、build、release smoke、隔离 `--check-report`、retained manifests 6/6、证据不变、进程/锁与 191-file pack dry-run 均通过。下一批仍须绑定新的 clean frozen SHA 并取得明确授权。
+本批 ordinal 1 Ark Coding Plan delegate 暴露了旧资格门禁假阳性：case passed，但 5 个 bash 生命周期全部为 error，精确写入命令也是 error。离线根因确认为 Pi Windows 子进程环境缺少 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 修复后，生产隔离环境中的 resolver 找到 `C:\Program Files\Git\bin\bash.exe`，两个系统根变量存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`，代理与凭据边界不变。提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 又要求未来资格 Pi delegate 的精确写入与精确 `git status --short` 生命周期各恰好一次且均 success，并由未来整批 passed verifier 重算；历史 blocked/interrupted 证据兼容，schema/plan、公开 MCP、provider/model/route/credential、提示词、validator、retry/fallback 均未改变。独立质量复审为 PASS、无 P0–P3；当前 fresh 全量为 49 files / 853 passed / 1 skipped / 0 failed，typecheck、build、release smoke、隔离 `--check-report`、retained manifests 6/6、证据不变、进程/锁与 191-file pack dry-run 均通过。下一批仍须绑定新的 clean frozen SHA、使用 fresh 内部执行引用并从 ordinal 1 开始；standing authorization 已取代逐批人工批准。
 
 上一轮 blocked 历史：2026-07-28 在 frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上只调用一次标准入口，启动批次 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678`。该轮 8 completed / 7 passed，因 ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 结果文件缺失而停止；manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`，证据提交 `1d5d2c4`。它只作历史审计，不能参与当前原子晋级。
 
@@ -45,6 +45,7 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 ## 当前证据矩阵
 
 <a id="ark-coding-plan-review"></a>
+
 ### ark-coding-plan review
 
 - 本次任务结果：passed；注册表状态：pending（同 profile 的 delegate 未通过）。
@@ -53,6 +54,7 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 - 证据：[JSON](evidence/2026-07-25T15-49-40.932Z-ark-coding-plan-review-ark.json)；SHA-256 `a4c2b6ba19e8226f8c641426c5ad9c81826fcd32adb77200ad7c90731dbb3dd4`。
 
 <a id="ark-coding-plan-delegate"></a>
+
 ### ark-coding-plan delegate
 
 - 本次任务结果：failed；注册表状态：pending；稳定失败类别为 `acceptance_failed`。
@@ -61,6 +63,7 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 - 证据：[JSON](evidence/2026-07-25T15-51-44.134Z-ark-coding-plan-delegate-ark.json)；SHA-256 `7d7af81493dd9e94a9669efb12eb90c83c1c7535959b81c385091aa3eef461eb`。
 
 <a id="ark-agent-plan-review"></a>
+
 ### ark-agent-plan review
 
 - 结果：passed；实际/预期模型均为 `ark-code-latest`；provider 为 `ark-agent-plan`；route 为 `direct`；耗时 9.098 秒。
@@ -68,6 +71,7 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 - 证据：[JSON](evidence/2026-07-25T15-52-57.715Z-ark-agent-plan-review-ark.json)；SHA-256 `c6ef0351080d9448c4bf65ad606349c219c3b51d1a2e3ff7a02127c0e6fb6871`。
 
 <a id="ark-agent-plan-delegate"></a>
+
 ### ark-agent-plan delegate
 
 - 结果：passed；实际/预期模型均为 `ark-code-latest`；provider 为 `ark-agent-plan`；route 为 `direct`；耗时 859.946 秒。
@@ -75,6 +79,7 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 - 证据：[JSON](evidence/2026-07-25T16-08-00.444Z-ark-agent-plan-delegate-ark.json)；SHA-256 `ef805b815ee95b58c2ce0e81ad8f2bff62efd9d49599571b7c8ff87f18b127df`。
 
 <a id="ark-agent-deepseek-v4-flash-review"></a>
+
 ### ark-agent-deepseek-v4-flash review
 
 - 结果：passed；实际/预期模型均为 `deepseek-v4-flash`；provider 为 `ark-agent-plan`；route 为 `direct`；耗时 16.000 秒。
@@ -82,6 +87,7 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 - 证据：[JSON](evidence/2026-07-25T16-09-09.705Z-ark-agent-deepseek-v4-flash-review-ark.json)；SHA-256 `24fb03e09071666f33d5194a50cac2ccca492021249bf0adf466c7d3fde97545`。
 
 <a id="ark-agent-deepseek-v4-flash-delegate"></a>
+
 ### ark-agent-deepseek-v4-flash delegate
 
 - 结果：passed；实际/预期模型均为 `deepseek-v4-flash`；provider 为 `ark-agent-plan`；route 为 `direct`；耗时 32.243 秒。
@@ -91,12 +97,14 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 ## 历史证据（不属于当前公开面）
 
 <a id="ark-agent-glm-5.2-review"></a>
+
 ### ark-agent-glm-5.2 review
 
 - 结果：passed；实际模型：`glm-5.2`；耗时：34.765 秒。
 - 证据：[JSON](evidence/2026-07-20T07-32-04.030Z-ark-agent-glm-5.2-review-ark.json)；SHA-256 `df9a02977e6501c96744f48b825377152287b3a82f18f428a8367e5121beef22`。
 
 <a id="ark-agent-glm-5.2-delegate"></a>
+
 ### ark-agent-glm-5.2 delegate
 
 - 结果：passed；实际模型：`glm-5.2`；耗时：41.426 秒。
@@ -104,12 +112,14 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 - 证据：[JSON](evidence/2026-07-20T07-36-31.292Z-ark-agent-glm-5.2-delegate-ark.json)；SHA-256 `4024d8eccc0cf88812958de0a64bb273f374a37139d3d9c67c9598eb3fcc34bb`。
 
 <a id="ark-agent-doubao-seed-2.0-pro-review"></a>
+
 ### ark-agent-doubao-seed-2.0-pro review
 
 - 结果：passed；实际模型：`doubao-seed-2.0-pro`；耗时：47.535 秒。
 - 证据：[JSON](evidence/2026-07-20T07-33-08.018Z-ark-agent-doubao-seed-2.0-pro-review-ark.json)；SHA-256 `8d287e0fb5af52fca30acb8cb9ecb6c37e010d9a114d560f4542abec8fa4e36b`。
 
 <a id="ark-agent-doubao-seed-2.0-pro-delegate"></a>
+
 ### ark-agent-doubao-seed-2.0-pro delegate
 
 - 结果：passed；实际模型：`doubao-seed-2.0-pro`；耗时：16.338 秒。

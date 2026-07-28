@@ -1,5 +1,7 @@
 # Qualification Required Command Success Implementation Plan
 
+> **Historical authorization note:** Any per-batch human authorization stop in this completed plan is superseded by `../specs/2026-07-28-standing-experiment-authorization-design.md`; its same-batch no-retry and required-command-success constraints remain unchanged.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prevent a Pi qualification delegate from passing when the required bash commands were only proposed but their tool lifecycles failed.
@@ -13,6 +15,7 @@
 ### Task 1: Classify the required status command without leaking it
 
 **Files:**
+
 - Modify: `src/smoke/pi-write-command-observation.ts`
 - Modify: `test/smoke/pi-write-command-observation.test.ts`
 
@@ -56,11 +59,7 @@ Change the match type to:
 
 ```ts
 export type PiWriteCommandMatch =
-  | "exact"
-  | "status_exact"
-  | "trim_only"
-  | "embedded"
-  | "other";
+  "exact" | "status_exact" | "trim_only" | "embedded" | "other";
 ```
 
 Change the matcher and public function so the third argument is optional:
@@ -106,6 +105,7 @@ git commit -m "test: classify Pi status command lifecycle"
 ### Task 2: Make qualification producer require two successful lifecycles
 
 **Files:**
+
 - Modify: `src/smoke/pi.ts`
 - Modify: `test/smoke/pi.test.ts`
 
@@ -133,7 +133,7 @@ Add a qualification delegate test whose fake service:
     origin: "raw_input",
     outcome: "success",
   },
-]
+];
 ```
 
 Assert:
@@ -215,7 +215,7 @@ qualification === null
   : requiredPiQualificationCommandsSucceeded(
       lifecycleObservations!,
       writeCommand,
-    )
+    );
 ```
 
 Pass `REQUIRED_STATUS_COMMAND` as the third argument to
@@ -245,6 +245,7 @@ git commit -m "fix: require successful Pi qualification commands"
 ### Task 3: Make future promotion evidence independently verifiable
 
 **Files:**
+
 - Modify: `src/qualification/verifier.ts`
 - Modify: `test/qualification/verifier.test.ts`
 
@@ -372,6 +373,7 @@ git commit -m "fix: verify Pi qualification command success"
 ### Task 4: Review, document, and freeze
 
 **Files:**
+
 - Review: all Task 1–3 code and tests
 - Modify: `AGENTS.md`
 - Modify: `docs/release/four-llm-qualification-execution-runbook.md`

@@ -1,5 +1,7 @@
 # Pi 写入命令生命周期脱敏诊断设计
 
+> 历史状态说明：本文当时的“新真实批次须独立授权”已被 [standing authorization](2026-07-28-standing-experiment-authorization-design.md) 覆盖；诊断分层、脱敏和资格协议边界保持不变。
+
 日期：2026-07-28
 
 状态：方案 B 离线实现、双重审阅与 fresh 验证已完成；待最终状态文档提交、clean allow-empty freeze 与新真实批次授权
@@ -120,7 +122,9 @@ Pi RPC sanitized events
 当且仅当原始 `event.isError` 是 boolean 时，额外保留：
 
 ```ts
-{ isError: event.isError }
+{
+  isError: event.isError;
+}
 ```
 
 不得保留 `args`、`result`、命令、路径、模型正文或工具输出。不得把字符串、数字、对象或 accessor 形式的 `isError` 转成 boolean。
@@ -148,17 +152,12 @@ Pi RPC sanitized events
 
 ```ts
 export type PiCommandLifecycleSource =
-  | "raw_input"
-  | "title_fallback"
-  | "unextractable";
+  "raw_input" | "title_fallback" | "unextractable";
 
 export type PiCommandLifecycleOrigin = "raw_input" | "title" | null;
 
 export type PiCommandLifecycleOutcome =
-  | "success"
-  | "error"
-  | "missing"
-  | "unknown";
+  "success" | "error" | "missing" | "unknown";
 
 export interface PiCommandLifecycleObservation {
   readonly source: PiCommandLifecycleSource;
@@ -201,11 +200,11 @@ Proxy、accessor、symbol、继承属性、非普通对象和读取异常全部 
 
 对每个首次 execute start：
 
-| 事件条件 | outcome |
-| --- | --- |
-| 开始之后恰有一个同 ID、同工具 title、boolean `isError=false` 的结果 | `success` |
-| 开始之后恰有一个同 ID、同工具 title、boolean `isError=true` 的结果 | `error` |
-| 没有结果事件，且没有其它协议异常 | `missing` |
+| 事件条件                                                                                                     | outcome   |
+| ------------------------------------------------------------------------------------------------------------ | --------- |
+| 开始之后恰有一个同 ID、同工具 title、boolean `isError=false` 的结果                                          | `success` |
+| 开始之后恰有一个同 ID、同工具 title、boolean `isError=true` 的结果                                           | `error`   |
+| 没有结果事件，且没有其它协议异常                                                                             | `missing` |
 | 结果先于开始、重复开始、重复结果、冲突结果、工具 title 缺失/不一致、`isError` 缺失/非 boolean 或其它关联异常 | `unknown` |
 
 孤立 result 没有首次 execute start 时不产生观察项。不同 ID、不同任务或不同 adapter run 不得关联。
@@ -271,11 +270,7 @@ Pi qualification delegate 在调用 service 前安装 observer，并在 task exe
 ### 8.3 evidence 类型
 
 ```ts
-export type PiWriteCommandMatch =
-  | "exact"
-  | "trim_only"
-  | "embedded"
-  | "other";
+export type PiWriteCommandMatch = "exact" | "trim_only" | "embedded" | "other";
 
 export interface SanitizedPiWriteCommandObservation {
   readonly source: PiCommandLifecycleSource;

@@ -12,9 +12,9 @@ ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、model�
 
 全量测试曾暴露 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察；提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试，独立复审 PASS、无 P0–P3，最终全量已经包含。状态文档提交与最终 clean frozen SHA 仍由主线程完成。
 
-当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。新的完整八项批次尚未授权；本轮状态文档提交并确认工作树 clean 后，最终 40 位 frozen SHA 只能由交接消息提供。用户若决定授权，必须在回复中逐字带上该 SHA，并授权“一次全新完整 `four-llm-v1` 八项，从 ordinal 1，single entry/cell，按首错停，绝不 resume/retry/fallback/补跑/第二批”。下一次授权审阅页只作为仓库内人工审阅材料，由最终交接直接提供入口，页面本身不构成授权；[本轮重新授权材料](release/four-llm-qualification-reauthorization-review.html)、[更早授权材料](release/four-llm-qualification-authorization-review.html)与[阻断结果审阅](release/four-llm-qualification-result-review.html)都只作历史审计。
+当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。维护者已对项目内真实资格实验给出 standing authorization：状态文档提交、完整复核和 clean freeze 后，Codex 自行生成每批 fresh 内部执行引用并运行新的完整 `four-llm-v1` 八项，无需用户逐字回复 SHA。每批仍从 ordinal 1 开始，single entry/cell、按首错停，绝不在同一批内 resume/retry/fallback/补跑；终态证据提交并完成可修缺陷的新 clean freeze 后，才可自主启动新批。仓库内 `docs/release/four-llm-qualification-next-authorization-review.html` 记录当前边界但不随 npm 包发布；[本轮重新授权材料](release/four-llm-qualification-reauthorization-review.html)、[更早授权材料](release/four-llm-qualification-authorization-review.html)与[阻断结果审阅](release/four-llm-qualification-result-review.html)都只作历史审计。
 
-2026-07-27 的 105 秒演练只构成离线基础设施证据；后续真实批次证明同一 cell 可以承载到协调器正常终态，但不证明四小时存活。未来另获授权后的唯一承载和 fail-closed 边界见[执行承载手册](release/four-llm-qualification-execution-runbook.md)，演练原始结论见[承载演练报告](release/qualification-carrier-rehearsal.md)。package/release assurance 只证明离线候选，不构成资格、安装或发布。
+2026-07-27 的 105 秒演练只构成离线基础设施证据；后续真实批次证明同一 cell 可以承载到协调器正常终态，但不证明四小时存活。standing authorization 下的唯一承载和 fail-closed 边界见[执行承载手册](release/four-llm-qualification-execution-runbook.md)，演练原始结论见[承载演练报告](release/qualification-carrier-rehearsal.md)。package/release assurance 只证明离线候选，不构成资格、安装或发布。
 
 项目代码和维护者都不得直接读取、写入、备份、恢复或手工编辑活动 `~/.codex/config.toml`。Codex 官方插件命令可能由官方机制更新该状态文件，因此真实 add/remove 每次都必须先准备权限包并取得针对该次动作的明确许可。
 
@@ -60,7 +60,7 @@ npm run acceptance:plugin:isolated
 
 ## 5. 准备真实安装权限包
 
-只有四个活动逻辑 LLM 的 review/delegate 在同一个 `four-llm-v1` 批次中 8/8 passed，才能准备可供授权的 ready 权限包。当前过渡注册表为 6 passed / 2 pending，只有 Ark Coding Plan 的 review/delegate pending；历史五模型结果以及所有 blocked/interrupted 批次，包括最新 6 completed / 5 passed 批次，都不能参与当前晋级，也不能与其它批次拼接。最新批次的授权已消费，且没有 retry、fallback、resume 或第二批；未来重入必须取得绑定新 clean frozen SHA 的明确授权，并从 ordinal 1 重新运行全新的完整八项。因此本阶段只保持 `blocked / not ready` 状态包，不提出真实安装授权问题；资格授权不能越过安装门禁。
+只有四个活动逻辑 LLM 的 review/delegate 在同一个 `four-llm-v1` 批次中 8/8 passed，才能准备可供授权的 ready 权限包。当前过渡注册表为 6 passed / 2 pending，只有 Ark Coding Plan 的 review/delegate pending；历史五模型结果以及所有 blocked/interrupted 批次，包括最新 6 completed / 5 passed 批次，都不能参与当前晋级，也不能与其它批次拼接。最新历史批次没有 retry、fallback、resume 或第二批；未来重入仍须绑定新的 clean frozen SHA、生成 fresh 内部执行引用并从 ordinal 1 运行全新的完整八项，但 standing authorization 已取代逐批人工许可。本阶段在真实批次 8/8 前只保持 `blocked / not ready` 状态包，不提出真实安装授权问题；默认实验授权不能越过活动安装门禁。
 
 权限包必须列出：
 

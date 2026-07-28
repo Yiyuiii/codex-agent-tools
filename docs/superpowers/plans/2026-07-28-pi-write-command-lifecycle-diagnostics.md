@@ -1,5 +1,7 @@
 # Pi Write Command Lifecycle Diagnostics Implementation Plan
 
+> **Historical authorization note:** Any per-batch human authorization stop in this completed plan is superseded by `../specs/2026-07-28-standing-experiment-authorization-design.md`; its diagnostic and protocol constraints remain unchanged.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add qualification-only, enum-only Pi write-command lifecycle diagnostics that distinguish command formation, tool outcome, and final artifact layers without changing prompts, acceptance, public results, routing, retries, or historical evidence.
@@ -175,10 +177,12 @@ const endEvent = {
   toolCallId: "tool-1",
   toolName,
   result: {
-    content: [{
-      type: "text",
-      text: oversizedEnd ? "x".repeat(70_000) : "ok",
-    }],
+    content: [
+      {
+        type: "text",
+        text: oversizedEnd ? "x".repeat(70_000) : "ok",
+      },
+    ],
   },
   isError:
     scenario === "oversized-tool-end-error"
@@ -371,12 +375,14 @@ Create table-driven tests for:
         isError: false,
       },
     ],
-    expected: [{
-      source: "raw_input",
-      command: "write",
-      origin: "raw_input",
-      outcome: "success",
-    }],
+    expected: [
+      {
+        source: "raw_input",
+        command: "write",
+        origin: "raw_input",
+        outcome: "success",
+      },
+    ],
   },
   {
     name: "boolean error remains error",
@@ -397,29 +403,35 @@ Create table-driven tests for:
         isError: true,
       },
     ],
-    expected: [{
-      source: "raw_input",
-      command: "write",
-      origin: "raw_input",
-      outcome: "error",
-    }],
+    expected: [
+      {
+        source: "raw_input",
+        command: "write",
+        origin: "raw_input",
+        outcome: "error",
+      },
+    ],
   },
   {
     name: "missing result remains missing",
-    events: [{
-      type: "tool_call",
-      runtime: "pi-rpc",
-      toolCallId: "a",
-      kind: "execute",
-      title: "bash",
-      rawInput: { command: "write" },
-    }],
-    expected: [{
-      source: "raw_input",
-      command: "write",
-      origin: "raw_input",
-      outcome: "missing",
-    }],
+    events: [
+      {
+        type: "tool_call",
+        runtime: "pi-rpc",
+        toolCallId: "a",
+        kind: "execute",
+        title: "bash",
+        rawInput: { command: "write" },
+      },
+    ],
+    expected: [
+      {
+        source: "raw_input",
+        command: "write",
+        origin: "raw_input",
+        outcome: "missing",
+      },
+    ],
   },
   {
     name: "missing boolean remains unknown",
@@ -439,14 +451,16 @@ Create table-driven tests for:
         title: "bash",
       },
     ],
-    expected: [{
-      source: "raw_input",
-      command: "write",
-      origin: "raw_input",
-      outcome: "unknown",
-    }],
+    expected: [
+      {
+        source: "raw_input",
+        command: "write",
+        origin: "raw_input",
+        outcome: "unknown",
+      },
+    ],
   },
-]
+];
 ```
 
 Also cover:
@@ -479,17 +493,12 @@ Create:
 
 ```ts
 export type PiCommandLifecycleSource =
-  | "raw_input"
-  | "title_fallback"
-  | "unextractable";
+  "raw_input" | "title_fallback" | "unextractable";
 
 export type PiCommandLifecycleOrigin = "raw_input" | "title" | null;
 
 export type PiCommandLifecycleOutcome =
-  | "success"
-  | "error"
-  | "missing"
-  | "unknown";
+  "success" | "error" | "missing" | "unknown";
 
 export interface PiCommandLifecycleObservation {
   readonly source: PiCommandLifecycleSource;
@@ -519,10 +528,7 @@ function plainRecord(value: unknown): Record<string, unknown> | undefined {
   }
 }
 
-function dataValue(
-  record: Record<string, unknown>,
-  key: string,
-): unknown {
+function dataValue(record: Record<string, unknown>, key: string): unknown {
   try {
     const descriptor = Object.getOwnPropertyDescriptor(record, key);
     return descriptor !== undefined && Object.hasOwn(descriptor, "value")
@@ -634,19 +640,19 @@ const result = await service.delegate(
   },
 );
 
-expect(reports).toEqual([[
-  {
-    source: "raw_input",
-    command: "node -e write",
-    origin: "raw_input",
-    outcome: "error",
-  },
-]]);
+expect(reports).toEqual([
+  [
+    {
+      source: "raw_input",
+      command: "node -e write",
+      origin: "raw_input",
+      outcome: "error",
+    },
+  ],
+]);
 expect(result.commandsRun).toEqual(["node -e write"]);
 expect(result).not.toHaveProperty("piCommandLifecycleObservations");
-expect(JSON.stringify(result)).not.toContain(
-  "piCommandLifecycleObservations",
-);
+expect(JSON.stringify(result)).not.toContain("piCommandLifecycleObservations");
 ```
 
 Add tests proving:
@@ -679,14 +685,12 @@ onPiCommandLifecycleObservations?: (
 After existing command observation extraction, and only for `profile.runtime === "pi-rpc"`:
 
 ```ts
-const lifecycleObservations =
-  extractPiCommandLifecycleObservations(adapterResult.events);
-const lifecycleView: readonly PiCommandLifecycleObservation[] =
-  Object.freeze(
-    lifecycleObservations.map((observation) =>
-      Object.freeze({ ...observation }),
-    ),
-  );
+const lifecycleObservations = extractPiCommandLifecycleObservations(
+  adapterResult.events,
+);
+const lifecycleView: readonly PiCommandLifecycleObservation[] = Object.freeze(
+  lifecycleObservations.map((observation) => Object.freeze({ ...observation })),
+);
 try {
   context.onPiCommandLifecycleObservations?.(lifecycleView);
 } catch {
@@ -846,11 +850,7 @@ import type {
   PiCommandLifecycleSource,
 } from "../tasks/pi-command-lifecycle.js";
 
-export type PiWriteCommandMatch =
-  | "exact"
-  | "trim_only"
-  | "embedded"
-  | "other";
+export type PiWriteCommandMatch = "exact" | "trim_only" | "embedded" | "other";
 
 export interface SanitizedPiWriteCommandObservation {
   readonly source: PiCommandLifecycleSource;
@@ -872,8 +872,7 @@ export function sanitizePiWriteCommandObservations(
   return observations.map((observation) => ({
     source: observation.source,
     match:
-      observation.origin === "raw_input" &&
-      observation.command !== null
+      observation.origin === "raw_input" && observation.command !== null
         ? matchCommand(observation.command, target)
         : "other",
     outcome: observation.outcome,
@@ -956,9 +955,7 @@ writeCommandObservations?: SanitizedPiWriteCommandObservation[];
 Before the delegate call:
 
 ```ts
-let lifecycleObservations:
-  | readonly PiCommandLifecycleObservation[]
-  | undefined;
+let lifecycleObservations: readonly PiCommandLifecycleObservation[] | undefined;
 let lifecycleReportCount = 0;
 if (qualification !== null) {
   context.onPiCommandLifecycleObservations = (observations) => {
@@ -975,9 +972,7 @@ if (
   qualification !== null &&
   (lifecycleReportCount !== 1 || lifecycleObservations === undefined)
 ) {
-  throw new Error(
-    "Internal Pi command lifecycle report contract violated",
-  );
+  throw new Error("Internal Pi command lifecycle report contract violated");
 }
 ```
 
@@ -1095,18 +1090,8 @@ const PI_WRITE_SOURCES = new Set([
   "title_fallback",
   "unextractable",
 ]);
-const PI_WRITE_MATCHES = new Set([
-  "exact",
-  "trim_only",
-  "embedded",
-  "other",
-]);
-const PI_WRITE_OUTCOMES = new Set([
-  "success",
-  "error",
-  "missing",
-  "unknown",
-]);
+const PI_WRITE_MATCHES = new Set(["exact", "trim_only", "embedded", "other"]);
+const PI_WRITE_OUTCOMES = new Set(["success", "error", "missing", "unknown"]);
 ```
 
 Implement:
@@ -1141,9 +1126,7 @@ function validatePiWriteCommandDiagnostics(
 
   const descriptors = Object.getOwnPropertyDescriptors(observations);
   const lengthDescriptor = descriptors.length;
-  const itemKeys = Object.keys(descriptors).filter(
-    (key) => key !== "length",
-  );
+  const itemKeys = Object.keys(descriptors).filter((key) => key !== "length");
   if (
     lengthDescriptor === undefined ||
     !Object.hasOwn(lengthDescriptor, "value") ||
@@ -1208,12 +1191,7 @@ Call it immediately after existing Kimi diagnostics validation:
 
 ```ts
 validateCommandObservationDiagnostics(evidence, identity, runtime);
-validatePiWriteCommandDiagnostics(
-  evidence,
-  protocol,
-  identity,
-  runtime,
-);
+validatePiWriteCommandDiagnostics(evidence, protocol, identity, runtime);
 ```
 
 - [x] **Step 5: Run verifier GREEN and historical manifests**

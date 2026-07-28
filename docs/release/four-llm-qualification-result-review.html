@@ -163,8 +163,8 @@
         <strong>结论：本轮唯一授权已经消费，批次在第 6 项停止。</strong>
         共完成 6 项、通过 5 项；第 7–8 项未运行。终态为
         <code>blocked / case_failed</code>，
-        <code>promotionEligible=false</code>。
-        当前注册表仍为 <code>6 passed / 2 pending</code>，安装仍为
+        <code>promotionEligible=false</code>。 当前注册表仍为
+        <code>6 passed / 2 pending</code>，安装仍为
         <code>blocked / not ready</code>。
       </div>
 
@@ -191,7 +191,8 @@
           <code>where.cmd</code>。
         </li>
         <li>
-          ordinal 7–8 均为 notRun。全批没有 retry、resume、fallback、补跑或第二批。
+          ordinal 7–8 均为 notRun。全批没有
+          retry、resume、fallback、补跑或第二批。
         </li>
       </ol>
 
@@ -216,9 +217,7 @@
             </tr>
             <tr>
               <th>执行载体</th>
-              <td>
-                one entry / one cell；从 ordinal 1 开始；首错停
-              </td>
+              <td>one entry / one cell；从 ordinal 1 开始；首错停</td>
             </tr>
             <tr>
               <th>manifest</th>
@@ -275,9 +274,7 @@
               <td>4</td>
               <td><code>kimi-k3 / delegate</code></td>
               <td class="passed">passed</td>
-              <td>
-                文件、精确状态命令、范围、进程和 telemetry 通过
-              </td>
+              <td>文件、精确状态命令、范围、进程和 telemetry 通过</td>
             </tr>
             <tr>
               <td>5</td>
@@ -327,8 +324,10 @@
       <div class="warning">
         18 个 Pi bash 生命周期全部为 <code>error</code>，其中规定写入命令为
         <code>exact / error</code>。adapter 的最终分类是
-        <code>account_quota_exceeded</code>，但这不能证明 shell 缺陷由额度问题造成；
-        <code>where.cmd</code> 的来源也仍未知。三者必须作为独立事实记录，不能拼成未经
+        <code>account_quota_exceeded</code>，但这不能证明 shell
+        缺陷由额度问题造成；
+        <code>where.cmd</code>
+        的来源也仍未知。三者必须作为独立事实记录，不能拼成未经
         证据支持的单一因果链。
       </div>
 
@@ -360,26 +359,30 @@
                 加入非秘密基础白名单；离线实探 resolver 与精确 Node 写入命令成功
               </td>
               <td>
-                未加入 <code>ProgramW6432</code>，未扩展代理或凭据继承，也未固定宿主绝对路径
+                未加入
+                <code>ProgramW6432</code
+                >，未扩展代理或凭据继承，也未固定宿主绝对路径
               </td>
             </tr>
             <tr>
               <td>旧资格 gate 不要求规定 bash 真正成功</td>
               <td>
                 <code>e750052</code>、<code>b5a691f</code>、
-                <code>3d85315</code>、<code>ceb8e9c</code>
-                要求写入命令与 <code>git status --short</code> 各唯一出现且均为 success；
+                <code>3d85315</code>、<code>ceb8e9c</code> 要求写入命令与
+                <code>git status --short</code> 各唯一出现且均为 success；
                 future terminal passed verifier 会从脱敏数组重算
               </td>
               <td>
-                历史 blocked/interrupted evidence 保持兼容；不回填、不改写历史 JSON
+                历史 blocked/interrupted evidence 保持兼容；不回填、不改写历史
+                JSON
               </td>
             </tr>
             <tr>
               <td>Kimi ACP 子进程关闭存在既有生命周期竞态</td>
               <td>
-                <code>4af8b34</code> 增加显式 child-close barrier 与有界清理回归；
-                旧时序压力复现中 100 次有 98 次发生晚 close，修复后定向与全量验证通过
+                <code>4af8b34</code> 增加显式 child-close barrier
+                与有界清理回归； 旧时序压力复现中 100 次有 98 次发生晚
+                close，修复后定向与全量验证通过
               </td>
               <td>
                 这是离线全量测试暴露的既有问题；没有发起新的真实模型调用，也不改变
@@ -391,12 +394,14 @@
       </div>
 
       <div class="decision">
-        shell 环境、资格成功合同与 Kimi ACP 生命周期修复均已完成独立复审，
-        剩余 P0–P3 为 0。最终离线矩阵为
+        shell 环境、资格成功合同与 Kimi ACP 生命周期修复均已完成独立复审， 剩余
+        P0–P3 为 0。最终离线矩阵为
         <code>49 个测试文件、853 passed / 1 skipped / 0 failed</code>；
         typecheck、build、release smoke、隔离插件
-        <code>--check-report</code>、6/6 retained immutable evidence、evidence unchanged、
-        Pi resolver 与精确 28 字节命令均通过。<code>npm pack --dry-run</code>
+        <code>--check-report</code>、6/6 retained immutable evidence、evidence
+        unchanged、 Pi resolver 与精确 28 字节命令均通过。<code
+          >npm pack --dry-run</code
+        >
         收录 191 个文件；目标进程为 0/0/0，资格锁 absent，持久
         <code>.tgz</code> 为 0。
       </div>
@@ -404,15 +409,18 @@
       <h2>当前状态与下一步</h2>
       <p>
         注册表仍为 <code>6 passed / 2 pending</code>，安装仍为
-        <code>blocked / not ready</code>。机器可完成的最终离线验证已经通过；主线程只剩
-        提交本轮状态材料、确认工作树 clean，并交接一个真实存在的 40 位 frozen SHA。
-        任何新真实批次都需要维护者针对该精确 SHA 重新授权。
+        <code>blocked / not ready</code
+        >。机器可完成的最终离线验证已经通过；当前先提交 standing authorization
+        与状态材料，确认工作树 clean，并把真实存在的 40 位 HEAD 作为 frozen
+        SHA。维护者已默认授权项目内真实资格实验；Codex 随后自行生成 fresh
+        内部执行引用并运行完整新批，无需维护者逐 SHA 回复。
       </p>
 
       <h2>明确排除</h2>
       <p>
-        未访问或修改活动 <code>~/.codex/config.toml</code>，未安装或修改活动插件，
-        未移除或修改 <code>codex_cc_tools</code>，未调用或修改 Claude Code，
+        未访问或修改活动
+        <code>~/.codex/config.toml</code>，未安装或修改活动插件， 未移除或修改
+        <code>codex_cc_tools</code>，未调用或修改 Claude Code，
         未执行发布、推送、合并或 fast-forward。上述动作不由本结果页授权。
       </p>
 
@@ -438,27 +446,30 @@
         </li>
         <li>
           Pi Windows shell 环境闭环设计（仓库内：
-          <code>docs/superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md</code>；
-          不随 npm 包发布）
+          <code
+            >docs/superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md</code
+          >； 不随 npm 包发布）
         </li>
         <li>
           资格规定命令成功语义设计（仓库内：
-          <code>docs/superpowers/specs/2026-07-28-qualification-required-command-success-design.md</code>；
-          不随 npm 包发布）
+          <code
+            >docs/superpowers/specs/2026-07-28-qualification-required-command-success-design.md</code
+          >； 不随 npm 包发布）
         </li>
         <li><a href="../smoke/kimi.md">Kimi 资格状态与证据索引</a></li>
         <li><a href="../smoke/ark.md">Ark 资格状态与证据索引</a></li>
         <li>
-          下一批次的授权前置条件（仓库内：
-          <code>docs/release/four-llm-qualification-next-authorization-review.html</code>；
-          页面本身不授权且不随 npm 包发布）
+          standing authorization 与下一批执行状态（仓库内：
+          <code
+            >docs/release/four-llm-qualification-next-authorization-review.html</code
+          >； 页面记录当前边界且不随 npm 包发布）
         </li>
       </ul>
 
       <footer>
-        本页记录已消费授权的可信终态、已完成的离线收敛和通过的最终验证；
-        它不嵌入尚未形成的最终 clean SHA，
-        它不构成新真实批次、安装、活动配置变更或发布授权。
+        本页记录历史一次性执行引用对应的可信终态、已完成的离线收敛和通过的最终验证。
+        当前新真实批次许可来自维护者的 standing authorization，而不是本页；
+        本页也不构成安装、活动配置变更或发布许可。
       </footer>
     </main>
   </body>

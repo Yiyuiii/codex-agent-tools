@@ -1,5 +1,7 @@
 # Kimi 资格命令观测与发布包闭包设计
 
+> 历史状态说明（2026-07-28）：本文记录的逐批人工授权停点已被 [standing authorization](2026-07-28-standing-experiment-authorization-design.md) 覆盖；Kimi exact validator、同批 no-retry/no-resume 和 package 闭包要求保持不变。
+
 ## 状态与授权
 
 本设计在 2026-07-27 由用户批准按推荐方案 A 继续收敛。批准范围包括：
@@ -67,7 +69,7 @@ Kimi delegate 资格提示词必须把任务写成两个有序、独立的工具
 严格 validator 保持原样：
 
 ```ts
-result.commandsRun.includes("git status --short")
+result.commandsRun.includes("git status --short");
 ```
 
 空白不同、复合命令、substring 命中、title 中出现相同文字或模型正文自述均不通过。
@@ -107,10 +109,7 @@ fake ACP 必须新增一个确定性场景：初始 `tool_call` 只给 execute �
 
 ```ts
 type CommandObservationSource =
-  | "raw_input"
-  | "title_fallback"
-  | "late_update"
-  | "unextractable";
+  "raw_input" | "title_fallback" | "late_update" | "unextractable";
 
 interface CommandObservation {
   source: CommandObservationSource;

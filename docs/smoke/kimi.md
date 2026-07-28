@@ -6,7 +6,7 @@
 
 最新 `four-llm-v1` 批次 `2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef` 绑定 frozen commit `cb9434b4b540e70f5384224e4e98823a3ea2dbae`。ordinal 3 Kimi review 与 ordinal 4 Kimi delegate 均固定使用 `kimi-code/k3` / direct，零 retry/fallback，并均 passed；这继续支持注册表中的 Kimi 两项能力，但不能替代同批八项原子晋级。
 
-该批次继续到 ordinal 6 `ark-agent-plan/delegate`，因 `account_quota_exceeded` 按首错停止，形成 6 completed / 5 passed、ordinal 7–8 notRun、`blocked / case_failed`、`promotionEligible=false`，仍未取得同批 8/8。Kimi 两项不能与其它批次拼接完成原子资格；过渡注册表继续为 6 passed / 2 pending，安装继续为 `blocked / not ready`。未来完整八项批次必须重新冻结、复核并取得绑定新 clean frozen SHA 的明确授权，从 ordinal 1 开始。
+该批次继续到 ordinal 6 `ark-agent-plan/delegate`，因 `account_quota_exceeded` 按首错停止，形成 6 completed / 5 passed、ordinal 7–8 notRun、`blocked / case_failed`、`promotionEligible=false`，仍未取得同批 8/8。Kimi 两项不能与其它批次拼接完成原子资格；过渡注册表继续为 6 passed / 2 pending，安装继续为 `blocked / not ready`。未来完整八项批次仍须重新冻结、复核并从 ordinal 1 开始；standing authorization 下由 Codex 为新批生成 fresh 内部执行引用，无需维护者逐批或逐 SHA 回复。
 
 最新批次没有回退到其它 Kimi 模型；标准入口和 `functions.exec` cell 各只有一个，没有 resume、retry、fallback、补跑、第二入口或第二批。最新 manifest SHA-256 为 `61051a8eb8107759cdd1a10d5d44a7fe6d8a3f2c6b3b8e03773c8db8de4cd88d`，证据提交为 `b1682cb`。
 
@@ -27,14 +27,14 @@
 用户已经批准并完成 Kimi 资格命令观测的离线实现。delegate 资格提示词现在要求先用一个工具调用写入 `result.txt`，再用另一个独立 execute/shell 工具调用只执行 `git status --short`；管道、重定向、连接符、包装命令和模型正文声明都不能满足该要求。通过判定保持原样，仍只使用：
 
 ```ts
-result.commandsRun.includes("git status --short")
+result.commandsRun.includes("git status --short");
 ```
 
 Kimi ACP client 现在保留协议允许晚到的 `kind/title/rawInput`，任务层只在同一次 adapter 结果内按 tool-call ID 归并初始 call 和 update，再形成一个最终命令观测。新产生的 Kimi delegate evidence 将把内部观测映射为 `raw_input / title_fallback / late_update / unextractable` 来源枚举与 `exact / trim_only / embedded / other` 匹配枚举，不保存命令、title、raw input、tool-call ID、路径、输出或模型正文。optional verifier 只在字段存在时严格检查形状、适用范围和 exact 一致性；历史 evidence 可以没有该字段。
 
 冻结前全量还暴露了 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3。该修复不修改公开任务/MCP 结果、模型/route/credential、资格计划、提示词或 retry/fallback。
 
-Kimi 命令观测加固的离线实现阶段本身没有调用真实模型，也没有修改任何既有 evidence JSON、`four-llm-v1` manifest/checkpoint schema 或公开任务/MCP 结果。后续真实批次已多次通过 Kimi review/delegate；这只验证 Kimi 路径，不改变“同批八项必须全部 passed”的原子门禁。最新批次仍为 `blocked / case_failed`，注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；新的完整八项批次尚未授权。48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed 是旧候选历史数字；当前 fresh 全量为 49 files / 853 passed / 1 skipped / 0 failed，typecheck、build、release smoke、隔离 `--check-report`、retained manifests 6/6、证据不变、目标进程 0/0/0、资格锁 absent 与 191-file pack dry-run 均通过。
+Kimi 命令观测加固的离线实现阶段本身没有调用真实模型，也没有修改任何既有 evidence JSON、`four-llm-v1` manifest/checkpoint schema 或公开任务/MCP 结果。后续真实批次已多次通过 Kimi review/delegate；这只验证 Kimi 路径，不改变“同批八项必须全部 passed”的原子门禁。最新批次仍为 `blocked / case_failed`，注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；新的完整八项批次已由 standing authorization 默认许可，但必须先完成 clean freeze 与完整复核。48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed 是旧候选历史数字；当前 fresh 全量为 49 files / 853 passed / 1 skipped / 0 failed，typecheck、build、release smoke、隔离 `--check-report`、retained manifests 6/6、证据不变、目标进程 0/0/0、资格锁 absent 与 191-file pack dry-run 均通过。
 
 ## 方法与通过标准
 
@@ -46,12 +46,13 @@ delegate 要求只创建内容为 `KIMI_SMOKE_OK` 的 `result.txt`，随后执�
 
 ## 当前注册表 K3 基线证据（2026-07-25）
 
-| 逻辑 LLM | 任务 | 实际模型 | 耗时 | 结果 | 证据文件 SHA-256 |
-| --- | --- | --- | ---: | --- | --- |
-| `kimi-k3` | review | `kimi-code/k3` | 28.145 s | 通过 | `1c9fcd3f5a005f4d1af0430a524906e72d58c9cf4e25da13c96871b8adb09408` |
+| 逻辑 LLM  | 任务     | 实际模型       |     耗时 | 结果 | 证据文件 SHA-256                                                   |
+| --------- | -------- | -------------- | -------: | ---- | ------------------------------------------------------------------ |
+| `kimi-k3` | review   | `kimi-code/k3` | 28.145 s | 通过 | `1c9fcd3f5a005f4d1af0430a524906e72d58c9cf4e25da13c96871b8adb09408` |
 | `kimi-k3` | delegate | `kimi-code/k3` | 17.598 s | 通过 | `c7169b47b229621dc926f430fe87c4e22c811786d223eb5f11e81b0afe677136` |
 
 <a id="kimi-k3-review"></a>
+
 ## kimi-k3-review
 
 - 状态：passed；实际/预期模型均为 `kimi-code/k3`；provider 不适用；route 为 `direct`。
@@ -59,6 +60,7 @@ delegate 要求只创建内容为 `KIMI_SMOKE_OK` 的 `result.txt`，随后执�
 - 证据：[2026-07-25T15-44-34.778Z-kimi-k3-review.json](evidence/2026-07-25T15-44-34.778Z-kimi-k3-review.json)；SHA-256 `1c9fcd3f5a005f4d1af0430a524906e72d58c9cf4e25da13c96871b8adb09408`。
 
 <a id="kimi-k3-delegate"></a>
+
 ## kimi-k3-delegate
 
 - 状态：passed；实际/预期模型均为 `kimi-code/k3`；provider 不适用；route 为 `direct`。
@@ -69,11 +71,11 @@ delegate 要求只创建内容为 `KIMI_SMOKE_OK` 的 `result.txt`，随后执�
 
 2026-07-18 曾为 `kimi-k2.7` 与 `kimi-k2.7-highspeed` 完成四项 passed 门禁。两者现已从注册表删除；这些记录仅保存历史事实，不证明当前能力，也不会被当前门禁复用。原始 evidence JSON 保持不变。
 
-| 历史逻辑 LLM | 任务 | 历史实际模型 | 结果 | 证据 |
-| --- | --- | --- | --- | --- |
-| `kimi-k2.7` | review | `kimi-code/kimi-for-coding` | 通过 | [JSON](evidence/2026-07-18T07-59-25.150Z-kimi-k2.7-review.json) |
-| `kimi-k2.7` | delegate | `kimi-code/kimi-for-coding` | 通过 | [JSON](evidence/2026-07-18T07-59-37.579Z-kimi-k2.7-delegate.json) |
-| `kimi-k2.7-highspeed` | review | `kimi-code/kimi-for-coding-highspeed` | 通过 | [JSON](evidence/2026-07-18T07-59-47.269Z-kimi-k2.7-highspeed-review.json) |
+| 历史逻辑 LLM          | 任务     | 历史实际模型                          | 结果 | 证据                                                                        |
+| --------------------- | -------- | ------------------------------------- | ---- | --------------------------------------------------------------------------- |
+| `kimi-k2.7`           | review   | `kimi-code/kimi-for-coding`           | 通过 | [JSON](evidence/2026-07-18T07-59-25.150Z-kimi-k2.7-review.json)             |
+| `kimi-k2.7`           | delegate | `kimi-code/kimi-for-coding`           | 通过 | [JSON](evidence/2026-07-18T07-59-37.579Z-kimi-k2.7-delegate.json)           |
+| `kimi-k2.7-highspeed` | review   | `kimi-code/kimi-for-coding-highspeed` | 通过 | [JSON](evidence/2026-07-18T07-59-47.269Z-kimi-k2.7-highspeed-review.json)   |
 | `kimi-k2.7-highspeed` | delegate | `kimi-code/kimi-for-coding-highspeed` | 通过 | [JSON](evidence/2026-07-18T07-59-56.939Z-kimi-k2.7-highspeed-delegate.json) |
 
 ## 结论

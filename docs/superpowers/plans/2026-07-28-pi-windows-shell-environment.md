@@ -1,5 +1,7 @@
 # Pi Windows Shell Environment Implementation Plan
 
+> **Historical authorization note:** Any per-batch human authorization stop in this completed plan is superseded by `../specs/2026-07-28-standing-experiment-authorization-design.md`; its environment-isolation and validation constraints remain unchanged.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Restore Pi 0.80.10's built-in Windows Git Bash discovery without weakening the project's child-process environment isolation.
@@ -13,6 +15,7 @@
 ### Task 1: Reproduce and close the environment allowlist gap
 
 **Files:**
+
 - Modify: `test/runtime/environment.test.ts`
 - Modify: `src/runtime/environment.ts`
 
@@ -90,6 +93,7 @@ git commit -m "fix: preserve Pi Windows shell roots"
 ### Task 2: Independently review the minimal implementation
 
 **Files:**
+
 - Review: `src/runtime/environment.ts`
 - Review: `test/runtime/environment.test.ts`
 - Review: `docs/superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md`
@@ -120,6 +124,7 @@ RED→GREEN cycle before proceeding.
 ### Task 3: Verify the real Pi shell boundary offline
 
 **Files:**
+
 - Read only: installed Pi 0.80.10 `dist/utils/shell.js`
 - Temporary only: one system-temp probe directory
 
@@ -133,7 +138,10 @@ only success/error plus the resolved shell path.
 Expected on this host:
 
 ```json
-{"ok":true,"config":{"shell":"C:\\Program Files\\Git\\bin\\bash.exe","args":["-c"]}}
+{
+  "ok": true,
+  "config": { "shell": "C:\\Program Files\\Git\\bin\\bash.exe", "args": ["-c"] }
+}
 ```
 
 The probe must not print the environment or any credential.
@@ -158,6 +166,7 @@ Do not call Pi RPC or any external model.
 ### Task 4: Update durable status and freeze a new candidate
 
 **Files:**
+
 - Modify: `AGENTS.md`
 - Modify: `docs/release/four-llm-qualification-execution-runbook.md`
 - Modify: `docs/release/four-llm-qualification-next-authorization-review.html`

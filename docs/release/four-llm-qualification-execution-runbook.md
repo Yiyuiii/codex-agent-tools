@@ -12,23 +12,23 @@
 
 105 秒承载演练只构成离线基础设施证据：`functions.exec` 约 1 秒后 yield，同一个 cell 随后经 4 次 `functions.wait` 完成；事件严格为 1 个 `started`、7 个有序 `heartbeat`、1 个 `completed`，shell exit code 为 0，观测 wall time 为 111.4 秒；演练后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。它不证明 cell 可存活 4 小时，不证明任何模型资格，也不授权真实批次。
 
-未来真实批次仍需先形成一份新的 clean frozen candidate（干净冻结候选），完成复核，再取得针对该精确候选的一次新明确授权。历史授权已经消费，不得复用。
+未来真实批次仍需先形成一份新的 clean frozen candidate（干净冻结候选）并完成复核。维护者已给出项目内真实资格实验的 standing authorization，Codex 不再逐批或逐 SHA 等待人工回复；历史一次性授权已消费且不得复用，但每批仍生成 fresh 内部执行引用并绑定实际 frozen SHA。
 
-## 1. 授权消费前条件
+## 1. 内部执行引用生成前条件
 
 下列条件必须全部成立；任一项缺失都应在生成或消费授权引用、调用标准资格入口之前停止：
 
 - 已有精确且 clean 的 frozen candidate，候选内容、构建身份和资格协议已经独立复核；
 - 确定性测试、隔离插件生命周期、package 闭包、不可变证据校验和必要的视觉检查均针对同一候选通过；
 - 最新真实资格状态仍按证据如实标记为 blocked/interrupted 或其它实际不可晋级终态，注册表和安装状态没有被单项结果越过；
-- 维护者已经针对该精确冻结候选，明确授权一次全新的、从 ordinal 1 开始的完整 `four-llm-v1` 八项批次；
+- 当前 standing authorization 仍有效，本批属于项目内真实资格实验，而不是活动安装、发布或其它未授权的外部状态动作；
 - 历史授权页只作为已消费审计记录，没有被当作本次授权；
-- 已创建并确认 active long-term goal；没有 active goal 时不得生成或消费授权引用；
+- 已创建并确认 active long-term goal；没有 active goal 时不得生成内部执行引用；
 - 当前会话同时提供 `functions.exec` 与 `functions.wait`，并已复核 105 秒离线承载演练报告；
 - 资格锁不存在，Kimi ACP / Pi RPC / real-smoke 目标进程为 0/0/0；
 - 没有计划访问活动配置、变更活动插件、移除旧工具、调用 Claude Code、发布或修改正式工作树。
 
-维护者完成上述核对后，仍只能在受控执行阶段消费一次新授权；本手册和任何审阅页都不能替代用户的明确授权。
+Codex 完成上述核对后，在受控执行阶段生成一个 fresh UUID v4。现有 CLI/schema 字段仍名为 `authorizationReference`，但在 standing authorization 下它只是一批一次性的内部执行引用：明文不写入仓库或报告，只把规范化后的 SHA-256 用于锁、防复用、checkpoint、manifest 和 case evidence 关联。它不能跨批复用，也不需要维护者查看或回复。
 
 ## 2. one-cell / one-entry 承载合同
 
@@ -81,7 +81,9 @@ terminal 已存在且完整八项同批结果为 8/8 passed 时，只读验证 t
 
 ### 失败终态
 
-出现 failed、blocked、interrupted、preflight 失败、进程异常退出、锁/身份不一致、任何 case 未通过或 evidence 校验失败时，立即停止并保留既有证据。不得补跑单项，不得重开入口，不得另开批次。
+出现 failed、blocked、interrupted、preflight 失败、进程异常退出、锁/身份不一致、任何 case 未通过或 evidence 校验失败时，立即停止**当前批次**并保留既有证据。不得补跑单项，不得在同一批次或同一终态处理链中重开入口，也不得用新批掩盖未验证终态。
+
+可信终态及其不可变证据提交后，再把原因分为三类：仓库内可修缺陷先按 TDD 修复、完整复核并形成新 clean frozen candidate，然后可依据 standing authorization 启动独立新批；账户额度、凭据、登录、服务权限或活动系统动作等外部阻碍停止并请求维护者处理；owner/lock/checkpoint/terminal 身份歧义则 fail closed 请求人工判断。没有代码变化、外部状态变化或新增诊断价值时，不得重复同一真实批次。
 
 ### 歧义终态
 
@@ -91,7 +93,7 @@ cell 无法恢复等待且 owner、batch、authorization hash、terminal 或目�
 
 本运行合同明确禁止：
 
-- retry、fallback、resume、跳项、单项补跑、入口重调、第二次 recovery 或第二批；
+- 当前批次内的 retry、fallback、resume、跳项、单项补跑、入口重调、第二次 recovery，或在同一终态处理链中启动第二批/用新批掩盖失败；
 - 读取、备份、恢复、手工编辑或以其它方式访问活动 `~/.codex/config.toml`；
 - 安装、升级、卸载、回滚或修改活动插件；
 - 调用、修改或卸载 Claude Code；
@@ -102,7 +104,7 @@ cell 无法恢复等待且 owner、batch、authorization hash、terminal 或目�
 
 ## 7. 文档与授权边界
 
-本手册只告诉维护者在未来另获明确授权后如何 fail closed 地承载一个批次。演练报告只记录离线基础设施证据；结果页只记录历史终态；已经消费的重新授权审阅页只保留审计材料。任何一份文档、任何文档组合、对设计或计划的确认、以及 active long-term goal 本身，都不生成、替代或暗示真实资格授权。
+本手册规定 standing authorization 下如何 fail closed 地承载一个批次，以及可信终态后何时可以自主进入新 clean frozen candidate。演练报告只记录离线基础设施证据；结果页只记录历史终态；已经消费的旧授权审阅页只保留审计材料。真实资格实验的长期许可来自维护者 2026-07-28 的当前明确要求，不来自任何文档、设计、计划或 active long-term goal；这些材料只负责持久化范围和执行合同。活动安装、活动配置、旧工具移除、Claude Code、发布和正式工作树动作仍各自需要满足原有边界。
 
 相关材料：
 

@@ -21,9 +21,9 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 全量测试还暴露并闭合了一个既有 Kimi ACP 时序竞态：client 可能早于 child close 返回，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49 文件矩阵已包含该修复。Pi resolver 在生产隔离环境中找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`。
 
-注册表继续保持 6 passed / 2 pending，安装继续保持 `blocked / not ready`。当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。本轮状态文档提交并确认工作树 clean 后，最终 40 位 frozen SHA 将只由交接消息提供；第二个真实批次尚未授权。新的授权审阅页只作为仓库内人工审阅材料，由最终交接直接提供入口，页面本身不构成授权；既有[阻断结果审阅](docs/release/four-llm-qualification-result-review.html)及两份旧授权材料都只作历史审计。
+注册表继续保持 6 passed / 2 pending，安装继续保持 `blocked / not ready`。当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。维护者已把项目内真实资格实验改为长期默认授权：工作树提交为 clean frozen candidate 并完成复核后，Codex 可自行生成 fresh 内部批次执行引用并启动新的完整八项批次，不再逐批或逐 SHA 等待人工回复。每批仍绑定实际 frozen SHA，仍按 one-entry/one-cell、single-attempt、首错停和无 resume/retry/fallback/补跑执行；现行合同见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)，既有[阻断结果审阅](docs/release/four-llm-qualification-result-review.html)及两份旧授权材料都只作历史审计。
 
-2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。未来另获授权的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
+2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
 项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端。
 
@@ -96,4 +96,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。冻结前 fresh 全量矩阵为 49 files / 853 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离 `--check-report`、retained manifests 6/6、证据不变、进程/锁与 191-file pack dry-run 均通过。四模型八项能力仍处于 6 passed / 2 pending；最新 `four-llm-v1` 批次按首错停为 6 completed / 5 passed，ordinal 6 因 `account_quota_exceeded` 失败，ordinal 7–8 notRun，未产生同批 8/8 资格。shell 环境、资格命令成功语义与 Kimi ACP close 竞态已离线加固，但第二个真实批次尚未授权，真实 Codex App 宿主门禁也尚未执行。因此当前仍是 `blocked / not ready` 的官方插件候选，不能称为已安装、已替代旧工具或可公开发布。
+当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。冻结前 fresh 全量矩阵为 49 files / 853 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离 `--check-report`、retained manifests 6/6、证据不变、进程/锁与 191-file pack dry-run 均通过。四模型八项能力仍处于 6 passed / 2 pending；最新 `four-llm-v1` 批次按首错停为 6 completed / 5 passed，ordinal 6 因 `account_quota_exceeded` 失败，ordinal 7–8 notRun，未产生同批 8/8 资格。shell 环境、资格命令成功语义与 Kimi ACP close 竞态已离线加固；真实资格实验现已默认授权，下一批将在新 clean frozen SHA 上自主运行，但真实 Codex App 宿主门禁仍未执行。因此当前仍是 `blocked / not ready` 的官方插件候选，不能称为已安装、已替代旧工具或可公开发布。

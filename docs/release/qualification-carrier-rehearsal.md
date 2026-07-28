@@ -43,6 +43,6 @@
 - 内层 shell timeout 至少为 `14,400,000 ms`；
 - 外层使用短周期 `wait` 持续接管与观察；
 - 继续遵守现有资格锁与恢复协议；
-- 针对精确 frozen commit（冻结提交）取得新的明确授权。
+- standing authorization 有效，批次绑定精确 frozen commit（冻结提交），并为该批生成 fresh 内部执行引用。
 
 本报告刻意不记录运行单元标识、PID、环境值、用户目录、授权数据或完整命令行。

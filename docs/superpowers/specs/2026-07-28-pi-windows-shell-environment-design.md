@@ -1,5 +1,7 @@
 # Pi Windows shell 环境闭环设计
 
+> 历史状态说明：本文当时的“不得启动第二个真实批次”已被 [standing authorization](2026-07-28-standing-experiment-authorization-design.md) 覆盖；Windows 环境白名单、代理和凭据边界保持不变。
+
 状态：已批准进入离线 TDD 实施。批准依据是维护者对 frozen SHA
 `cb9434b4b540e70f5384224e4e98823a3ea2dbae` 真实批次失败后的自主离线
 诊断、修复、审阅、验证和重新冻结授权。本设计不授权第二个真实批次。

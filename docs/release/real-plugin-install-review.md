@@ -19,7 +19,7 @@
 - 第 4 层真实 Codex App 宿主门禁尚未执行。
 - 当前没有执行活动 Codex 的 marketplace/plugin add 或 remove，也没有读取、写入、备份或恢复活动 `~/.codex/config.toml`。
 
-本文件不提出安装授权问题，也不提供当前可立即执行的安装命令。[原四模型八项资格批次授权审阅](four-llm-qualification-authorization-review.html)和[重新授权审阅](four-llm-qualification-reauthorization-review.html)都已经消费且不能复用；下一次资格批次授权审阅页只作为仓库内人工审阅材料，由最终交接直接提供入口，页面本身不是授权、不进入公开 npm 包面，更不是活动安装许可。过去对“采用官方插件机制”的原则性同意不能替代未来某次真实 add/remove 的逐动作许可。
+本文件不提出安装授权问题，也不提供当前可立即执行的安装命令。[原四模型八项资格批次授权审阅](four-llm-qualification-authorization-review.html)和[重新授权审阅](four-llm-qualification-reauthorization-review.html)都已经消费且不能复用；真实资格实验现由 standing authorization 自主推进，仓库内 `docs/release/four-llm-qualification-next-authorization-review.html` 只记录范围与进度，不进入公开 npm 包面，也不是活动安装许可。过去对“采用官方插件机制”的原则性同意和当前默认实验授权都不能替代未来某次真实 add/remove 的逐动作许可。
 
 ## 为什么最终仍需要官方安装
 
@@ -36,7 +36,7 @@
 - ordinal 1 虽在旧资格门禁下 passed，但其 5 个 Pi bash 生命周期同样全部为 error，精确写入命令也是 error，构成已确认的历史假阳性。
 - blocked manifest：[JSON](../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/manifest.json)，SHA-256 `61051a8eb8107759cdd1a10d5d44a7fe6d8a3f2c6b3b8e03773c8db8de4cd88d`。
 - 终态为 `blocked / case_failed`、`promotionEligible=false`；immutable-evidence verifier 已通过，资格锁 absent，目标进程为 0/0/0。证据由独立提交 `b1682cb` 保存。
-- 当前授权已经消费；未来任何真实批次仍需要完成本轮文档提交和 clean freeze，再取得绑定最终 40 位 SHA 的明确授权并从 ordinal 1 重新开始，不能复用本轮或历史证据。
+- 该历史批次的一次性执行引用已经消费；未来真实批次仍需要完成文档提交和 clean freeze，绑定最终 40 位 SHA、生成 fresh 内部执行引用并从 ordinal 1 重新开始，不能复用本轮或历史证据。standing authorization 已取代逐批人工批准。
 
 该终态没有改变注册表或安装状态：仍为 6 passed / 2 pending 与 **blocked / not ready**。活动配置、插件 add/remove、`codex_cc_tools` 移除、Claude Code、发布与正式仓库 fast-forward 均未执行。
 
@@ -57,7 +57,7 @@ frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上的批次 `2026-07-2
 - manifest schema v2，`promotionEligible=false`，0 completed cases，ordinal 2–8 共 7 个 notRun，2 个 checkpoints；没有 cases 文件、case evidence 或 `uncommittedEvidence`。
 - ordinal 1 是否完成真实后端请求无法由现有证据证明；因此不得虚构 telemetry 或失败 evidence SHA，也不能把本次中断写成模型、route、凭据或 acceptance 失败。
 - interrupted manifest：[JSON](../smoke/evidence/batches/2026-07-27T04-27-07.245Z-3ee30234-325e-450f-8562-1598d5843cde/manifest.json)，SHA-256 `3e200dca507fe886d4e3a4bbf67cc811cca485120e6969e7632f933537ba902b`；immutable-evidence verifier 已通过，锁已消失，目标进程为 0/0/0。
-- evidence 已由独立提交 `b76c75d` 保存（3 files / 276 insertions）。当前授权已经消费；未来任何真实批次都需要新的明确授权，并从 ordinal 1 重新开始，不能复用旧证据。
+- evidence 已由独立提交 `b76c75d` 保存（3 files / 276 insertions）。该历史执行引用已经消费；未来任何真实批次都必须使用 fresh 内部执行引用、绑定新 clean frozen SHA 并从 ordinal 1 重新开始，不能复用旧证据。
 
 该终态没有改变注册表或安装状态：仍为 6 passed / 2 pending 与 **blocked / not ready**。活动配置、插件 add/remove、`codex_cc_tools` 移除、Claude Code、发布与正式仓库 fast-forward 均未执行。
 
@@ -71,7 +71,7 @@ frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上的批次 `2026-07-2
 - blocked manifest：[JSON](../smoke/evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json)，SHA-256 `f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c`；immutable-evidence verifier 已通过，`promotionEligible=false`，后七项 not run。
 - 当前授权已经消费；批次后 Kimi ACP、Pi RPC、real-smoke 目标进程均为 0。没有 retry、fallback、resume、跳项或第二批。
 
-该终态不允许只补跑失败项，也不允许复用当前授权。未来若重新认证，必须先取得新的明确授权，再从第 1 项开始运行新的完整八项批次。
+该终态不允许只补跑失败项，也不允许复用历史执行引用。未来若重新认证，standing authorization 允许在新 clean frozen SHA 上生成 fresh 内部执行引用，再从第 1 项开始运行新的完整八项批次。
 
 ## 历史：Ark Coding Plan 离线修复与验证
 
@@ -113,14 +113,14 @@ blocked case 的 raw/normalized 双哈希已确定实际文件是 `ARK_SMOKE_OK:
 
 当前四个活动 LLM 全部直连。最新资格批次形成 ordinal 1–5 passed、ordinal 6 failed 与 ordinal 7–8 notRun 的不可变 evidence，但因原子晋级要求未达到同批 8/8，下表注册表保持不变；只有 Ark Coding Plan 的 review/delegate pending。
 
-| 逻辑 LLM | 固定后端 / 模型 / 路由 | 注册表 review | 注册表 delegate |
-| --- | --- | --- | --- |
-| `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | passed | passed |
-| `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | pending | pending |
-| `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | passed | passed |
-| `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | passed | passed |
+| 逻辑 LLM                      | 固定后端 / 模型 / 路由                               | 注册表 review | 注册表 delegate |
+| ----------------------------- | ---------------------------------------------------- | ------------- | --------------- |
+| `kimi-k3`                     | Kimi ACP / `kimi-code/k3` / direct                   | passed        | passed          |
+| `ark-coding-plan`             | Pi / `ark-coding-plan` / `ark-code-latest` / direct  | pending       | pending         |
+| `ark-agent-plan`              | Pi / `ark-agent-plan` / `ark-code-latest` / direct   | passed        | passed          |
+| `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | passed        | passed          |
 
-既有精确证据和 SHA-256 见 [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)与 [Gemini 退役历史](../smoke/pi-gemini.md)索引。最新 blocked 证据以及更早的 interrupted/blocked 证据都不能单独晋级任何 pending 能力；未来新资格仍必须来自绑定新 frozen SHA、另获明确授权的一次全新完整 `four-llm-v1` 8/8 批次，不能把这些既有证据拼接为当前资格。
+既有精确证据和 SHA-256 见 [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)与 [Gemini 退役历史](../smoke/pi-gemini.md)索引。最新 blocked 证据以及更早的 interrupted/blocked 证据都不能单独晋级任何 pending 能力；未来新资格仍必须来自绑定新 frozen SHA、使用 fresh 内部执行引用的一次全新完整 `four-llm-v1` 8/8 批次，不能把这些既有证据拼接为当前资格。
 
 ### 历史五模型阻断证据
 
@@ -141,11 +141,11 @@ blocked case 的 raw/normalized 双哈希已确定实际文件是 `ARK_SMOKE_OK:
 
 未来只有同时满足以下全部条件，才能把本文件重新收敛为 `ready` 并开始准备某一次真实安装许可：
 
-1. 取得绑定最终 40 位 frozen SHA 的明确资格授权，并以 single entry/cell 在一个全新的 `four-llm-v1` 批次中从 ordinal 1 开始严格串行完成四个活动 LLM 的八个精确组合，按首错停且绝不 resume/retry/fallback/补跑/第二批；只有八项全部生成新的、脱敏的 `passed` evidence 才能晋级。
+1. standing authorization 有效，在最终 40 位 frozen SHA 上生成 fresh 内部执行引用，并以 single entry/cell 在一个全新的 `four-llm-v1` 批次中从 ordinal 1 开始严格串行完成四个活动 LLM 的八个精确组合，按首错停且绝不在同一批内 resume/retry/fallback/补跑；只有八项全部生成新的、脱敏的 `passed` evidence 才能晋级。
 2. 每次实际 backend、模型、provider 和 route 与上表固定身份精确一致；不并行运行 Pi smoke，不重用旧证据，不自动 retry 或 fallback。
 3. review 找到预置缺陷且工作区零变化；delegate 只产生预期变化并观测到验证命令；每次结束后都没有新增 Kimi/Pi RPC 进程。
 4. Kimi/Ark smoke 索引、`docs/smoke/evidence/`、内置注册表、README、运维文档与四层发布清单重新收敛为八项全部 passed，不保留 pending 或自相矛盾的当前状态；Gemini 页面继续只作为退役历史。
-5. 当前候选已完成全量测试、类型检查、构建、`npm run smoke:release`、隔离报告 check-only、资格 help、全部 retained manifests、证据不变、生产进程/锁与 pack 检查；48 files / 837 passed 只属于旧候选历史。第 2 层隔离官方插件生命周期也已通过；本轮状态文档提交和 clean freeze 完成后，必须以交接消息给出的最终 SHA 作为授权绑定值。若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
+5. 当前候选已完成全量测试、类型检查、构建、`npm run smoke:release`、隔离报告 check-only、资格 help、全部 retained manifests、证据不变、生产进程/锁与 pack 检查；48 files / 837 passed 只属于旧候选历史。第 2 层隔离官方插件生命周期也已通过；本轮状态文档提交和 clean freeze 完成后，以实际最终 SHA 作为 frozen/build identity 绑定值，并由 Codex 生成 fresh 内部执行引用，无需交接消息授权。若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
 6. 本状态包改写为 `ready`，以当时的构建产物、隔离状态差异和官方命令行为重新独立审阅。
 
 在这些条件全部成立前，不生成真实安装授权问题，也不进入真实安装执行。

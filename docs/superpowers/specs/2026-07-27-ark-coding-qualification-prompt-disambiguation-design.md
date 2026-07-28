@@ -1,5 +1,7 @@
 # Ark Coding Plan 资格提示词消歧与后续替代路线设计
 
+> 历史状态说明（2026-07-28）：本文记录的逐批/逐 SHA 人工许可已被 [standing authorization](2026-07-28-standing-experiment-authorization-design.md) 覆盖；严格 validator、单批原子性和无 retry/fallback 要求保持不变。
+
 日期：2026-07-27
 
 状态：设计已获用户确认；实现提交、独立规格/质量审阅、全量离线验证和授权审阅材料已完成；待文档提交、空冻结提交与最终 post-freeze 复验
@@ -18,12 +20,12 @@
 
 当前活动产品面固定为：
 
-| 逻辑 LLM | 运行时 | provider / 模型 | 网络 |
-| --- | --- | --- | --- |
-| `kimi-k3` | Kimi Code ACP | `kimi-code/k3` | direct |
-| `ark-coding-plan` | Pi RPC | `ark-coding-plan` / `ark-code-latest` | direct |
-| `ark-agent-plan` | Pi RPC | `ark-agent-plan` / `ark-code-latest` | direct |
-| `ark-agent-deepseek-v4-flash` | Pi RPC | `ark-agent-plan` / `deepseek-v4-flash` | direct |
+| 逻辑 LLM                      | 运行时        | provider / 模型                        | 网络   |
+| ----------------------------- | ------------- | -------------------------------------- | ------ |
+| `kimi-k3`                     | Kimi Code ACP | `kimi-code/k3`                         | direct |
+| `ark-coding-plan`             | Pi RPC        | `ark-coding-plan` / `ark-code-latest`  | direct |
+| `ark-agent-plan`              | Pi RPC        | `ark-agent-plan` / `ark-code-latest`   | direct |
+| `ark-agent-deepseek-v4-flash` | Pi RPC        | `ark-agent-plan` / `deepseek-v4-flash` | direct |
 
 公开 MCP 仍为 `codex_external_agents`，只公开 `external_review` 和 `external_delegate`，两者的 `llm` 始终必填。当前八项 review/delegate 能力为 6 passed / 2 pending，只有 Ark Coding Plan 成对 pending；安装状态保持 `blocked / not ready`。
 
@@ -49,13 +51,13 @@
 
 schema v3 case evidence 没有保存文件正文，但保存了足以做确定性复核的脱敏字段：
 
-| 字段 | evidence 值 |
-| --- | --- |
-| `resultFileByteLength` | `30` |
-| `resultFileNormalizedLineCount` | `1` |
+| 字段                             | evidence 值                                                        |
+| -------------------------------- | ------------------------------------------------------------------ |
+| `resultFileByteLength`           | `30`                                                               |
+| `resultFileNormalizedLineCount`  | `1`                                                                |
 | `expectedResultNormalizedSha256` | `4cf493d60030fed3f4936d1ad56df60e0352025fd992aaf789ae15bc4f40d32c` |
-| `resultFileRawSha256` | `5c3ae3a993f9b1cf485f886e3f02c6dcebb321e39351c2accef9e6eb509c8b74` |
-| `resultFileNormalizedSha256` | `0555faa8158199923b4d16e2d74e3a54b42bff3bdf2fb63388e2877f465a2b20` |
+| `resultFileRawSha256`            | `5c3ae3a993f9b1cf485f886e3f02c6dcebb321e39351c2accef9e6eb509c8b74` |
+| `resultFileNormalizedSha256`     | `0555faa8158199923b4d16e2d74e3a54b42bff3bdf2fb63388e2877f465a2b20` |
 
 本地只读复算得到：
 
@@ -224,19 +226,19 @@ git status --short
 
 ## 11. 授权矩阵
 
-| 动作 | 当前设计确认是否足够 |
-| --- | --- |
-| 文档终态闭合、提示词消歧、TDD、确定性验证 | 是 |
-| 临时 `CODEX_HOME` 隔离生命周期 | 是 |
-| 子代理只读规格/质量复核 | 是 |
-| 新候选冻结 | 是 |
-| 新一次真实八项资格批次 | 否，需新的明确授权 |
-| 方案 B 的真实六项资格批次 | 否，需先确认新设计并取得另一份明确授权 |
+| 动作                                                 | 当前设计确认是否足够                              |
+| ---------------------------------------------------- | ------------------------------------------------- |
+| 文档终态闭合、提示词消歧、TDD、确定性验证            | 是                                                |
+| 临时 `CODEX_HOME` 隔离生命周期                       | 是                                                |
+| 子代理只读规格/质量复核                              | 是                                                |
+| 新候选冻结                                           | 是                                                |
+| 新一次真实八项资格批次                               | 否，需新的明确授权                                |
+| 方案 B 的真实六项资格批次                            | 否，需先确认新设计并取得另一份明确授权            |
 | `ready` 后正式仓库 pure fast-forward、重建与隔离复验 | 是，但必须满足 clean / branch / ancestry 前置检查 |
-| 活动 marketplace/plugin add 与失败 remove | 否，需独立明确授权 |
-| 旧 `codex_cc_tools` 移除与恢复 | 否，需独立明确授权 |
-| npm 或公共 marketplace 发布 | 否，需独立明确授权 |
-| 直接访问活动 `config.toml` | 不在当前路线内 |
+| 活动 marketplace/plugin add 与失败 remove            | 否，需独立明确授权                                |
+| 旧 `codex_cc_tools` 移除与恢复                       | 否，需独立明确授权                                |
+| npm 或公共 marketplace 发布                          | 否，需独立明确授权                                |
+| 直接访问活动 `config.toml`                           | 不在当前路线内                                    |
 
 ## 12. 非目标
 

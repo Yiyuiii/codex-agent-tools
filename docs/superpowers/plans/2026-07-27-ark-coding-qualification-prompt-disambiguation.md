@@ -1,5 +1,7 @@
 # Ark Coding Plan Qualification Prompt Disambiguation Implementation Plan
 
+> **Historical authorization note (2026-07-28):** The per-batch human authorization stop in this completed plan is superseded by `../specs/2026-07-28-standing-experiment-authorization-design.md`; its strict validator, atomic-batch, and no-retry/fallback constraints remain applicable.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Eliminate the deterministic Ark Coding Plan delegate qualification-prompt delimiter ambiguity, preserve every existing safety and qualification gate, freeze a fully verified candidate, and stop with an exact one-batch authorization review package before any real model call.
@@ -86,96 +88,95 @@ import {
 
 Insert this test before the existing `"validates delegate file and command evidence"` test:
 
-```ts
-  it.each([
-    {
-      llm: "ark-coding-plan",
-      resultFileName: "ark-coding-plan-smoke.txt",
-      expectedLine: "ARK_SMOKE_OK:ark-coding-plan",
-      payloadBase64: "QVJLX1NNT0tFX09LOmFyay1jb2RpbmctcGxhbgo=",
-    },
-    {
-      llm: "ark-agent-plan",
-      resultFileName: "ark-agent-plan-smoke.txt",
-      expectedLine: "ARK_SMOKE_OK:ark-agent-plan",
-      payloadBase64: "QVJLX1NNT0tFX09LOmFyay1hZ2VudC1wbGFuCg==",
-    },
-    {
-      llm: "ark-agent-deepseek-v4-flash",
-      resultFileName: "ark-agent-deepseek-v4-flash-smoke.txt",
-      expectedLine: "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash",
-      payloadBase64:
-        "QVJLX1NNT0tFX09LOmFyay1hZ2VudC1kZWVwc2Vlay12NC1mbGFzaAo=",
-    },
-  ] as const)(
-    "builds an unambiguous delegate write contract for $llm",
-    ({ llm, resultFileName, expectedLine, payloadBase64 }) => {
-      const writeCommand =
-        `node -e 'require("node:fs").writeFileSync(process.argv[1],Buffer.from(process.argv[2],"base64"))' ` +
-        `'${resultFileName}' '${payloadBase64}'`;
-      const contract = buildPiDelegateSmokeContract(llm);
+````ts
+it.each([
+  {
+    llm: "ark-coding-plan",
+    resultFileName: "ark-coding-plan-smoke.txt",
+    expectedLine: "ARK_SMOKE_OK:ark-coding-plan",
+    payloadBase64: "QVJLX1NNT0tFX09LOmFyay1jb2RpbmctcGxhbgo=",
+  },
+  {
+    llm: "ark-agent-plan",
+    resultFileName: "ark-agent-plan-smoke.txt",
+    expectedLine: "ARK_SMOKE_OK:ark-agent-plan",
+    payloadBase64: "QVJLX1NNT0tFX09LOmFyay1hZ2VudC1wbGFuCg==",
+  },
+  {
+    llm: "ark-agent-deepseek-v4-flash",
+    resultFileName: "ark-agent-deepseek-v4-flash-smoke.txt",
+    expectedLine: "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash",
+    payloadBase64: "QVJLX1NNT0tFX09LOmFyay1hZ2VudC1kZWVwc2Vlay12NC1mbGFzaAo=",
+  },
+] as const)(
+  "builds an unambiguous delegate write contract for $llm",
+  ({ llm, resultFileName, expectedLine, payloadBase64 }) => {
+    const writeCommand =
+      `node -e 'require("node:fs").writeFileSync(process.argv[1],Buffer.from(process.argv[2],"base64"))' ` +
+      `'${resultFileName}' '${payloadBase64}'`;
+    const contract = buildPiDelegateSmokeContract(llm);
 
-      expect(contract).toEqual({
-        resultFileName,
-        expectedLine,
+    expect(contract).toEqual({
+      resultFileName,
+      expectedLine,
+      writeCommand,
+      prompt: [
+        "Both actions below are mandatory before you finish.",
+        "1. Invoke the bash tool with this exact command:",
+        "```bash",
         writeCommand,
-        prompt: [
-          "Both actions below are mandatory before you finish.",
-          "1. Invoke the bash tool with this exact command:",
-          "```bash",
-          writeCommand,
-          "```",
-          "The command must create the result file with this exact normalized payload:",
-          "```text",
-          expectedLine,
-          "```",
-          "The code fences are not part of the file.",
-          "2. Invoke the bash tool with this exact command:",
-          "```bash",
-          "git status --short",
-          "```",
-          "Report both actions. Do not modify any other file. Do not substitute a prose claim for either bash invocation.",
-        ].join("\n"),
-      });
-      expect(contract.prompt).not.toContain(`${expectedLine};`);
+        "```",
+        "The command must create the result file with this exact normalized payload:",
+        "```text",
+        expectedLine,
+        "```",
+        "The code fences are not part of the file.",
+        "2. Invoke the bash tool with this exact command:",
+        "```bash",
+        "git status --short",
+        "```",
+        "Report both actions. Do not modify any other file. Do not substitute a prose claim for either bash invocation.",
+      ].join("\n"),
+    });
+    expect(contract.prompt).not.toContain(`${expectedLine};`);
 
-      const lines = contract.prompt.split("\n");
-      const payloadIndex = lines.indexOf(expectedLine);
-      expect(lines[payloadIndex - 1]).toBe("```text");
-      expect(lines[payloadIndex + 1]).toBe("```");
+    const lines = contract.prompt.split("\n");
+    const payloadIndex = lines.indexOf(expectedLine);
+    expect(lines[payloadIndex - 1]).toBe("```text");
+    expect(lines[payloadIndex + 1]).toBe("```");
 
-      const bashCommands = [
-        ...contract.prompt.matchAll(/```bash\n([^\r\n]+)\n```/gu),
-      ].map((match) => match[1]);
-      expect(bashCommands).toEqual([writeCommand, "git status --short"]);
+    const bashCommands = [
+      ...contract.prompt.matchAll(/```bash\n([^\r\n]+)\n```/gu),
+    ].map((match) => match[1]);
+    expect(bashCommands).toEqual([writeCommand, "git status --short"]);
 
-      const commandParts = writeCommand.split("'");
-      expect(commandParts).toHaveLength(7);
-      expect(commandParts[1]).toBe(
-        'require("node:fs").writeFileSync(process.argv[1],Buffer.from(process.argv[2],"base64"))',
-      );
-      expect(commandParts[3]).toBe(resultFileName);
-      expect(commandParts[5]).toBe(payloadBase64);
-      expect(Buffer.from(commandParts[5] ?? "", "base64")).toEqual(
-        Buffer.from(`${expectedLine}\n`, "utf8"),
-      );
-    },
-  );
-```
+    const commandParts = writeCommand.split("'");
+    expect(commandParts).toHaveLength(7);
+    expect(commandParts[1]).toBe(
+      'require("node:fs").writeFileSync(process.argv[1],Buffer.from(process.argv[2],"base64"))',
+    );
+    expect(commandParts[3]).toBe(resultFileName);
+    expect(commandParts[5]).toBe(payloadBase64);
+    expect(Buffer.from(commandParts[5] ?? "", "base64")).toEqual(
+      Buffer.from(`${expectedLine}\n`, "utf8"),
+    );
+  },
+);
+````
 
 - [x] **Step 2a: Add unsafe shell-token rejection to the RED contract test**
 
 Add:
 
 ```ts
-  it.each(["ark'unsafe", "ark\nunsafe", "ark unsafe"])(
-    "rejects unsafe delegate smoke token %j",
-    (llm) => {
-      expect(() => buildPiDelegateSmokeContract(llm)).toThrow(
-        "Unsafe Pi smoke llm id",
-      );
-    },
-  );
+it.each(["ark'unsafe", "ark\nunsafe", "ark unsafe"])(
+  "rejects unsafe delegate smoke token %j",
+  (llm) => {
+    expect(() => buildPiDelegateSmokeContract(llm)).toThrow(
+      "Unsafe Pi smoke llm id",
+    );
+  },
+);
 ```
 
 - [x] **Step 2b: Replace the old prose-shape assertions in the delegate integration test**
@@ -183,17 +184,19 @@ Add:
 At the end of `"validates delegate file and command evidence"`, replace:
 
 ```ts
-    expect(receivedPrompt).toContain("Both actions are mandatory");
-    expect(receivedPrompt).toContain("bash tool with the exact command `git status --short`");
+expect(receivedPrompt).toContain("Both actions are mandatory");
+expect(receivedPrompt).toContain(
+  "bash tool with the exact command `git status --short`",
+);
 ```
 
 with:
 
 ```ts
-    expect(receivedPrompt).toBe(
-      buildPiDelegateSmokeContract("ark-agent-plan").prompt,
-    );
-    expect(receivedPrompt).not.toContain("ARK_SMOKE_OK:ark-agent-plan;");
+expect(receivedPrompt).toBe(
+  buildPiDelegateSmokeContract("ark-agent-plan").prompt,
+);
+expect(receivedPrompt).not.toContain("ARK_SMOKE_OK:ark-agent-plan;");
 ```
 
 - [x] **Step 3: Run the focused test and observe RED**
@@ -210,7 +213,7 @@ Expected: FAIL because `buildPiDelegateSmokeContract` is not exported/implemente
 
 Insert after `sha256()` in `src/smoke/pi.ts`:
 
-```ts
+````ts
 export interface PiDelegateSmokeContract {
   readonly resultFileName: string;
   readonly expectedLine: string;
@@ -255,7 +258,7 @@ export function buildPiDelegateSmokeContract(
     ].join("\n"),
   });
 }
-```
+````
 
 This helper is exported only from the internal smoke module for direct testing. Do not re-export it from the package root or MCP surface.
 
@@ -264,21 +267,20 @@ This helper is exported only from the internal smoke module for direct testing. 
 Replace the inline `resultFileName`, `expectedLine`, and one-sentence prompt in `runPiSmoke` with:
 
 ```ts
-    const { resultFileName, expectedLine, prompt } =
-      buildPiDelegateSmokeContract(options.llm);
-    const result = await inSmokeInfrastructureStage(
-      "task_execution",
-      () =>
-        service.delegate(
-          {
-            llm: options.llm,
-            prompt,
-            cwd,
-            timeoutMs,
-          },
-          context,
-        ),
-    );
+const { resultFileName, expectedLine, prompt } = buildPiDelegateSmokeContract(
+  options.llm,
+);
+const result = await inSmokeInfrastructureStage("task_execution", () =>
+  service.delegate(
+    {
+      llm: options.llm,
+      prompt,
+      cwd,
+      timeoutMs,
+    },
+    context,
+  ),
+);
 ```
 
 Leave `inspectResultFile`, `requiredCommandObserved`, telemetry, environment, file-range, and cleanup code byte-for-byte unchanged except for formatter-only wrapping.
@@ -331,105 +333,103 @@ import {
 Replace `"uses a profile-specific delegate file and requires command evidence"` with:
 
 ```ts
-  it.each([
-    {
-      llm: "ark-coding-plan",
-      actualModel: "ark-code-latest",
-      provider: "ark-coding-plan",
-      credentialEnv: "CODEX_AGENT_ARK_CODING_KEY",
-    },
-    {
-      llm: "ark-agent-plan",
-      actualModel: "ark-code-latest",
-      provider: "ark-agent-plan",
-      credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
-    },
-    {
-      llm: "ark-agent-deepseek-v4-flash",
-      actualModel: "deepseek-v4-flash",
-      provider: "ark-agent-plan",
-      credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
-    },
-  ] as const)(
-    "uses the exact delegate contract for $llm",
-    async ({ llm, actualModel, provider, credentialEnv }) => {
-      const root = await tempRoot();
-      const contract = buildPiDelegateSmokeContract(llm);
-      let receivedPrompt = "";
-      const service: PiSmokeService = {
-        review: async () => {
-          throw new Error("not used");
-        },
-        delegate: async (input, context) => {
-          context?.onExecutionTelemetry?.(validPiTelemetry);
-          receivedPrompt = input.prompt;
-          await writeFile(
-            path.join(input.cwd, contract.resultFileName),
-            `${contract.expectedLine}\n`,
-            "utf8",
-          );
-          return {
-            ok: true,
-            status: "completed",
-            llm,
-            actualModel,
-            elapsedMs: 10,
-            diagnostics: [],
-            filesChanged: [contract.resultFileName],
-            summary: "created and verified",
-            commandsRun: ["git status --short"],
-            verification: [],
-            risks: [],
-          };
-        },
-      };
-
-      const evidence = await runArkSmoke(
-        { llm, task: "delegate", tempRoot: root },
-        {
-          service,
-          runtimeEvidence: {
-            configSha256: "c".repeat(64),
-            childEnvironment: {
-              [credentialEnv]: "secret",
-              PI_CODING_AGENT_DIR: "C:\\cache\\pi",
-            },
-          },
-          readPiVersion: async () => "0.80.10",
-          listPiRpcProcessIds: async () => [],
-        },
-      );
-
-      expect(receivedPrompt).toBe(contract.prompt);
-      expect(evidence.passed).toBe(true);
-      expect(evidence).toMatchObject({
-        llm,
-        actualModel,
-        expectedModel: actualModel,
-        provider,
-        credentialEnv,
-        filesChanged: [contract.resultFileName],
-        resultFileReadStatus: "read",
-        resultFileByteLength: Buffer.byteLength(
+it.each([
+  {
+    llm: "ark-coding-plan",
+    actualModel: "ark-code-latest",
+    provider: "ark-coding-plan",
+    credentialEnv: "CODEX_AGENT_ARK_CODING_KEY",
+  },
+  {
+    llm: "ark-agent-plan",
+    actualModel: "ark-code-latest",
+    provider: "ark-agent-plan",
+    credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+  },
+  {
+    llm: "ark-agent-deepseek-v4-flash",
+    actualModel: "deepseek-v4-flash",
+    provider: "ark-agent-plan",
+    credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+  },
+] as const)(
+  "uses the exact delegate contract for $llm",
+  async ({ llm, actualModel, provider, credentialEnv }) => {
+    const root = await tempRoot();
+    const contract = buildPiDelegateSmokeContract(llm);
+    let receivedPrompt = "";
+    const service: PiSmokeService = {
+      review: async () => {
+        throw new Error("not used");
+      },
+      delegate: async (input, context) => {
+        context?.onExecutionTelemetry?.(validPiTelemetry);
+        receivedPrompt = input.prompt;
+        await writeFile(
+          path.join(input.cwd, contract.resultFileName),
           `${contract.expectedLine}\n`,
-        ),
-        resultFileRawSha256: sha256(`${contract.expectedLine}\n`),
-        resultFileNormalizedSha256: sha256(contract.expectedLine),
-        expectedResultNormalizedSha256: sha256(contract.expectedLine),
-        resultFileNormalizedLineCount: 1,
-        resultFileContainsExpectedLine: true,
-        checks: {
-          resultFileValid: true,
-          resultFileObserved: true,
-          onlyExpectedFileChanged: true,
-          requiredCommandObserved: true,
-          environmentIsolated: true,
-          noNewPiRpcProcesses: true,
+          "utf8",
+        );
+        return {
+          ok: true,
+          status: "completed",
+          llm,
+          actualModel,
+          elapsedMs: 10,
+          diagnostics: [],
+          filesChanged: [contract.resultFileName],
+          summary: "created and verified",
+          commandsRun: ["git status --short"],
+          verification: [],
+          risks: [],
+        };
+      },
+    };
+
+    const evidence = await runArkSmoke(
+      { llm, task: "delegate", tempRoot: root },
+      {
+        service,
+        runtimeEvidence: {
+          configSha256: "c".repeat(64),
+          childEnvironment: {
+            [credentialEnv]: "secret",
+            PI_CODING_AGENT_DIR: "C:\\cache\\pi",
+          },
         },
-      });
-      expect(await readdir(root)).toEqual([]);
-    },
-  );
+        readPiVersion: async () => "0.80.10",
+        listPiRpcProcessIds: async () => [],
+      },
+    );
+
+    expect(receivedPrompt).toBe(contract.prompt);
+    expect(evidence.passed).toBe(true);
+    expect(evidence).toMatchObject({
+      llm,
+      actualModel,
+      expectedModel: actualModel,
+      provider,
+      credentialEnv,
+      filesChanged: [contract.resultFileName],
+      resultFileReadStatus: "read",
+      resultFileByteLength: Buffer.byteLength(`${contract.expectedLine}\n`),
+      resultFileRawSha256: sha256(`${contract.expectedLine}\n`),
+      resultFileNormalizedSha256: sha256(contract.expectedLine),
+      expectedResultNormalizedSha256: sha256(contract.expectedLine),
+      resultFileNormalizedLineCount: 1,
+      resultFileContainsExpectedLine: true,
+      checks: {
+        resultFileValid: true,
+        resultFileObserved: true,
+        onlyExpectedFileChanged: true,
+        requiredCommandObserved: true,
+        environmentIsolated: true,
+        noNewPiRpcProcesses: true,
+      },
+    });
+    expect(await readdir(root)).toEqual([]);
+  },
+);
 ```
 
 This removes the brittle `/create ([^ ]+\.txt)/` prompt parser from the old test.
@@ -567,7 +567,14 @@ npm run --silent verify:qualification -- --mode immutable-evidence --manifest do
 Expected JSON:
 
 ```json
-{"verified":true,"mode":"immutable-evidence","batchId":"2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d","qualificationPlanId":"four-llm-v1","status":"blocked","promotionEligible":false}
+{
+  "verified": true,
+  "mode": "immutable-evidence",
+  "batchId": "2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d",
+  "qualificationPlanId": "four-llm-v1",
+  "status": "blocked",
+  "promotionEligible": false
+}
 ```
 
 - [x] **Step 3: Recheck the five-file current batch SHA-256 values and baseline blobs**
@@ -652,7 +659,7 @@ npx tsx -e "import('./src/runtime/agent-processes.ts').then(async ({ classifyAge
 Expected:
 
 ```json
-{"kimi":{"count":0},"piRpc":{"count":0},"realSmoke":{"count":0}}
+{ "kimi": { "count": 0 }, "piRpc": { "count": 0 }, "realSmoke": { "count": 0 } }
 ```
 
 - [x] **Step 7: Record the fresh command results for the final review brief**
@@ -751,79 +758,180 @@ The `44 个文件、569 passed / 1 skipped / 0 failed` line is the expected coun
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>四模型八项资格批次授权审阅</title>
     <style>
-      :root { color-scheme: light; font-family: system-ui, sans-serif; }
-      body { max-width: 920px; margin: 0 auto; padding: 32px 20px 64px; line-height: 1.65; color: #1f2937; }
-      h1, h2 { color: #111827; line-height: 1.25; }
-      .status { border: 2px solid #b45309; background: #fffbeb; padding: 16px; border-radius: 10px; }
-      .ok { border-left: 4px solid #047857; background: #ecfdf5; padding: 12px 16px; }
-      .stop { border-left: 4px solid #b91c1c; background: #fef2f2; padding: 12px 16px; }
-      code { background: #f3f4f6; padding: 0.1em 0.35em; border-radius: 4px; }
-      li { margin: 0.35em 0; }
-      a { color: #1d4ed8; }
+      :root {
+        color-scheme: light;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+        line-height: 1.65;
+        color: #1f2937;
+      }
+      h1,
+      h2 {
+        color: #111827;
+        line-height: 1.25;
+      }
+      .status {
+        border: 2px solid #b45309;
+        background: #fffbeb;
+        padding: 16px;
+        border-radius: 10px;
+      }
+      .ok {
+        border-left: 4px solid #047857;
+        background: #ecfdf5;
+        padding: 12px 16px;
+      }
+      .stop {
+        border-left: 4px solid #b91c1c;
+        background: #fef2f2;
+        padding: 12px 16px;
+      }
+      code {
+        background: #f3f4f6;
+        padding: 0.1em 0.35em;
+        border-radius: 4px;
+      }
+      li {
+        margin: 0.35em 0;
+      }
+      a {
+        color: #1d4ed8;
+      }
     </style>
   </head>
   <body>
     <h1>四模型八项真实资格批次授权审阅</h1>
     <div class="status">
       <strong>状态：等待明确授权，尚未调用真实模型。</strong>
-      本文件本身不是授权，也不是安装权限包。候选的完整 40 位提交由 Codex 在交接消息中提供；它必须等于本文件所在干净工作树的 HEAD。
+      本文件本身不是授权，也不是安装权限包。候选的完整 40 位提交由 Codex
+      在交接消息中提供；它必须等于本文件所在干净工作树的 HEAD。
     </div>
 
     <h2>为什么需要新批次</h2>
     <p>
       上一批在首项 Ark Coding Plan delegate 停止。双哈希复算证明模型写入的是
-      <code>ARK_SMOKE_OK:ark-coding-plan;</code>，分号来自旧提示词中紧邻目标内容的自然语言分隔符。
+      <code>ARK_SMOKE_OK:ark-coding-plan;</code
+      >，分号来自旧提示词中紧邻目标内容的自然语言分隔符。
       路由、模型、凭据隔离、文件范围、必需命令、单次执行和进程清理均已通过。
     </p>
 
     <h2>Codex 已自动完成</h2>
     <div class="ok">
       <ul>
-        <li>将写文件动作改成可复制的 Node + Base64 精确 Bash 命令，并把 payload 独立分隔。</li>
-        <li>继续严格拒绝尾部分号、额外行、非法 UTF-8、范围外文件和非精确 git 命令。</li>
-        <li>唯一生产改动是 <code>src/smoke/pi.ts</code> 的提示词合同；回归覆盖 <code>pi.test.ts</code>、<code>ark.test.ts</code> 和 <code>result-file-evidence.test.ts</code>。</li>
-        <li>类型检查、构建和 release smoke 通过；全量测试为 44 个文件、569 passed / 1 skipped / 0 failed；临时 CODEX_HOME 隔离生命周期 check-report 通过。</li>
-        <li>旧批次 immutable verifier、当前批次 5/5 文件、历史 Gemini 14/14 SHA/blob 与目标进程 0/0/0 均通过复核。</li>
-        <li>完成独立规格与代码质量复核；没有调用真实模型、安装插件或访问活动 config.toml。</li>
+        <li>
+          将写文件动作改成可复制的 Node + Base64 精确 Bash 命令，并把 payload
+          独立分隔。
+        </li>
+        <li>
+          继续严格拒绝尾部分号、额外行、非法 UTF-8、范围外文件和非精确 git
+          命令。
+        </li>
+        <li>
+          唯一生产改动是 <code>src/smoke/pi.ts</code> 的提示词合同；回归覆盖
+          <code>pi.test.ts</code>、<code>ark.test.ts</code> 和
+          <code>result-file-evidence.test.ts</code>。
+        </li>
+        <li>
+          类型检查、构建和 release smoke 通过；全量测试为 44 个文件、569 passed
+          / 1 skipped / 0 failed；临时 CODEX_HOME 隔离生命周期 check-report
+          通过。
+        </li>
+        <li>
+          旧批次 immutable verifier、当前批次 5/5 文件、历史 Gemini 14/14
+          SHA/blob 与目标进程 0/0/0 均通过复核。
+        </li>
+        <li>
+          完成独立规格与代码质量复核；没有调用真实模型、安装插件或访问活动
+          config.toml。
+        </li>
       </ul>
     </div>
 
     <h2>本次请求的唯一授权</h2>
     <p>
       允许 Codex 只在交接消息列出的 clean frozen commit 上启动一次全新的
-      <code>four-llm-v1</code> 完整八项资格批次。固定顺序从 Ark Coding Plan delegate/review
-      开始，再执行 Kimi K3、Ark Agent Plan 和 Ark Agent DeepSeek V4 Flash 的 review/delegate。
+      <code>four-llm-v1</code> 完整八项资格批次。固定顺序从 Ark Coding Plan
+      delegate/review 开始，再执行 Kimi K3、Ark Agent Plan 和 Ark Agent DeepSeek
+      V4 Flash 的 review/delegate。
     </p>
     <ul>
-      <li>任一 failed、blocked 或 interrupted 立即停止，后续项记为 not run。</li>
+      <li>
+        任一 failed、blocked 或 interrupted 立即停止，后续项记为 not run。
+      </li>
       <li>不 retry、fallback、resume、跳项、复用旧 evidence 或启动第二批。</li>
       <li>只有同批 8/8 passed 才允许后续成对晋级 Ark Coding Plan。</li>
-      <li>最多产生八次真实调用并可能消耗对应计划额度；只允许创建一个新 batch evidence 目录。</li>
-      <li>授权后才在内存生成一次性 UUID，文档、聊天和日志均不保存 UUID 正文。</li>
-      <li>若 preflight 在 batch_started 前失败，本轮命令不会重跑；若 batch_started 已落盘，则任何终态都会消费本次授权。</li>
+      <li>
+        最多产生八次真实调用并可能消耗对应计划额度；只允许创建一个新 batch
+        evidence 目录。
+      </li>
+      <li>
+        授权后才在内存生成一次性 UUID，文档、聊天和日志均不保存 UUID 正文。
+      </li>
+      <li>
+        若 preflight 在 batch_started 前失败，本轮命令不会重跑；若 batch_started
+        已落盘，则任何终态都会消费本次授权。
+      </li>
     </ul>
 
     <div class="stop">
       <strong>本次授权不包括：</strong>
-      活动插件安装或回滚、读取或编辑活动 config.toml、移除 codex_cc_tools、修改 Claude Code、npm/公共 marketplace 发布。
-      也不包括把隔离 worktree fast-forward 到长期正式仓库。
+      活动插件安装或回滚、读取或编辑活动 config.toml、移除 codex_cc_tools、修改
+      Claude Code、npm/公共 marketplace 发布。 也不包括把隔离 worktree
+      fast-forward 到长期正式仓库。
     </div>
 
     <h2>可追溯材料</h2>
     <ul>
-      <li><a href="../superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md">已确认设计</a></li>
-      <li><a href="../superpowers/plans/2026-07-27-ark-coding-qualification-prompt-disambiguation.md">逐任务实施计划</a></li>
+      <li>
+        <a
+          href="../superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md"
+          >已确认设计</a
+        >
+      </li>
+      <li>
+        <a
+          href="../superpowers/plans/2026-07-27-ark-coding-qualification-prompt-disambiguation.md"
+          >逐任务实施计划</a
+        >
+      </li>
       <li><a href="checklist.md">四层发布门禁</a></li>
-      <li><a href="real-plugin-install-review.md">当前 blocked / not ready 安装状态包</a></li>
-      <li><a href="../smoke/evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/cases/2026-07-26T17-23-31.295Z-ark-coding-plan-delegate-ark.json">上一批首项 case evidence</a>，SHA-256 <code>166947716c19d435155e4ce0d041e4c88b7ef9b79f302787e0c27572eb39e6c9</code></li>
-      <li><a href="../smoke/evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json">上一批 blocked manifest</a></li>
-      <li>blocked manifest SHA-256：<code>f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c</code></li>
+      <li>
+        <a href="real-plugin-install-review.md"
+          >当前 blocked / not ready 安装状态包</a
+        >
+      </li>
+      <li>
+        <a
+          href="../smoke/evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/cases/2026-07-26T17-23-31.295Z-ark-coding-plan-delegate-ark.json"
+          >上一批首项 case evidence</a
+        >，SHA-256
+        <code
+          >166947716c19d435155e4ce0d041e4c88b7ef9b79f302787e0c27572eb39e6c9</code
+        >
+      </li>
+      <li>
+        <a
+          href="../smoke/evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json"
+          >上一批 blocked manifest</a
+        >
+      </li>
+      <li>
+        blocked manifest SHA-256：<code
+          >f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c</code
+        >
+      </li>
     </ul>
 
     <h2>建议回复</h2>
     <p>
-      若同意，请明确回复：<strong>“授权在交接消息所列冻结提交上执行一次完整
-      four-llm-v1 八项资格批次。”</strong>
+      若同意，请明确回复：<strong
+        >“授权在交接消息所列冻结提交上执行一次完整 four-llm-v1
+        八项资格批次。”</strong
+      >
     </p>
   </body>
 </html>

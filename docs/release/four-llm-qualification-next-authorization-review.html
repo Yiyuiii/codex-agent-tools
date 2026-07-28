@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:," />
-    <title>待交接：下一次四模型八项真实资格批次</title>
+    <title>长期默认授权：四模型八项真实资格自主执行状态</title>
     <style>
       :root {
         color-scheme: light;
@@ -147,24 +147,28 @@
   </head>
   <body>
     <main>
-      <h1>待交接：下一次四模型八项真实资格批次</h1>
+      <h1>长期默认授权：四模型八项真实资格自主执行状态</h1>
 
       <div class="status">
-        <strong>本页不构成授权，当前也还不能请求授权。</strong>
-        frozen SHA
+        <strong
+          >维护者已默认授权项目内真实资格实验，无需再回复授权句或逐字提供
+          SHA。</strong
+        >
+        上一批 frozen SHA
         <code>cb9434b4b540e70f5384224e4e98823a3ea2dbae</code>
-        对应的唯一授权已经由最新真实批次消费。离线修复、独立复审和最终全量矩阵已经完成；
-        状态提交与 clean freeze 尚未完成，因此本页故意不写入不存在的最终 SHA。
+        对应的一次性执行引用已经消费。离线修复、独立复审和最终全量矩阵已经完成；
+        当前先把新授权边界提交为 clean frozen candidate，随后由 Codex 自主生成
+        fresh 内部执行引用并启动新批。
       </div>
 
-      <h2>为什么需要新的授权门槛</h2>
+      <h2>为什么仍需要新的 clean frozen candidate</h2>
       <p>
         最新批次
         <code
           >2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef</code
         >
-        在旧 frozen SHA 上以 one entry / one cell 运行，共 6 completed、5 passed。
-        ordinal 6 <code>ark-agent-plan / delegate</code> 返回
+        在旧 frozen SHA 上以 one entry / one cell 运行，共 6 completed、5
+        passed。 ordinal 6 <code>ark-agent-plan / delegate</code> 返回
         <code>account_quota_exceeded</code>，ordinal 7–8 因首错停而 notRun；
         manifest 终态为 <code>blocked / case_failed</code>，
         <code>promotionEligible=false</code>。
@@ -191,22 +195,26 @@
               <td>Pi 子环境缺少 Windows Git Bash 发现所需根变量</td>
               <td>
                 ordinal 6 的 18 个 bash 生命周期全部 error；规定写入为
-                <code>exact / error</code>。ordinal 1 的 5 个 bash 生命周期也全部 error
+                <code>exact / error</code>。ordinal 1 的 5 个 bash
+                生命周期也全部 error
               </td>
               <td>
                 <code>2a815c7</code> 只增加 <code>ProgramFiles</code> 与
-                <code>ProgramFiles(x86)</code>；离线 resolver 和精确 Node 命令实探成功
+                <code>ProgramFiles(x86)</code>；离线 resolver 和精确 Node
+                命令实探成功
               </td>
             </tr>
             <tr>
               <td>旧资格 gate 会把规定 bash 失败后的正确最终制品误判为通过</td>
               <td>
-                ordinal 1 的规定写入为 <code>exact / error</code>，旧 gate 仍记录 passed
+                ordinal 1 的规定写入为 <code>exact / error</code>，旧 gate
+                仍记录 passed
               </td>
               <td>
                 <code>e750052</code>、<code>b5a691f</code>、
                 <code>3d85315</code>、<code>ceb8e9c</code>
-                要求写入与状态命令各唯一 success，并由 future terminal passed verifier 重算
+                要求写入与状态命令各唯一 success，并由 future terminal passed
+                verifier 重算
               </td>
             </tr>
           </tbody>
@@ -214,55 +222,78 @@
       </div>
 
       <div class="ok">
-        shell 环境与资格成功合同修复均已完成独立规格和代码质量审阅，剩余 P0–P3 为 0。代理、凭据、
-        provider、model、direct route、single-attempt、retry/fallback、公开 MCP 和历史
-        evidence 均未被放宽或重写。
+        shell 环境与资格成功合同修复均已完成独立规格和代码质量审阅，剩余 P0–P3
+        为 0。代理、凭据、 provider、model、direct
+        route、single-attempt、retry/fallback、公开 MCP 和历史 evidence
+        均未被放宽或重写。
       </div>
 
       <h2>全量矩阵另行收敛的既有 Kimi ACP 竞态</h2>
       <p>
-        最终离线验证还暴露了 Kimi ACP 子进程关闭的既有生命周期竞态：旧时序压力复现中
-        100 次有 98 次晚 close。<code>4af8b34</code> 通过显式 child-close barrier
-        与有界清理回归完成修复；独立复审剩余 P0–P3 为 0。该工作没有发起新的真实模型调用，
-        也没有改变 provider、model、路由或公开 MCP 合同。
+        最终离线验证还暴露了 Kimi ACP
+        子进程关闭的既有生命周期竞态：旧时序压力复现中 100 次有 98 次晚
+        close。<code>4af8b34</code> 通过显式 child-close barrier
+        与有界清理回归完成修复；独立复审剩余 P0–P3 为
+        0。该工作没有发起新的真实模型调用， 也没有改变
+        provider、model、路由或公开 MCP 合同。
       </p>
 
       <h2>当前尚未完成的机器工作</h2>
       <ul>
-        <li>主线程提交最终状态材料。</li>
-        <li>确认提交后的工作树 clean，并在交接消息中给出真实的 40 位 frozen SHA。</li>
+        <li>提交 standing authorization 设计、执行计划和全部当前状态材料。</li>
+        <li>
+          完成完整离线复验，确认工作树 clean，并把提交后的 40 位 HEAD 作为
+          frozen SHA。
+        </li>
+        <li>
+          在 active long-term goal 中自行生成 fresh
+          内部执行引用并运行完整八项批次。
+        </li>
       </ul>
       <div class="ok">
         <strong>最终离线矩阵：</strong>
         <code>49 个测试文件、853 passed / 1 skipped / 0 failed</code>。
-        typecheck、build、release smoke、隔离插件 <code>--check-report</code>、6/6 retained
-        immutable evidence、evidence unchanged、Pi resolver 与精确 28 字节命令均通过；
-        <code>npm pack --dry-run</code> 收录 191 个文件，目标进程 0/0/0，资格锁 absent，
-        持久 <code>.tgz</code> 为 0。
+        typecheck、build、release smoke、隔离插件
+        <code>--check-report</code>、6/6 retained immutable evidence、evidence
+        unchanged、Pi resolver 与精确 28 字节命令均通过；
+        <code>npm pack --dry-run</code> 收录 191 个文件，目标进程 0/0/0，资格锁
+        absent， 持久 <code>.tgz</code> 为 0。
       </div>
 
-      <h2>未来唯一可接受的批次合同</h2>
+      <h2>standing authorization 下的批次合同</h2>
       <ul>
-        <li>等待主线程交接最终 clean SHA，且维护者回复必须逐字包含该 40 位 SHA。</li>
         <li>
-          只允许一次全新的完整 <code>four-llm-v1</code> 八项批次，从 ordinal 1 开始。
+          每批都必须绑定提交后 clean 的真实 40 位 frozen
+          SHA；无需维护者逐字回复。
         </li>
-        <li>single entry / cell；每个 case single-attempt；严格按固定顺序执行。</li>
-        <li>首错立即发布终态并停止。</li>
-        <li>绝不 resume、retry、fallback、补跑、跳项或启动第二批。</li>
         <li>
-          若最终 preflight 的 SHA、build identity、工作树、凭据、进程、锁或 evidence
-          不满足合同，必须在首次真实调用前 fail closed。
+          每次只运行一个全新的完整 <code>four-llm-v1</code> 八项批次，从 ordinal
+          1 开始。
+        </li>
+        <li>
+          single entry / cell；每个 case single-attempt；严格按固定顺序执行。
+        </li>
+        <li>首错立即发布终态并停止。</li>
+        <li>当前批绝不 resume、retry、fallback、补跑、跳项或重开入口。</li>
+        <li>
+          可信终态和不可变证据提交后，只有完成仓库内修复与新 clean
+          freeze，才可自主启动独立新批；
+          没有代码、外部状态或诊断信息变化时不得重复烧额度。
+        </li>
+        <li>
+          若最终 preflight 的 SHA、build identity、工作树、凭据、进程、锁或
+          evidence 不满足合同，必须在首次真实调用前 fail closed。
         </li>
       </ul>
 
-      <h2>维护者届时如何授权</h2>
+      <h2>维护者是否还需要操作</h2>
       <div class="reply">
-        <strong>现在不要回复授权句。</strong>
-        主线程完成状态提交和 clean freeze 后，会在交接消息中给出一个真实的
-        40 位 SHA。只有维护者后续回复同时明确“一次全新完整八项、从 ordinal 1、
-        single entry/cell、首错停、无 resume/retry/fallback/补跑/第二批”，并逐字包含
-        该 SHA，授权才成立。旧 SHA、截短 SHA、本页面或没有 SHA 的概括回复均无效。
+        <strong>目前不需要维护者回复或批准实验。</strong>
+        Codex 会继续完成提交、clean freeze、完整 preflight
+        和一个真实批次。只有遇到账户额度、
+        凭据、登录、服务权限、活动系统变更，或 owner/lock/terminal
+        身份无法可靠消歧时， 才会携带最小充分证据请求维护者处理。每批的 fresh
+        UUID 只作为内部执行引用， 规范化后仅把 SHA-256 写入不可变证据。
       </div>
 
       <h2>风险与停止条件</h2>
@@ -270,10 +301,15 @@
         <li>真实 Kimi/Pi 调用会消耗计划额度，并可能持续较长时间。</li>
         <li>Ark 外部额度状态可能继续阻断；修复 shell 不等于修复额度。</li>
         <li>
-          新合同能防止规定 bash 失败后的假阳性，但不能保证所有模型都通过，也不能把
+          新合同能防止规定 bash
+          失败后的假阳性，但不能保证所有模型都通过，也不能把
           <code>where.cmd</code> 的未知来源自动归因。
         </li>
-        <li>若新 SHA 上的批次失败，只记录并审计该终态；不得把授权扩张成调试后重跑。</li>
+        <li>
+          若新 SHA 上的批次失败，先记录并提交该终态；仓库内可修缺陷按 TDD
+          修复并重新冻结后可启新批，
+          外部账户/凭据/登录阻碍则停止请求维护者处理。
+        </li>
       </ul>
 
       <h2>明确排除的动作</h2>
@@ -283,12 +319,21 @@
           <li>不安装、升级、卸载或回滚活动 Codex 插件。</li>
           <li>不移除或修改 <code>codex_cc_tools</code>。</li>
           <li>不调用、修改或卸载 Claude Code。</li>
-          <li>不执行 npm/marketplace 发布，不推送、不合并、不 fast-forward 正式工作树。</li>
+          <li>
+            不执行 npm/marketplace 发布，不推送、不合并、不 fast-forward
+            正式工作树。
+          </li>
         </ul>
       </div>
 
       <h2>可追溯材料</h2>
       <ul>
+        <li>
+          <a
+            href="../superpowers/specs/2026-07-28-standing-experiment-authorization-design.md"
+            >真实资格实验长期默认授权设计</a
+          >
+        </li>
         <li>
           <a href="four-llm-qualification-result-review.html"
             >最新真实批次最小充分结果审阅</a
@@ -306,7 +351,8 @@
           >
         </li>
         <li>
-          <a href="../superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md"
+          <a
+            href="../superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md"
             >Pi Windows shell 环境闭环设计</a
           >
         </li>
@@ -322,8 +368,10 @@
 
       <footer>
         当前注册表仍为 6 passed / 2 pending，安装仍为 blocked / not ready。
-        最终 clean SHA 必须由主线程在提交后交接；本页不嵌入或推测该 SHA，
-        只定义未来授权前置条件，不构成真实批次、安装、配置或发布授权。
+        standing authorization
+        只覆盖项目内真实资格实验及其离线收敛；本页记录该边界，
+        不构成活动安装、活动配置、旧工具移除、Claude
+        Code、发布或正式工作树变更许可。
       </footer>
     </main>
   </body>
