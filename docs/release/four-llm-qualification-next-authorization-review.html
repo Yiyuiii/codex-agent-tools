@@ -4,343 +4,327 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:," />
-    <title>待授权：下一次四模型八项真实资格批次</title>
+    <title>待交接：下一次四模型八项真实资格批次</title>
     <style>
       :root {
         color-scheme: light;
         font-family:
+          Inter,
+          "Noto Sans SC",
+          "Microsoft YaHei",
           system-ui,
           -apple-system,
           BlinkMacSystemFont,
           "Segoe UI",
           sans-serif;
+        --ink: #1f2937;
+        --muted: #64748b;
+        --line: #d1d5db;
+        --panel: #f8fafc;
+        --amber: #b45309;
+        --amber-bg: #fffbeb;
+        --green: #047857;
+        --green-bg: #ecfdf5;
+        --red: #b91c1c;
+        --red-bg: #fef2f2;
+        --blue: #1d4ed8;
+        --blue-bg: #eff6ff;
       }
       * {
         box-sizing: border-box;
       }
       body {
-        max-width: 960px;
-        margin: 0 auto;
-        padding: 32px 20px 64px;
+        margin: 0;
+        background: #eef2f7;
+        color: var(--ink);
         line-height: 1.65;
-        color: #1f2937;
+      }
+      main {
+        width: min(1000px, calc(100% - 28px));
+        margin: 24px auto;
+        padding: clamp(22px, 4vw, 38px);
+        border: 1px solid var(--line);
+        border-radius: 18px;
         background: #fff;
+        box-shadow: 0 18px 45px rgb(15 23 42 / 8%);
       }
       h1,
       h2 {
         color: #111827;
         line-height: 1.25;
       }
+      h1 {
+        margin-top: 0;
+        font-size: clamp(1.7rem, 4vw, 2.4rem);
+      }
       h2 {
         margin-top: 2rem;
+        font-size: 1.3rem;
+      }
+      code {
+        padding: 0.1em 0.35em;
+        border-radius: 4px;
+        background: #f3f4f6;
+        overflow-wrap: anywhere;
+      }
+      a {
+        color: var(--blue);
       }
       .status,
       .ok,
       .risk,
       .stop,
       .reply {
-        padding: 14px 16px;
-        border-radius: 10px;
+        margin: 1rem 0;
+        padding: 15px 17px;
+        border-radius: 11px;
       }
       .status {
-        border: 2px solid #b45309;
-        background: #fffbeb;
+        border: 2px solid var(--amber);
+        background: var(--amber-bg);
       }
       .ok {
-        border-left: 4px solid #047857;
-        background: #ecfdf5;
+        border-left: 5px solid var(--green);
+        background: var(--green-bg);
       }
       .risk {
-        border-left: 4px solid #b45309;
-        background: #fffbeb;
+        border-left: 5px solid var(--amber);
+        background: var(--amber-bg);
       }
       .stop {
-        border-left: 4px solid #b91c1c;
-        background: #fef2f2;
+        border-left: 5px solid var(--red);
+        background: var(--red-bg);
       }
       .reply {
-        border: 1px solid #64748b;
-        background: #f8fafc;
+        border: 2px solid var(--blue);
+        background: var(--blue-bg);
       }
-      code {
-        overflow-wrap: anywhere;
-        background: #f3f4f6;
-        padding: 0.1em 0.35em;
-        border-radius: 4px;
-      }
-      pre {
-        margin: 0.75rem 0 0;
-        padding: 14px;
+      .table-wrap {
+        width: 100%;
         overflow-x: auto;
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-        border-radius: 8px;
-        background: #111827;
-        color: #f9fafb;
-      }
-      pre code {
-        padding: 0;
-        background: transparent;
-        color: inherit;
-      }
-      li {
-        margin: 0.4em 0;
-      }
-      a {
-        color: #1d4ed8;
       }
       table {
         width: 100%;
+        margin: 1rem 0;
         border-collapse: collapse;
       }
       th,
       td {
-        padding: 10px;
-        vertical-align: top;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
         text-align: left;
-        border: 1px solid #d1d5db;
+        vertical-align: top;
+        overflow-wrap: anywhere;
       }
       th {
-        background: #f3f4f6;
+        background: var(--panel);
+      }
+      li {
+        margin: 0.4em 0;
+      }
+      footer {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
       }
       @media (max-width: 640px) {
-        body {
-          padding: 20px 14px 48px;
+        main {
+          width: min(100% - 16px, 1000px);
+          margin: 8px auto;
+          padding: 20px 14px;
+          border-radius: 12px;
         }
-        table,
-        thead,
-        tbody,
-        tr,
+        table {
+          font-size: 0.9rem;
+        }
         th,
         td {
-          display: block;
-        }
-        thead {
-          position: absolute;
-          width: 1px;
-          height: 1px;
-          overflow: hidden;
-          clip: rect(0 0 0 0);
-        }
-        tr {
-          margin-bottom: 12px;
-          border: 1px solid #d1d5db;
-        }
-        td {
-          border: 0;
-          border-bottom: 1px solid #e5e7eb;
-        }
-        td:last-child {
-          border-bottom: 0;
-        }
-        td::before {
-          display: block;
-          margin-bottom: 2px;
-          font-weight: 700;
-          color: #374151;
-          content: attr(data-label);
+          padding: 8px 7px;
         }
       }
     </style>
   </head>
   <body>
-    <h1>待授权：下一次四模型八项真实资格批次</h1>
-    <div class="status">
-      <strong>状态：离线实现与自动验证已完成，真实批次尚未授权。</strong>
-      本页是供维护者判断的最小材料，不是授权，也不会自动触发模型调用。最终 40 位
-      frozen SHA 只有在本轮状态文档提交和 clean allow-empty freeze 完成后，才会由交接消息提供。
-    </div>
+    <main>
+      <h1>待交接：下一次四模型八项真实资格批次</h1>
 
-    <h2>背景</h2>
-    <p>
-      最新真实批次绑定 frozen commit
-      <code>07fd0d79e6885ee1e0af4a021e12170ef6c9f470</code>，批次 ID 为
-      <code>2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678</code>。
-      该批次从 ordinal 1 完整执行八项，8 completed、7 passed；ordinal 8
-      <code>ark-agent-deepseek-v4-flash/delegate</code>
-      因结果文件缺失而 <code>acceptance_failed</code>。
-    </p>
-    <p>
-      失败项的 provider、模型、direct route、凭据隔离、single-attempt、0
-      retry/fallback、命令数 6、精确 <code>git status --short</code>
-      观测和进程清理均正确。旧 evidence 不能证明精确写入命令是否形成、被执行、被改写或被跳过。
-      manifest SHA-256 为
-      <code>eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556</code>，
-      证据由提交 <code>1d5d2c4</code> 保存。该次授权已经消费；没有
-      resume、retry、fallback、补跑、第二入口或第二批。
-    </p>
+      <div class="status">
+        <strong>本页不构成授权，当前也还不能请求授权。</strong>
+        frozen SHA
+        <code>cb9434b4b540e70f5384224e4e98823a3ea2dbae</code>
+        对应的唯一授权已经由最新真实批次消费。离线修复、独立复审和最终全量矩阵已经完成；
+        状态提交与 clean freeze 尚未完成，因此本页故意不写入不存在的最终 SHA。
+      </div>
 
-    <h2>离线改动范围</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>层次</th>
-          <th>已完成改动</th>
-          <th>明确不代表什么</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td data-label="层次">事件清洗</td>
-          <td data-label="已完成改动">
-            超大 Pi 结束事件只安全保留 boolean <code>isError</code>。
-          </td>
-          <td data-label="明确不代表什么">不改变事件正文保留边界。</td>
-        </tr>
-        <tr>
-          <td data-label="层次">Pi 生命周期</td>
-          <td data-label="已完成改动">
-            独立 Pi-only observer 记录命令的 <code>source / match / outcome</code>。
-          </td>
-          <td data-label="明确不代表什么">
-            只定位命令形成、工具结果与最终制品层，不证明四种具体根因。
-          </td>
-        </tr>
-        <tr>
-          <td data-label="层次">资格 evidence</td>
-          <td data-label="已完成改动">
-            只有 qualification producer 可在 schema v3 evidence 中写入可选
-            <code>writeCommandObservations</code>。
-          </td>
-          <td data-label="明确不代表什么">
-            standalone、review、公开 MCP 和历史 evidence 不新增或回填该字段。
-          </td>
-        </tr>
-        <tr>
-          <td data-label="层次">验真</td>
-          <td data-label="已完成改动">字段存在时由 optional verifier 严格校验。</td>
-          <td data-label="明确不代表什么">
-            字段不参与 passed、failure reason 或现有 validator 的计算。
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    <p>
-      提示词、validator、公开 MCP、<code>commandsRun</code> /
-      <code>commandCount</code>、provider/model/route/credential/retry/fallback、
-      manifest/checkpoint/protocol 与历史 JSON 均未修改。新字段尚未由新的真实批次实测。
-    </p>
-
-    <h2>Codex 已自动过滤和验证的内容</h2>
-    <div class="ok">
-      <ul>
-        <li>
-          实现与审阅提交链：
-          <code>8261736</code>、<code>652b13d</code> /
-          <code>5e209e1</code> / <code>16cdad5</code>、<code>293e745</code>、
-          <code>969e546</code> / <code>0852691</code> /
-          <code>d9eb28a</code>、<code>4bd2439</code>。
-        </li>
-        <li>逐任务规格/质量审阅与整体规格/安全审阅均 PASS。</li>
-        <li>
-          本轮两次 Kimi 外部复核均无结论：设计级跨多实现面审阅约 604.5 秒
-          <code>timed_out</code>，只返回读取进度；实现后两个内嵌摘录的单一不变量审阅约
-          181.8 秒 <code>timed_out</code>，review 正文为空。二者不计 PASS、不阻断，
-          也未重试同形任务。
-        </li>
-        <li>
-          fresh 离线矩阵：48 个测试文件，837 passed / 1 个平台条件 skipped / 0 failed；
-          类型检查、构建、release smoke、隔离 check-report、两个 help 与 diff check 均通过。
-        </li>
-        <li>
-          5/5 retained manifests 通过 immutable verifier；evidence 相对
-          <code>a8aa4d8</code> 无变更，untracked 为 0。
-        </li>
-        <li>
-          Kimi ACP / Pi RPC / real-smoke 进程为 0/0/0，资格锁 absent，持久
-          <code>.tgz</code> 为 0。
-        </li>
-        <li>
-          npm dry-run：171 files / 15 Markdown/HTML / 3 plugin files，size
-          536161，unpackedSize 2703085。
-        </li>
-      </ul>
-    </div>
-
-    <h2>仍需维护者判断的唯一问题</h2>
-    <p>
-      是否允许在交接消息给出的最终 40 位 frozen SHA 上，只启动一次全新的完整
-      <code>four-llm-v1</code> 八项真实资格批次，用新 evidence
-      验证既有严格资格合同和新增的 Pi 脱敏生命周期观察。
-    </p>
-    <div class="risk">
-      <strong>执行合同必须逐字理解为：</strong>
-      一次全新完整 <code>four-llm-v1</code> 八项，从 ordinal 1，single entry/cell，
-      按首错停，绝不 resume/retry/fallback/补跑/第二批。每个 case
-      仍是 single-attempt；任一失败立即保留终态并停止。
-    </div>
-
-    <h2>风险与停止条件</h2>
-    <ul>
-      <li>真实 Kimi/Pi 调用会消耗本机计划额度，并可能持续较长时间。</li>
-      <li>新增观察只能缩小故障层次，不能保证本批 8/8，也不能自动归因。</li>
-      <li>
-        若预飞发现 HEAD、build identity、工作树、凭据、进程、锁、证据或 frozen
-        verifier 不满足合同，必须在首次真实调用前 fail closed。
-      </li>
-      <li>
-        若批次失败，只能记录并审计该批终态；本次授权不得解释为调试后的重跑许可。
-      </li>
-    </ul>
-
-    <h2>明确排除的动作</h2>
-    <div class="stop">
-      <ul>
-        <li>不安装、升级、卸载或回滚活动 Codex 插件。</li>
-        <li>不访问或修改活动 <code>~/.codex/config.toml</code>。</li>
-        <li>不移除或修改 <code>codex_cc_tools</code>。</li>
-        <li>不调用、修改或卸载 Claude Code。</li>
-        <li>不执行 npm/marketplace 发布，不推送、不合并、不 fast-forward 正式工作树。</li>
-        <li>不把旧 frozen SHA、旧批次授权或本页面本身解释为新授权。</li>
-      </ul>
-    </div>
-
-    <h2>回复模板</h2>
-    <div class="reply">
-      <strong>请先等待最终交接消息。</strong>
-      只有回复中逐字包含交接消息给出的 40 位 frozen SHA，授权才可被识别。
-      旧 SHA 无效；本页故意不提供可自动触发的 SHA 或占位符。收到交接消息后，请复制下一句，
-      并在句末“精确 frozen SHA 为”之后逐字追加该消息中的 40 位 SHA：
-      <pre><code>我已审阅下一次四模型八项资格批次材料。我授权一次全新完整 four-llm-v1 八项，从 ordinal 1，single entry/cell，按首错停，绝不 resume/retry/fallback/补跑/第二批；本授权不包含页面列出的排除动作。精确 frozen SHA 为</code></pre>
+      <h2>为什么需要新的授权门槛</h2>
       <p>
-        若不授权，可回复：“暂不授权真实批次，请保持 blocked / not ready。”
+        最新批次
+        <code
+          >2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef</code
+        >
+        在旧 frozen SHA 上以 one entry / one cell 运行，共 6 completed、5 passed。
+        ordinal 6 <code>ark-agent-plan / delegate</code> 返回
+        <code>account_quota_exceeded</code>，ordinal 7–8 因首错停而 notRun；
+        manifest 终态为 <code>blocked / case_failed</code>，
+        <code>promotionEligible=false</code>。
       </p>
-    </div>
+      <p>
+        本批没有 retry、resume、fallback、补跑或第二批。manifest SHA-256 为
+        <code
+          >61051a8eb8107759cdd1a10d5d44a7fe6d8a3f2c6b3b8e03773c8db8de4cd88d</code
+        >，证据提交为 <code>b1682cb</code>。
+      </p>
 
-    <h2>可追溯材料</h2>
-    <ul>
-      <li>
-        <a href="../superpowers/specs/2026-07-28-pi-write-command-lifecycle-diagnostics-design.md"
-          >Pi 写入命令生命周期脱敏诊断设计</a
-        >
-      </li>
-      <li>
-        <a href="../superpowers/plans/2026-07-28-pi-write-command-lifecycle-diagnostics.md"
-          >Pi 写入命令生命周期脱敏诊断实施计划</a
-        >
-      </li>
-      <li>
-        <a href="pi-write-command-diagnostics-design-review.html"
-          >已批准的方案 B 设计审阅</a
-        >
-      </li>
-      <li>
-        <a
-          href="../smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/manifest.json"
-          >最新真实批次 manifest</a
-        >
-      </li>
-      <li>
-        <a
-          href="../smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T02-05-37.999Z-ark-agent-deepseek-v4-flash-delegate-ark.json"
-          >ordinal 8 脱敏 case evidence</a
-        >
-      </li>
-      <li><a href="checklist.md">四层发布门禁</a></li>
-      <li>
-        <a href="real-plugin-install-review.md">当前 blocked / not ready 安装状态包</a>
-      </li>
-      <li><a href="../operations.md">运维与外部状态边界</a></li>
-    </ul>
+      <h2>批次暴露的两个独立缺口</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>已证缺口</th>
+              <th>真实证据</th>
+              <th>离线修复</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Pi 子环境缺少 Windows Git Bash 发现所需根变量</td>
+              <td>
+                ordinal 6 的 18 个 bash 生命周期全部 error；规定写入为
+                <code>exact / error</code>。ordinal 1 的 5 个 bash 生命周期也全部 error
+              </td>
+              <td>
+                <code>2a815c7</code> 只增加 <code>ProgramFiles</code> 与
+                <code>ProgramFiles(x86)</code>；离线 resolver 和精确 Node 命令实探成功
+              </td>
+            </tr>
+            <tr>
+              <td>旧资格 gate 会把规定 bash 失败后的正确最终制品误判为通过</td>
+              <td>
+                ordinal 1 的规定写入为 <code>exact / error</code>，旧 gate 仍记录 passed
+              </td>
+              <td>
+                <code>e750052</code>、<code>b5a691f</code>、
+                <code>3d85315</code>、<code>ceb8e9c</code>
+                要求写入与状态命令各唯一 success，并由 future terminal passed verifier 重算
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="ok">
+        shell 环境与资格成功合同修复均已完成独立规格和代码质量审阅，剩余 P0–P3 为 0。代理、凭据、
+        provider、model、direct route、single-attempt、retry/fallback、公开 MCP 和历史
+        evidence 均未被放宽或重写。
+      </div>
+
+      <h2>全量矩阵另行收敛的既有 Kimi ACP 竞态</h2>
+      <p>
+        最终离线验证还暴露了 Kimi ACP 子进程关闭的既有生命周期竞态：旧时序压力复现中
+        100 次有 98 次晚 close。<code>4af8b34</code> 通过显式 child-close barrier
+        与有界清理回归完成修复；独立复审剩余 P0–P3 为 0。该工作没有发起新的真实模型调用，
+        也没有改变 provider、model、路由或公开 MCP 合同。
+      </p>
+
+      <h2>当前尚未完成的机器工作</h2>
+      <ul>
+        <li>主线程提交最终状态材料。</li>
+        <li>确认提交后的工作树 clean，并在交接消息中给出真实的 40 位 frozen SHA。</li>
+      </ul>
+      <div class="ok">
+        <strong>最终离线矩阵：</strong>
+        <code>49 个测试文件、853 passed / 1 skipped / 0 failed</code>。
+        typecheck、build、release smoke、隔离插件 <code>--check-report</code>、6/6 retained
+        immutable evidence、evidence unchanged、Pi resolver 与精确 28 字节命令均通过；
+        <code>npm pack --dry-run</code> 收录 191 个文件，目标进程 0/0/0，资格锁 absent，
+        持久 <code>.tgz</code> 为 0。
+      </div>
+
+      <h2>未来唯一可接受的批次合同</h2>
+      <ul>
+        <li>等待主线程交接最终 clean SHA，且维护者回复必须逐字包含该 40 位 SHA。</li>
+        <li>
+          只允许一次全新的完整 <code>four-llm-v1</code> 八项批次，从 ordinal 1 开始。
+        </li>
+        <li>single entry / cell；每个 case single-attempt；严格按固定顺序执行。</li>
+        <li>首错立即发布终态并停止。</li>
+        <li>绝不 resume、retry、fallback、补跑、跳项或启动第二批。</li>
+        <li>
+          若最终 preflight 的 SHA、build identity、工作树、凭据、进程、锁或 evidence
+          不满足合同，必须在首次真实调用前 fail closed。
+        </li>
+      </ul>
+
+      <h2>维护者届时如何授权</h2>
+      <div class="reply">
+        <strong>现在不要回复授权句。</strong>
+        主线程完成状态提交和 clean freeze 后，会在交接消息中给出一个真实的
+        40 位 SHA。只有维护者后续回复同时明确“一次全新完整八项、从 ordinal 1、
+        single entry/cell、首错停、无 resume/retry/fallback/补跑/第二批”，并逐字包含
+        该 SHA，授权才成立。旧 SHA、截短 SHA、本页面或没有 SHA 的概括回复均无效。
+      </div>
+
+      <h2>风险与停止条件</h2>
+      <ul>
+        <li>真实 Kimi/Pi 调用会消耗计划额度，并可能持续较长时间。</li>
+        <li>Ark 外部额度状态可能继续阻断；修复 shell 不等于修复额度。</li>
+        <li>
+          新合同能防止规定 bash 失败后的假阳性，但不能保证所有模型都通过，也不能把
+          <code>where.cmd</code> 的未知来源自动归因。
+        </li>
+        <li>若新 SHA 上的批次失败，只记录并审计该终态；不得把授权扩张成调试后重跑。</li>
+      </ul>
+
+      <h2>明确排除的动作</h2>
+      <div class="stop">
+        <ul>
+          <li>不访问或修改活动 <code>~/.codex/config.toml</code>。</li>
+          <li>不安装、升级、卸载或回滚活动 Codex 插件。</li>
+          <li>不移除或修改 <code>codex_cc_tools</code>。</li>
+          <li>不调用、修改或卸载 Claude Code。</li>
+          <li>不执行 npm/marketplace 发布，不推送、不合并、不 fast-forward 正式工作树。</li>
+        </ul>
+      </div>
+
+      <h2>可追溯材料</h2>
+      <ul>
+        <li>
+          <a href="four-llm-qualification-result-review.html"
+            >最新真实批次最小充分结果审阅</a
+          >
+        </li>
+        <li>
+          <a
+            href="../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/manifest.json"
+            >最新 blocked manifest</a
+          >
+        </li>
+        <li>
+          <a href="pi-write-command-diagnostics-design-review.html"
+            >Pi 命令诊断的真实验证与离线闭环</a
+          >
+        </li>
+        <li>
+          <a href="../superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md"
+            >Pi Windows shell 环境闭环设计</a
+          >
+        </li>
+        <li>
+          <a
+            href="../superpowers/specs/2026-07-28-qualification-required-command-success-design.md"
+            >资格规定命令成功语义设计</a
+          >
+        </li>
+        <li><a href="checklist.md">四层发布门禁</a></li>
+        <li><a href="../operations.md">运维与外部状态边界</a></li>
+      </ul>
+
+      <footer>
+        当前注册表仍为 6 passed / 2 pending，安装仍为 blocked / not ready。
+        最终 clean SHA 必须由主线程在提交后交接；本页不嵌入或推测该 SHA，
+        只定义未来授权前置条件，不构成真实批次、安装、配置或发布授权。
+      </footer>
+    </main>
   </body>
 </html>

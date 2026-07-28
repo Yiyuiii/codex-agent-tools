@@ -117,6 +117,12 @@
         color: var(--blocked);
         font-weight: 700;
       }
+      td.passed,
+      td.failed,
+      td.blocked {
+        white-space: nowrap;
+        overflow-wrap: normal;
+      }
       li {
         margin: 0.4em 0;
       }
@@ -154,40 +160,38 @@
       <h1>四模型八项资格批次阻断结果审阅</h1>
 
       <div class="status">
-        <strong
-          >结论：本轮唯一授权已经消费，批次在第 4 项 Kimi delegate
-          的严格命令证据验收处停止。</strong
-        >
+        <strong>结论：本轮唯一授权已经消费，批次在第 6 项停止。</strong>
+        共完成 6 项、通过 5 项；第 7–8 项未运行。终态为
+        <code>blocked / case_failed</code>，
+        <code>promotionEligible=false</code>。
         当前注册表仍为 <code>6 passed / 2 pending</code>，安装仍为
-        <code>blocked / not ready</code>。没有补跑、重试、fallback、resume
-        或第二批。
+        <code>blocked / not ready</code>。
       </div>
 
-      <h2>发生了什么</h2>
+      <h2>最小充分结论</h2>
       <ol>
         <li>
           在 frozen commit
-          <code>652e14ac637bfc04d90c448179ecc5838f2f8450</code>
-          上完成 clean preflight，只通过一个标准入口启动一个
+          <code>cb9434b4b540e70f5384224e4e98823a3ea2dbae</code>
+          上，通过唯一标准入口启动一个全新的完整
           <code>four-llm-v1</code> 批次。
         </li>
         <li>
-          运行由一个 <code>functions.exec</code> cell
-          和一个四小时预算的前台 shell 承载；后续只等待同一 cell。约 979
-          秒后协调器正常返回可信终态，没有发生 cell 丢失或 recovery。
+          运行严格使用一个 <code>functions.exec</code> cell 和一个前台
+          shell；后续只等待同一 cell。没有第二入口、cell recovery 或并行补跑。
         </li>
         <li>
-          ordinal 1 Ark Coding Plan delegate、ordinal 2 Ark Coding Plan
-          review、ordinal 3 Kimi review 依次通过。
+          ordinal 1–5 依次通过；ordinal 6
+          <code>ark-agent-plan / delegate</code> 返回
+          <code>account_quota_exceeded</code>，协调器随即首错停止。
         </li>
         <li>
-          ordinal 4 Kimi delegate 完成了预期文件写入，但
-          <code>requiredCommandObserved=false</code>，因此以
-          <code>acceptance_failed</code> 停止。
+          ordinal 6 的固定模型、direct 路由、凭据、single-attempt 和 telemetry
+          均正确，结果文件本身也有效；但文件范围多出来源未知的
+          <code>where.cmd</code>。
         </li>
         <li>
-          ordinal 5–8 全部按协议标记为 notRun；协调器发布
-          <code>blocked / case_failed</code> 终态并释放资格锁。
+          ordinal 7–8 均为 notRun。全批没有 retry、resume、fallback、补跑或第二批。
         </li>
       </ol>
 
@@ -199,7 +203,7 @@
               <th>批次</th>
               <td>
                 <code
-                  >2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa</code
+                  >2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef</code
                 >
               </td>
             </tr>
@@ -207,24 +211,13 @@
               <th>计划与冻结点</th>
               <td>
                 <code>four-llm-v1</code>；
-                <code>652e14ac637bfc04d90c448179ecc5838f2f8450</code>
+                <code>cb9434b4b540e70f5384224e4e98823a3ea2dbae</code>
               </td>
             </tr>
             <tr>
-              <th>构建身份</th>
+              <th>执行载体</th>
               <td>
-                <code
-                  >71576ad637f1a9ee9914ebf7294b267abd43421a4df89621f45fd0adfdf034ee</code
-                >
-              </td>
-            </tr>
-            <tr>
-              <th>preflight</th>
-              <td>
-                clean / passed；SHA-256
-                <code
-                  >2449bc7c4b30ecb7d447fef8e399a04b1433c084025a4c01ad89a2df9f87d36c</code
-                >
+                one entry / one cell；从 ordinal 1 开始；首错停
               </td>
             </tr>
             <tr>
@@ -233,21 +226,19 @@
                 schema v2；<code>blocked / case_failed</code>；
                 <code>promotionEligible=false</code>；SHA-256
                 <code
-                  >d7be5e6ba3884075d80fe399dd3c2d72caaa1a3833f92e529928655e623b7b69</code
+                  >61051a8eb8107759cdd1a10d5d44a7fe6d8a3f2c6b3b8e03773c8db8de4cd88d</code
                 >
               </td>
             </tr>
             <tr>
               <th>证据提交</th>
-              <td>
-                <code>4f816f0</code>；仅包含本轮 14 个新批次 JSON 文件
-              </td>
+              <td><code>b1682cb</code></td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <h2>已执行四项</h2>
+      <h2>八项执行账本</h2>
       <div class="table-wrap">
         <table>
           <thead>
@@ -264,133 +255,210 @@
               <td><code>ark-coding-plan / delegate</code></td>
               <td class="passed">passed</td>
               <td>
-                <code>ark-code-latest</code> / direct；结果、命令、隔离与 telemetry
-                全通过
+                旧 gate 判定通过；但 5 个 Pi bash 生命周期全部为
+                <code>error</code>，规定写入为 <code>exact / error</code>
               </td>
             </tr>
             <tr>
               <td>2</td>
               <td><code>ark-coding-plan / review</code></td>
               <td class="passed">passed</td>
-              <td>
-                已识别预置缺陷；工作区不变；隔离与 telemetry 全通过
-              </td>
+              <td>固定模型、direct 路由、隔离、工作区和 telemetry 通过</td>
             </tr>
             <tr>
               <td>3</td>
               <td><code>kimi-k3 / review</code></td>
               <td class="passed">passed</td>
-              <td>
-                <code>kimi-code/k3</code> / direct；工作区不变；无残留进程
-              </td>
+              <td><code>kimi-code/k3</code> / direct；工作区不变</td>
             </tr>
             <tr>
               <td>4</td>
               <td><code>kimi-k3 / delegate</code></td>
+              <td class="passed">passed</td>
+              <td>
+                文件、精确状态命令、范围、进程和 telemetry 通过
+              </td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td><code>ark-agent-plan / review</code></td>
+              <td class="passed">passed</td>
+              <td>固定身份、direct 路由、工作区和 telemetry 通过</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td><code>ark-agent-plan / delegate</code></td>
               <td class="failed">failed</td>
               <td>
-                文件内容与范围正确；唯一失败检查为
-                <code>requiredCommandObserved=false</code>
+                <code>account_quota_exceeded</code>；结果文件有效，但多出
+                <code>where.cmd</code>；18 个 bash 生命周期全部为 error
               </td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td><code>ark-agent-deepseek-v4-flash / review</code></td>
+              <td class="blocked">notRun</td>
+              <td>第 6 项首错停止后未调用</td>
+            </tr>
+            <tr>
+              <td>8</td>
+              <td><code>ark-agent-deepseek-v4-flash / delegate</code></td>
+              <td class="blocked">notRun</td>
+              <td>第 6 项首错停止后未调用</td>
             </tr>
           </tbody>
         </table>
       </div>
 
       <div class="verified">
-        四项 telemetry 均为 <code>1 / 0 / 0 / false / false</code>。所有已执行项
-        的实际模型与固定身份匹配，route 为 direct；批次后 Kimi ACP / Pi RPC /
-        real-smoke 为 0/0/0。
+        六个已执行项均保持 single-attempt；没有 adapter retry、runtime retry、
+        adapter fallback 或 orchestrator fallback。ordinal 6 的 telemetry 为
+        <code>1 / 0 / 0 / false / false</code>。
       </div>
 
-      <h2>失败边界</h2>
+      <h2>第 6 项：已证事实与不可归因部分</h2>
       <p>
-        Kimi delegate 确实只改变了 <code>result.txt</code>；文件可安全读取，14
-        bytes、单行、规范化 SHA-256 与预期完全相同，并包含精确
-        <code>KIMI_SMOKE_OK</code>。模型、路由、文件范围、结果内容、进程清理和
-        telemetry 都不是本次失败点。
+        可确认的事实是：实际模型为 <code>ark-code-latest</code>，provider 为
+        <code>ark-agent-plan</code>，route 为 direct，子进程凭据为
+        <code>CODEX_AGENT_ARK_AGENT_KEY</code>；结果文件可安全读取，28 bytes、
+        单行、哈希与预期一致。最终文件变化为预期结果文件加
+        <code>where.cmd</code>。
       </p>
       <div class="warning">
-        可证实的直接原因只有：桥接层观测到 1 条命令事件，但其中没有一个数组项与
-        <code>git status --short</code>
-        完全相等。证据协议故意不保存原始命令正文，因此不能进一步断言 Kimi
-        是完全省略了状态检查，还是把它合并进另一条命令。该不确定性不得用来放宽
-        validator、宣布模型通过或补跑单项。
+        18 个 Pi bash 生命周期全部为 <code>error</code>，其中规定写入命令为
+        <code>exact / error</code>。adapter 的最终分类是
+        <code>account_quota_exceeded</code>，但这不能证明 shell 缺陷由额度问题造成；
+        <code>where.cmd</code> 的来源也仍未知。三者必须作为独立事实记录，不能拼成未经
+        证据支持的单一因果链。
       </div>
 
-      <h2>自动验证已经过滤的内容</h2>
-      <ul>
-        <li>唯一新增一个批次目录，包含 4 case、9 checkpoint 和 1 manifest。</li>
-        <li>
-          <code>immutable-evidence</code> verifier 通过；manifest 与四份
-          evidence 的身份、SHA、顺序和 telemetry 链闭合。
-        </li>
-        <li>原 frozen commit 在运行期间未漂移；新 evidence 已独立提交。</li>
-        <li>资格锁 absent；Kimi ACP / Pi RPC / real-smoke 为 0/0/0。</li>
-        <li>
-          ordinal 5–8 没有运行；没有 retry、fallback、resume、跳项、recovery
-          或第二批。
-        </li>
-      </ul>
-
-      <h2>下一步边界</h2>
-      <div class="decision">
-        <strong>当前不请求新的真实批次授权。</strong>
-        推荐的离线设计候选是“强化资格提示词 + 最小脱敏命令观测分类”：要求文件写入与精确
-        <code>git status --short</code>
-        由两个独立工具调用完成；只持久化
-        <code>raw input / title fallback / late update / unextractable</code>
-        等来源类别与
-        <code>exact / trim-only / embedded / other</code>
-        匹配类别，绝不保存命令正文。只有 fake ACP
-        协议夹具证明命令字段确实晚到时，才合并同一 tool-call 的 update 字段。严格
-        validator、模型、路由、凭据、single-attempt 与无 retry/fallback 均保持不变。
-        “只改提示词”改动更小但仍留下观测歧义；放宽成 substring、任意命令事件或复合命令通过不建议采用。任何实现都必须先经设计批准、TDD、独立复核和重新冻结；之后才可另行决定是否授权一个全新的完整八项批次。
-      </div>
-
-      <h2>独立的发布包缺口</h2>
+      <h2>第 1 项暴露的资格误判</h2>
       <p>
-        本轮只读审计还发现：已有打包文档会链接到资格承载演练和执行手册，但这两份文件
-        当前没有进入 npm package；现有包内链接检查也只覆盖固定审阅页集合。该问题不是本次
-        Kimi 失败原因，最新结果页没有新增指向缺失文件的链接。建议把“纳入两份文档并把链接检查
-        扩展到全部已打包 Markdown/HTML”作为同一离线设计阶段的独立 TDD 子任务，不在证据收敛
-        提交中顺手改变发布面。
+        ordinal 1 的目标文件和范围最终正确，因此旧 gate 记录为 passed；然而它的
+        5 个 bash 生命周期也全部为 <code>error</code>，规定写入同样是
+        <code>exact / error</code>。这证明旧 gate 只根据最终制品和命令形成判定，
+        会把“规定 bash 执行失败、由其它动作形成正确文件”的情况误判为通过。
+        该历史 evidence 不改写，但不能再作为规定写入合同成功的正证据。
+      </p>
+
+      <h2>真实批次之后完成的离线收敛</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>缺口</th>
+              <th>修复</th>
+              <th>边界</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Pi 在隔离子环境中找不到 Windows Git Bash</td>
+              <td>
+                <code>2a815c7</code> 将 Pi 0.80.10 实际读取的
+                <code>ProgramFiles</code> 与 <code>ProgramFiles(x86)</code>
+                加入非秘密基础白名单；离线实探 resolver 与精确 Node 写入命令成功
+              </td>
+              <td>
+                未加入 <code>ProgramW6432</code>，未扩展代理或凭据继承，也未固定宿主绝对路径
+              </td>
+            </tr>
+            <tr>
+              <td>旧资格 gate 不要求规定 bash 真正成功</td>
+              <td>
+                <code>e750052</code>、<code>b5a691f</code>、
+                <code>3d85315</code>、<code>ceb8e9c</code>
+                要求写入命令与 <code>git status --short</code> 各唯一出现且均为 success；
+                future terminal passed verifier 会从脱敏数组重算
+              </td>
+              <td>
+                历史 blocked/interrupted evidence 保持兼容；不回填、不改写历史 JSON
+              </td>
+            </tr>
+            <tr>
+              <td>Kimi ACP 子进程关闭存在既有生命周期竞态</td>
+              <td>
+                <code>4af8b34</code> 增加显式 child-close barrier 与有界清理回归；
+                旧时序压力复现中 100 次有 98 次发生晚 close，修复后定向与全量验证通过
+              </td>
+              <td>
+                这是离线全量测试暴露的既有问题；没有发起新的真实模型调用，也不改变
+                provider、model、路由或公开 MCP 合同
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="decision">
+        shell 环境、资格成功合同与 Kimi ACP 生命周期修复均已完成独立复审，
+        剩余 P0–P3 为 0。最终离线矩阵为
+        <code>49 个测试文件、853 passed / 1 skipped / 0 failed</code>；
+        typecheck、build、release smoke、隔离插件
+        <code>--check-report</code>、6/6 retained immutable evidence、evidence unchanged、
+        Pi resolver 与精确 28 字节命令均通过。<code>npm pack --dry-run</code>
+        收录 191 个文件；目标进程为 0/0/0，资格锁 absent，持久
+        <code>.tgz</code> 为 0。
+      </div>
+
+      <h2>当前状态与下一步</h2>
+      <p>
+        注册表仍为 <code>6 passed / 2 pending</code>，安装仍为
+        <code>blocked / not ready</code>。机器可完成的最终离线验证已经通过；主线程只剩
+        提交本轮状态材料、确认工作树 clean，并交接一个真实存在的 40 位 frozen SHA。
+        任何新真实批次都需要维护者针对该精确 SHA 重新授权。
       </p>
 
       <h2>明确排除</h2>
       <p>
-        本轮没有访问活动 <code>config.toml</code>，没有安装或修改活动插件，没有移除
-        <code>codex_cc_tools</code>，没有调用或修改 Claude Code，也没有 publish、
-        push、merge 或 fast-forward 正式工作树。上述动作不由本结果页授权。
+        未访问或修改活动 <code>~/.codex/config.toml</code>，未安装或修改活动插件，
+        未移除或修改 <code>codex_cc_tools</code>，未调用或修改 Claude Code，
+        未执行发布、推送、合并或 fast-forward。上述动作不由本结果页授权。
       </p>
 
       <h2>最小可追溯材料</h2>
       <ul>
         <li>
           <a
-            href="../smoke/evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/manifest.json"
+            href="../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/manifest.json"
             >本轮 blocked manifest</a
           >
         </li>
         <li>
           <a
-            href="../smoke/evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/cases/2026-07-27T10-24-46.832Z-kimi-k3-delegate.json"
-            >Kimi delegate 失败 evidence</a
+            href="../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/cases/2026-07-28T11-17-16.613Z-ark-agent-plan-delegate-ark.json"
+            >ordinal 6 失败 evidence</a
           >
         </li>
         <li>
           <a
-            href="../smoke/evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/cases/2026-07-27T10-23-27.732Z-ark-coding-plan-delegate-ark.json"
-            >Ark Coding Plan delegate 通过 evidence</a
+            href="../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/cases/2026-07-28T11-00-49.160Z-ark-coding-plan-delegate-ark.json"
+            >ordinal 1 历史误判 evidence</a
           >
+        </li>
+        <li>
+          Pi Windows shell 环境闭环设计（仓库内：
+          <code>docs/superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md</code>；
+          不随 npm 包发布）
+        </li>
+        <li>
+          资格规定命令成功语义设计（仓库内：
+          <code>docs/superpowers/specs/2026-07-28-qualification-required-command-success-design.md</code>；
+          不随 npm 包发布）
         </li>
         <li><a href="../smoke/kimi.md">Kimi 资格状态与证据索引</a></li>
         <li><a href="../smoke/ark.md">Ark 资格状态与证据索引</a></li>
-        <li><a href="../operations.md">运维与资格执行边界</a></li>
+        <li>
+          下一批次的授权前置条件（仓库内：
+          <code>docs/release/four-llm-qualification-next-authorization-review.html</code>；
+          页面本身不授权且不随 npm 包发布）
+        </li>
       </ul>
 
       <footer>
-        本页记录已消费授权的可信终态和下一步设计边界；它不构成离线修复设计批准、真实批次授权、安装授权或发布授权。
+        本页记录已消费授权的可信终态、已完成的离线收敛和通过的最终验证；
+        它不嵌入尚未形成的最终 clean SHA，
+        它不构成新真实批次、安装、活动配置变更或发布授权。
       </footer>
     </main>
   </body>

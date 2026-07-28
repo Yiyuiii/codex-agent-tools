@@ -10,12 +10,12 @@
 
 本状态包为 **blocked / not ready**，不是当前有效的安装权限包。
 
-- 较早的 44 files / 584 passed 与 46 files / 759 passed 只描述各自历史候选。当前 fresh 离线矩阵为 48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed，类型检查、构建、release smoke、隔离 check-report、两个 help、5/5 retained manifests、证据不变、进程/锁、pack 与 clean tree 均通过。
+- 44 files / 584 passed、46 files / 759 passed 与 48 files / 837 passed 都只描述各自历史候选；当前 fresh 全量为 49 files / 853 passed / 1 skipped / 0 failed，类型检查、构建、release smoke、隔离 `--check-report`、retained manifests 6/6、证据不变、进程/锁与 191-file pack dry-run 均通过。
 - 第 2 层隔离官方插件生命周期已经通过。
 - 当前活动产品面是四个逻辑 LLM、八项 review/delegate 能力，全部固定使用 direct。
 - 按同一逻辑 LLM 的 review/delegate 必须成对通过的规则，当前过渡注册表是 **6 passed / 2 pending**；只有 Ark Coding Plan 的两项能力 pending。
-- 最新 `four-llm-v1` 批次由同一 execution cell 从 ordinal 1 完整执行八项；ordinal 1–7 passed，ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 因结果文件缺失而形成 `blocked / case_failed` 终态，未取得同批 8/8 资格。
-- Pi 写入命令生命周期脱敏诊断方案 B 已完成离线实现：boolean `isError` 安全保留、Pi-only `source / match / outcome` observer、qualification-only schema v3 producer 和严格 optional verifier 均已通过审阅与 fresh 验证。提示词、validator、公开 MCP、`commandsRun` / `commandCount`、路由与资格协议均未改变；新字段尚未由新真实批次实测。
+- 最新 `four-llm-v1` 批次由同一 execution cell 从 ordinal 1 执行到首错：6 completed / 5 passed，ordinal 6 `ark-agent-plan/delegate` 因 `account_quota_exceeded` failed，ordinal 7–8 notRun，终态为 `blocked / case_failed`，未取得同批 8/8 资格。
+- 真实 evidence 暴露 Pi Windows bash resolver 失败与旧资格门禁假阳性。`2a815c7` 补齐 `ProgramFiles` / `ProgramFiles(x86)` 后离线 resolver 和精确 Node spawn 成功；`e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 要求未来 Pi delegate 的写入/状态命令各一次 success，并由未来 passed terminal verifier 重算。独立质量复审 PASS、无 P0–P3。
 - 第 4 层真实 Codex App 宿主门禁尚未执行。
 - 当前没有执行活动 Codex 的 marketplace/plugin add 或 remove，也没有读取、写入、备份或恢复活动 `~/.codex/config.toml`。
 
@@ -29,15 +29,20 @@
 
 ## 最新四模型原子资格认证阻断事实
 
-- 冻结 commit：`07fd0d79e6885ee1e0af4a021e12170ef6c9f470`；分支：`codex/gemini-retirement`；候选包：`0.1.0-alpha.1`；批次：`2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678`；协议：`four-llm-v1`。
-- 标准入口和 execution cell 各只有一个，从 ordinal 1 完整执行八项，8 completed / 7 passed；没有 recovery、resume、retry、fallback、跳项、补跑、第二入口或第二批。
-- ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 的 provider `ark-agent-plan`、模型 `deepseek-v4-flash`、direct route、Agent Plan 凭据隔离、single-attempt、0 retry/fallback、命令数 6、精确 `git status --short` 观测与进程清理均正确。
-- ordinal 8 的结果文件完全缺失：`filesChanged=[]`、`resultFileReadStatus=missing`、`resultFileObserved=false`，因此 `acceptance_failed`。旧 evidence 只能证明最终制品缺失及脱敏命令统计，不能证明精确写入命令是否形成、被执行、被改写或被跳过。
-- blocked manifest：[JSON](../smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/manifest.json)，SHA-256 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`。
-- immutable-evidence verifier 已通过，资格锁 absent，目标进程为 0/0/0。26 个批次文件由独立提交 `1d5d2c4` 保存。
+- 冻结 commit：`cb9434b4b540e70f5384224e4e98823a3ea2dbae`；分支：`codex/gemini-retirement`；候选包：`0.1.0-alpha.1`；批次：`2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef`；协议：`four-llm-v1`。
+- 标准入口和 execution cell 各只有一个，从 ordinal 1 执行到首错，6 completed / 5 passed，ordinal 7–8 notRun；没有 recovery、resume、retry、fallback、跳项、补跑、第二入口或第二批。
+- ordinal 1–5 passed。ordinal 6 `ark-agent-plan/delegate` 的 provider `ark-agent-plan`、模型 `ark-code-latest`、direct route、Agent Plan 凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件有效，但以 `account_quota_exceeded` failed。
+- ordinal 6 的 `filesChanged` 同时包含预期文件与来源不明的 `where.cmd`；18 个 Pi bash 生命周期全部为 error，精确写入命令也是 error。不能把 shell 缺陷写成额度失败原因，也不能推断 `where.cmd` 的来源。
+- ordinal 1 虽在旧资格门禁下 passed，但其 5 个 Pi bash 生命周期同样全部为 error，精确写入命令也是 error，构成已确认的历史假阳性。
+- blocked manifest：[JSON](../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/manifest.json)，SHA-256 `61051a8eb8107759cdd1a10d5d44a7fe6d8a3f2c6b3b8e03773c8db8de4cd88d`。
+- 终态为 `blocked / case_failed`、`promotionEligible=false`；immutable-evidence verifier 已通过，资格锁 absent，目标进程为 0/0/0。证据由独立提交 `b1682cb` 保存。
 - 当前授权已经消费；未来任何真实批次仍需要完成本轮文档提交和 clean freeze，再取得绑定最终 40 位 SHA 的明确授权并从 ordinal 1 重新开始，不能复用本轮或历史证据。
 
 该终态没有改变注册表或安装状态：仍为 6 passed / 2 pending 与 **blocked / not ready**。活动配置、插件 add/remove、`codex_cc_tools` 移除、Claude Code、发布与正式仓库 fast-forward 均未执行。
+
+### 历史：2026-07-28 结果文件缺失批次
+
+frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上的批次 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678` 完成八项、形成 7 passed，因 ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 结果文件缺失而 `acceptance_failed`。manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`，证据提交为 `1d5d2c4`。它只作历史审计，不能参与当前晋级。
 
 ### 历史：2026-07-27 Kimi 命令观测阻断批次
 
@@ -84,13 +89,15 @@ blocked case 的 raw/normalized 双哈希已确定实际文件是 `ARK_SMOKE_OK:
 
 该阶段离线冻结矩阵为 46 个测试文件、759 passed / 1 skipped / 0 failed；后续最新真实批次中 Kimi delegate 已通过。此处不作为当前候选验证数字。
 
-## 当前：Pi 写入命令生命周期脱敏诊断实现
+## 当前：Pi Windows shell 与资格命令成功合同
 
-方案 B 的离线实现提交链为 `8261736`、`652b13d` / `5e209e1` / `16cdad5`、`293e745`、`969e546` / `0852691` / `d9eb28a`、`4bd2439`。超大 Pi 结束事件只保留 boolean `isError`；独立 Pi-only observer 记录 `source / match / outcome`；qualification-only schema v3 producer 可写入 `writeCommandObservations`；optional verifier 在字段存在时严格校验。诊断只定位命令形成、工具结果与最终制品层，不声称已经识别四种具体根因。
+最新真实 evidence 已用 `writeCommandObservations` 定位到 Pi bash 工具层：ordinal 6 的 18 个 bash 生命周期全部 error，ordinal 1 的 5 个 bash 生命周期同样全部 error；后者仍在旧门禁下 passed，证明旧判定存在假阳性。离线复现确认环境白名单漏掉 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Pi 0.80.10 的 Windows Git Bash resolver 失败。提交 `2a815c7` 补齐两个系统根变量；真实 resolver 找到 Git Bash，精确 Node spawn 命令离线成功，且没有改变代理或凭据边界。
 
-提示词、validator、公开 MCP、`commandsRun` / `commandCount`、provider/model/route/credential/retry/fallback、manifest/checkpoint/protocol 与历史 JSON 均未修改，新字段尚未由新真实批次实测。逐任务规格/质量审阅与整体规格/安全审阅均 PASS；本轮两次 Kimi 外部复核均无结论：设计级跨多实现面审阅约 604.5 秒 `timed_out`，只返回读取进度；实现后两个内嵌摘录的单一不变量审阅约 181.8 秒 `timed_out`，review 正文为空。二者不计 PASS、不阻断，也未重试同形任务。
+资格合同提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 将 `status_exact` 加入脱敏枚举；未来资格 Pi delegate 必须同时具有恰好一个 `exact / success` 写入生命周期和恰好一个 `status_exact / success` 状态生命周期。未来整批 `passed` 的 verifier 会强制重新计算该合同；历史 blocked/interrupted evidence 仍可验证。schema/plan、公开 MCP、provider/model/route/credential、提示词、结果 validator、retry/fallback 均未改变。独立质量复审为 PASS、无 P0–P3。
 
-fresh 离线矩阵为 48 files / 837 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离 check-report、两个 help、5/5 retained manifests、evidence 相对 `a8aa4d8` 无变更、untracked 0、进程 0/0/0、锁 absent、持久 `.tgz` 0 和 clean tree 均通过。npm dry-run 的稳定文件面为 171 files / 15 Markdown/HTML / 3 plugin files；精确 byte size 不写入包内文档，避免打包元数据自引用。本轮状态文档提交与 clean allow-empty freeze 尚待完成。
+48 files / 837 passed / 1 skipped / 0 failed 与 171 files / 15 Markdown/HTML / 3 plugin files 都是修复前旧候选的历史数字。当前冻结前 fresh 矩阵为 49 files / 853 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离 `--check-report`、全部 retained manifests immutable verifier 6/6、最新 evidence 不变、生产隔离 Pi resolver/精确写入探针、目标进程 0/0/0、资格锁 absent 与 191-file pack dry-run 均通过，且没有持久 `.tgz`。
+
+首次全量曾暴露 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察；提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试。独立复审 PASS、无 P0–P3，最终 49-file 全量已经包含该修复。
 
 ## 历史五模型原子重认证停止事实
 
@@ -104,7 +111,7 @@ fresh 离线矩阵为 48 files / 837 passed / 1 skipped / 0 failed；类型检�
 
 ## 当前四模型过渡状态
 
-当前四个活动 LLM 全部直连。最新八项资格批次形成 ordinal 1–7 passed 与 ordinal 8 failed 的不可变 case evidence，但因原子晋级要求未达到同批 8/8，下表注册表保持不变；只有 Ark Coding Plan 的 review/delegate pending。
+当前四个活动 LLM 全部直连。最新资格批次形成 ordinal 1–5 passed、ordinal 6 failed 与 ordinal 7–8 notRun 的不可变 evidence，但因原子晋级要求未达到同批 8/8，下表注册表保持不变；只有 Ark Coding Plan 的 review/delegate pending。
 
 | 逻辑 LLM | 固定后端 / 模型 / 路由 | 注册表 review | 注册表 delegate |
 | --- | --- | --- | --- |
@@ -138,7 +145,7 @@ fresh 离线矩阵为 48 files / 837 passed / 1 skipped / 0 failed；类型检�
 2. 每次实际 backend、模型、provider 和 route 与上表固定身份精确一致；不并行运行 Pi smoke，不重用旧证据，不自动 retry 或 fallback。
 3. review 找到预置缺陷且工作区零变化；delegate 只产生预期变化并观测到验证命令；每次结束后都没有新增 Kimi/Pi RPC 进程。
 4. Kimi/Ark smoke 索引、`docs/smoke/evidence/`、内置注册表、README、运维文档与四层发布清单重新收敛为八项全部 passed，不保留 pending 或自相矛盾的当前状态；Gemini 页面继续只作为退役历史。
-5. 当前方案 B 候选已完成 48 files / 837 passed / 1 skipped / 0 failed 的 fresh 离线矩阵，以及类型检查、构建、`npm run smoke:release`、隔离报告 check-only、两个资格 help、5/5 retained manifests、证据不变、生产进程/锁、pack 与 clean-tree 检查。第 2 层隔离官方插件生命周期此前已经通过；本轮状态文档提交和 clean allow-empty freeze 完成后，必须以交接消息给出的最终 SHA 作为授权绑定值。若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
+5. 当前候选已完成全量测试、类型检查、构建、`npm run smoke:release`、隔离报告 check-only、资格 help、全部 retained manifests、证据不变、生产进程/锁与 pack 检查；48 files / 837 passed 只属于旧候选历史。第 2 层隔离官方插件生命周期也已通过；本轮状态文档提交和 clean freeze 完成后，必须以交接消息给出的最终 SHA 作为授权绑定值。若候选的任何 tracked 内容或生成产物随后发生变化，均须在当时版本重新确认。
 6. 本状态包改写为 `ready`，以当时的构建产物、隔离状态差异和官方命令行为重新独立审阅。
 
 在这些条件全部成立前，不生成真实安装授权问题，也不进入真实安装执行。

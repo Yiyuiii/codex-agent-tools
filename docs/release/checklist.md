@@ -8,9 +8,9 @@
 
 包版本：`0.1.0-alpha.1`
 
-当前结论：**Pi 写入命令生命周期脱敏诊断方案 B 已完成离线实现、逐任务规格/质量审阅与整体规格/安全审阅；它只定位命令形成、工具结果与最终制品层，不声称已经识别四种具体根因。fresh 离线矩阵为 48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed，类型检查、构建、release smoke、隔离 check-report、两个 help、5/5 retained manifests、证据不变、进程/锁、pack 与 clean-tree 均通过。第 3 层仍为 6 passed / 2 pending；最新 `four-llm-v1` 批次完整执行八项，ordinal 1–7 passed，ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 因结果文件缺失而 `acceptance_failed`，仍未取得同批 8/8。新诊断字段尚未由新真实批次实测，第二批尚未授权；本轮状态文档提交和 clean allow-empty freeze 尚待完成，第 4 层真实 Codex App 宿主门禁也未执行。当前仍是 blocked / not ready，不是已安装、已替代旧工具或可公开发布状态。**
+当前结论：**最新真实 `four-llm-v1` 批次按首错停为 6 completed / 5 passed，ordinal 6 `ark-agent-plan/delegate` 因 `account_quota_exceeded` failed，ordinal 7–8 notRun；第 3 层仍为 6 passed / 2 pending。真实 evidence 同时暴露 Pi Windows bash resolver 失败和旧资格门禁假阳性；提交 `2a815c7` 已补齐 `ProgramFiles` / `ProgramFiles(x86)`，提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 已要求未来 Pi delegate 的写入/状态命令各恰好一次 success，并由未来 passed terminal verifier 重算。冻结前 fresh 全量为 49 files / 853 passed / 1 skipped / 0 failed，类型检查、构建、release smoke、隔离 `--check-report`、retained manifests 6/6、证据不变、Pi 探针、进程/锁与 191-file pack dry-run 均通过；Kimi ACP close 竞态修复 `4af8b34` 的独立复审也为 PASS、无 P0–P3。第 4 层真实 Codex App 宿主门禁仍未执行。当前仍是 blocked / not ready，不是已安装、已替代旧工具或可公开发布状态。**
 
-最新真实批次绑定 frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470`，批次 ID 为 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；证据提交为 `1d5d2c4`。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)；下一批授权判断由仓库内审阅页与最终交接提供，该审阅页不进入公开 npm 包面。
+本轮唯一获授权的最新真实批次绑定 frozen commit `cb9434b4b540e70f5384224e4e98823a3ea2dbae`，批次 ID 为 `2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `61051a8eb8107759cdd1a10d5d44a7fe6d8a3f2c6b3b8e03773c8db8de4cd88d`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；证据提交为 `b1682cb`。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)；下一批仍须在当前候选完成全量复核与 clean freeze 后，取得绑定新精确 SHA 的明确授权。
 
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 
@@ -18,9 +18,9 @@
 
 | 层级 | 验收对象 | 当前状态 | 通过证据路径 |
 | --- | --- | --- | --- |
-| 1 | 确定性单测、类型检查、构建、release smoke | fresh offline passed；状态文档提交与 clean freeze pending | 48 files，837 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离报告 check-only、两个 help、5/5 retained manifests、evidence 相对 `a8aa4d8` 不变、进程 0/0/0、锁 absent、171/15/3 pack 与 clean tree 均通过 |
+| 1 | 确定性单测、类型检查、构建、release smoke | passed | 49 files / 853 passed / 1 skipped / 0 failed；typecheck、build、release smoke、隔离 `--check-report`、retained manifests 6/6、证据不变、进程/锁与 191-file pack dry-run 均通过 |
 | 2 | 临时 `CODEX_HOME` 中的官方插件生命周期 | passed | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs` |
-| 3 | 四个逻辑 LLM 的八项真实模型门禁 | blocked：6 passed / 2 pending；最新 `four-llm-v1` 为 8 completed / 7 passed | [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)、[最新 blocked manifest](../smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/manifest.json)、[Gemini 退役历史](../smoke/pi-gemini.md) |
+| 3 | 四个逻辑 LLM 的八项真实模型门禁 | blocked：6 passed / 2 pending；最新 `four-llm-v1` 为 6 completed / 5 passed | [Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)、[最新 blocked manifest](../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/manifest.json)、[Gemini 退役历史](../smoke/pi-gemini.md) |
 | 4 | 活动 Codex 的真实 App 宿主门禁 | not run / blocked | [real-plugin-install-review.md](real-plugin-install-review.md) 当前已存在，但只是 `blocked / not ready` 草案；只有 `four-llm-v1` 同批 8/8 passed 后才能重新审阅并改为 `ready`，授权后才可生成 `real-host-acceptance.md` |
 
 ## 第 1 层：确定性单测与构建
@@ -48,7 +48,9 @@ git diff --check
 
 ### 当前证据
 
-任务 5 的旧五模型阶段曾由主线程复验 release assurance 24/24、全量 191/191；Task 12 的 44 files / 560 passed、阻断收敛的 44 files / 584 passed、Kimi/package 阶段的 46 files / 759 passed 都只描述各自历史候选。当前方案 B 候选的 fresh 矩阵为 48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed；类型检查、完整构建、release smoke、隔离 check-report、两个资格 help、5/5 retained batch immutable verifier、evidence 相对 `a8aa4d8` 无变更、untracked 0、目标进程 0/0/0、资格锁 absent 与 clean tree 均通过。npm dry-run 的稳定文件面为 171 files / 15 Markdown/HTML / 3 plugin files，无持久 `.tgz`；精确 byte size 不写入包内文档，避免打包元数据自引用。实际进入 bundle 的 `fast-uri` 已升级至 3.1.4，生产审计 high/critical 为 0；最新 MCP SDK 固定的 Hono 1.x moderate 不进入本项目 stdio 插件 bundle 或 HTTP/serve-static 路径，按不可达 upstream 风险记录。上述 fresh 验收不替代第 3 层真实模型资格、第 4 层真实 App 宿主门禁，也不把尚未完成的状态文档提交和 clean freeze 写成已完成。
+任务 5 的 release assurance 24/24、全量 191/191，Task 12 的 44 files / 560 passed、阻断收敛的 44 files / 584 passed、Kimi/package 阶段的 46 files / 759 passed，以及方案 B 阶段的 48 files / 837 passed / 1 skipped，都只描述各自历史候选。171 files / 15 Markdown/HTML / 3 plugin files 同样只是旧候选的 npm dry-run 历史数字。当前 fresh 结果为 49 files / 853 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离 `--check-report`、retained manifests immutable verifier 6/6、最新 evidence 不变、Pi resolver/精确写入探针、目标进程 0/0/0、资格锁 absent 与 191-file pack dry-run 均通过，且没有持久 `.tgz`。
+
+首次全量曾暴露 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁和两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49-file 全量已经包含该修复。
 
 ### 失败停止条件
 
@@ -100,13 +102,17 @@ npm run acceptance:plugin:isolated
 
 ### 最新四模型 blocked 批次
 
-2026-07-28 在冻结 commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上只调用一次标准入口，启动 `four-llm-v1` 批次 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678`。同一 execution cell 从 ordinal 1 完整执行八项，8 completed、7 passed；没有 cell 丢失、recovery、resume、retry、fallback、跳项、补跑、第二入口或第二批。
+2026-07-28 在冻结 commit `cb9434b4b540e70f5384224e4e98823a3ea2dbae` 上只调用一次标准入口，启动 `four-llm-v1` 批次 `2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef`。同一 execution cell 从 ordinal 1 执行到首个失败项，6 completed、5 passed，ordinal 7–8 notRun；没有 cell 丢失、recovery、resume、retry、fallback、跳项、补跑、第二入口或第二批。
 
-ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 的 provider `ark-agent-plan`、模型 `deepseek-v4-flash`、direct route、Agent Plan 凭据隔离、single-attempt、0 retry/fallback、命令数 6、精确 `git status --short` 观测与进程清理均正确，但结果文件完全缺失：`filesChanged=[]`、`resultFileReadStatus=missing`、`resultFileObserved=false`，因此 `acceptance_failed`。旧 evidence 不能证明精确写入命令是否形成、被执行、被改写或被跳过。
+ordinal 1–5 passed。ordinal 6 `ark-agent-plan/delegate` 的 provider `ark-agent-plan`、模型 `ark-code-latest`、direct route、Agent Plan 凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件有效，但以 `account_quota_exceeded` failed。该项 `filesChanged` 包含预期文件和来源不明的 `where.cmd`，18 个 Pi bash 生命周期全部为 error，精确写入命令也是 error；这些 shell 事实不能被写成额度失败原因，也不能证明 `where.cmd` 的来源。ordinal 1 在旧资格门禁下 passed，但 5 个 bash 生命周期同样全部为 error、精确写入命令也是 error，构成历史假阳性。
 
-最新 manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`；immutable-evidence verifier、锁 absent 与目标进程 0/0/0 均已通过，26 个批次文件由独立提交 `1d5d2c4` 保存。本轮授权已经消费，原子晋级未发生。
+最新 manifest SHA-256 为 `61051a8eb8107759cdd1a10d5d44a7fe6d8a3f2c6b3b8e03773c8db8de4cd88d`；终态为 `blocked / case_failed`、`promotionEligible=false`，immutable-evidence verifier、锁 absent 与目标进程 0/0/0 均已通过，证据由独立提交 `b1682cb` 保存。本轮授权已经消费，原子晋级未发生。
 
-方案 B 的离线实现现已完成：超大事件只保留 boolean `isError`，Pi-only observer 记录 `source / match / outcome`，qualification-only schema v3 producer 可写入 `writeCommandObservations`，optional verifier 在字段存在时严格校验。它只定位命令形成、工具结果和最终制品层，不声称四种具体根因。提示词、validator、公开 MCP、`commandsRun` / `commandCount`、provider/model/route/credential/retry/fallback、manifest/checkpoint/protocol 和历史 JSON 均未改变；新字段尚未由新真实批次实测。任何未来真实批次仍须完成本轮文档提交和 clean freeze、取得绑定最终 40 位 SHA 的明确授权并从 ordinal 1 开始；仓库内下一次授权审阅页本身不构成授权，也不进入公开 npm 包面。
+离线根因确认为 Pi Windows 子进程环境缺少 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 修复后，生产隔离环境中的 resolver 找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0，精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`，代理与凭据边界不变。提交 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 要求未来资格 Pi delegate 的精确写入和精确 `git status --short` 生命周期各恰好一次且均 success，并由未来整批 passed verifier 重算；历史 blocked/interrupted 继续兼容。schema/plan、提示词、结果 validator、公开 MCP、provider/model/route/credential/retry/fallback 均未改变。独立质量复审为 PASS、无 P0–P3。未来真实批次仍须等待状态文档提交和 clean freeze，取得绑定最终 40 位 SHA 的明确授权并从 ordinal 1 开始。
+
+### 上一轮四模型 blocked 批次（结果文件缺失）
+
+frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上的批次 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678` 完成八项并形成 7 passed，因 ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 结果文件缺失而 `acceptance_failed`。manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`，证据提交为 `1d5d2c4`。该轮现在只作历史审计，不能参与当前原子晋级。
 
 ### 上一轮四模型 blocked 批次（Kimi 命令观测）
 
@@ -138,11 +144,11 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 资格承载演练和执行手册在该阶段纳入 npm package；当时 dry-run 为 145 files / 15 docs / 4 plugin files。该数字只描述历史候选，当前 pack 事实以第 1 层当前证据为准。
 
-### 当前：Pi 写入命令生命周期脱敏诊断离线候选
+### 历史：Pi 写入命令生命周期脱敏诊断离线候选
 
-实现与审阅提交链为 `8261736`、`652b13d` / `5e209e1` / `16cdad5`、`293e745`、`969e546` / `0852691` / `d9eb28a`、`4bd2439`。逐任务规格/质量审阅与整体规格/安全审阅均 PASS；本轮两次 Kimi 外部复核均无结论：设计级跨多实现面审阅约 604.5 秒 `timed_out`，只返回读取进度；实现后两个内嵌摘录的单一不变量审阅约 181.8 秒 `timed_out`，review 正文为空。二者不计 PASS、不阻断，也未重试同形任务。当前 fresh 离线验证为 48 files / 837 passed / 1 skipped / 0 failed，并满足第 1 层所列的全部确定性、隔离、证据、进程、锁和 pack 检查。
+实现与审阅提交链为 `8261736`、`652b13d` / `5e209e1` / `16cdad5`、`293e745`、`969e546` / `0852691` / `d9eb28a`、`4bd2439`。逐任务规格/质量审阅与整体规格/安全审阅均 PASS；本轮两次 Kimi 外部复核均无结论：设计级跨多实现面审阅约 604.5 秒 `timed_out`，只返回读取进度；实现后两个内嵌摘录的单一不变量审阅约 181.8 秒 `timed_out`，review 正文为空。二者不计 PASS、不阻断，也未重试同形任务。该阶段验证为 48 files / 837 passed / 1 skipped / 0 failed；这个数字只属于当时的历史候选。
 
-当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；本轮状态文档提交和 clean allow-empty freeze 尚待完成，第二个真实批次尚未授权。
+当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；当前候选的最终全量验证已经通过，状态文档提交和 clean freeze 尚待主线程完成，新的真实批次尚未授权。
 
 ### 历史五模型证据
 

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:," />
-    <title>Pi 写入命令脱敏诊断设计审阅</title>
+    <title>Pi 命令诊断：真实验证与离线闭环</title>
     <style>
       :root {
         color-scheme: light;
@@ -24,6 +24,7 @@
         --green-bg: #f0fdf4;
         --amber: #9a3412;
         --amber-bg: #fff7ed;
+        --red-bg: #fef2f2;
       }
       * {
         box-sizing: border-box;
@@ -87,7 +88,7 @@
       }
       .warning {
         border-left: 5px solid var(--amber);
-        background: #fef2f2;
+        background: var(--red-bg);
       }
       .table-wrap {
         width: 100%;
@@ -109,214 +110,270 @@
       th {
         background: var(--panel);
       }
-      .recommended {
-        color: var(--green);
-        font-weight: 700;
-      }
       .muted {
         color: var(--muted);
       }
-      pre {
-        padding: 14px;
-        border-radius: 10px;
-        background: #111827;
-        color: #f8fafc;
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
+      li {
+        margin: 0.4em 0;
+      }
+      footer {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
       }
       @media (max-width: 560px) {
         main {
           width: min(100% - 16px, 1040px);
           margin: 8px auto;
+          padding: 20px 14px;
           border-radius: 12px;
         }
         th,
         td {
-          padding: 8px;
+          padding: 8px 7px;
         }
       }
     </style>
   </head>
   <body>
     <main>
-      <h1>Pi 写入命令脱敏诊断设计审阅</h1>
+      <h1>Pi 命令诊断：真实验证与离线闭环</h1>
       <p class="muted">
-        审阅日期：2026-07-28。方案 B 已由维护者批准并完成离线实现与自动验证；新字段尚未由新真实批次实测，本文不授权第二个真实模型批次。
+        更新日期：2026-07-28。本页把原“方案 B 设计审阅”更新为真实批次已经验证的历史记录，
+        并说明随后完成的 shell、资格成功语义与 Kimi ACP 生命周期离线收敛。
+        本页不授权新的真实批次。
       </p>
 
       <div class="status">
-        <strong>当前终态：</strong>新批次
-        <code>2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678</code>
-        完成全部八项，但只有前七项通过；最后一项
-        <code>ark-agent-deepseek-v4-flash/delegate</code>
-        因结果文件缺失而失败，批次仍为 <code>blocked / case_failed</code>。该批次绑定 frozen commit
-        <code>07fd0d79e6885ee1e0af4a021e12170ef6c9f470</code>，manifest SHA-256 为
-        <code>eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556</code>，
-        证据提交为 <code>1d5d2c4</code>。
+        <strong>最新终态：</strong>批次
+        <code
+          >2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef</code
+        >
+        绑定 frozen commit
+        <code>cb9434b4b540e70f5384224e4e98823a3ea2dbae</code>，
+        完成 6 项、通过 5 项；ordinal 6
+        <code>ark-agent-plan / delegate</code> 失败，ordinal 7–8 未运行。
+        manifest 为 <code>blocked / case_failed</code>，
+        <code>promotionEligible=false</code>，SHA-256
+        <code
+          >61051a8eb8107759cdd1a10d5d44a7fe6d8a3f2c6b3b8e03773c8db8de4cd88d</code
+        >；证据提交为 <code>b1682cb</code>。
       </div>
 
-      <h2>已经由机器确认的事实</h2>
+      <h2>原诊断方案已经回答了什么</h2>
+      <p>
+        原方案 B 通过 Pi-only 命令生命周期 observer，把每个 execute 生命周期压缩成
+        <code>source / match / outcome</code> 三个闭合枚举，不保存原始命令、tool-call ID、
+        路径、Base64 payload、模型正文或工具输出。最新真实批次首次把该诊断用于完整资格流程，
+        并成功把问题从“最终文件状态不明”缩小到“规定 bash 已形成，但工具层失败”。
+      </p>
+
       <div class="verified">
         <ul>
-          <li>冻结提交、预飞、模型、provider、direct 路由、凭据隔离、单次调用、零重试/回退均正确。</li>
-          <li>此前失败的 Kimi delegate 已通过，证明 Kimi late command observation 修复生效。</li>
-          <li>同一新 Pi 写入合同在 Ark Coding Plan 和 Ark Agent Plan delegate 中通过。</li>
-          <li>DeepSeek Flash 正常结束并执行了 6 条命令；精确 <code>git status --short</code> 被观察到。</li>
-          <li>最终没有任何文件变化，目标结果文件的读取状态是 <code>missing</code>。</li>
-          <li>不可变 verifier 通过，资格锁已释放，目标进程为 0/0/0。</li>
+          <li>
+            ordinal 6 的 18 个 Pi bash 生命周期全部为 <code>error</code>，规定写入命令为
+            <code>exact / error</code>。
+          </li>
+          <li>
+            ordinal 1 的 5 个 Pi bash 生命周期同样全部为 <code>error</code>，规定写入也是
+            <code>exact / error</code>。
+          </li>
+          <li>
+            两项最终结果文件均可安全读取，内容与哈希正确，证明“最终制品正确”不能替代
+            “规定 bash 成功”的证据。
+          </li>
+          <li>
+            evidence 没有泄漏命令正文、结果路径、tool-call ID、工具输出或任何凭据值。
+          </li>
         </ul>
       </div>
 
-      <h2>机器现在无法回答的问题</h2>
-      <p>
-        现有 evidence 只保存命令数量与“是否看到精确
-        <code>git status --short</code>”，没有保存第一条写入命令的脱敏分类，也没有关联工具结束事件。
-        因此当前连失败发生在哪一层都无法可靠判断，可能涉及以下情况：
-      </p>
-      <ol>
-        <li>模型跳过了写入命令；</li>
-        <li>模型改写或包裹了命令；</li>
-        <li>精确命令已经发出，但工具返回错误；</li>
-        <li>命令成功写入后，后续动作又删除了文件。</li>
-      </ol>
-      <p>
-        <code>diagnosticCount=0</code> 不能排除工具错误，因为 Pi 的 tool-level error 当前没有进入 adapter diagnostics。
-      </p>
+      <h2>真实批次仍然不能证明什么</h2>
+      <div class="warning">
+        ordinal 6 同时存在三个独立事实：adapter 分类为
+        <code>account_quota_exceeded</code>；18 个 bash 生命周期全部 error；文件变化多出来源未知的
+        <code>where.cmd</code>。证据不能证明 shell 缺陷由额度耗尽造成，也不能证明
+        <code>where.cmd</code> 是谁创建的。不能把这些事实拼成未经验证的单一原因。
+      </div>
 
-      <h2>三个方案</h2>
+      <h2>离线根因：Windows shell 发现环境缺口</h2>
+      <p>
+        离线复现确认，隔离子环境没有向 Pi 0.80.10 传递
+        <code>ProgramFiles</code> 与 <code>ProgramFiles(x86)</code>。Pi 的
+        <code>getShellConfig()</code> 因而无法从标准 Git 安装目录定位 Git Bash，并回退到失败的
+        PATH 搜索。该缺口与 Ark 额度状态相互独立。
+      </p>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>方案</th>
-              <th>内容</th>
-              <th>优点</th>
-              <th>缺点</th>
+              <th>修复</th>
+              <th>离线证据</th>
+              <th>安全边界</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>A：只记录命令匹配</td>
-              <td>保存写入命令的来源及 <code>exact / trim_only / embedded / other</code>。</td>
-              <td>改动最小。</td>
-              <td>若看到 exact 但文件仍缺失，仍无法判断工具错误还是后续删除，可能再浪费一个真实批次。</td>
-            </tr>
-            <tr>
-              <td class="recommended">B：完整生命周期脱敏诊断（推荐）</td>
-              <td>在 A 的基础上，按内部 tool-call ID 关联开始与结束事件，只持久化 <code>success / error / missing / unknown</code> 结果枚举。</td>
-              <td>一次新 evidence 可判断精确命令是否发出、工具是否报错，并把失败范围收窄到命令形成、工具执行或最终制品层；仍不保存命令、ID 或输出正文。</td>
-              <td>需要同时加固 Pi event sanitizer、内部 observation folding、producer 与 verifier，TDD 面更大。</td>
-            </tr>
-            <tr>
-              <td>C：立即改提示词</td>
-              <td>缩短或重写当前 Node + Base64 指令。</td>
-              <td>若失败只是模型偶发遵循问题，可能提高下一次通过概率。</td>
-              <td>当前没有证据指向提示词缺陷；同一合同已有两个同批通过反例，属于猜测性修复。</td>
+              <td>
+                <code>2a815c7</code> 在基础环境白名单加入
+                <code>ProgramFiles</code>、<code>ProgramFiles(x86)</code>
+              </td>
+              <td>
+                生产 environment builder 下，Pi resolver 解析到本机 Git Bash；与生产相同的
+                Node 写入命令 exit 0，并生成精确预期文件
+              </td>
+              <td>
+                不加入 <code>ProgramW6432</code>；不继承代理或额外凭据；不固定宿主路径；
+                不修改非 Windows shell 选择逻辑
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <h2>推荐设计：方案 B</h2>
+      <h2>真实批次发现的第二个问题：旧资格 gate 假阳性</h2>
       <p>
-        该方案的目标是<strong>定位失败层并指导下一步</strong>，不是仅凭三个枚举宣称证明四个具体根因。
-        它可以确认 <code>exact + error</code>，也可以确认 <code>exact + success</code> 后最终制品仍不一致；
-        但 <code>other</code> 或没有精确匹配不能严格区分“完全跳过”与“完全改写”，
-        <code>success + missing</code> 也不能单独证明发生了删除动作。
+        ordinal 1 虽然所有 bash 生命周期都失败，但模型通过其它动作形成了正确目标文件，
+        旧 gate 仍把该 case 标为 passed。这证明旧语义只检查最终制品与命令形成，
+        没有证明规定 bash 工具调用成功。历史 evidence 必须保持不可变，但其 passed
+        不能再解释为规定写入合同已通过。
       </p>
+
+      <h2>当前资格成功合同</h2>
       <ol>
         <li>
-          <strong>内部事件层：</strong>Pi 的超大工具结束事件仍保留非秘密
-          boolean <code>isError</code>；普通事件保持现状。缺失或非 boolean 值绝不能按
-          <code>false</code> 解释。按内部 tool-call ID 折叠开始与结束事件：首次开始事件确定顺序，
-          唯一且合法的结束事件形成 <code>success / error</code>，没有结束事件形成 <code>missing</code>，
-          重复、冲突或协议异常形成 <code>unknown</code>，不猜测成功。
+          <code>e750052</code> 为脱敏匹配枚举增加 <code>status_exact</code>，仍不保存状态命令正文。
         </li>
         <li>
-          <strong>独立观察通道：</strong>新增 Pi-only 生命周期 observer，不修改现有
-          <code>CommandObservation</code>、命令提取器或 policy。它覆盖所有 Pi execute start，并按首次 start
-          顺序输出；Pi delegate 的资格 producer 必须验证 observer 恰好回调一次。
+          <code>b5a691f</code> 仅在 qualification producer 中要求规定写入命令与精确
+          <code>git status --short</code> 各出现恰好一次，且 lifecycle outcome 都是
+          <code>success</code>。
         </li>
         <li>
-          <strong>脱敏 evidence：</strong>新增可选 <code>writeCommandObservations</code>。每项只含
-          <code>source</code>、<code>match</code>、<code>outcome</code> 三个闭合枚举；禁止 command、hash、rawInput、
-          tool-call ID、cwd、模型正文和工具输出。该字段只由当前资格协议的 Pi delegate schema v3 producer
-          产生；standalone、review、Kimi 和历史 evidence 均不新增或回填该字段。
+          <code>3d85315</code> 让 future terminal passed verifier 必须看到诊断数组，并独立重算
+          同一双命令成功合同；缺失、重复、error、missing、unknown 或 check 不一致均 fail closed。
         </li>
         <li>
-          <strong>严格 verifier：</strong>历史 evidence 缺字段仍通过；新字段出现时只允许当前
-          <code>four-llm-v1</code> 的 Pi delegate schema v3，检查普通稠密数组、普通对象、精确键、枚举和最多
-          256 项。沿用 Pi 的 <code>compatibility</code> 策略，因此
-          <code>source != unextractable</code> 的条目数必须等于现有 <code>commandCount</code>；
-          不能照抄 Kimi <code>raw_only</code> 的计数规则。
-        </li>
-        <li>
-          <strong>验收中立：</strong>新字段只用于诊断。结果文件、唯一文件范围和精确
-          <code>git status --short</code> 仍决定通过；不把命令 start 或 tool success 冒充最终文件成功。
+          <code>ceb8e9c</code> 增加完整正向回归，证明两个规定命令各唯一 success 时 producer
+          仍可得到 passed，不会把加固误写成永久阻断。
         </li>
       </ol>
 
-      <div class="warning">
-        <strong>本设计明确不做：</strong>不修改提示词，不放宽 validator，不改变模型、provider、route、credential、
-        retry/fallback，不改 manifest/checkpoint/qualification plan，不回填历史 JSON，不修改公开 MCP 结果。
+      <div class="decision">
+        <strong>兼容策略：</strong>future terminal passed 必须满足新语义；历史
+        blocked/interrupted manifest 仍按其生成时合同验证。旧 evidence 不回填、不改写，
+        schema v3 与 <code>four-llm-v1</code> 外壳保持不变。
       </div>
 
-      <h2>测试与收口</h2>
+      <h2>全量验证另行暴露的 Kimi ACP 生命周期竞态</h2>
+      <p>
+        fresh 全量测试还暴露了一个与 Pi 命令合同相互独立的既有问题：Kimi ACP 子进程
+        close 事件可能晚于清理。旧时序压力复现中 100 次有 98 次晚 close；
+        <code>4af8b34</code> 增加显式 child-close barrier 与有界清理回归后，
+        定向和全量验证均通过，独立复审剩余 P0–P3 为 0。该修复没有发起新的真实模型调用，
+        也没有改变 provider、model、路由或公开 MCP 合同。
+      </p>
+
+      <h2>安全、性能与公开边界</h2>
       <ul>
-        <li>RED→GREEN 已覆盖 exact、trim-only、embedded、other、title spoof、截断 start/end、boolean/non-boolean end、end error、缺 end、重复/冲突事件、乱序、重复 ID 和超限。</li>
-        <li>evidence JSON 已验证不含任何命令正文、Base64 参数、tool-call ID、路径或输出。</li>
-        <li>现有 <code>commandsRun</code>、<code>commandCount</code>、公开 MCP structured content 和验收判定保持原语义。</li>
-        <li>5/5 retained manifests 通过 immutable verifier；evidence 相对 <code>a8aa4d8</code> 无变更，untracked 为 0。</li>
-        <li>逐任务规格/质量审阅与整体规格/安全审阅均 PASS；本轮两次 Kimi 外部复核均无结论：设计级跨多实现面审阅约 604.5 秒 <code>timed_out</code>，只返回读取进度；实现后两个内嵌摘录的单一不变量审阅约 181.8 秒 <code>timed_out</code>，review 正文为空。二者不计 PASS、不阻断，也未重试同形任务。</li>
-        <li>fresh 离线矩阵为 48 个测试文件、837 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离 check-report、两个 help 与 diff check 均通过。</li>
-        <li>Kimi ACP / Pi RPC / real-smoke 进程为 0/0/0，锁 absent，持久 <code>.tgz</code> 为 0；npm dry-run 为 171 files / 15 Markdown/HTML / 3 plugin files，size 536161、unpackedSize 2703085。</li>
-        <li>当前还需提交本轮状态文档并完成 clean allow-empty freeze；最终 40 位 SHA 只能由后续交接消息提供。本页本身不授权真实调用。</li>
+        <li>
+          verifier 继续严格检查普通稠密数组、原型、descriptor、精确三字段对象、闭合枚举、
+          <code>commandCount</code> 和 256 项上限。
+        </li>
+        <li>
+          duplicate 以实际匹配条目数计数；只有唯一
+          <code>exact / success</code> 与唯一
+          <code>status_exact / success</code> 才构成成功。
+        </li>
+        <li>standalone smoke 继续沿用原命令出现语义；加固不扩张到公开 MCP 或普通 delegate。</li>
+        <li>
+          模型、provider、direct route、凭据、提示词、结果文件 validator、case 顺序、
+          single-attempt、retry/fallback 和 coordinator 首错停规则均未改变。
+        </li>
       </ul>
 
-      <h2>已批准的判断</h2>
-      <div class="decision">
-        <p>维护者已明确批准：</p>
-        <pre>批准方案 B：只增加 Pi 写入命令生命周期的脱敏诊断，不改提示词、validator、公开 MCP、模型/路由/凭据和重试策略；按 TDD 实施、双审、全量离线验证并冻结新候选。</pre>
-        <p>
-          正式 spec 和逐步实施计划已经持久化，离线实现提交链为
-          <code>8261736</code>、<code>652b13d</code> / <code>5e209e1</code> /
-          <code>16cdad5</code>、<code>293e745</code>、<code>969e546</code> /
-          <code>0852691</code> / <code>d9eb28a</code>、<code>4bd2439</code>。
-          当前只剩状态文档提交、clean freeze 和绑定最终 SHA 的新批次授权门槛。
-        </p>
+      <h2>审阅与验证现状</h2>
+      <div class="verified">
+        shell 环境、资格成功合同与 Kimi ACP 生命周期修复均完成独立复审，剩余 P0–P3 为 0。
+        最终全量矩阵为
+        <code>49 个测试文件、853 passed / 1 skipped / 0 failed</code>。
+      </div>
+      <div class="verified">
+        typecheck、build、release smoke、隔离插件 <code>--check-report</code>、6/6 retained
+        immutable evidence、evidence unchanged、Pi resolver 与精确 28 字节命令均通过。
+        <code>npm pack --dry-run</code> 收录 191 个文件；目标进程为 0/0/0，资格锁 absent，
+        持久 <code>.tgz</code> 为 0。
       </div>
 
-      <div class="warning">
-        <strong>外部状态保持不变：</strong>未安装活动插件，未访问或修改
-        <code>~/.codex/config.toml</code>，未移除 <code>codex_cc_tools</code>，未调用或修改
-        Claude Code，也未发布、推送、合并或 fast-forward。注册表仍为 6 passed / 2 pending，
-        安装仍为 blocked / not ready。
-      </div>
+      <h2>当前产品状态与授权边界</h2>
+      <p>
+        注册表仍为 <code>6 passed / 2 pending</code>，安装仍为
+        <code>blocked / not ready</code>。旧
+        <code>cb9434b4b540e70f5384224e4e98823a3ea2dbae</code>
+        授权已经消费；本页不提供新授权。最终离线验证已通过，主线程只剩状态提交、
+        clean freeze 与真实 40 位 SHA 的交接；维护者随后才能针对该 SHA
+        决定是否授权一次新的完整八项批次。
+      </p>
+
+      <h2>未操作的外部状态</h2>
+      <p>
+        未访问或修改活动 <code>~/.codex/config.toml</code>，未安装或修改活动插件，
+        未移除或修改 <code>codex_cc_tools</code>，未调用或修改 Claude Code，
+        未执行发布、推送、合并或 fast-forward。
+      </p>
 
       <h2>可追溯证据</h2>
       <ul>
         <li>
-          <a href="four-llm-qualification-result-review.html">上一轮阻断结果历史审阅</a>
+          <a href="four-llm-qualification-result-review.html">最新真实批次结果审阅</a>
         </li>
         <li>
-          <a href="../smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/manifest.json">本轮批次 manifest</a>
+          <a
+            href="../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/manifest.json"
+            >最新 blocked manifest</a
+          >
         </li>
         <li>
-          <a href="../smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T02-05-37.999Z-ark-agent-deepseek-v4-flash-delegate-ark.json">失败 case 的脱敏 evidence</a>
+          <a
+            href="../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/cases/2026-07-28T11-17-16.613Z-ark-agent-plan-delegate-ark.json"
+            >ordinal 6 失败 evidence</a
+          >
         </li>
         <li>
-          <a href="../superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md">当前 Pi 写入合同设计</a>
+          <a
+            href="../smoke/evidence/batches/2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef/cases/2026-07-28T11-00-49.160Z-ark-coding-plan-delegate-ark.json"
+            >ordinal 1 历史误判 evidence</a
+          >
         </li>
         <li>
-          <a href="../superpowers/specs/2026-07-28-pi-write-command-lifecycle-diagnostics-design.md">已批准的正式诊断设计</a>
+          <a
+            href="../superpowers/specs/2026-07-28-pi-write-command-lifecycle-diagnostics-design.md"
+            >原 Pi 生命周期脱敏诊断设计</a
+          >
         </li>
         <li>
-          <a href="../superpowers/plans/2026-07-28-pi-write-command-lifecycle-diagnostics.md">逐任务实施计划</a>
+          <a href="../superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md"
+            >Pi Windows shell 环境闭环设计</a
+          >
         </li>
         <li>
-          <a href="four-llm-qualification-next-authorization-review.html">下一次完整八项批次授权审阅（页面本身不构成授权）</a>
+          <a
+            href="../superpowers/specs/2026-07-28-qualification-required-command-success-design.md"
+            >资格规定命令成功语义设计</a
+          >
+        </li>
+        <li>
+          <a href="four-llm-qualification-next-authorization-review.html"
+            >下一批次授权前置条件（页面本身不授权）</a
+          >
         </li>
       </ul>
+
+      <footer>
+        本页记录诊断方案如何被真实批次验证、如何定位 shell 缺口并暴露资格假阳性，
+        以及离线修复和最终验证后的当前边界；它不构成真实调用、安装、配置或发布授权。
+      </footer>
     </main>
   </body>
 </html>
