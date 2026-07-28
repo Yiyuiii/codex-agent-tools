@@ -57,9 +57,15 @@ function isOrdinaryRecord(value: unknown): value is Record<string, unknown> {
     return false;
   }
   try {
-    return (
-      Object.getPrototypeOf(value) === Object.prototype &&
-      Object.getOwnPropertySymbols(value).length === 0
+    if (
+      Object.getPrototypeOf(value) !== Object.prototype ||
+      Object.getOwnPropertySymbols(value).length !== 0
+    ) {
+      return false;
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    return Object.values(descriptors).every((descriptor) =>
+      Object.hasOwn(descriptor, "value"),
     );
   } catch {
     return false;

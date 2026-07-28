@@ -436,10 +436,60 @@ describe("extractPiCommandLifecycleObservations", () => {
         source: "title_fallback",
         command: "Safe fallback",
         origin: "title",
-        outcome: "unknown",
+        outcome: "missing",
       },
     ]);
     expect(getterCount).toBe(0);
+  });
+
+  it("ignores an otherwise valid event with an unrelated accessor", () => {
+    let getterCount = 0;
+    const event = executeCall("accessor-event", "Must be ignored");
+    Object.defineProperty(event, "unrelated", {
+      enumerable: true,
+      get() {
+        getterCount += 1;
+        throw new Error("unrelated event getter must not run");
+      },
+    });
+
+    const observations = extractPiCommandLifecycleObservations([event]);
+
+    expect(getterCount).toBe(0);
+    expect(observations).toEqual([]);
+  });
+
+  it("rejects a raw command when raw input has an unrelated accessor", () => {
+    let getterCount = 0;
+    const rawInput = { command: "must not be used" };
+    Object.defineProperty(rawInput, "unrelated", {
+      enumerable: true,
+      get() {
+        getterCount += 1;
+        throw new Error("unrelated raw-input getter must not run");
+      },
+    });
+
+    const observations = extractPiCommandLifecycleObservations([
+      {
+        runtime: "pi-rpc",
+        type: "tool_call",
+        toolCallId: "accessor-raw-input",
+        kind: "execute",
+        title: "Safe fallback",
+        rawInput,
+      },
+    ]);
+
+    expect(getterCount).toBe(0);
+    expect(observations).toEqual([
+      {
+        source: "title_fallback",
+        command: "Safe fallback",
+        origin: "title",
+        outcome: "missing",
+      },
+    ]);
   });
 
   it("fails closed for own symbols on events and raw input", () => {
