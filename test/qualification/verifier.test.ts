@@ -267,6 +267,15 @@ function evidenceForCase(
           commandObservations: [{ source: "raw_input", match: "exact" }],
         }
       : {}),
+    ...(logicalIdentity.runtime === "pi-rpc" && identity.task === "delegate"
+      ? {
+          commandCount: 2,
+          writeCommandObservations: [
+            { source: "raw_input", match: "exact", outcome: "success" },
+            { source: "raw_input", match: "other", outcome: "success" },
+          ],
+        }
+      : {}),
     checks: acceptanceChecks(identity),
     ...(identity.task === "delegate"
       ? {
@@ -501,6 +510,41 @@ async function coherentlyRewriteEvidenceReference(options: {
     Record<string, unknown>
   >;
   checkpointReferences[completedSequence]!.sha256 = checkpointSha256;
+  await overwriteJson(options.manifestPath, manifest);
+}
+
+async function coherentlyRewriteHistoricalEvidenceReference(options: {
+  repositoryRoot: string;
+  manifestPath: string;
+  ordinal: number;
+  mutateEvidence: (evidence: Record<string, unknown>) => void;
+}): Promise<void> {
+  const manifest = await readJson(options.manifestPath);
+  const manifestCases = manifest.cases as Array<Record<string, unknown>>;
+  const caseEntry = manifestCases[options.ordinal - 1]!;
+  const evidenceReference = caseEntry.evidence as Record<string, unknown>;
+  const evidencePath = path.resolve(
+    options.repositoryRoot,
+    evidenceReference.path as string,
+  );
+  const evidence = await readJson(evidencePath);
+  options.mutateEvidence(evidence);
+  await overwriteJson(evidencePath, evidence);
+  const evidenceSha256 = sha256(await readFile(evidencePath));
+  evidenceReference.sha256 = evidenceSha256;
+
+  const completedSequence = options.ordinal * 2;
+  const checkpointPath = path.join(
+    path.dirname(options.manifestPath),
+    "checkpoints",
+    `${String(completedSequence).padStart(6, "0")}.json`,
+  );
+  const checkpoint = await readJson(checkpointPath);
+  (checkpoint.evidence as Record<string, unknown>).sha256 = evidenceSha256;
+  await overwriteJson(checkpointPath, checkpoint);
+  (
+    (manifest.checkpoints as Array<Record<string, unknown>>)[completedSequence]!
+  ).sha256 = sha256(await readFile(checkpointPath));
   await overwriteJson(options.manifestPath, manifest);
 }
 
@@ -1231,6 +1275,328 @@ describe("qualification verifier", () => {
           }
         },
       );
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+  });
+
+  describe("Pi write command diagnostics", () => {
+    it("accepts valid diagnostics on passed Pi delegate evidence", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot);
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        status: "passed",
+        promotionEligible: true,
+      });
+    });
+
+    it("accepts exact/error diagnostics on failed Pi delegate evidence", async () => {
+      const repositoryRoot = await tempRepository();
+      const manifestPath = await createCurrentBlockedBatch(
+        repositoryRoot,
+        (evidence) => {
+          evidence.writeCommandObservations = [
+            { source: "raw_input", match: "exact", outcome: "error" },
+            { source: "raw_input", match: "other", outcome: "success" },
+          ];
+        },
+      );
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        status: "blocked",
+        promotionEligible: false,
+      });
+    });
+
+    it("does not couple exact write diagnostics to requiredCommandObserved", async () => {
+      const repositoryRoot = await tempRepository();
+      const manifestPath = await createCurrentBlockedBatch(
+        repositoryRoot,
+        (evidence) => {
+          evidence.writeCommandObservations = [
+            { source: "raw_input", match: "exact", outcome: "error" },
+            { source: "raw_input", match: "other", outcome: "success" },
+          ];
+          const checks = evidence.checks as Record<string, unknown>;
+          checks.requiredCommandObserved = false;
+        },
+      );
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        status: "blocked",
+        promotionEligible: false,
+      });
+    });
+
+    it("keeps current v3 evidence without the optional field compatible", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm === "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          delete evidence.writeCommandObservations;
+        },
+      });
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+        status: "passed",
+      });
+    });
+
+    it("keeps legacy v2 evidence without the optional field compatible", async () => {
+      const repositoryRoot = await tempRepository();
+      const manifestPath = await copyHistoricalBatch(repositoryRoot);
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toMatchObject({
+        verified: true,
+        qualificationPlanId: "five-llm-v1",
+        status: "blocked",
+      });
+    });
+
+    it("rejects the field on Kimi delegate evidence", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.llm !== "kimi-k3" || identity.task !== "delegate") {
+            return;
+          }
+          evidence.writeCommandObservations = [
+            { source: "raw_input", match: "exact", outcome: "success" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects the field on Pi review evidence", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.ordinal !== 2) return;
+          evidence.commandCount = 0;
+          evidence.writeCommandObservations = [];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects the field under the legacy v2 protocol", async () => {
+      const repositoryRoot = await tempRepository();
+      const manifestPath = await copyHistoricalBatch(repositoryRoot);
+      await coherentlyRewriteHistoricalEvidenceReference({
+        repositoryRoot,
+        manifestPath,
+        ordinal: 1,
+        mutateEvidence: (evidence) => {
+          evidence.writeCommandObservations = [
+            { source: "raw_input", match: "exact", outcome: "success" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects a non-array field", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.ordinal !== 1) return;
+          evidence.commandCount = 0;
+          evidence.writeCommandObservations = {};
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects a sparse array after its JSON representation exposes a non-record hole", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.ordinal !== 1) return;
+          const sparse = new Array(2);
+          sparse[0] = {
+            source: "raw_input",
+            match: "exact",
+            outcome: "success",
+          };
+          evidence.commandCount = 1;
+          evidence.writeCommandObservations = sparse;
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects more than 256 observations", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.ordinal !== 1) return;
+          evidence.commandCount = 257;
+          evidence.writeCommandObservations = Array.from(
+            { length: 257 },
+            () => ({
+              source: "raw_input",
+              match: "other",
+              outcome: "success",
+            }),
+          );
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it("rejects a non-record observation", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.ordinal !== 1) return;
+          evidence.commandCount = 1;
+          evidence.writeCommandObservations = [
+            { source: "raw_input", match: "exact", outcome: "success" },
+            "invalid",
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it.each([
+      "command",
+      "toolCallId",
+      "rawInput",
+      "path",
+      "output",
+    ])("rejects an observation with extra %s data", async (extraKey) => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.ordinal !== 1) return;
+          evidence.writeCommandObservations = [
+            {
+              source: "raw_input",
+              match: "exact",
+              outcome: "success",
+              [extraKey]: "redacted",
+            },
+            { source: "raw_input", match: "other", outcome: "success" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it.each([
+      ["source", "late_update"],
+      ["match", "prefix"],
+      ["outcome", "failed"],
+    ])("rejects an unknown %s enum value", async (field, value) => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.ordinal !== 1) return;
+          evidence.writeCommandObservations = [
+            {
+              source: "raw_input",
+              match: "exact",
+              outcome: "success",
+              [field]: value,
+            },
+            { source: "raw_input", match: "other", outcome: "success" },
+          ];
+        },
+      });
+
+      await expectVerificationFailure(repositoryRoot, manifestPath);
+    });
+
+    it.each(["title_fallback", "unextractable"])(
+      "rejects %s paired with a non-other match",
+      async (source) => {
+        const repositoryRoot = await tempRepository();
+        const { manifestPath } = await createPassedBatch(repositoryRoot, {
+          mutateEvidence: (evidence, identity) => {
+            if (identity.ordinal !== 1) return;
+            evidence.commandCount = source === "unextractable" ? 1 : 2;
+            evidence.writeCommandObservations = [
+              { source, match: "exact", outcome: "success" },
+              { source: "raw_input", match: "other", outcome: "success" },
+            ];
+          },
+        });
+
+        await expectVerificationFailure(repositoryRoot, manifestPath);
+      },
+    );
+
+    it.each([-1, 1.5, Number.MAX_SAFE_INTEGER + 1, "2"])(
+      "rejects a non-safe non-negative Pi commandCount %s",
+      async (commandCount) => {
+        const repositoryRoot = await tempRepository();
+        const { manifestPath } = await createPassedBatch(repositoryRoot, {
+          mutateEvidence: (evidence, identity) => {
+            if (identity.ordinal !== 1) return;
+            evidence.commandCount = commandCount;
+          },
+        });
+
+        await expectVerificationFailure(repositoryRoot, manifestPath);
+      },
+    );
+
+    it("rejects an extractable observation count unequal to commandCount", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath } = await createPassedBatch(repositoryRoot, {
+        mutateEvidence: (evidence, identity) => {
+          if (identity.ordinal !== 1) return;
+          evidence.commandCount = 1;
+        },
+      });
 
       await expectVerificationFailure(repositoryRoot, manifestPath);
     });

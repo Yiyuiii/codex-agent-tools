@@ -496,6 +496,116 @@ function validateCommandObservationDiagnostics(
   }
 }
 
+const PI_WRITE_SOURCES = new Set([
+  "raw_input",
+  "title_fallback",
+  "unextractable",
+]);
+const PI_WRITE_MATCHES = new Set([
+  "exact",
+  "trim_only",
+  "embedded",
+  "other",
+]);
+const PI_WRITE_OUTCOMES = new Set([
+  "success",
+  "error",
+  "missing",
+  "unknown",
+]);
+
+function validatePiWriteCommandDiagnostics(
+  evidence: Record<string, unknown>,
+  protocol: VerifierProtocol,
+  identity: Readonly<QualificationCaseIdentity>,
+  runtime: FrozenLogicalLlmIdentity["runtime"],
+): void {
+  if (!Object.hasOwn(evidence, "writeCommandObservations")) return;
+  if (
+    protocol !== CURRENT_VERIFIER_PROTOCOL ||
+    evidence.schemaVersion !== 3 ||
+    identity.task !== "delegate" ||
+    runtime !== "pi-rpc"
+  ) {
+    throw new QualificationVerificationError();
+  }
+
+  const observations = evidence.writeCommandObservations;
+  if (
+    !Array.isArray(observations) ||
+    nodeUtilTypes.isProxy(observations) ||
+    Object.getPrototypeOf(observations) !== Array.prototype ||
+    Object.getOwnPropertySymbols(observations).length !== 0 ||
+    observations.length > 256
+  ) {
+    throw new QualificationVerificationError();
+  }
+
+  const descriptors = Object.getOwnPropertyDescriptors(observations) as Record<
+    string,
+    PropertyDescriptor
+  >;
+  const lengthDescriptor = descriptors.length;
+  const itemKeys = Object.keys(descriptors).filter((key) => key !== "length");
+  if (
+    lengthDescriptor === undefined ||
+    !Object.hasOwn(lengthDescriptor, "value") ||
+    lengthDescriptor.value !== observations.length ||
+    lengthDescriptor.enumerable !== false ||
+    lengthDescriptor.configurable !== false ||
+    lengthDescriptor.writable !== true ||
+    itemKeys.length !== observations.length ||
+    itemKeys.some((key, index) => key !== String(index))
+  ) {
+    throw new QualificationVerificationError();
+  }
+
+  let extractableCount = 0;
+  for (const key of itemKeys) {
+    const descriptor = descriptors[key]!;
+    if (
+      descriptor.enumerable !== true ||
+      !Object.hasOwn(descriptor, "value") ||
+      descriptor.get !== undefined ||
+      descriptor.set !== undefined
+    ) {
+      throw new QualificationVerificationError();
+    }
+    const observation = plainRecord(descriptor.value);
+    const keys = Object.keys(observation).sort();
+    if (
+      keys.length !== 3 ||
+      keys[0] !== "match" ||
+      keys[1] !== "outcome" ||
+      keys[2] !== "source" ||
+      typeof observation.source !== "string" ||
+      !PI_WRITE_SOURCES.has(observation.source) ||
+      typeof observation.match !== "string" ||
+      !PI_WRITE_MATCHES.has(observation.match) ||
+      typeof observation.outcome !== "string" ||
+      !PI_WRITE_OUTCOMES.has(observation.outcome) ||
+      ((observation.source === "title_fallback" ||
+        observation.source === "unextractable") &&
+        observation.match !== "other")
+    ) {
+      throw new QualificationVerificationError();
+    }
+    if (observation.source !== "unextractable") {
+      extractableCount += 1;
+    }
+  }
+
+  const commandCount = evidence.commandCount;
+  if (
+    typeof commandCount !== "number" ||
+    !Number.isSafeInteger(commandCount) ||
+    commandCount < 0 ||
+    extractableCount !== commandCount
+  ) {
+    throw new QualificationVerificationError();
+  }
+}
+
 function validateQualificationIdentity(
   evidence: Record<string, unknown>,
   protocol: VerifierProtocol,
@@ -662,6 +772,12 @@ function validateEvidenceIdentityAndAcceptance(
   }
   validateCommandObservationDiagnostics(
     evidence,
+    identity,
+    logicalIdentity.runtime,
+  );
+  validatePiWriteCommandDiagnostics(
+    evidence,
+    protocol,
     identity,
     logicalIdentity.runtime,
   );
