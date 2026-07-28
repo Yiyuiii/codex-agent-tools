@@ -14,6 +14,7 @@ import type {
 import type { LlmProfile, TaskKind } from "../../src/domain/types.js";
 import { createLlmRegistry, resolveLlm } from "../../src/llms/registry.js";
 import type { CommandObservation } from "../../src/tasks/command-observations.js";
+import type { PiCommandLifecycleObservation } from "../../src/tasks/pi-command-lifecycle.js";
 import { ExternalAgentService } from "../../src/tasks/service.js";
 
 let cwd: string;
@@ -79,6 +80,17 @@ function createService(
   return new ExternalAgentService({
     registry: createLlmRegistry(profiles),
     adapters: new Map([["kimi-acp", adapter]]),
+    parentEnvironment: { PATH: process.env.PATH },
+  });
+}
+
+function createPiService(
+  run: (request: AdapterRunRequest) => Promise<AdapterRunResult>,
+) {
+  const adapter: ExternalAgentAdapter = { runtime: "pi-rpc", run };
+  return new ExternalAgentService({
+    registry: createLlmRegistry([enabledProfile("ark-agent-plan")]),
+    adapters: new Map([["pi-rpc", adapter]]),
     parentEnvironment: { PATH: process.env.PATH },
   });
 }
@@ -298,6 +310,239 @@ describe("ExternalAgentService", () => {
     });
     expect(piRun).toHaveBeenCalledOnce();
     expect(kimiRun).not.toHaveBeenCalled();
+  });
+
+  it("reports Pi command lifecycle observations once without exposing them publicly", async () => {
+    const reports: Array<readonly PiCommandLifecycleObservation[]> = [];
+    const commandReports: Array<readonly CommandObservation[]> = [];
+    const service = createPiService(async () =>
+      completed({
+        actualModel: "ark-code-latest",
+        events: [
+          {
+            runtime: "pi-rpc",
+            type: "tool_call",
+            toolCallId: "write-1",
+            kind: "execute",
+            title: "Write result",
+            rawInput: { command: "node -e write" },
+          },
+          {
+            runtime: "pi-rpc",
+            type: "tool_result",
+            toolCallId: "write-1",
+            title: "Write result",
+            isError: true,
+          },
+        ],
+      }),
+    );
+
+    const result = await service.delegate(
+      { llm: "ark-agent-plan", prompt: "Run", cwd },
+      {
+        onCommandObservations: (value) => commandReports.push(value),
+        onPiCommandLifecycleObservations: (value) => reports.push(value),
+      },
+    );
+
+    expect(reports).toEqual([
+      [
+        {
+          source: "raw_input",
+          command: "node -e write",
+          origin: "raw_input",
+          outcome: "error",
+        },
+      ],
+    ]);
+    expect(commandReports).toEqual([
+      [
+        {
+          source: "raw_input",
+          command: "node -e write",
+          origin: "raw_input",
+        },
+      ],
+    ]);
+    expect(result.commandsRun).toEqual(["node -e write"]);
+    expect(result).not.toHaveProperty("piCommandLifecycleObservations");
+    expect(JSON.stringify(result)).not.toContain(
+      "piCommandLifecycleObservations",
+    );
+  });
+
+  it("reports one empty Pi command lifecycle batch when the adapter throws", async () => {
+    const reports: Array<readonly PiCommandLifecycleObservation[]> = [];
+    const service = createPiService(async () => {
+      throw new Error("adapter failed");
+    });
+
+    const result = await service.delegate(
+      { llm: "ark-agent-plan", prompt: "Run", cwd },
+      {
+        onPiCommandLifecycleObservations: (value) => reports.push(value),
+      },
+    );
+
+    expect(reports).toEqual([[]]);
+    expect(result.diagnostics).toEqual(["adapter failed"]);
+  });
+
+  it("reports one empty Pi command lifecycle batch for zero events", async () => {
+    const reports: Array<readonly PiCommandLifecycleObservation[]> = [];
+    const service = createPiService(async () => completed({ events: [] }));
+
+    await service.delegate(
+      { llm: "ark-agent-plan", prompt: "Run", cwd },
+      {
+        onPiCommandLifecycleObservations: (value) => reports.push(value),
+      },
+    );
+
+    expect(reports).toEqual([[]]);
+  });
+
+  it("never reports Pi command lifecycle observations for a Kimi delegate", async () => {
+    const observer = vi.fn();
+    const service = createService(async () =>
+      completed({
+        events: [
+          {
+            runtime: "pi-rpc",
+            type: "tool_call",
+            toolCallId: "lookalike",
+            kind: "execute",
+            title: "Run",
+            rawInput: { command: "npm test" },
+          },
+        ],
+      }),
+    );
+
+    await service.delegate(
+      { llm: "kimi-k3", prompt: "Run", cwd },
+      { onPiCommandLifecycleObservations: observer },
+    );
+
+    expect(observer).not.toHaveBeenCalled();
+  });
+
+  it("freezes the Pi command lifecycle observation array and items", async () => {
+    let observed: readonly PiCommandLifecycleObservation[] = [];
+    const service = createPiService(async () =>
+      completed({
+        events: [
+          {
+            runtime: "pi-rpc",
+            type: "tool_call",
+            toolCallId: "freeze-1",
+            kind: "execute",
+            title: "Run",
+            rawInput: { command: "npm test" },
+          },
+        ],
+      }),
+    );
+
+    await service.delegate(
+      { llm: "ark-agent-plan", prompt: "Run", cwd },
+      {
+        onPiCommandLifecycleObservations: (value) => {
+          observed = value;
+        },
+      },
+    );
+
+    expect(Object.isFrozen(observed)).toBe(true);
+    expect(Object.isFrozen(observed[0])).toBe(true);
+  });
+
+  it("isolates a throwing Pi command lifecycle callback with one fixed diagnostic", async () => {
+    const commandObserver = vi.fn();
+    const service = createPiService(async () =>
+      completed({
+        events: [
+          {
+            runtime: "pi-rpc",
+            type: "tool_call",
+            toolCallId: "callback-1",
+            kind: "execute",
+            title: "Run",
+            rawInput: { command: "npm test" },
+          },
+        ],
+      }),
+    );
+
+    const result = await service.delegate(
+      { llm: "ark-agent-plan", prompt: "Run", cwd },
+      {
+        onCommandObservations: commandObserver,
+        onPiCommandLifecycleObservations: () => {
+          throw new Error("SENSITIVE lifecycle detail: npm test");
+        },
+      },
+    );
+
+    expect(commandObserver).toHaveBeenCalledOnce();
+    expect(result.commandsRun).toEqual(["npm test"]);
+    expect(result.diagnostics).toEqual([
+      "Internal Pi command lifecycle callback failed",
+    ]);
+    expect(result.diagnostics.join("\n")).not.toContain("SENSITIVE");
+    expect(result.diagnostics.join("\n")).not.toContain("npm test");
+  });
+
+  it("keeps the existing command policy beside Pi command lifecycle reporting", async () => {
+    const commandReports: Array<readonly CommandObservation[]> = [];
+    const lifecycleReports: Array<
+      readonly PiCommandLifecycleObservation[]
+    > = [];
+    const service = createPiService(async () =>
+      completed({
+        events: [
+          {
+            runtime: "pi-rpc",
+            type: "tool_call",
+            toolCallId: "title-only",
+            kind: "execute",
+            title: "git status --short",
+          },
+        ],
+      }),
+    );
+
+    const result = await service.delegate(
+      { llm: "ark-agent-plan", prompt: "Run", cwd },
+      {
+        commandObservationPolicy: "raw_only",
+        onCommandObservations: (value) => commandReports.push(value),
+        onPiCommandLifecycleObservations: (value) =>
+          lifecycleReports.push(value),
+      },
+    );
+
+    expect(commandReports).toEqual([
+      [
+        {
+          source: "title_fallback",
+          command: "git status --short",
+          origin: "title",
+        },
+      ],
+    ]);
+    expect(lifecycleReports).toEqual([
+      [
+        {
+          source: "title_fallback",
+          command: "git status --short",
+          origin: "title",
+          outcome: "missing",
+        },
+      ],
+    ]);
+    expect(result.commandsRun).toEqual([]);
   });
 
   it("fails review when Pi reports a disallowed writable tool event", async () => {

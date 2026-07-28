@@ -28,6 +28,10 @@ import {
   commandsFromObservations,
   extractCommandObservations,
 } from "./command-observations.js";
+import {
+  extractPiCommandLifecycleObservations,
+  type PiCommandLifecycleObservation,
+} from "./pi-command-lifecycle.js";
 import type {
   ExternalDelegateResult,
   ExternalReviewResult,
@@ -37,6 +41,8 @@ import type {
 
 const INTERNAL_COMMAND_OBSERVATION_CALLBACK_FAILED =
   "Internal command observation callback failed";
+const INTERNAL_PI_COMMAND_LIFECYCLE_CALLBACK_FAILED =
+  "Internal Pi command lifecycle callback failed";
 const INTERNAL_EXECUTION_TELEMETRY_CALLBACK_FAILED =
   "Internal execution telemetry callback failed";
 
@@ -56,6 +62,9 @@ export interface TaskExecutionContext {
   ) => void;
   onCommandObservations?: (
     observations: readonly CommandObservation[],
+  ) => void;
+  onPiCommandLifecycleObservations?: (
+    observations: readonly PiCommandLifecycleObservation[],
   ) => void;
 }
 
@@ -306,6 +315,27 @@ export class ExternalAgentService {
             INTERNAL_COMMAND_OBSERVATION_CALLBACK_FAILED,
           ],
         };
+      }
+      if (profile.runtime === "pi-rpc") {
+        const lifecycleObservations =
+          extractPiCommandLifecycleObservations(adapterResult.events);
+        const lifecycleView: readonly PiCommandLifecycleObservation[] =
+          Object.freeze(
+            lifecycleObservations.map((observation) =>
+              Object.freeze({ ...observation }),
+            ),
+          );
+        try {
+          context.onPiCommandLifecycleObservations?.(lifecycleView);
+        } catch {
+          adapterResult = {
+            ...adapterResult,
+            diagnostics: [
+              ...adapterResult.diagnostics,
+              INTERNAL_PI_COMMAND_LIFECYCLE_CALLBACK_FAILED,
+            ],
+          };
+        }
       }
       try {
         context.onExecutionTelemetry?.(adapterResult.executionTelemetry);

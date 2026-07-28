@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createMcpServer } from "../../src/mcp/server.js";
 import { registerExternalTools } from "../../src/mcp/tools.js";
-import type { ExternalReviewResult } from "../../src/tasks/results.js";
+import type {
+  ExternalDelegateResult,
+  ExternalReviewResult,
+} from "../../src/tasks/results.js";
 
 function reviewResult(): ExternalReviewResult {
   return {
@@ -17,6 +20,23 @@ function reviewResult(): ExternalReviewResult {
     diagnostics: [],
     filesChanged: [],
     review: "No findings.",
+  };
+}
+
+function delegateResult(): ExternalDelegateResult {
+  return {
+    ok: true,
+    status: "completed",
+    llm: "ark-agent-plan",
+    actualModel: "ark-code-latest",
+    elapsedMs: 10,
+    sessionId: "session-1",
+    diagnostics: [],
+    filesChanged: [],
+    summary: "Delegated.",
+    commandsRun: ["npm test"],
+    verification: [],
+    risks: [],
   };
 }
 
@@ -131,6 +151,59 @@ describe("codex_external_agents MCP server", () => {
     });
     expect(JSON.parse(result.content[0]!.text)).not.toHaveProperty(
       "executionTelemetry",
+    );
+  });
+
+  it("keeps delegate structured content free of Pi lifecycle fields", async () => {
+    let callback:
+      | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    const service = {
+      review: vi.fn(async () => reviewResult()),
+      delegate: vi.fn(async () => delegateResult()),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        if (name === "external_delegate") callback = handler;
+      },
+    };
+    registerExternalTools(fakeServer as never, service);
+
+    const result = (await callback?.(
+      {
+        llm: "ark-agent-plan",
+        prompt: "Delegate",
+        cwd: process.cwd(),
+      },
+      {},
+    )) as {
+      structuredContent: ExternalDelegateResult;
+      content: Array<{ text: string }>;
+    };
+
+    expect(Object.keys(result.structuredContent).sort()).toEqual([
+      "actualModel",
+      "commandsRun",
+      "diagnostics",
+      "elapsedMs",
+      "filesChanged",
+      "llm",
+      "ok",
+      "risks",
+      "sessionId",
+      "status",
+      "summary",
+      "verification",
+    ]);
+    expect(JSON.stringify(result.structuredContent)).not.toContain(
+      "LifecycleObservation",
     );
   });
 });
