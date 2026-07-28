@@ -14,7 +14,6 @@ export type PiCommandLifecycleOutcome =
   | "unknown";
 
 export interface PiCommandLifecycleObservation {
-  readonly toolCallId: string;
   readonly source: PiCommandLifecycleSource;
   readonly command: string | null;
   readonly origin: PiCommandLifecycleOrigin;
@@ -58,7 +57,10 @@ function isOrdinaryRecord(value: unknown): value is Record<string, unknown> {
     return false;
   }
   try {
-    return Object.getPrototypeOf(value) === Object.prototype;
+    return (
+      Object.getPrototypeOf(value) === Object.prototype &&
+      Object.getOwnPropertySymbols(value).length === 0
+    );
   } catch {
     return false;
   }
@@ -81,6 +83,10 @@ function readOwnDataProperty(
 
 function parsePiToolEvent(event: unknown): ParsedPiToolEvent | undefined {
   if (!isOrdinaryRecord(event)) return undefined;
+
+  if (readOwnDataProperty(event, "runtime").value !== "pi-rpc") {
+    return undefined;
+  }
 
   const type = readOwnDataProperty(event, "type").value;
   if (type !== "tool_call" && type !== "tool_result") return undefined;
@@ -119,13 +125,11 @@ function nonEmptyTitle(title: unknown): string | undefined {
 }
 
 function commandObservation(
-  toolCallId: string,
   start: ParsedToolCall,
 ): Omit<PiCommandLifecycleObservation, "outcome"> {
   const rawCommand = ownRawCommand(start.rawInput);
   if (rawCommand !== undefined) {
     return {
-      toolCallId,
       source: "raw_input",
       command: rawCommand,
       origin: "raw_input",
@@ -135,7 +139,6 @@ function commandObservation(
   const title = nonEmptyTitle(start.title);
   if (title !== undefined) {
     return {
-      toolCallId,
       source: "title_fallback",
       command: title,
       origin: "title",
@@ -143,7 +146,6 @@ function commandObservation(
   }
 
   return {
-    toolCallId,
     source: "unextractable",
     command: null,
     origin: null,
@@ -214,7 +216,7 @@ export function extractPiCommandLifecycleObservations(
 
     const startTitle = nonEmptyTitle(parsed.title);
     if (startTitle !== undefined) folded.startTitle = startTitle;
-    folded.observation = commandObservation(parsed.toolCallId, parsed);
+    folded.observation = commandObservation(parsed);
     includedOrder.push(folded);
   }
 

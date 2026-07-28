@@ -11,6 +11,7 @@ function executeCall(
   command?: unknown,
 ): Record<string, unknown> {
   return {
+    runtime: "pi-rpc",
     type: "tool_call",
     toolCallId,
     kind: "execute",
@@ -25,6 +26,7 @@ function toolResult(
   isError?: unknown,
 ): Record<string, unknown> {
   return {
+    runtime: "pi-rpc",
     type: "tool_result",
     toolCallId,
     title,
@@ -43,20 +45,32 @@ describe("extractPiCommandLifecycleObservations", () => {
       ]),
     ).toEqual([
       {
-        toolCallId: "second",
         source: "raw_input",
         command: "second command",
         origin: "raw_input",
         outcome: "error",
       },
       {
-        toolCallId: "first",
         source: "title_fallback",
         command: "First title",
         origin: "title",
         outcome: "success",
       },
     ] satisfies readonly PiCommandLifecycleObservation[]);
+  });
+
+  it("returns exactly the public observation fields without the internal ID", () => {
+    const observations = extractPiCommandLifecycleObservations([
+      executeCall("internal", "Run"),
+    ]);
+
+    expect(Object.keys(observations[0]!)).toEqual([
+      "source",
+      "command",
+      "origin",
+      "outcome",
+    ]);
+    expect(observations[0]).not.toHaveProperty("toolCallId");
   });
 
   it("accepts an own string command, including an empty string", () => {
@@ -66,7 +80,6 @@ describe("extractPiCommandLifecycleObservations", () => {
       ]),
     ).toEqual([
       {
-        toolCallId: "empty-command",
         source: "raw_input",
         command: "",
         origin: "raw_input",
@@ -94,7 +107,6 @@ describe("extractPiCommandLifecycleObservations", () => {
   ])("falls back to a non-empty title for $name", ({ event }) => {
     expect(extractPiCommandLifecycleObservations([event])).toEqual([
       {
-        toolCallId: "fallback",
         source: "title_fallback",
         command: "Fallback title",
         origin: "title",
@@ -107,6 +119,7 @@ describe("extractPiCommandLifecycleObservations", () => {
     {
       name: "a missing title",
       event: {
+        runtime: "pi-rpc",
         type: "tool_call",
         toolCallId: "unextractable",
         kind: "execute",
@@ -119,6 +132,7 @@ describe("extractPiCommandLifecycleObservations", () => {
     {
       name: "a non-string title",
       event: {
+        runtime: "pi-rpc",
         type: "tool_call",
         toolCallId: "unextractable",
         kind: "execute",
@@ -128,7 +142,6 @@ describe("extractPiCommandLifecycleObservations", () => {
   ])("reports $name as unextractable", ({ event }) => {
     expect(extractPiCommandLifecycleObservations([event])).toEqual([
       {
-        toolCallId: "unextractable",
         source: "unextractable",
         command: null,
         origin: null,
@@ -150,7 +163,6 @@ describe("extractPiCommandLifecycleObservations", () => {
         ]),
       ).toEqual([
         {
-          toolCallId: "a",
           source: "title_fallback",
           command: "Run",
           origin: "title",
@@ -165,7 +177,6 @@ describe("extractPiCommandLifecycleObservations", () => {
       extractPiCommandLifecycleObservations([executeCall("a", "Run")]),
     ).toEqual([
       {
-        toolCallId: "a",
         source: "title_fallback",
         command: "Run",
         origin: "title",
@@ -213,6 +224,7 @@ describe("extractPiCommandLifecycleObservations", () => {
       name: "a start without a title",
       events: [
         {
+          runtime: "pi-rpc",
           type: "tool_call",
           toolCallId: "a",
           kind: "execute",
@@ -228,7 +240,12 @@ describe("extractPiCommandLifecycleObservations", () => {
       name: "a result without a title",
       events: [
         executeCall("a", "Run"),
-        { type: "tool_result", toolCallId: "a", isError: false },
+        {
+          runtime: "pi-rpc",
+          type: "tool_result",
+          toolCallId: "a",
+          isError: false,
+        },
       ],
     },
     {
@@ -256,7 +273,6 @@ describe("extractPiCommandLifecycleObservations", () => {
     }) => {
       expect(extractPiCommandLifecycleObservations(events)).toEqual([
         {
-          toolCallId: "a",
           source: expectedSource,
           command: expectedCommand,
           origin: expectedOrigin,
@@ -271,14 +287,52 @@ describe("extractPiCommandLifecycleObservations", () => {
       extractPiCommandLifecycleObservations([
         toolResult("orphan", "Run", false),
         {
+          runtime: "pi-rpc",
           type: "tool_call_update",
           toolCallId: "update",
           kind: "execute",
           title: "Update",
         },
-        { type: "message_start", toolCallId: "message" },
+        {
+          runtime: "pi-rpc",
+          type: "message_start",
+          toolCallId: "message",
+        },
         executeCall("", "Empty ID"),
         toolResult("", "Empty ID", false),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("ignores lookalike tool events without an own pi-rpc runtime", () => {
+    expect(
+      extractPiCommandLifecycleObservations([
+        {
+          type: "tool_call",
+          toolCallId: "missing-runtime",
+          kind: "execute",
+          title: "Missing runtime",
+        },
+        {
+          type: "tool_result",
+          toolCallId: "missing-runtime",
+          title: "Missing runtime",
+          isError: false,
+        },
+        {
+          runtime: "kimi-acp",
+          type: "tool_call",
+          toolCallId: "other-runtime",
+          kind: "execute",
+          title: "Other runtime",
+        },
+        {
+          runtime: "kimi-acp",
+          type: "tool_result",
+          toolCallId: "other-runtime",
+          title: "Other runtime",
+          isError: false,
+        },
       ]),
     ).toEqual([]);
   });
@@ -287,6 +341,7 @@ describe("extractPiCommandLifecycleObservations", () => {
     expect(
       extractPiCommandLifecycleObservations([
         {
+          runtime: "pi-rpc",
           type: "tool_call",
           toolCallId: "a",
           kind: "read",
@@ -328,7 +383,6 @@ describe("extractPiCommandLifecycleObservations", () => {
       ]),
     ).toEqual([
       {
-        toolCallId: "safe",
         source: "title_fallback",
         command: "Safe fallback",
         origin: "title",
@@ -355,6 +409,7 @@ describe("extractPiCommandLifecycleObservations", () => {
       },
     });
     const accessorResult = {
+      runtime: "pi-rpc",
       type: "tool_result",
       toolCallId: "safe",
       title: "Safe fallback",
@@ -378,7 +433,6 @@ describe("extractPiCommandLifecycleObservations", () => {
       ]),
     ).toEqual([
       {
-        toolCallId: "safe",
         source: "title_fallback",
         command: "Safe fallback",
         origin: "title",
@@ -388,8 +442,40 @@ describe("extractPiCommandLifecycleObservations", () => {
     expect(getterCount).toBe(0);
   });
 
+  it("fails closed for own symbols on events and raw input", () => {
+    const metadata = Symbol("metadata");
+
+    expect(
+      extractPiCommandLifecycleObservations([
+        {
+          ...executeCall("symbol-event", "Ignored event"),
+          [metadata]: "unexpected",
+        },
+        {
+          runtime: "pi-rpc",
+          type: "tool_call",
+          toolCallId: "symbol-raw-input",
+          kind: "execute",
+          title: "Safe fallback",
+          rawInput: {
+            command: "must not be used",
+            [metadata]: "unexpected",
+          },
+        },
+      ]),
+    ).toEqual([
+      {
+        source: "title_fallback",
+        command: "Safe fallback",
+        origin: "title",
+        outcome: "missing",
+      },
+    ]);
+  });
+
   it("ignores inherited and symbol-only event fields", () => {
     const inherited = Object.create({
+      runtime: "pi-rpc",
       type: "tool_call",
       toolCallId: "inherited",
       kind: "execute",
@@ -402,12 +488,14 @@ describe("extractPiCommandLifecycleObservations", () => {
       extractPiCommandLifecycleObservations([
         inherited,
         {
+          runtime: "pi-rpc",
           [symbolType]: "tool_call",
           toolCallId: "symbol-type",
           kind: "execute",
           title: "Symbol type",
         },
         {
+          runtime: "pi-rpc",
           type: "tool_call",
           [symbolId]: "symbol-id",
           kind: "execute",
