@@ -66,6 +66,12 @@ describe("Pi write command observation sanitizer", () => {
             rawOutput: privateSentinels.rawOutput,
           },
         ),
+        {
+          source: "raw_input",
+          command: "git status --short",
+          origin: "raw_input",
+          outcome: "success",
+        },
         Object.assign(
           {
             source: "title_fallback",
@@ -92,6 +98,7 @@ describe("Pi write command observation sanitizer", () => {
         ),
       ],
       "write",
+      "git status --short",
     );
 
     expect(sanitized).toEqual([
@@ -100,6 +107,7 @@ describe("Pi write command observation sanitizer", () => {
       { source: "unextractable", match: "other", outcome: "error" },
       { source: "raw_input", match: "trim_only", outcome: "error" },
       { source: "raw_input", match: "embedded", outcome: "unknown" },
+      { source: "raw_input", match: "status_exact", outcome: "success" },
       { source: "title_fallback", match: "other", outcome: "missing" },
       { source: "unextractable", match: "other", outcome: "unknown" },
     ]);
@@ -116,5 +124,6 @@ describe("Pi write command observation sanitizer", () => {
     }
     const serialized = JSON.stringify(sanitized);
     expect(serialized).not.toContain("echo before");
+    expect(serialized).not.toContain("git status --short");
   });
 });
