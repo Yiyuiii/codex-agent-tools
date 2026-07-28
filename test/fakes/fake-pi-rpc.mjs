@@ -446,13 +446,29 @@ function handle(command) {
         toolName,
         args,
       });
-      emit({
+      const oversizedEnd =
+        scenario === "oversized-tool-end-error" ||
+        scenario === "oversized-tool-end-nonboolean";
+      const endEvent = {
         type: "tool_execution_end",
         toolCallId: "tool-1",
         toolName,
-        result: { content: [{ type: "text", text: "ok" }] },
-        isError: false,
-      });
+        result: {
+          content: [
+            {
+              type: "text",
+              text: oversizedEnd ? "x".repeat(70_000) : "ok",
+            },
+          ],
+        },
+        isError:
+          scenario === "oversized-tool-end-error"
+            ? true
+            : scenario === "oversized-tool-end-nonboolean"
+              ? "false"
+              : false,
+      };
+      emit(endEvent);
       emit({ type: "agent_end", messages: [], willRetry: false });
       emit({ type: "agent_settled" });
       const stderrBytes = Number.parseInt(

@@ -30,14 +30,17 @@ function mapToolEvent(event: unknown): unknown {
   }
   const toolName = typeof record.toolName === "string" ? record.toolName : "unknown";
   if (record.type === "tool_execution_end") {
-    return {
+    const mapped: Record<string, unknown> = {
       type: "tool_result",
       runtime: "pi-rpc",
       title: toolName,
       rawOutput: record.result,
-      isError: record.isError === true,
       toolCallId: record.toolCallId,
     };
+    if (typeof record.isError === "boolean") {
+      mapped.isError = record.isError;
+    }
+    return mapped;
   }
   const kind =
     toolName === "bash"

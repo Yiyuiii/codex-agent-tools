@@ -334,6 +334,52 @@ describe("Pi RPC client", () => {
     );
   });
 
+  it.each([
+    {
+      scenario: "oversized-tool-end-error",
+      expected: {
+        type: "tool_execution_end",
+        toolCallId: "tool-1",
+        toolName: "bash",
+        isError: true,
+        truncated: true,
+      },
+    },
+    {
+      scenario: "oversized-tool-end-nonboolean",
+      expected: {
+        type: "tool_execution_end",
+        toolCallId: "tool-1",
+        toolName: "bash",
+        truncated: true,
+      },
+    },
+  ] as const)(
+    "sanitizes $scenario without inventing a boolean outcome",
+    async ({ scenario, expected }) => {
+      const cwd = await tempDirectory();
+      const result = await runPiRpc({
+        ...baseRequest(
+          cwd,
+          {
+            PATH: process.env.PATH,
+            SYSTEMROOT: process.env.SYSTEMROOT,
+            FAKE_PI_SCENARIO: scenario,
+          },
+          "delegate",
+        ),
+      });
+      const end = result.events.find(
+        (event) =>
+          typeof event === "object" &&
+          event !== null &&
+          (event as { type?: unknown }).type === "tool_execution_end",
+      );
+      expect(end).toEqual(expected);
+      expect(JSON.stringify(end)).not.toContain("x".repeat(128));
+    },
+  );
+
   it("reports an abnormal exit as failed", async () => {
     const cwd = await tempDirectory();
     const result = await runPiRpc(

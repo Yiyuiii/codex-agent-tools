@@ -122,12 +122,16 @@ function sanitizedEvent(
 ): unknown {
   const serialized = JSON.stringify(event);
   if (Buffer.byteLength(serialized, "utf8") > 65_536) {
-    return {
+    const summary: Record<string, unknown> = {
       type: event.type,
       toolCallId: event.toolCallId,
       toolName: event.toolName,
       truncated: true,
     };
+    if (typeof event.isError === "boolean") {
+      summary.isError = event.isError;
+    }
+    return summary;
   }
   return JSON.parse(redactText(serialized, secrets)) as unknown;
 }

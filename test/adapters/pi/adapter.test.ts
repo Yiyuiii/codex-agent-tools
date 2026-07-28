@@ -130,6 +130,79 @@ describe("PiAdapter", () => {
     expect(request.environment.OPENAI_API_KEY_DOUBAO).toBeUndefined();
   });
 
+  it.each([
+    ["missing", undefined],
+    ["string", "false"],
+    ["number", 0],
+    ["object", { value: false }],
+  ] as const)(
+    "does not invent a successful tool result for a %s isError value",
+    async (_label, isError) => {
+      const runClient = vi.fn(async (_request: PiRpcRunRequest) => ({
+        status: "completed" as const,
+        text: "done",
+        actualModel: "ark-code-latest",
+        elapsedMs: 10,
+        events: [
+          {
+            type: "tool_execution_start",
+            toolCallId: "tool-1",
+            toolName: "bash",
+            args: { command: "git status --short" },
+          },
+          {
+            type: "tool_execution_end",
+            toolCallId: "tool-1",
+            toolName: "bash",
+            result: { content: [{ type: "text", text: "result.txt" }] },
+            isError,
+          },
+        ],
+        diagnostics: [],
+        executionTelemetry: {
+          adapterClientInvocationCount: 1,
+          adapterRetryCount: 0,
+          runtimeReportedAutoRetryCount: 0,
+          adapterReportedFallbackUsed: false,
+          source: "pi-rpc-observable" as const,
+        },
+      }));
+      const adapter = new PiAdapter({
+        locateExecutable: async () => "C:\\npm\\pi.cmd",
+        buildConfig: async () => ({
+          agentDir: "C:\\cache\\codex-agent-tools\\pi\\0.1.0-alpha.1",
+          settingsPath: "C:\\cache\\settings.json",
+          modelsPath: "C:\\cache\\models.json",
+          environment: {
+            PI_CODING_AGENT_DIR:
+              "C:\\cache\\codex-agent-tools\\pi\\0.1.0-alpha.1",
+          },
+          contentSha256: "a".repeat(64),
+        }),
+        runClient,
+      });
+
+      const result = await adapter.run({
+        profile: profile(),
+        task: "delegate",
+        cwd: process.cwd(),
+        prompt: "Implement",
+        parentEnvironment: {
+          PATH: "C:\\Windows",
+          OPENAI_API_KEY_DOUBAO: "ark-secret",
+        },
+      });
+
+      const toolResult = result.events.find(
+        (event) =>
+          typeof event === "object" &&
+          event !== null &&
+          (event as { type?: unknown }).type === "tool_result",
+      );
+      expect(toolResult).not.toHaveProperty("isError");
+    },
+  );
+
   it("fails explicitly when Pi reports a different actual model", async () => {
     const adapter = new PiAdapter({
       locateExecutable: async () => "pi.cmd",
