@@ -141,7 +141,7 @@
     <main>
       <h1>Pi 写入命令脱敏诊断设计审阅</h1>
       <p class="muted">
-        审阅日期：2026-07-28。方案 B 已由维护者批准并进入离线实现；本文不授权第二个真实模型批次。
+        审阅日期：2026-07-28。方案 B 已由维护者批准并完成离线实现与自动验证；新字段尚未由新真实批次实测，本文不授权第二个真实模型批次。
       </p>
 
       <div class="status">
@@ -149,7 +149,10 @@
         <code>2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678</code>
         完成全部八项，但只有前七项通过；最后一项
         <code>ark-agent-deepseek-v4-flash/delegate</code>
-        因结果文件缺失而失败，批次仍为 <code>blocked / case_failed</code>。
+        因结果文件缺失而失败，批次仍为 <code>blocked / case_failed</code>。该批次绑定 frozen commit
+        <code>07fd0d79e6885ee1e0af4a021e12170ef6c9f470</code>，manifest SHA-256 为
+        <code>eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556</code>，
+        证据提交为 <code>1d5d2c4</code>。
       </div>
 
       <h2>已经由机器确认的事实</h2>
@@ -260,12 +263,14 @@
 
       <h2>测试与收口</h2>
       <ul>
-        <li>RED→GREEN 覆盖 exact、trim-only、embedded、other、title spoof、截断 start/end、boolean/non-boolean end、end error、缺 end、重复/冲突事件、乱序、重复 ID 和超限。</li>
-        <li>验证 evidence JSON 不含任何命令正文、Base64 参数、tool-call ID、路径或输出。</li>
-        <li>证明现有 <code>commandsRun</code>、<code>commandCount</code>、公开 MCP structured content 和验收判定逐字节保持原语义。</li>
-        <li>保持所有历史 batch 的 SHA 与 immutable verifier 不变。</li>
-        <li>任务级规格审阅、代码质量审阅与全范围复审后，运行全量测试、类型检查、构建、release smoke、隔离 check-report、包闭包、锁/进程检查并冻结 clean candidate。</li>
-        <li>冻结后停止在第二个真实批次的精确 SHA 授权边界；本页本身不授权真实调用。</li>
+        <li>RED→GREEN 已覆盖 exact、trim-only、embedded、other、title spoof、截断 start/end、boolean/non-boolean end、end error、缺 end、重复/冲突事件、乱序、重复 ID 和超限。</li>
+        <li>evidence JSON 已验证不含任何命令正文、Base64 参数、tool-call ID、路径或输出。</li>
+        <li>现有 <code>commandsRun</code>、<code>commandCount</code>、公开 MCP structured content 和验收判定保持原语义。</li>
+        <li>5/5 retained manifests 通过 immutable verifier；evidence 相对 <code>a8aa4d8</code> 无变更，untracked 为 0。</li>
+        <li>逐任务规格/质量审阅与整体规格/安全审阅均 PASS；本轮两次 Kimi 外部复核均无结论：设计级跨多实现面审阅约 604.5 秒 <code>timed_out</code>，只返回读取进度；实现后两个内嵌摘录的单一不变量审阅约 181.8 秒 <code>timed_out</code>，review 正文为空。二者不计 PASS、不阻断，也未重试同形任务。</li>
+        <li>fresh 离线矩阵为 48 个测试文件、837 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离 check-report、两个 help 与 diff check 均通过。</li>
+        <li>Kimi ACP / Pi RPC / real-smoke 进程为 0/0/0，锁 absent，持久 <code>.tgz</code> 为 0；npm dry-run 为 171 files / 15 Markdown/HTML / 3 plugin files，size 536161、unpackedSize 2703085。</li>
+        <li>当前还需提交本轮状态文档并完成 clean allow-empty freeze；最终 40 位 SHA 只能由后续交接消息提供。本页本身不授权真实调用。</li>
       </ul>
 
       <h2>已批准的判断</h2>
@@ -273,8 +278,19 @@
         <p>维护者已明确批准：</p>
         <pre>批准方案 B：只增加 Pi 写入命令生命周期的脱敏诊断，不改提示词、validator、公开 MCP、模型/路由/凭据和重试策略；按 TDD 实施、双审、全量离线验证并冻结新候选。</pre>
         <p>
-          正式 spec 和逐步实施计划已经持久化。Codex 将持续自主实现；只有新的 clean frozen SHA 需要再次真实调用时才会停下索取精确授权。
+          正式 spec 和逐步实施计划已经持久化，离线实现提交链为
+          <code>8261736</code>、<code>652b13d</code> / <code>5e209e1</code> /
+          <code>16cdad5</code>、<code>293e745</code>、<code>969e546</code> /
+          <code>0852691</code> / <code>d9eb28a</code>、<code>4bd2439</code>。
+          当前只剩状态文档提交、clean freeze 和绑定最终 SHA 的新批次授权门槛。
         </p>
+      </div>
+
+      <div class="warning">
+        <strong>外部状态保持不变：</strong>未安装活动插件，未访问或修改
+        <code>~/.codex/config.toml</code>，未移除 <code>codex_cc_tools</code>，未调用或修改
+        Claude Code，也未发布、推送、合并或 fast-forward。注册表仍为 6 passed / 2 pending，
+        安装仍为 blocked / not ready。
       </div>
 
       <h2>可追溯证据</h2>
@@ -296,6 +312,9 @@
         </li>
         <li>
           <a href="../superpowers/plans/2026-07-28-pi-write-command-lifecycle-diagnostics.md">逐任务实施计划</a>
+        </li>
+        <li>
+          <a href="four-llm-qualification-next-authorization-review.html">下一次完整八项批次授权审阅（页面本身不构成授权）</a>
         </li>
       </ul>
     </main>

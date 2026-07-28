@@ -11,17 +11,17 @@
 
 当前八项 review/delegate 能力的过渡状态为 6 passed / 2 pending：`kimi-k3`、`ark-agent-plan` 与 `ark-agent-deepseek-v4-flash` 各两项 passed，只有 `ark-coding-plan` 的两项能力 pending。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用和 2026-07-26 五模型 blocked 批次只作为历史审计证据保留。pending 能力会明确拒绝，不会复用单项通过、旧模型证据或静默切换到其它 LLM。
 
-2026-07-27 在 frozen commit `652e14ac637bfc04d90c448179ecc5838f2f8450` 上只调用一次标准入口，启动 `four-llm-v1` 批次 `2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa`。一个 `functions.exec` cell 内的单个四小时预算前台 shell 持续承载约 979 秒并取得协调器正常终态；没有发生 cell 丢失或 recovery。
+最新真实批次绑定 frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470`，批次 ID 为 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678`。标准入口只调用一次；同一 `functions.exec` cell 从 ordinal 1 完整执行八项，8 completed、7 passed，没有 resume、retry、fallback、补跑、第二入口或第二批。
 
-ordinal 1 Ark Coding Plan delegate、ordinal 2 Ark Coding Plan review 与 ordinal 3 Kimi review 通过。ordinal 4 Kimi delegate 的实际模型、direct 路由、文件范围、14-byte 单行结果、进程清理与 `1 / 0 / 0 / false / false` telemetry 均正确，但严格检查没有观测到一个与 `git status --short` 完全相等的命令数组项，因此以 `acceptance_failed` 停止；ordinal 5–8 均未运行。证据协议不保存原始命令正文，所以不能断言该状态检查是完全省略还是被合并进其它命令，也不能据此放宽 validator。
+ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 的 provider、`deepseek-v4-flash` 模型、direct route、Agent Plan 凭据隔离、single-attempt、0 retry/fallback、命令数 6、精确 `git status --short` 观测与进程清理均正确，但结果文件完全缺失，因而以 `acceptance_failed` 结束。现有 evidence 只能证明最终制品缺失和已观察到的命令统计，不能证明精确写入命令是否形成、被执行、被改写或被跳过。manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`，26 个批次文件由独立提交 `1d5d2c4` 保存。
 
-该 manifest 为 schema v2、`blocked / case_failed`、`promotionEligible=false`，包含 4 个 completed case、4 个 notRun、9 个 checkpoint，且 `uncommittedEvidence=null`；SHA-256 为 `d7be5e6ba3884075d80fe399dd3c2d72caaa1a3833f92e529928655e623b7b69`。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在；14 个新证据文件由独立提交 `4f816f0` 保存。没有 retry、fallback、resume、跳项、补跑或第二批。
+用户批准的方案 B 已完成离线实现：超大 Pi 结束事件只安全保留 boolean `isError`；独立 Pi-only observer 产生 `source / match / outcome` 生命周期观察；qualification-only schema v3 producer 才可写入 `writeCommandObservations`；optional verifier 在该字段存在时严格校验。三个枚举只定位命令形成、工具结果与最终制品三层，不宣称已经识别四种具体根因。提示词、validator、公开 MCP、`commandsRun` / `commandCount`、provider/model/route/credential/retry/fallback、manifest/checkpoint/protocol 与历史 JSON 均未修改，新字段尚未由新真实批次实测。
 
-同批前三项通过不能与历史证据拼接晋级，注册表继续保持 6 passed / 2 pending，安装继续保持 `blocked / not ready`。用户随后批准并已完成 Kimi 资格命令观测的离线加固：资格提示词要求写文件与状态检查使用两个有序、独立的工具调用，ACP late fields 按 tool-call ID 归并，新产生的 Kimi delegate evidence 将只保存来源/匹配枚举；严格判定仍是 `commandsRun.includes("git status --short")`，公开结果、资格 manifest/checkpoint schema 与全部既有 evidence 均未修改。历史 evidence 可以没有新诊断字段，字段存在时才由 verifier 严格校验。
+实现与审阅提交链为 `8261736`、`652b13d` / `5e209e1` / `16cdad5`、`293e745`、`969e546` / `0852691` / `d9eb28a`、`4bd2439`。逐任务规格/质量审阅与整体规格/安全审阅均 PASS；本轮两次 Kimi 外部复核均无结论：设计级跨多实现面审阅约 604.5 秒 `timed_out`，只返回读取进度；实现后两个内嵌摘录的单一不变量审阅约 181.8 秒 `timed_out`，review 正文为空。二者不计 PASS、不阻断，也未重试同形任务。fresh 离线矩阵为 48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed；类型检查、构建、release smoke、隔离 check-report、两个 help 与 diff check 均通过。5/5 retained manifests 通过 immutable verifier，evidence 相对 `a8aa4d8` 无变更且 untracked 为 0；Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁 absent，持久 `.tgz` 为 0。`npm pack --dry-run --json` 的稳定文件面为 171 files / 15 Markdown/HTML / 3 plugin files；精确 byte size 不写入包内文档，避免打包元数据自引用。
 
-这轮实现没有调用真实模型，因此没有产生新的 Kimi 资格 evidence，也没有改变最新真实批次的 `blocked / case_failed` 终态。本轮真实批次授权已经消费，新的完整八项批次尚未授权，未来仍须在最终冻结和复核后取得另一份明确授权并从 ordinal 1 开始。当前最小历史证据见[四模型八项资格批次阻断结果审阅](docs/release/four-llm-qualification-result-review.html)；[本轮重新授权材料](docs/release/four-llm-qualification-reauthorization-review.html)与[更早授权材料](docs/release/four-llm-qualification-authorization-review.html)都只作已消费历史记录。
+注册表继续保持 6 passed / 2 pending，安装继续保持 `blocked / not ready`。当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。本轮状态文档提交与 clean allow-empty freeze 完成后，最终 40 位 frozen SHA 将只由交接消息提供；第二个真实批次尚未授权。新的授权审阅页只作为仓库内人工审阅材料，由最终交接直接提供入口，页面本身不构成授权；既有[阻断结果审阅](docs/release/four-llm-qualification-result-review.html)及两份旧授权材料都只作历史审计。
 
-2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；本轮约 979 秒真实批次进一步证明同一 cell 可承载到协调器正常终态，但两者都不证明四小时存活或任何未执行模型资格。未来真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议，并在新 frozen candidate 上取得另一份明确授权。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。这两份文档现已纳入 npm package；release smoke 以 `npm pack --dry-run --json` 的实际文件面为准，对全部 15 份 Markdown/HTML 做敏感信息与包内链接闭包检查。当前 dry-run 文件面为 145 files，其中插件面仍精确为 4 files；这只是 package/release assurance 改进，不构成模型资格、安装或发布。
+2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。未来另获授权的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
 项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端。
 
@@ -52,7 +52,7 @@ ordinal 1 Ark Coding Plan delegate、ordinal 2 Ark Coding Plan review 与 ordina
 
 要求 Node.js 20+，并已安装、登录本机 Kimi Code。Kimi 使用本机 OAuth 会话，本项目不复制或保存其令牌。
 
-仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。阻断结果收敛阶段曾以 44 个测试文件（584 passed / 1 个平台条件 skipped / 0 failed）完成当时的第 1 层验证；Kimi 观测与 package 闭包实现后的最终离线冻结矩阵为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed，类型检查、构建、release smoke、隔离 check-report、证据完整性、进程/锁和 clean-tree 检查均通过，代码层独立规格与质量复审也已通过。第 2 层隔离官方插件生命周期已经通过：Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。
+仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。较早的 44 files / 584 passed 与 46 files / 759 passed 矩阵只描述各自历史候选；当前 fresh 离线矩阵是 48 个测试文件、837 passed / 1 skipped / 0 failed，并通过类型检查、构建、release smoke、隔离 check-report、证据完整性、进程/锁与 clean-tree 检查。第 2 层隔离官方插件生命周期已经通过：Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。
 
 当前尚未执行真实官方安装。项目代码绝不直接读取或写入活动 `~/.codex/config.toml`；只有 `four-llm-v1` 同批八项全部 passed、隔离验收完成、阻断状态包重新收敛为 ready 权限包，并取得针对本次动作的明确许可后，维护者才可使用官方 `codex plugin` 命令。当前仍有两项注册表能力 pending，最新批次也以 `blocked / case_failed` 结束，因此真实安装授权准备处于 blocked / not ready。任何真实安装、升级或回滚都必须逐次授权，且不得用手工编辑配置代替官方机制。
 
@@ -94,4 +94,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。Kimi 观测和 package 文档闭包已经离线实现，最终离线冻结矩阵与独立规格/质量复审均已通过；第 2 层隔离官方插件生命周期此前已经通过。四模型八项能力仍处于 6 passed / 2 pending；最新 `four-llm-v1` 批次已由同一 execution cell 正常承载到协调器终态，但在第 4 项 Kimi delegate 的严格命令观测验收处形成 `blocked / case_failed`，未产生同批 8/8 资格，新的完整八项批次尚未授权，真实 Codex App 宿主门禁也尚未执行。因此当前是“离线候选已冻结、模型资格被阻断的官方插件候选”，不能称为已安装、已替代旧工具或可公开发布。
+当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。方案 B 离线实现、独立审阅与 48 files / 837 passed 的 fresh 验收已经完成；第 2 层隔离官方插件生命周期此前已经通过。四模型八项能力仍处于 6 passed / 2 pending；最新 `four-llm-v1` 批次完成八项但仅 7 passed，ordinal 8 因结果文件缺失而 `acceptance_failed`，未产生同批 8/8 资格。新诊断字段尚未经过新的真实批次实测，第二批尚未授权，真实 Codex App 宿主门禁也尚未执行。因此当前仍是 `blocked / not ready` 的官方插件候选，不能称为已安装、已替代旧工具或可公开发布。

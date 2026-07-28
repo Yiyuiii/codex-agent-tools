@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-最新真实 `four-llm-v1` 批次 `2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa` 已由一个 `functions.exec` cell 和一个四小时预算的前台 shell 正常承载到可信终态。ordinal 1 Ark Coding Plan delegate、ordinal 2 Ark Coding Plan review 与 ordinal 3 Kimi review 通过；ordinal 4 Kimi delegate 因 `requiredCommandObserved=false` 以 `acceptance_failed` 停止，ordinal 5–8 未运行。终态为 `blocked / case_failed` 且 `promotionEligible=false`；活动注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`。
+最新真实 `four-llm-v1` 批次 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678` 绑定 frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470`，已由一个 `functions.exec` cell 和一个四小时预算的前台 shell 从 ordinal 1 完整承载八项到可信终态。ordinal 1–7 passed；ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 的模型、provider、direct route、凭据隔离、single-attempt、0 retry/fallback、精确 `git status --short` 观测和进程清理均正确，但结果文件缺失而 `acceptance_failed`。终态为 `blocked / case_failed`、8 completed / 7 passed 且 `promotionEligible=false`；活动注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`。
 
-本轮没有发生 cell 丢失或 recovery，也没有 retry、fallback、resume、补跑或第二批。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。该结果证明本手册的长时承载路径可以取得正常终态，但不允许把同批前三项与历史证据拼接晋级。
+本轮没有发生 cell 丢失或 recovery，也没有 resume、retry、fallback、补跑、第二入口或第二批。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。该结果证明本手册的长时承载路径可以取得正常终态，但不允许把同批任一通过项与历史证据拼接晋级。
 
 105 秒承载演练只构成离线基础设施证据：`functions.exec` 约 1 秒后 yield，同一个 cell 随后经 4 次 `functions.wait` 完成；事件严格为 1 个 `started`、7 个有序 `heartbeat`、1 个 `completed`，shell exit code 为 0，观测 wall time 为 111.4 秒；演练后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。它不证明 cell 可存活 4 小时，不证明任何模型资格，也不授权真实批次。
 
@@ -105,7 +105,7 @@ cell 无法恢复等待且 owner、batch、authorization hash、terminal 或目�
 相关材料：
 
 - [105 秒离线承载演练](qualification-carrier-rehearsal.md)
-- [最新阻断结果审阅](four-llm-qualification-result-review.html)
+- [历史：2026-07-27 Kimi 命令观测阻断结果审阅](four-llm-qualification-result-review.html)
 - [已消费的历史授权材料](four-llm-qualification-authorization-review.html)
 - [发布验收清单](checklist.md)
 - [运维边界](../operations.md)

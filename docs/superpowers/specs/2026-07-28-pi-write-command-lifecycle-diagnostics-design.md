@@ -2,7 +2,7 @@
 
 日期：2026-07-28
 
-状态：维护者已批准推荐方案 B；待按 TDD 实现、双重审阅、全量离线验证并冻结新候选
+状态：方案 B 离线实现、双重审阅与 fresh 验证已完成；待最终状态文档提交、clean allow-empty freeze 与新真实批次授权
 
 ## 1. 授权与边界
 
@@ -55,20 +55,20 @@
 
 这些证据不能证明写入命令被省略、改写、执行失败或执行后制品消失。相同提示词合同在同一批次的 Ark Coding Plan 与 Ark Agent Plan delegate 中通过，因此当前证据不支持猜测性修改提示词、模型、路由、凭据、重试或 validator。
 
-## 3. 当前观测缺口
+## 3. 设计时观测缺口（已由离线实现闭合）
 
-Pi RPC client 会保留 `tool_execution_start` / `tool_execution_end`，Pi adapter 再映射为内部 `tool_call` / `tool_result`。任务服务目前只从开始事件提取公开 `commandsRun`：
+实施前，Pi RPC client 会保留 `tool_execution_start` / `tool_execution_end`，Pi adapter 再映射为内部 `tool_call` / `tool_result`。任务服务当时只从开始事件提取公开 `commandsRun`：
 
 - 有字符串 `rawInput.command` 时使用该字符串；
 - 否则在 compatibility policy 下回退到 title；
 - 结束事件不参与命令观测；
 - tool-level `isError` 不进入公开结果或资格 evidence。
 
-另有一个确定的 fail-open 风险：
+另有一个当时确定存在的 fail-open 风险：
 
 1. 超过 65,536 bytes 的 Pi 工具事件只保留 `type / toolCallId / toolName / truncated`；
 2. 超大结束事件的 boolean `isError` 因此丢失；
-3. adapter 当前用 `record.isError === true` 映射结果；
+3. adapter 当时用 `record.isError === true` 映射结果；
 4. 缺失或非 boolean 值会被强制变成 `false`，表现为“没有错误”。
 
 本设计必须把该路径改为三态语义：只有明确 boolean 才能形成 success/error；缺失、非 boolean 或协议冲突必须形成 `unknown`。
@@ -359,7 +359,7 @@ export interface SanitizedPiWriteCommandObservation {
 
 外部 LLM 只允许通过 `codex_external_agents.external_review` 明确选择非 Claude 逻辑 LLM做只读复核；超时或无结论不计 PASS，也不重试同形宽任务。
 
-## 12. 完成条件
+## 12. 完成条件与当前状态
 
 同时满足以下条件才算离线实现完成：
 
@@ -377,6 +377,26 @@ export interface SanitizedPiWriteCommandObservation {
 - 最终候选为 clean 40 位 SHA；
 - 没有运行第二个真实批次或其它越界动作。
 
+### 12.1 已完成的实现与审阅
+
+- 实现与审阅提交链为 `8261736`、`652b13d` / `5e209e1` / `16cdad5`、`293e745`、`969e546` / `0852691` / `d9eb28a`、`4bd2439`。
+- 超大结束事件 boolean `isError`、Pi-only 生命周期状态机、内部 observer、qualification-only schema v3 producer 与严格 optional verifier 均已按本设计实现。
+- 逐任务规格/质量审阅与整体规格/安全审阅均 PASS。
+- 本轮两次 Kimi 外部复核均无结论：设计级跨多实现面审阅约 604.5 秒 `timed_out`，只返回读取进度；实现后两个内嵌摘录的单一不变量审阅约 181.8 秒 `timed_out`，review 正文为空。二者不计 PASS、不阻断，也未重试同形任务。
+- fresh 离线矩阵为 48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed；typecheck、build、release smoke、隔离 check-report、两个 help 与 diff check 均通过。
+- 5/5 retained manifests 通过 immutable verifier；evidence 相对 `a8aa4d8` 无变更且 untracked 为 0。
+- Kimi ACP / Pi RPC / real-smoke 进程为 0/0/0，资格锁 absent，持久 `.tgz` 为 0。
+- `npm pack --dry-run --json` 为 171 files / 15 Markdown/HTML / 3 plugin files，size 536161、unpackedSize 2703085。
+
+### 12.2 尚未完成的收口
+
+- 本轮状态文档提交尚未完成。
+- clean allow-empty freeze 尚未完成，本文不得提前记录最终 40 位 frozen SHA。
+- `writeCommandObservations` 尚未由新的真实批次实测。
+- 第二个真实 `four-llm-v1` 批次尚未授权。
+- 注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`。
+- 未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。
+
 ## 13. 后续人工门槛
 
-离线实现冻结后，只能准备新的真实资格批次授权材料。下一次批次必须绑定届时的精确 frozen SHA，仍从 ordinal 1 开始执行完整八项；本设计批准不能复用为真实调用授权，也不能只补跑最后一项或拼接旧 evidence。
+完成状态文档提交与 clean allow-empty freeze 后，只能准备新的真实资格批次授权材料。下一次批次必须绑定交接消息届时提供的精确 40 位 frozen SHA，并遵守“一次全新完整 `four-llm-v1` 八项，从 ordinal 1，single entry/cell，按首错停，绝不 resume/retry/fallback/补跑/第二批”。本设计批准不能复用为真实调用授权，旧 SHA、旧授权与[授权审阅页面](../../release/four-llm-qualification-next-authorization-review.html)本身也都不能触发真实调用。

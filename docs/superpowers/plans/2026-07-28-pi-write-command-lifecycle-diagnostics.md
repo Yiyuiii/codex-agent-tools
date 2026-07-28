@@ -18,6 +18,18 @@
 - Failed case: `docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T02-05-37.999Z-ark-agent-deepseek-v4-flash-delegate-ark.json`
 - Planning parent: `a8aa4d8`
 
+## Execution status on 2026-07-28
+
+- Tasks 0–5 are complete. The approved planning baseline was committed as `bfecc7c`; behavior implementation and review fixes are `8261736`, `652b13d` / `5e209e1` / `16cdad5`, `293e745`, `969e546` / `0852691` / `d9eb28a`, and `4bd2439`.
+- Every task-level specification and quality review passed. Whole-change specification and security reviews also passed.
+- Two Kimi external reviews produced no conclusion: the design-level review across several implementation surfaces timed out after about 604.5 seconds with read progress only; the post-implementation review of two inlined excerpts and one invariant timed out after about 181.8 seconds with an empty review body. Neither is PASS or a blocker, and neither shape was retried.
+- Fresh offline verification passed with 48 test files, 837 passed / 1 platform-conditional skipped / 0 failed, plus typecheck, build, release smoke, isolated check-report, both help commands and diff check.
+- All 5/5 retained manifests passed immutable verification. Evidence is unchanged relative to `a8aa4d8`, evidence untracked count is 0, target process counts are 0/0/0, the qualification lock is absent, and no persistent `.tgz` exists.
+- npm dry-run reports 171 files / 15 Markdown-or-HTML files / 3 plugin files, size 536161 and unpackedSize 2703085.
+- The implementation preserves prompts, validators, public MCP results, `commandsRun` / `commandCount`, provider/model/route/credential/retry/fallback, manifest/checkpoint/protocol and historical JSON. The qualification-only schema v3 field has not yet been exercised by a new real batch.
+- Task 6 is now at the status-documentation handoff. The documentation commit, clean re-verification, allow-empty freeze, exact 40-character frozen SHA and new real-batch authorization remain pending. Do not infer a final SHA from this plan and do not mark the final freeze complete.
+- No active plugin was installed; active `~/.codex/config.toml` was not accessed or modified; `codex_cc_tools` was not removed; Claude Code was not invoked or modified; no publish, push, merge or formal-worktree fast-forward occurred.
+
 ## Fixed invariants
 
 Do not change:
@@ -83,11 +95,11 @@ Reviewers must not call real models, edit files, inspect active config, or touch
 - Modify: `AGENTS.md`
 - Modify: `docs/release/pi-write-command-diagnostics-design-review.html`
 
-- [ ] **Step 1: Record approval and index both documents**
+- [x] **Step 1: Record approval and index both documents**
 
 Add the maintainer approval to `AGENTS.md`, replace the review index label `待批准` with `已批准`, and link this design and plan. In the HTML, change the status copy from “用于批准” to “方案已批准、等待实现”, while retaining the statement that it does not authorize a real batch.
 
-- [ ] **Step 2: Self-review design/plan coverage**
+- [x] **Step 2: Self-review design/plan coverage**
 
 Check each approved design requirement maps to a plan task:
 
@@ -99,7 +111,7 @@ rg -n "isError|unknown|Pi-only|writeCommandObservations|commandCount|公开 MCP|
 
 Expected: every invariant appears in both the design and an implementation task.
 
-- [ ] **Step 3: Scan the plan for placeholders**
+- [x] **Step 3: Scan the plan for placeholders**
 
 ```powershell
 $planPath = "docs/superpowers/plans/2026-07-28-pi-write-command-lifecycle-diagnostics.md"
@@ -121,11 +133,11 @@ foreach ($pattern in $forbidden) {
 
 Expected: no matches.
 
-- [ ] **Step 4: Request read-only planning review**
+- [x] **Step 4: Request read-only planning review**
 
 The reviewer must check state-machine completeness, Pi compatibility counting, qualification-only scope, historical optionality, privacy, exact non-goals and TDD ordering. Correct documentation-only issues before implementation.
 
-- [ ] **Step 5: Commit the planning baseline**
+- [x] **Step 5: Commit the planning baseline**
 
 ```powershell
 git add -- `
@@ -150,7 +162,7 @@ Expected: commit succeeds and the final status is empty.
 - Modify: `test/adapters/pi/adapter.test.ts`
 - Modify: `src/adapters/pi/adapter.ts`
 
-- [ ] **Step 1: Add oversized end-event fixtures**
+- [x] **Step 1: Add oversized end-event fixtures**
 
 In the fake default event branch, select end data from `FAKE_PI_SCENARIO`:
 
@@ -180,7 +192,7 @@ emit(endEvent);
 
 Do not put a secret or target command in the oversized payload.
 
-- [ ] **Step 2: Write RED client tests**
+- [x] **Step 2: Write RED client tests**
 
 Add:
 
@@ -232,7 +244,7 @@ it.each([
 );
 ```
 
-- [ ] **Step 3: Run client RED**
+- [x] **Step 3: Run client RED**
 
 ```powershell
 npx.cmd vitest run test/adapters/pi/client.test.ts -t "without inventing a boolean outcome"
@@ -240,7 +252,7 @@ npx.cmd vitest run test/adapters/pi/client.test.ts -t "without inventing a boole
 
 Expected: the boolean-error case lacks `isError:true`; observe that exact failure before production edits.
 
-- [ ] **Step 4: Implement safe oversized summary**
+- [x] **Step 4: Implement safe oversized summary**
 
 Replace the oversized branch with:
 
@@ -259,7 +271,7 @@ return summary;
 
 Do not add any other event property.
 
-- [ ] **Step 5: Write RED adapter tests for missing and non-boolean values**
+- [x] **Step 5: Write RED adapter tests for missing and non-boolean values**
 
 Create a table-driven test whose injected client returns one start and one end. For each `isError` value `undefined`, `"false"`, `0`, and `{ value: false }`, assert:
 
@@ -275,7 +287,7 @@ expect(toolResult).not.toHaveProperty("isError");
 
 Keep the existing boolean false expectation as a positive control.
 
-- [ ] **Step 6: Run adapter RED**
+- [x] **Step 6: Run adapter RED**
 
 ```powershell
 npx.cmd vitest run test/adapters/pi/adapter.test.ts -t "does not invent"
@@ -283,7 +295,7 @@ npx.cmd vitest run test/adapters/pi/adapter.test.ts -t "does not invent"
 
 Expected: FAIL because the current mapper produces `isError:false`.
 
-- [ ] **Step 7: Implement tri-state adapter mapping**
+- [x] **Step 7: Implement tri-state adapter mapping**
 
 Use:
 
@@ -303,7 +315,7 @@ return mapped;
 
 Do not infer success from absence.
 
-- [ ] **Step 8: Run focused GREEN**
+- [x] **Step 8: Run focused GREEN**
 
 ```powershell
 npx.cmd vitest run test/adapters/pi/client.test.ts test/adapters/pi/adapter.test.ts
@@ -313,7 +325,7 @@ git diff --check
 
 Expected: both files pass, typecheck exits 0, diff check exits 0.
 
-- [ ] **Step 9: Commit and complete two-stage review**
+- [x] **Step 9: Commit and complete two-stage review**
 
 ```powershell
 git add -- `
@@ -334,7 +346,7 @@ Then follow the review protocol before Task 2.
 - Create: `src/tasks/pi-command-lifecycle.ts`
 - Create: `test/tasks/pi-command-lifecycle.test.ts`
 
-- [ ] **Step 1: Write RED behavior tests**
+- [x] **Step 1: Write RED behavior tests**
 
 Create table-driven tests for:
 
@@ -453,7 +465,7 @@ Also cover:
 - empty/non-string IDs ignored;
 - Proxy event/rawInput, accessor/inherited/symbol command and throwing getters never execute user code.
 
-- [ ] **Step 2: Run lifecycle RED**
+- [x] **Step 2: Run lifecycle RED**
 
 ```powershell
 npx.cmd vitest run test/tasks/pi-command-lifecycle.test.ts
@@ -461,7 +473,7 @@ npx.cmd vitest run test/tasks/pi-command-lifecycle.test.ts
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement exact exported types**
+- [x] **Step 3: Implement exact exported types**
 
 Create:
 
@@ -487,7 +499,7 @@ export interface PiCommandLifecycleObservation {
 }
 ```
 
-- [ ] **Step 4: Implement fail-closed parsing and folding**
+- [x] **Step 4: Implement fail-closed parsing and folding**
 
 Use non-evaluating descriptor reads:
 
@@ -578,7 +590,7 @@ function outcomeFor(state: CallState): PiCommandLifecycleOutcome {
 
 Return one observation per first execute start, in first-start order. Never include tool-call ID or output in the returned object.
 
-- [ ] **Step 5: Run lifecycle GREEN and characterization**
+- [x] **Step 5: Run lifecycle GREEN and characterization**
 
 ```powershell
 npx.cmd vitest run `
@@ -590,7 +602,7 @@ git diff --check
 
 Expected: both the new lifecycle suite and unchanged command-observation suite pass.
 
-- [ ] **Step 6: Commit and complete two-stage review**
+- [x] **Step 6: Commit and complete two-stage review**
 
 ```powershell
 git add -- `
@@ -609,7 +621,7 @@ Then follow the review protocol before Task 3.
 - Modify: `test/tasks/service.test.ts`
 - Modify: `test/mcp/server.test.ts`
 
-- [ ] **Step 1: Write RED Pi-only observer tests**
+- [x] **Step 1: Write RED Pi-only observer tests**
 
 Add a service test with Pi start/end events and:
 
@@ -646,7 +658,7 @@ Add tests proving:
 - observer throw adds only fixed `Internal Pi command lifecycle callback failed`;
 - existing `onCommandObservations` result and command policy remain unchanged.
 
-- [ ] **Step 2: Run service RED**
+- [x] **Step 2: Run service RED**
 
 ```powershell
 npx.cmd vitest run test/tasks/service.test.ts -t "Pi command lifecycle"
@@ -654,7 +666,7 @@ npx.cmd vitest run test/tasks/service.test.ts -t "Pi command lifecycle"
 
 Expected: FAIL because the context callback does not exist.
 
-- [ ] **Step 3: Integrate the internal observer**
+- [x] **Step 3: Integrate the internal observer**
 
 Add:
 
@@ -697,7 +709,7 @@ const INTERNAL_PI_COMMAND_LIFECYCLE_CALLBACK_FAILED =
 
 Do not change `commandsRun`, result interfaces or Zod schemas.
 
-- [ ] **Step 4: Add MCP byte-shape non-regression**
+- [x] **Step 4: Add MCP byte-shape non-regression**
 
 In the delegate MCP test, assert the sorted structured-content keys remain exactly:
 
@@ -723,7 +735,7 @@ expect(JSON.stringify(result.structuredContent)).not.toContain(
 
 Create the delegate fixture with both `actualModel` and `sessionId`, so the exact key set above is deterministic.
 
-- [ ] **Step 5: Run GREEN and public non-regression**
+- [x] **Step 5: Run GREEN and public non-regression**
 
 ```powershell
 npx.cmd vitest run `
@@ -737,7 +749,7 @@ git diff --check
 
 Expected: all pass; existing Kimi command tests remain unchanged.
 
-- [ ] **Step 6: Commit and complete two-stage review**
+- [x] **Step 6: Commit and complete two-stage review**
 
 ```powershell
 git add -- `
@@ -759,7 +771,7 @@ Then follow the review protocol before Task 4.
 - Modify: `test/smoke/pi.test.ts`
 - Modify: `test/smoke/ark.test.ts`
 
-- [ ] **Step 1: Write sanitizer RED tests**
+- [x] **Step 1: Write sanitizer RED tests**
 
 Test:
 
@@ -815,7 +827,7 @@ expect(Object.keys(sanitized[0]!).sort()).toEqual([
 expect(JSON.stringify(sanitized)).not.toContain("echo before");
 ```
 
-- [ ] **Step 2: Run sanitizer RED**
+- [x] **Step 2: Run sanitizer RED**
 
 ```powershell
 npx.cmd vitest run test/smoke/pi-write-command-observation.test.ts
@@ -823,7 +835,7 @@ npx.cmd vitest run test/smoke/pi-write-command-observation.test.ts
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement the enum-only sanitizer**
+- [x] **Step 3: Implement the enum-only sanitizer**
 
 Create:
 
@@ -869,7 +881,7 @@ export function sanitizePiWriteCommandObservations(
 }
 ```
 
-- [ ] **Step 4: Write qualification producer RED tests**
+- [x] **Step 4: Write qualification producer RED tests**
 
 Create a delegate qualification context for ordinal 8 and a fake service that reports:
 
@@ -922,7 +934,7 @@ Also assert:
 - title fallback equal to the target remains `match="other"`;
 - the new field does not change `passed` or `checks`.
 
-- [ ] **Step 5: Run producer RED**
+- [x] **Step 5: Run producer RED**
 
 ```powershell
 npx.cmd vitest run `
@@ -933,7 +945,7 @@ npx.cmd vitest run `
 
 Expected: sanitizer import or expected qualification field fails before production edits.
 
-- [ ] **Step 6: Wire qualification-only observer**
+- [x] **Step 6: Wire qualification-only observer**
 
 Add optional payload typing:
 
@@ -991,7 +1003,7 @@ Return the existing evidence plus:
 
 Do not add the callback or field to review/standalone paths.
 
-- [ ] **Step 7: Run producer GREEN**
+- [x] **Step 7: Run producer GREEN**
 
 ```powershell
 npx.cmd vitest run `
@@ -1006,7 +1018,7 @@ git diff --check
 
 Expected: all pass; Kimi evidence shape and exact validator remain unchanged.
 
-- [ ] **Step 8: Commit and complete two-stage review**
+- [x] **Step 8: Commit and complete two-stage review**
 
 ```powershell
 git add -- `
@@ -1027,7 +1039,7 @@ Then follow the review protocol before Task 5.
 - Modify: `src/qualification/verifier.ts`
 - Modify: `test/qualification/verifier.test.ts`
 
-- [ ] **Step 1: Add valid synthetic Pi delegate diagnostics**
+- [x] **Step 1: Add valid synthetic Pi delegate diagnostics**
 
 In `evidenceForCase`, add for current Pi delegate cases:
 
@@ -1041,7 +1053,7 @@ writeCommandObservations: [
 
 Keep the existing Kimi `commandObservations` fixture unchanged.
 
-- [ ] **Step 2: Write verifier RED tests**
+- [x] **Step 2: Write verifier RED tests**
 
 Mutate current passed/blocked synthetic evidence to reject:
 
@@ -1065,7 +1077,7 @@ Add positive tests for:
 - `exact` does not need to equal `requiredCommandObserved`, because the targets differ;
 - historical field absence remains accepted.
 
-- [ ] **Step 3: Run verifier RED**
+- [x] **Step 3: Run verifier RED**
 
 ```powershell
 npx.cmd vitest run test/qualification/verifier.test.ts -t "Pi write command"
@@ -1073,7 +1085,7 @@ npx.cmd vitest run test/qualification/verifier.test.ts -t "Pi write command"
 
 Expected: at least one invalid new-field case currently verifies.
 
-- [ ] **Step 4: Implement strict optional validation**
+- [x] **Step 4: Implement strict optional validation**
 
 Add closed sets:
 
@@ -1204,7 +1216,7 @@ validatePiWriteCommandDiagnostics(
 );
 ```
 
-- [ ] **Step 5: Run verifier GREEN and historical manifests**
+- [x] **Step 5: Run verifier GREEN and historical manifests**
 
 ```powershell
 npx.cmd vitest run test/qualification/verifier.test.ts
@@ -1223,7 +1235,7 @@ git diff --check
 
 Expected: verifier tests pass and every retained manifest verifies with its original status.
 
-- [ ] **Step 6: Prove historical bytes are untouched**
+- [x] **Step 6: Prove historical bytes are untouched**
 
 ```powershell
 git diff --quiet a8aa4d8 -- docs/smoke/evidence
@@ -1240,7 +1252,7 @@ if ($untrackedEvidence.Count -ne 0) {
 
 Expected: no tracked or untracked evidence changes.
 
-- [ ] **Step 7: Commit and complete two-stage review**
+- [x] **Step 7: Commit and complete two-stage review**
 
 ```powershell
 git add -- `
@@ -1265,7 +1277,7 @@ Then follow the review protocol before Task 6.
 - Create: `docs/release/four-llm-qualification-next-authorization-review.html`
 - Modify: this plan and its design only to record verified completion facts.
 
-- [ ] **Step 1: Dispatch whole-change specification review**
+- [x] **Step 1: Dispatch whole-change specification review**
 
 Give the reviewer:
 
@@ -1277,7 +1289,7 @@ Give the reviewer:
 
 Require it to verify every invariant, especially qualification-only field scope, Pi compatibility count, unknown semantics, title-spoof rejection, public MCP non-drift and unchanged historical evidence.
 
-- [ ] **Step 2: Dispatch whole-change quality/security review**
+- [x] **Step 2: Dispatch whole-change quality/security review**
 
 Require review of:
 
@@ -1291,7 +1303,7 @@ Require review of:
 
 Fix substantive findings only through new RED → GREEN tests and re-review until both reviewers PASS.
 
-- [ ] **Step 3: Attempt one narrowly bounded external review**
+- [x] **Step 3: Attempt narrowly bounded external review**
 
 Use `codex_external_agents.external_review` with explicit `llm: "kimi-k3"` only if the tool is healthy. Inline the single invariant under review and at most two focused code excerpts; cap findings at five. Do not ask Kimi to traverse the repository.
 
@@ -1301,7 +1313,7 @@ If it times out or returns no conclusion:
 - do not retry the same shape;
 - do not treat it as PASS or as a blocker after independent Codex reviews and deterministic tests.
 
-- [ ] **Step 4: Run fresh full offline verification**
+- [x] **Step 4: Run fresh full offline verification**
 
 ```powershell
 npm.cmd run typecheck
@@ -1316,7 +1328,7 @@ git diff --check
 
 Read every exit code and the full test file/pass/skip/fail count. Do not copy an older count into docs.
 
-- [ ] **Step 5: Run evidence, package, lock and process audits**
+- [x] **Step 5: Run evidence, package, lock and process audits**
 
 ```powershell
 $manifests = Get-ChildItem -LiteralPath docs/smoke/evidence/batches -Recurse -Filter manifest.json
@@ -1358,7 +1370,7 @@ Document:
 - install remains blocked / not ready;
 - exact fresh verification counts;
 - no prompt/validator/public MCP/provider/model/route/credential/retry/history change;
-- no real model call occurred during implementation;
+- no new real qualification batch ran during implementation; the two explicitly selected Kimi read-only reviews above remain recorded as inconclusive external calls;
 - the next batch requires a new exact frozen SHA authorization.
 
 The Chinese HTML authorization brief must include background, changed scope, automatically verified evidence, risks, exact one-batch scope, no retry/fallback/resume/second batch, excluded actions, links and the exact authorization reply. It must state that the page itself is not authorization.
