@@ -433,6 +433,11 @@ describe("Ark Pi real-smoke harness", () => {
     const contract = buildPiDelegateSmokeContract(
       "ark-agent-deepseek-v4-flash",
     );
+    const privateLifecycleSentinels = {
+      toolCallId: "PI_PRODUCER_PRIVATE_TOOL_CALL_ID_SENTINEL",
+      path: "PI_PRODUCER_PRIVATE_PATH_SENTINEL",
+      rawOutput: "PI_PRODUCER_PRIVATE_RAW_OUTPUT_SENTINEL",
+    } as const;
     const service: PiSmokeService = {
       review: async () => {
         throw new Error("not used");
@@ -440,12 +445,15 @@ describe("Ark Pi real-smoke harness", () => {
       delegate: async (_input, context) => {
         context?.onExecutionTelemetry?.(validPiTelemetry);
         context?.onPiCommandLifecycleObservations?.([
-          {
-            source: "raw_input",
-            command: contract.writeCommand,
-            origin: "raw_input",
-            outcome: "error",
-          },
+          Object.assign(
+            {
+              source: "raw_input",
+              command: contract.writeCommand,
+              origin: "raw_input",
+              outcome: "error",
+            } as const,
+            privateLifecycleSentinels,
+          ),
           {
             source: "raw_input",
             command: "git status --short",
@@ -508,8 +516,10 @@ describe("Ark Pi real-smoke harness", () => {
     expect(serialized).not.toContain(
       Buffer.from(`${contract.expectedLine}\n`, "utf8").toString("base64"),
     );
-    expect(serialized).not.toContain("tool-call");
     expect(serialized).not.toContain('"origin"');
+    for (const sentinel of Object.values(privateLifecycleSentinels)) {
+      expect(serialized).not.toContain(sentinel);
+    }
     expect(await readdir(root)).toEqual([]);
   });
 

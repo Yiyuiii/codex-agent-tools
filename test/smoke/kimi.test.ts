@@ -158,6 +158,7 @@ describe("Kimi real-smoke harness", () => {
     });
     expect(evidence.outputSha256).toMatch(/^[a-f0-9]{64}$/u);
     expect(evidence).not.toHaveProperty("commandObservations");
+    expect(evidence).not.toHaveProperty("writeCommandObservations");
     expect(JSON.stringify(evidence)).not.toContain(secretCommand);
     expect(await readdir(root)).toEqual([]);
   });
@@ -236,6 +237,7 @@ describe("Kimi real-smoke harness", () => {
       commandCount: 1,
       commandObservations: [{ source: "late_update", match: "exact" }],
     });
+    expect(evidence).not.toHaveProperty("writeCommandObservations");
     expect(JSON.stringify(evidence)).not.toContain(observedCommand);
     expect(await readdir(root)).toEqual([]);
   });
