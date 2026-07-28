@@ -96,6 +96,7 @@
 - [Pi 资格规定命令成功语义设计](docs/superpowers/specs/2026-07-28-qualification-required-command-success-design.md)
 - [Pi 写入命令生命周期脱敏诊断实施计划](docs/superpowers/plans/2026-07-28-pi-write-command-lifecycle-diagnostics.md)
 - [Pi Windows shell 环境闭环实施计划](docs/superpowers/plans/2026-07-28-pi-windows-shell-environment.md)
+- [Pi 资格规定命令成功语义实施计划](docs/superpowers/plans/2026-07-28-qualification-required-command-success.md)
 - [Kimi 资格命令观测加固实施计划](docs/superpowers/plans/2026-07-27-kimi-command-observation-hardening.md)
 - [npm 发布包文档链接闭包实施计划](docs/superpowers/plans/2026-07-27-package-document-link-closure.md)
 - [Kimi 观测与发布包闭包长期执行目标](docs/superpowers/plans/2026-07-27-kimi-observation-package-closure-goal.md)
