@@ -610,6 +610,81 @@ describe("Ark Pi real-smoke harness", () => {
     expect(await readdir(root)).toEqual([]);
   });
 
+  it("accepts a qualification delegate when both required lifecycles uniquely succeed", async () => {
+    const root = await tempRoot();
+    const contract = buildPiDelegateSmokeContract(
+      "ark-agent-deepseek-v4-flash",
+    );
+    const service: PiSmokeService = {
+      review: async () => {
+        throw new Error("not used");
+      },
+      delegate: async (input, context) => {
+        context?.onExecutionTelemetry?.(validPiTelemetry);
+        context?.onPiCommandLifecycleObservations?.([
+          {
+            source: "raw_input",
+            command: contract.writeCommand,
+            origin: "raw_input",
+            outcome: "success",
+          },
+          {
+            source: "raw_input",
+            command: "git status --short",
+            origin: "raw_input",
+            outcome: "success",
+          },
+        ]);
+        await writeFile(
+          path.join(input.cwd, contract.resultFileName),
+          `${contract.expectedLine}\n`,
+          "utf8",
+        );
+        return {
+          ok: true,
+          status: "completed",
+          llm: "ark-agent-deepseek-v4-flash",
+          actualModel: "deepseek-v4-flash",
+          elapsedMs: 15,
+          diagnostics: [],
+          filesChanged: [contract.resultFileName],
+          summary: "qualification delegate completed",
+          commandsRun: [contract.writeCommand, "git status --short"],
+          verification: [],
+          risks: [],
+        };
+      },
+    };
+
+    const evidence = await runPiSmoke(
+      {
+        llm: "ark-agent-deepseek-v4-flash",
+        task: "delegate",
+        tempRoot: root,
+        qualificationContext: delegateQualificationContext,
+      },
+      {
+        service,
+        runtimeEvidence: runtimeEvidence(),
+        readPiVersion: async () => "0.80.10",
+        listPiRpcProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence).toMatchObject({
+      passed: true,
+      failureReason: null,
+      checks: {
+        requiredCommandObserved: true,
+      },
+      writeCommandObservations: [
+        { source: "raw_input", match: "exact", outcome: "success" },
+        { source: "raw_input", match: "status_exact", outcome: "success" },
+      ],
+    });
+    expect(await readdir(root)).toEqual([]);
+  });
+
   it.each([
     ["missing", []],
     [
