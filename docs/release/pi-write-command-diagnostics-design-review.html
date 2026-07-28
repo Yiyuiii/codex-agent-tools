@@ -141,7 +141,7 @@
     <main>
       <h1>Pi 写入命令脱敏诊断设计审阅</h1>
       <p class="muted">
-        审阅日期：2026-07-28。本文只用于批准下一轮离线实现设计，不授权第二个真实模型批次。
+        审阅日期：2026-07-28。方案 B 已由维护者批准并进入离线实现；本文不授权第二个真实模型批次。
       </p>
 
       <div class="status">
@@ -268,12 +268,12 @@
         <li>冻结后停止在第二个真实批次的精确 SHA 授权边界；本页本身不授权真实调用。</li>
       </ul>
 
-      <h2>需要你的判断</h2>
+      <h2>已批准的判断</h2>
       <div class="decision">
-        <p>推荐批准方案 B。你可以直接回复：</p>
+        <p>维护者已明确批准：</p>
         <pre>批准方案 B：只增加 Pi 写入命令生命周期的脱敏诊断，不改提示词、validator、公开 MCP、模型/路由/凭据和重试策略；按 TDD 实施、双审、全量离线验证并冻结新候选。</pre>
         <p>
-          批准后，Codex 会先写正式 spec 和逐步实施计划，再持续自主实现；只有新的 clean frozen SHA 需要再次真实调用时才会停下索取精确授权。
+          正式 spec 和逐步实施计划已经持久化。Codex 将持续自主实现；只有新的 clean frozen SHA 需要再次真实调用时才会停下索取精确授权。
         </p>
       </div>
 
@@ -290,6 +290,12 @@
         </li>
         <li>
           <a href="../superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md">当前 Pi 写入合同设计</a>
+        </li>
+        <li>
+          <a href="../superpowers/specs/2026-07-28-pi-write-command-lifecycle-diagnostics-design.md">已批准的正式诊断设计</a>
+        </li>
+        <li>
+          <a href="../superpowers/plans/2026-07-28-pi-write-command-lifecycle-diagnostics.md">逐任务实施计划</a>
         </li>
       </ul>
     </main>

@@ -18,6 +18,7 @@
 - 2026-07-27：用户确认 Ark Coding Plan 资格提示词消歧路线，并要求建立长期 `goal` 后持续自主构建，直到预期必须人工干预。本阶段授权覆盖计划、TDD 离线修复、确定性验证、临时 `CODEX_HOME` 隔离生命周期、只读复核、证据完整性校验、新候选冻结和资格批次授权审阅材料；不覆盖真实模型批次、活动插件安装、活动 `config.toml` 访问、旧 `codex_cc_tools` 移除或公共发布。
 - 2026-07-27：最新唯一授权批次中断后，用户要求规划下一轮。当前规划权限只覆盖形成“Codex 原生长时执行承载离线演练 → 执行手册 → 新重新授权审阅页 → 完整离线/隔离验收 → clean candidate 冻结”的设计与实施计划；规划本身不授权实施，不授权生成资格 UUID 或运行真实模型批次。
 - 2026-07-28：用户明确授权在最终 clean frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上启动一个全新的完整 `four-llm-v1` 八项真实资格批次，并授权 Codex 在失败后自主完成根因调查、TDD 修复、审阅、离线验证和重新冻结。该授权已由下述 `2026-07-28T01-52-35.087Z-...` 批次消费。由于项目资格协议把每个真实批次绑定到精确 frozen SHA，本次授权不预先覆盖尚不存在的新 SHA 上的第二个真实批次；活动插件、活动配置、旧工具移除、Claude Code、发布、推送、合并和正式工作树 fast-forward 仍未获授权。
+- 2026-07-28：用户已批准 Pi 写入命令生命周期脱敏诊断的推荐方案 B。批准范围是独立 Pi-only 生命周期 observer、超大结束事件的 boolean `isError` 安全保留、qualification-only schema v3 producer、严格 optional verifier、TDD、规格/质量双审、全量离线/隔离验证和新 clean candidate 冻结；不修改提示词、validator、公开 MCP、模型/provider/route/credential、retry/fallback、资格协议或历史 evidence，也不授权第二个真实批次及其它上一条列明的外部状态动作。
 
 ## 当前事实状态
 
@@ -76,6 +77,7 @@
 - 2026-07-27：用户已批准按推荐方案 A 继续推进 Kimi 资格命令观测与发布包闭包：强化为两个独立工具调用的资格提示词，保持精确 validator，按 ACP tool-call ID 保留并归并协议允许晚到的 `kind/title/rawInput`，只持久化 `raw_input / title_fallback / late_update / unextractable` 与 `exact / trim_only / embedded / other` 脱敏分类；同时把资格承载演练和执行手册纳入 npm package，并把本地链接检查扩展到全部实际打包 Markdown/HTML。批准覆盖设计、TDD、独立审阅、离线/隔离验证和重新冻结，不授权新的真实批次、活动安装/配置、旧工具移除、Claude Code、发布、推送或合并。正式设计见[Kimi 资格命令观测与发布包闭包设计](docs/superpowers/specs/2026-07-27-kimi-command-observation-and-package-closure-design.md)。
 - 2026-07-27：批准方案的代码实现和审阅修复已完成。Kimi 提交链为 `d681f8f`、`6c92cf0`、`86a21ac`、`bc5069e`、`55a7f51`、`00e48e2`、`393274e`、`03cd172`、`ebb8082`、`696bfa6`：资格提示词使用两个独立工具调用，ACP late fields 按 tool-call ID 归并；Kimi 资格路径只把真实 `rawInput.command` 计入 `commandsRun`，title 只能持久化为 `title_fallback / other`，新 delegate producer 只输出来源/匹配枚举，optional verifier 在字段存在时严格校验。公开 `commandsRun.includes("git status --short")` exact validator、任务/MCP 结果、manifest/checkpoint schema 与全部既有 evidence JSON 均未改变。package 提交链为 `68d59eb`、`0388d89`、`ca74018`、`1b38b72`、`c416462`：两份承载文档已打包，release smoke 扫描实际 pack 全部 Markdown/HTML；Markdown 使用精确锁定的 `commonmark@0.31.2` AST，HTML tokenizer 处理 text-only 元素、路径安全、脱敏和线性复杂度，dry-run 为 145 files / 15 docs / 4 plugin files。供应链复审又以 `4766b6a` 将实际进入 bundle 的 `fast-uri` 从 3.1.3 升至 3.1.4，`npm audit --omit=dev` 的 high/critical 已清零；余下 Hono moderate 来自最新 MCP SDK 固定的 1.x 依赖，项目只使用 stdio 且插件 bundle 不含 Hono HTTP/serve-static 路径，已作为不可达 upstream 风险记录，不降级 SDK 或强制覆盖 Hono major。最终离线矩阵为 46 个测试文件、759 passed / 1 个平台条件 skipped / 0 failed；类型检查、构建、release smoke、隔离 check-report、两个 help、四份不可变 evidence、当前 5/5、历史 14/14、进程 0/0/0、锁 absent、pack 145/15/4 和 clean tree 均通过，代码层独立规格与质量复审也已通过。clean freeze 由本条完成状态文档提交承载，精确 SHA 应从最终 Git 交接读取，不在提交自身内硬编码。本轮没有调用真实模型、安装插件、访问活动配置、发布、推送或合并；最新批次仍为 `blocked / case_failed`，注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`，旧授权已消费且新的完整八项批次尚未授权。
 - 2026-07-28：用户新授权已在 active long-term goal、one-cell/one-entry 与四小时内层预算下消费。冻结候选 `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 的 fresh 预飞为 46 个测试文件、759 passed / 1 skipped / 0 failed，类型检查、构建、release smoke、隔离 check-report、Kimi 可执行、两类 Ark 凭据命中、目标进程 0/0/0、资格锁 absent 和 clean tree 均通过。标准入口只调用一次，同一 `functions.exec` cell 约 790 秒后正常返回批次 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678` 的可信 `blocked / case_failed` 终态；8 项全部完成，ordinal 1–7 passed，包含此前阻断的 Kimi delegate，ordinal 8 `ark-agent-deepseek-v4-flash/delegate` failed。该失败的模型、provider、direct route、凭据隔离、命令观测、single-attempt、零 retry/fallback 与进程清理均正确，但结果文件完全缺失：`filesChanged=[]`、`resultFileReadStatus=missing`、`resultFileObserved=false`，因此 `acceptance_failed`。现有脱敏 evidence 只能证明 `commandCount=6` 且精确 `git status --short` 被观察，不能证明精确写入命令是否被执行、改写或跳过；这些原因仍是待验证假设，不是事实。manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`，immutable-evidence verifier 通过，锁 absent、目标进程 0/0/0；26 个批次文件由独立提交 `1d5d2c4` 保存。没有 retry、补跑、第二入口或第二批。原子晋级未发生，活动注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`；当前自主调试先闭合 Pi 写入命令的脱敏观测缺口，不放宽 validator，不改变 provider/model/route/credential/retry/fallback。
+- 2026-07-28：Pi 诊断方案经独立反证审计修正后获用户批准。目标不是用三个枚举证明四种具体根因，而是用 `source / match / outcome` 定位命令形成、工具执行和最终制品层；`exact + success + missing` 只表示工具报告成功后制品仍不一致，不能直接断言发生删除。正式设计与实施计划已持久化，当前进入 TDD 实施；下一次真实模型批次仍需绑定新 frozen SHA 的独立明确授权。
 
 ## 架构与计划索引
 
@@ -86,6 +88,8 @@
 - [Ark Coding Plan 资格提示词消歧与后续替代路线设计](docs/superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md)
 - [资格长时承载修复与再授权准备设计](docs/superpowers/specs/2026-07-27-qualification-carrier-and-reauthorization-design.md)
 - [Kimi 资格命令观测与发布包闭包设计](docs/superpowers/specs/2026-07-27-kimi-command-observation-and-package-closure-design.md)
+- [Pi 写入命令生命周期脱敏诊断设计](docs/superpowers/specs/2026-07-28-pi-write-command-lifecycle-diagnostics-design.md)
+- [Pi 写入命令生命周期脱敏诊断实施计划](docs/superpowers/plans/2026-07-28-pi-write-command-lifecycle-diagnostics.md)
 - [Kimi 资格命令观测加固实施计划](docs/superpowers/plans/2026-07-27-kimi-command-observation-hardening.md)
 - [npm 发布包文档链接闭包实施计划](docs/superpowers/plans/2026-07-27-package-document-link-closure.md)
 - [Kimi 观测与发布包闭包长期执行目标](docs/superpowers/plans/2026-07-27-kimi-observation-package-closure-goal.md)
@@ -97,7 +101,7 @@
 - [历史：已执行且授权已消费的四模型资格批次与结果收敛实施计划](docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md)
 - [历史：已消费的四模型八项资格批次授权审阅](docs/release/four-llm-qualification-authorization-review.html)
 - [最新：四模型八项资格批次阻断结果审阅](docs/release/four-llm-qualification-result-review.html)
-- [待批准：Pi 写入命令脱敏诊断设计审阅](docs/release/pi-write-command-diagnostics-design-review.html)
+- [已批准：Pi 写入命令脱敏诊断设计审阅](docs/release/pi-write-command-diagnostics-design-review.html)
 - [历史：十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md)
 - [历史：五模型官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)
 - [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)
