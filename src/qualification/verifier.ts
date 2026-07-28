@@ -503,6 +503,7 @@ const PI_WRITE_SOURCES = new Set([
 ]);
 const PI_WRITE_MATCHES = new Set([
   "exact",
+  "status_exact",
   "trim_only",
   "embedded",
   "other",
@@ -519,8 +520,14 @@ function validatePiWriteCommandDiagnostics(
   protocol: VerifierProtocol,
   identity: Readonly<QualificationCaseIdentity>,
   runtime: FrozenLogicalLlmIdentity["runtime"],
+  requireSuccessfulContract: boolean,
 ): void {
-  if (!Object.hasOwn(evidence, "writeCommandObservations")) return;
+  if (!Object.hasOwn(evidence, "writeCommandObservations")) {
+    if (requireSuccessfulContract) {
+      throw new QualificationVerificationError();
+    }
+    return;
+  }
   if (
     protocol !== CURRENT_VERIFIER_PROTOCOL ||
     evidence.schemaVersion !== 3 ||
@@ -561,6 +568,8 @@ function validatePiWriteCommandDiagnostics(
   }
 
   let extractableCount = 0;
+  const writeMatches: Array<Record<string, unknown>> = [];
+  const statusMatches: Array<Record<string, unknown>> = [];
   for (const key of itemKeys) {
     const descriptor = descriptors[key]!;
     if (
@@ -593,6 +602,11 @@ function validatePiWriteCommandDiagnostics(
     if (observation.source !== "unextractable") {
       extractableCount += 1;
     }
+    if (observation.match === "exact") {
+      writeMatches.push(observation);
+    } else if (observation.match === "status_exact") {
+      statusMatches.push(observation);
+    }
   }
 
   const commandCount = evidence.commandCount;
@@ -601,6 +615,22 @@ function validatePiWriteCommandDiagnostics(
     !Number.isSafeInteger(commandCount) ||
     commandCount < 0 ||
     extractableCount !== commandCount
+  ) {
+    throw new QualificationVerificationError();
+  }
+
+  const contractSucceeded =
+    writeMatches.length === 1 &&
+    writeMatches[0]?.outcome === "success" &&
+    statusMatches.length === 1 &&
+    statusMatches[0]?.outcome === "success";
+  const checks = plainRecord(evidence.checks);
+  const containsStatusExact = statusMatches.length > 0;
+  if (
+    (containsStatusExact &&
+      checks.requiredCommandObserved !== contractSucceeded) ||
+    (requireSuccessfulContract &&
+      (checks.requiredCommandObserved !== true || !contractSucceeded))
   ) {
     throw new QualificationVerificationError();
   }
@@ -670,6 +700,7 @@ function validateEvidenceIdentityAndAcceptance(
   preflight: FrozenPreflightRecord,
   authorizationReferenceSha256: unknown,
   batchId: string,
+  terminalPassed: boolean,
 ): void {
   const evidence = plainRecord(evidenceValue);
   const logicalIdentity = preflight.logicalLlms.find(
@@ -780,6 +811,10 @@ function validateEvidenceIdentityAndAcceptance(
     protocol,
     identity,
     logicalIdentity.runtime,
+    protocol === CURRENT_VERIFIER_PROTOCOL &&
+      terminalPassed &&
+      identity.task === "delegate" &&
+      logicalIdentity.runtime === "pi-rpc",
   );
 }
 
@@ -916,6 +951,7 @@ async function validateManifestEvidence(
       preflight,
       manifest.authorizationReferenceSha256,
       batchId,
+      manifest.status === "passed",
     );
   }
 }

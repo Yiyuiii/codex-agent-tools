@@ -30,6 +30,8 @@ const authorizationHash = "a".repeat(64);
 const repositoryCommit = "b".repeat(40);
 const historicalBatchId =
   "2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f";
+const retainedBlockedBatchId =
+  "2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef";
 
 function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
@@ -272,7 +274,11 @@ function evidenceForCase(
           commandCount: 2,
           writeCommandObservations: [
             { source: "raw_input", match: "exact", outcome: "success" },
-            { source: "raw_input", match: "other", outcome: "success" },
+            {
+              source: "raw_input",
+              match: "status_exact",
+              outcome: "success",
+            },
           ],
         }
       : {}),
@@ -573,6 +579,62 @@ async function expectVerificationFailure(
   });
 }
 
+const invalidPassedPiDiagnostics: ReadonlyArray<
+  readonly [string, (evidence: Record<string, unknown>) => void]
+> = [
+  [
+    "missing diagnostics",
+    (evidence) => {
+      delete evidence.writeCommandObservations;
+    },
+  ],
+  [
+    "failed write lifecycle",
+    (evidence) => {
+      const observations = evidence.writeCommandObservations as Array<
+        Record<string, unknown>
+      >;
+      observations[0]!.outcome = "error";
+    },
+  ],
+  [
+    "missing status lifecycle",
+    (evidence) => {
+      const observations = evidence.writeCommandObservations as Array<
+        Record<string, unknown>
+      >;
+      evidence.writeCommandObservations = [observations[0]!];
+      evidence.commandCount = 1;
+    },
+  ],
+  [
+    "failed status lifecycle",
+    (evidence) => {
+      const observations = evidence.writeCommandObservations as Array<
+        Record<string, unknown>
+      >;
+      observations[1]!.outcome = "error";
+    },
+  ],
+  [
+    "duplicate status lifecycle",
+    (evidence) => {
+      const observations = evidence.writeCommandObservations as Array<
+        Record<string, unknown>
+      >;
+      observations.push({ ...observations[1]! });
+      evidence.commandCount = 3;
+    },
+  ],
+  [
+    "false required-command check",
+    (evidence) => {
+      const checks = evidence.checks as Record<string, unknown>;
+      checks.requiredCommandObserved = false;
+    },
+  ],
+];
+
 describe("qualification verifier", () => {
   it("prints protocol identity and terminal state in verifier CLI output", async () => {
     let stdout = "";
@@ -804,6 +866,7 @@ describe("qualification verifier", () => {
         delete evidence.configSha256;
         delete evidence.credentialEnv;
         for (const key of [
+          "commandCount",
           "expectedResultNormalizedSha256",
           "resultFileByteLength",
           "resultFileContainsExpectedLine",
@@ -811,6 +874,7 @@ describe("qualification verifier", () => {
           "resultFileNormalizedSha256",
           "resultFileRawSha256",
           "resultFileReadStatus",
+          "writeCommandObservations",
         ]) {
           delete evidence[key];
         }
@@ -1298,6 +1362,43 @@ describe("qualification verifier", () => {
       });
     });
 
+    it.each(invalidPassedPiDiagnostics)(
+      "rejects terminal passed Pi delegate evidence with %s",
+      async (_label, mutateEvidence) => {
+        const repositoryRoot = await tempRepository();
+        const { manifestPath } = await createPassedBatch(repositoryRoot);
+        await coherentlyRewriteEvidenceReference({
+          repositoryRoot,
+          manifestPath,
+          ordinal: 1,
+          mutateEvidence,
+        });
+
+        await expectVerificationFailure(repositoryRoot, manifestPath);
+      },
+    );
+
+    it("also rejects missing terminal-passed Pi diagnostics in frozen-candidate mode", async () => {
+      const repositoryRoot = await tempRepository();
+      const { manifestPath, preflight } =
+        await createPassedBatch(repositoryRoot);
+      await coherentlyRewriteEvidenceReference({
+        repositoryRoot,
+        manifestPath,
+        ordinal: 1,
+        mutateEvidence: (evidence) => {
+          delete evidence.writeCommandObservations;
+        },
+      });
+
+      await expectVerificationFailure(
+        repositoryRoot,
+        manifestPath,
+        "frozen-candidate",
+        frozenCandidate(preflight),
+      );
+    });
+
     it("accepts exact/error diagnostics on failed Pi delegate evidence", async () => {
       const repositoryRoot = await tempRepository();
       const manifestPath = await createCurrentBlockedBatch(
@@ -1350,16 +1451,14 @@ describe("qualification verifier", () => {
       });
     });
 
-    it("keeps current v3 evidence without the optional field compatible", async () => {
+    it("keeps blocked current v3 evidence without the optional field compatible", async () => {
       const repositoryRoot = await tempRepository();
-      const { manifestPath } = await createPassedBatch(repositoryRoot, {
-        mutateEvidence: (evidence, identity) => {
-          if (identity.llm === "kimi-k3" || identity.task !== "delegate") {
-            return;
-          }
+      const manifestPath = await createCurrentBlockedBatch(
+        repositoryRoot,
+        (evidence) => {
           delete evidence.writeCommandObservations;
         },
-      });
+      );
 
       await expect(
         verifyQualification({
@@ -1370,7 +1469,8 @@ describe("qualification verifier", () => {
       ).resolves.toMatchObject({
         verified: true,
         qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
-        status: "passed",
+        status: "blocked",
+        promotionEligible: false,
       });
     });
 
@@ -1388,6 +1488,34 @@ describe("qualification verifier", () => {
         verified: true,
         qualificationPlanId: "five-llm-v1",
         status: "blocked",
+      });
+    });
+
+    it("verifies the retained 2026-07-28 blocked batch without rewriting evidence", async () => {
+      const repositoryRoot = process.cwd();
+      const manifestPath = path.join(
+        repositoryRoot,
+        "docs",
+        "smoke",
+        "evidence",
+        "batches",
+        retainedBlockedBatchId,
+        "manifest.json",
+      );
+
+      await expect(
+        verifyQualification({
+          repositoryRoot,
+          manifestPath,
+          mode: "immutable-evidence",
+        }),
+      ).resolves.toEqual({
+        verified: true,
+        mode: "immutable-evidence",
+        batchId: retainedBlockedBatchId,
+        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+        status: "blocked",
+        promotionEligible: false,
       });
     });
 
