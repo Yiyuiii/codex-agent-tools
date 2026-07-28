@@ -13,6 +13,8 @@ const BASE_ENVIRONMENT_KEYS = [
   "SYSTEMROOT",
   "WINDIR",
   "COMSPEC",
+  "ProgramFiles",
+  "ProgramFiles(x86)",
   "TEMP",
   "TMP",
   "HOME",

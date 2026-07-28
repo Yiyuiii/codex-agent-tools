@@ -8,6 +8,23 @@ describe("child environment", () => {
     expectTypeOf<NetworkPolicy>().toEqualTypeOf<"direct">();
   });
 
+  it("preserves Windows program roots needed by Pi shell discovery", () => {
+    const env = buildChildEnvironment(
+      { network: "direct", credentialEnv: [] },
+      {
+        PROGRAMFILES: "C:\\Program Files",
+        "programfiles(x86)": "C:\\Program Files (x86)",
+        ProgramW6432: "C:\\Program Files",
+        HTTP_PROXY: "http://parent:1",
+      },
+    );
+
+    expect(env).toEqual({
+      ProgramFiles: "C:\\Program Files",
+      "ProgramFiles(x86)": "C:\\Program Files (x86)",
+    });
+  });
+
   it("removes inherited proxies and unrelated credentials for direct profiles", () => {
     const env = buildChildEnvironment(
       { network: "direct", credentialEnv: [] },
