@@ -1,0 +1,334 @@
+{
+  "schemaVersion": 2,
+  "qualificationPlanId": "four-llm-v1",
+  "batchId": "2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678",
+  "status": "blocked",
+  "authorizationReferenceSha256": "29ee47f86ce9ef513c0f182e977e807980b787b2cd271f6cfb2f20fdaf3054ac",
+  "repositoryCommit": "07fd0d79e6885ee1e0af4a021e12170ef6c9f470",
+  "buildIdentitySha256": "ebf3782fba278f46c21aa9854f2d2b9788078fce8093bc9f0f03b8bb669e1402",
+  "preflightSha256": "7dc4f81a696a9f9c45a4848d6d9bf1000de471bb07a02a36c5153ef844074a50",
+  "preflight": {
+    "schemaVersion": 2,
+    "qualificationPlanId": "four-llm-v1",
+    "repositoryCommit": "07fd0d79e6885ee1e0af4a021e12170ef6c9f470",
+    "repositoryBranch": "codex/gemini-retirement",
+    "repositoryDirty": false,
+    "packageVersion": "0.1.0-alpha.1",
+    "packageLockSha256": "96d102ac5258d975c49e8ac24d471ada07cf7f6d575788942b305afc26c36ec0",
+    "buildArtifacts": [
+      {
+        "path": "dist/ark-smoke.js",
+        "sha256": "11b9fcf71ec72df52ea11eba13d63f86941fb2e84f8ad706275c341b6ad18659"
+      },
+      {
+        "path": "dist/kimi-smoke.js",
+        "sha256": "3fa7da34704f46bf4035cbfdaba7e4a0e5042338c6a97b29ce71dedf08d27c66"
+      },
+      {
+        "path": "dist/smoke-evidence.js",
+        "sha256": "7990e85ce502b99aa2a1115d3251b87ec473e4c56b572b8686cac9fcbbf3b221"
+      },
+      {
+        "path": "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+        "sha256": "eb87bd879080c8aea1b638c48d95a2e78c03ec6bbf6ce330065f0e16e61a9605"
+      }
+    ],
+    "buildIdentitySha256": "ebf3782fba278f46c21aa9854f2d2b9788078fce8093bc9f0f03b8bb669e1402",
+    "runtimeVersions": {
+      "node": "v24.14.1",
+      "codex": "codex-cli 0.135.0",
+      "kimi": "0.27.0",
+      "pi": "0.80.10"
+    },
+    "piConfigSha256": "3b1e8827e21207d0d41d3189a7409d0f722ce7fece8aa41049046a14bc04349e",
+    "logicalLlms": [
+      {
+        "llm": "ark-agent-deepseek-v4-flash",
+        "runtime": "pi-rpc",
+        "model": "deepseek-v4-flash",
+        "provider": "ark-agent-plan",
+        "route": "direct"
+      },
+      {
+        "llm": "ark-agent-plan",
+        "runtime": "pi-rpc",
+        "model": "ark-code-latest",
+        "provider": "ark-agent-plan",
+        "route": "direct"
+      },
+      {
+        "llm": "ark-coding-plan",
+        "runtime": "pi-rpc",
+        "model": "ark-code-latest",
+        "provider": "ark-coding-plan",
+        "route": "direct"
+      },
+      {
+        "llm": "kimi-k3",
+        "runtime": "kimi-acp",
+        "model": "kimi-code/k3",
+        "provider": null,
+        "route": "direct"
+      }
+    ],
+    "credentialMatches": [
+      {
+        "llm": "ark-agent-deepseek-v4-flash",
+        "environmentVariableName": "OPENAI_API_KEY_DOUBAO"
+      },
+      {
+        "llm": "ark-agent-plan",
+        "environmentVariableName": "OPENAI_API_KEY_DOUBAO"
+      },
+      {
+        "llm": "ark-coding-plan",
+        "environmentVariableName": "API_KEY_DOUBAO_CODING"
+      },
+      {
+        "llm": "kimi-k3",
+        "environmentVariableName": null
+      }
+    ],
+    "targetProcesses": {
+      "kimi": {
+        "count": 0
+      },
+      "piRpc": {
+        "count": 0
+      },
+      "realSmoke": {
+        "count": 0
+      }
+    }
+  },
+  "cases": [
+    {
+      "ordinal": 1,
+      "llm": "ark-coding-plan",
+      "task": "delegate",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T01-56-02.392Z-ark-coding-plan-delegate-ark.json",
+        "sha256": "fa004916cf737cc9114e2cbef42f5110398cb38a70e257bec91976d7dfed2419"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable"
+    },
+    {
+      "ordinal": 2,
+      "llm": "ark-coding-plan",
+      "task": "review",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T01-56-21.772Z-ark-coding-plan-review-ark.json",
+        "sha256": "be85b8315edfb264f644456eec6e867534a057543932491c1da1c6bb2a1af5a9"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable"
+    },
+    {
+      "ordinal": 3,
+      "llm": "kimi-k3",
+      "task": "review",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T01-56-48.309Z-kimi-k3-review.json",
+        "sha256": "6a843809513af866c20f0392e9f122479692fab376d8cea480e6d2ebd2e8787f"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "kimi-acp-observable"
+    },
+    {
+      "ordinal": 4,
+      "llm": "kimi-k3",
+      "task": "delegate",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T01-57-12.855Z-kimi-k3-delegate.json",
+        "sha256": "356284c02d16ad291e36b7fe588fbb4d6bcf4ef822d0a71c4dcc6c1cd1fa1790"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "kimi-acp-observable"
+    },
+    {
+      "ordinal": 5,
+      "llm": "ark-agent-plan",
+      "task": "review",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T01-57-34.208Z-ark-agent-plan-review-ark.json",
+        "sha256": "d85d5e5d557cb7a8d8c2b418b9e453347b8ea0e9b805ca28a5d82cdb81424ae7"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable"
+    },
+    {
+      "ordinal": 6,
+      "llm": "ark-agent-plan",
+      "task": "delegate",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T02-04-08.782Z-ark-agent-plan-delegate-ark.json",
+        "sha256": "5d9231a1ef175a7017d754d80f531b12cb7f59c0481171ddd2d14331d1d71352"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable"
+    },
+    {
+      "ordinal": 7,
+      "llm": "ark-agent-deepseek-v4-flash",
+      "task": "review",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T02-04-38.189Z-ark-agent-deepseek-v4-flash-review-ark.json",
+        "sha256": "2f024490e66daf4f2e724ac329a3d43071828ab21a77124b36f56aefea91eef0"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable"
+    },
+    {
+      "ordinal": 8,
+      "llm": "ark-agent-deepseek-v4-flash",
+      "task": "delegate",
+      "result": "failed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T02-05-37.999Z-ark-agent-deepseek-v4-flash-delegate-ark.json",
+        "sha256": "607cde71b8dc82cd6da959efd9a4dd0a4b6f704ea18d2d44339c4669a345be6b"
+      },
+      "failureReason": "acceptance_failed",
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable"
+    }
+  ],
+  "uncommittedEvidence": null,
+  "checkpoints": [
+    {
+      "sequence": 0,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000000.json",
+      "sha256": "5332fc88287786e42a6f2f926452989b6d79541d94d82e9633fb0b22b766ad6f"
+    },
+    {
+      "sequence": 1,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000001.json",
+      "sha256": "ba1c7138e6052aafd57ed42ca172a96ffd75d62f7148d555d015eeb0a23fdca2"
+    },
+    {
+      "sequence": 2,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000002.json",
+      "sha256": "1fe371e8813baa51dbb4fa81a1c0586de12a0eba8d015cdc36a49cb11e63572c"
+    },
+    {
+      "sequence": 3,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000003.json",
+      "sha256": "7ff45b8948b1d9e4e2917f9736c5b6ac6c780a4806117e0b39e0c7467d17607d"
+    },
+    {
+      "sequence": 4,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000004.json",
+      "sha256": "882282f560d2a68b2c8a387404e976afaa1b3e7cac417f2255bfebe9d57909f5"
+    },
+    {
+      "sequence": 5,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000005.json",
+      "sha256": "fe218ed31257f4a552747d0e7f7194520231307a4830eb9378f36dda8d1bf737"
+    },
+    {
+      "sequence": 6,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000006.json",
+      "sha256": "48bcb75fa804eeedd6cd10ba8ff5b86738731558ef34eb97c66a1404610fa1b3"
+    },
+    {
+      "sequence": 7,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000007.json",
+      "sha256": "8bf4208525bbb80bd22aab83e39ed3bc256c34e6a5f78ec95b98491c55cfed31"
+    },
+    {
+      "sequence": 8,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000008.json",
+      "sha256": "446c79644f0348cdd72b7c866d8bf0e90e8c42e8fa5b1db824f5330de6be331c"
+    },
+    {
+      "sequence": 9,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000009.json",
+      "sha256": "52c42eb3918da6edfd7123a38fa9b002caf4e713b36930cf24d48881e85ca334"
+    },
+    {
+      "sequence": 10,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000010.json",
+      "sha256": "614aa61d534f36fbdbbe2dc8a406645b835354ad2478c36b47dfb60c7fcd4c96"
+    },
+    {
+      "sequence": 11,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000011.json",
+      "sha256": "783bc02532741a38afeac7ac0f30c0b7055d88005d597060801b965674cd2dfe"
+    },
+    {
+      "sequence": 12,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000012.json",
+      "sha256": "17fc26faf84c17fb292441ab5c68267367803a649b03ea7d13a1831d5d279a40"
+    },
+    {
+      "sequence": 13,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000013.json",
+      "sha256": "e41b2c4ea30f377ae2874bf86144f9a831edb57a5c91457857043d152449be35"
+    },
+    {
+      "sequence": 14,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000014.json",
+      "sha256": "1b4f02f1d36ec37b865688342addf45048664ac203c1bf996ee4aeaed149fa25"
+    },
+    {
+      "sequence": 15,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000015.json",
+      "sha256": "3c54946dadd17752841cfbb5127d5f767666a1001002c3bf95fcde21aa5ca776"
+    },
+    {
+      "sequence": 16,
+      "path": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/checkpoints/000016.json",
+      "sha256": "a1cd53d5abe395c0b858e5e36ffa08a7dd967dff60837c1306b89f68db9e1dfc"
+    }
+  ],
+  "stopReason": "case_failed",
+  "notRun": [],
+  "promotionEligible": false,
+  "completedAt": "2026-07-28T02:05:39.748Z"
+}
