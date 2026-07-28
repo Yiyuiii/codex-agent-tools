@@ -76,6 +76,24 @@ interface ModelSelection {
   value: string;
 }
 
+const KIMI_CHILD_CLOSE_TIMEOUT_MS = 1_000;
+
+async function waitForChildClose(
+  childClosed: Promise<void>,
+): Promise<boolean> {
+  let timer: NodeJS.Timeout | undefined;
+  const closed = await Promise.race([
+    childClosed.then(() => true),
+    new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), KIMI_CHILD_CLOSE_TIMEOUT_MS);
+    }),
+  ]);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+  }
+  return closed;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
@@ -266,6 +284,9 @@ export async function runKimiAcp(
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   });
+  const childClosed = new Promise<void>((resolve) => {
+    child.once("close", () => resolve());
+  });
   child.once("error", (error) => {
     spawnError = error;
   });
@@ -443,12 +464,26 @@ export async function runKimiAcp(
     clearInterval(heartbeat);
     if (killTimer !== undefined) clearTimeout(killTimer);
     request.signal?.removeEventListener("abort", onCallerAbort);
+    let shouldAwaitChildClose = child.pid === undefined;
     if (child.pid !== undefined) {
       try {
         await terminateProcessTree(child.pid);
+        shouldAwaitChildClose = true;
       } catch (error) {
         diagnostics.push(`Process tree cleanup failed: ${String(error)}`);
         if (status === "completed") status = "failed";
+      }
+    }
+    if (shouldAwaitChildClose) {
+      const childDidClose = await waitForChildClose(childClosed);
+      if (!childDidClose) {
+        child.stdin.destroy();
+        child.stdout.destroy();
+        child.stderr.destroy();
+        diagnostics.push(
+          `Kimi ACP child did not close within ${KIMI_CHILD_CLOSE_TIMEOUT_MS}ms after process tree termination`,
+        );
+        status = "failed";
       }
     }
     if (stderr.trim() !== "") {
