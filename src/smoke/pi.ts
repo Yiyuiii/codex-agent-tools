@@ -148,6 +148,31 @@ export interface PiSmokeRuntimeFactoryDependencies {
   createAdapter?: (dependencies: PiAdapterDependencies) => PiAdapter;
 }
 
+const REQUIRED_STATUS_COMMAND = "git status --short";
+
+function exactLifecycleSucceeded(
+  observations: readonly PiCommandLifecycleObservation[],
+  command: string,
+): boolean {
+  const matches = observations.filter(
+    (observation) =>
+      observation.source === "raw_input" &&
+      observation.origin === "raw_input" &&
+      observation.command === command,
+  );
+  return matches.length === 1 && matches[0]?.outcome === "success";
+}
+
+function requiredPiQualificationCommandsSucceeded(
+  observations: readonly PiCommandLifecycleObservation[],
+  writeCommand: string,
+): boolean {
+  return (
+    exactLifecycleSucceeded(observations, writeCommand) &&
+    exactLifecycleSucceeded(observations, REQUIRED_STATUS_COMMAND)
+  );
+}
+
 export async function createPiSmokeRuntime(
   llm: string,
   task: PiSmokeTask,
@@ -717,9 +742,13 @@ export async function runPiSmoke(
       resultFileObserved: normalizedFiles.includes(resultFileName),
       onlyExpectedFileChanged:
         normalizedFiles.length === 1 && normalizedFiles[0] === resultFileName,
-      requiredCommandObserved: result.commandsRun.includes(
-        "git status --short",
-      ),
+      requiredCommandObserved:
+        qualification === null
+          ? result.commandsRun.includes(REQUIRED_STATUS_COMMAND)
+          : requiredPiQualificationCommandsSucceeded(
+              lifecycleObservations!,
+              writeCommand,
+            ),
       executionTelemetryValid: telemetryIsValid(
         executionTelemetry,
         executionTelemetryReportCount,
@@ -751,6 +780,7 @@ export async function runPiSmoke(
               sanitizePiWriteCommandObservations(
                 lifecycleObservations!,
                 writeCommand,
+                REQUIRED_STATUS_COMMAND,
               ),
           }),
     };

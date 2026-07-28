@@ -505,14 +505,14 @@ describe("Ark Pi real-smoke harness", () => {
       resultFileReadStatus: "missing",
       writeCommandObservations: [
         { source: "raw_input", match: "exact", outcome: "error" },
-        { source: "raw_input", match: "other", outcome: "success" },
+        { source: "raw_input", match: "status_exact", outcome: "success" },
       ],
     });
     expect(evidence.checks).toMatchObject({
       resultFileValid: false,
       resultFileObserved: false,
       onlyExpectedFileChanged: false,
-      requiredCommandObserved: true,
+      requiredCommandObserved: false,
       executionTelemetryValid: true,
     });
     const serialized = JSON.stringify(evidence);
@@ -527,6 +527,194 @@ describe("Ark Pi real-smoke harness", () => {
     }
     expect(await readdir(root)).toEqual([]);
   });
+
+  it("rejects a qualification delegate when the exact write lifecycle failed", async () => {
+    const root = await tempRoot();
+    const contract = buildPiDelegateSmokeContract(
+      "ark-agent-deepseek-v4-flash",
+    );
+    const service: PiSmokeService = {
+      review: async () => {
+        throw new Error("not used");
+      },
+      delegate: async (input, context) => {
+        context?.onExecutionTelemetry?.(validPiTelemetry);
+        context?.onPiCommandLifecycleObservations?.([
+          {
+            source: "raw_input",
+            command: contract.writeCommand,
+            origin: "raw_input",
+            outcome: "error",
+          },
+          {
+            source: "raw_input",
+            command: "git status --short",
+            origin: "raw_input",
+            outcome: "success",
+          },
+        ]);
+        await writeFile(
+          path.join(input.cwd, contract.resultFileName),
+          `${contract.expectedLine}\n`,
+          "utf8",
+        );
+        return {
+          ok: true,
+          status: "completed",
+          llm: "ark-agent-deepseek-v4-flash",
+          actualModel: "deepseek-v4-flash",
+          elapsedMs: 15,
+          diagnostics: [],
+          filesChanged: [contract.resultFileName],
+          summary: "qualification delegate completed",
+          commandsRun: [contract.writeCommand, "git status --short"],
+          verification: [],
+          risks: [],
+        };
+      },
+    };
+
+    const evidence = await runPiSmoke(
+      {
+        llm: "ark-agent-deepseek-v4-flash",
+        task: "delegate",
+        tempRoot: root,
+        qualificationContext: delegateQualificationContext,
+      },
+      {
+        service,
+        runtimeEvidence: runtimeEvidence(),
+        readPiVersion: async () => "0.80.10",
+        listPiRpcProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence).toMatchObject({
+      passed: false,
+      failureReason: "acceptance_failed",
+      checks: {
+        actualModelMatches: true,
+        environmentIsolated: true,
+        noNewPiRpcProcesses: true,
+        resultFileValid: true,
+        resultFileObserved: true,
+        onlyExpectedFileChanged: true,
+        requiredCommandObserved: false,
+        executionTelemetryValid: true,
+      },
+      writeCommandObservations: [
+        { source: "raw_input", match: "exact", outcome: "error" },
+        { source: "raw_input", match: "status_exact", outcome: "success" },
+      ],
+    });
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  it.each([
+    ["missing", []],
+    [
+      "error",
+      [
+        {
+          source: "raw_input",
+          command: "git status --short",
+          origin: "raw_input",
+          outcome: "error",
+        },
+      ],
+    ],
+    [
+      "duplicate",
+      [
+        {
+          source: "raw_input",
+          command: "git status --short",
+          origin: "raw_input",
+          outcome: "success",
+        },
+        {
+          source: "raw_input",
+          command: "git status --short",
+          origin: "raw_input",
+          outcome: "success",
+        },
+      ],
+    ],
+  ] as const)(
+    "rejects a qualification delegate when the status lifecycle is %s",
+    async (_label, statusObservations) => {
+      const root = await tempRoot();
+      const contract = buildPiDelegateSmokeContract(
+        "ark-agent-deepseek-v4-flash",
+      );
+      const service: PiSmokeService = {
+        review: async () => {
+          throw new Error("not used");
+        },
+        delegate: async (input, context) => {
+          context?.onExecutionTelemetry?.(validPiTelemetry);
+          context?.onPiCommandLifecycleObservations?.([
+            {
+              source: "raw_input",
+              command: contract.writeCommand,
+              origin: "raw_input",
+              outcome: "success",
+            },
+            ...statusObservations,
+          ]);
+          await writeFile(
+            path.join(input.cwd, contract.resultFileName),
+            `${contract.expectedLine}\n`,
+            "utf8",
+          );
+          return {
+            ok: true,
+            status: "completed",
+            llm: "ark-agent-deepseek-v4-flash",
+            actualModel: "deepseek-v4-flash",
+            elapsedMs: 15,
+            diagnostics: [],
+            filesChanged: [contract.resultFileName],
+            summary: "qualification delegate completed",
+            commandsRun: [contract.writeCommand, "git status --short"],
+            verification: [],
+            risks: [],
+          };
+        },
+      };
+
+      const evidence = await runPiSmoke(
+        {
+          llm: "ark-agent-deepseek-v4-flash",
+          task: "delegate",
+          tempRoot: root,
+          qualificationContext: delegateQualificationContext,
+        },
+        {
+          service,
+          runtimeEvidence: runtimeEvidence(),
+          readPiVersion: async () => "0.80.10",
+          listPiRpcProcessIds: async () => [100],
+        },
+      );
+
+      expect(evidence).toMatchObject({
+        passed: false,
+        failureReason: "acceptance_failed",
+        checks: {
+          actualModelMatches: true,
+          environmentIsolated: true,
+          noNewPiRpcProcesses: true,
+          resultFileValid: true,
+          resultFileObserved: true,
+          onlyExpectedFileChanged: true,
+          requiredCommandObserved: false,
+          executionTelemetryValid: true,
+        },
+      });
+      expect(await readdir(root)).toEqual([]);
+    },
+  );
 
   it.each([
     ["missing", 0],
