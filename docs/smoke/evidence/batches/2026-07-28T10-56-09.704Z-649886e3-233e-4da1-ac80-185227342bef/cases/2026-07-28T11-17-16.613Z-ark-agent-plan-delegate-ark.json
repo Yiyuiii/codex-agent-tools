@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 3,
+  "qualification": {
+    "qualificationPlanId": "four-llm-v1",
+    "batchId": "2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef",
+    "ordinal": 6,
+    "llm": "ark-agent-plan",
+    "task": "delegate",
+    "frozenCommit": "cb9434b4b540e70f5384224e4e98823a3ea2dbae",
+    "frozenBuildIdentity": "dadc3b95e1f0ba16e07ec713eaf8dc4b9e0124626539718ed46a6a7be8cff810",
+    "authorizationReferenceSha256": "9d4f945c789f55e336aa0d8f0ae3ae7521b49dc961c85ddff5aef9c62401754a",
+    "orchestratorFallbackUsed": false
+  },
+  "timestamp": "2026-07-28T11:17:16.613Z",
+  "piVersion": "0.80.10",
+  "llm": "ark-agent-plan",
+  "actualModel": "ark-code-latest",
+  "expectedModel": "ark-code-latest",
+  "runtime": "pi-rpc",
+  "provider": "ark-agent-plan",
+  "endpointHost": "ark.cn-beijing.volces.com",
+  "route": "direct",
+  "credentialEnv": "CODEX_AGENT_ARK_AGENT_KEY",
+  "configSha256": "3b1e8827e21207d0d41d3189a7409d0f722ce7fece8aa41049046a14bc04349e",
+  "task": "delegate",
+  "status": "failed",
+  "passed": false,
+  "failureReason": "account_quota_exceeded",
+  "elapsedMs": 882061,
+  "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "filesChanged": [
+    "ark-agent-plan-smoke.txt",
+    "where.cmd"
+  ],
+  "commandCount": 18,
+  "diagnosticCount": 1,
+  "adapterClientInvocationCount": 1,
+  "adapterRetryCount": 0,
+  "runtimeReportedAutoRetryCount": 0,
+  "adapterReportedFallbackUsed": false,
+  "orchestratorFallbackUsed": false,
+  "executionTelemetrySource": "pi-rpc-observable",
+  "checks": {
+    "actualModelMatches": true,
+    "environmentIsolated": true,
+    "noNewPiRpcProcesses": true,
+    "resultFileValid": true,
+    "resultFileObserved": true,
+    "onlyExpectedFileChanged": false,
+    "requiredCommandObserved": true,
+    "executionTelemetryValid": true
+  },
+  "resultFileReadStatus": "read",
+  "expectedResultNormalizedSha256": "de8cdfbc15d126229a7c0462e4b8498c6d115e50bf5f37715fab425135e41c35",
+  "resultFileByteLength": 28,
+  "resultFileRawSha256": "81fcf9156bbf05c9deccd3a31abd32ec54bfb7c20a27357b9efb7f6a4b640370",
+  "resultFileNormalizedSha256": "de8cdfbc15d126229a7c0462e4b8498c6d115e50bf5f37715fab425135e41c35",
+  "resultFileNormalizedLineCount": 1,
+  "resultFileContainsExpectedLine": true,
+  "writeCommandObservations": [
+    {
+      "source": "raw_input",
+      "match": "exact",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "error"
+    }
+  ]
+}
