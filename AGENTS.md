@@ -92,6 +92,7 @@
 - [资格长时承载修复与再授权准备设计](docs/superpowers/specs/2026-07-27-qualification-carrier-and-reauthorization-design.md)
 - [Kimi 资格命令观测与发布包闭包设计](docs/superpowers/specs/2026-07-27-kimi-command-observation-and-package-closure-design.md)
 - [Pi 写入命令生命周期脱敏诊断设计](docs/superpowers/specs/2026-07-28-pi-write-command-lifecycle-diagnostics-design.md)
+- [Pi Windows shell 环境闭环设计](docs/superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md)
 - [Pi 写入命令生命周期脱敏诊断实施计划](docs/superpowers/plans/2026-07-28-pi-write-command-lifecycle-diagnostics.md)
 - [Kimi 资格命令观测加固实施计划](docs/superpowers/plans/2026-07-27-kimi-command-observation-hardening.md)
 - [npm 发布包文档链接闭包实施计划](docs/superpowers/plans/2026-07-27-package-document-link-closure.md)
