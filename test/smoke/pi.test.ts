@@ -46,10 +46,12 @@ afterEach(async () => {
   );
 });
 
-function runtimeEvidence(environment: NodeJS.ProcessEnv = {
-  CODEX_AGENT_ARK_AGENT_KEY: "secret",
-  PI_CODING_AGENT_DIR: "C:\\cache\\pi",
-}) {
+function runtimeEvidence(
+  environment: NodeJS.ProcessEnv = {
+    CODEX_AGENT_ARK_AGENT_KEY: "secret",
+    PI_CODING_AGENT_DIR: "C:\\cache\\pi",
+  },
+) {
   return {
     configSha256: "a".repeat(64),
     childEnvironment: environment,
@@ -74,6 +76,13 @@ const qualificationContext = {
   frozenBuildIdentity: "b".repeat(64),
   authorizationReferenceSha256: "c".repeat(64),
   orchestratorFallbackUsed: false as const,
+};
+
+const delegateQualificationContext = {
+  ...qualificationContext,
+  ordinal: 8,
+  llm: "ark-agent-deepseek-v4-flash",
+  task: "delegate" as const,
 };
 
 describe("Ark Pi real-smoke harness", () => {
@@ -115,9 +124,7 @@ describe("Ark Pi real-smoke harness", () => {
               buildConfig: (
                 options: BuildIsolatedPiConfigOptions,
               ) => Promise<IsolatedPiConfig>;
-              createAdapter: (
-                dependencies: PiAdapterDependencies,
-              ) => PiAdapter;
+              createAdapter: (dependencies: PiAdapterDependencies) => PiAdapter;
             },
           ) => Promise<unknown>;
         }
@@ -164,6 +171,7 @@ describe("Ark Pi real-smoke harness", () => {
     const root = await tempRoot();
     const service: PiSmokeService = {
       review: async (_input, context) => {
+        expect(context).not.toHaveProperty("onPiCommandLifecycleObservations");
         context?.onExecutionTelemetry?.(validPiTelemetry);
         return {
           ok: true,
@@ -218,7 +226,50 @@ describe("Ark Pi real-smoke harness", () => {
         knownDefectFound: true,
       },
     });
+    expect(evidence).not.toHaveProperty("writeCommandObservations");
     expect(evidence.configSha256).toBe("a".repeat(64));
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  it("keeps the lifecycle observer and evidence field out of qualification reviews", async () => {
+    const root = await tempRoot();
+    const service: PiSmokeService = {
+      review: async (_input, context) => {
+        expect(context).not.toHaveProperty("onPiCommandLifecycleObservations");
+        context?.onExecutionTelemetry?.(validPiTelemetry);
+        return {
+          ok: true,
+          status: "completed",
+          llm: "ark-agent-plan",
+          actualModel: "ark-code-latest",
+          elapsedMs: 12,
+          diagnostics: [],
+          filesChanged: [],
+          review: "Empty input has length zero, so division returns NaN.",
+        };
+      },
+      delegate: async () => {
+        throw new Error("not used");
+      },
+    };
+
+    const evidence = await runPiSmoke(
+      {
+        llm: "ark-agent-plan",
+        task: "review",
+        tempRoot: root,
+        qualificationContext,
+      },
+      {
+        service,
+        runtimeEvidence: runtimeEvidence(),
+        readPiVersion: async () => "0.80.10",
+        listPiRpcProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence.schemaVersion).toBe(3);
+    expect(evidence).not.toHaveProperty("writeCommandObservations");
     expect(await readdir(root)).toEqual([]);
   });
 
@@ -239,8 +290,7 @@ describe("Ark Pi real-smoke harness", () => {
       llm: "ark-agent-deepseek-v4-flash",
       resultFileName: "ark-agent-deepseek-v4-flash-smoke.txt",
       expectedLine: "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash",
-      payloadBase64:
-        "QVJLX1NNT0tFX09LOmFyay1hZ2VudC1kZWVwc2Vlay12NC1mbGFzaAo=",
+      payloadBase64: "QVJLX1NNT0tFX09LOmFyay1hZ2VudC1kZWVwc2Vlay12NC1mbGFzaAo=",
     },
   ] as const)(
     "builds an unambiguous delegate write contract for $llm",
@@ -314,6 +364,7 @@ describe("Ark Pi real-smoke harness", () => {
         throw new Error("not used");
       },
       delegate: async (input, context) => {
+        expect(context).not.toHaveProperty("onPiCommandLifecycleObservations");
         context?.onExecutionTelemetry?.(validPiTelemetry);
         receivedPrompt = input.prompt;
         await writeFile(
@@ -355,14 +406,10 @@ describe("Ark Pi real-smoke harness", () => {
       filesChanged: ["ark-agent-plan-smoke.txt"],
       commandCount: 1,
       resultFileReadStatus: "read",
-      resultFileByteLength: Buffer.byteLength(
-        "ARK_SMOKE_OK:ark-agent-plan\n",
-      ),
+      resultFileByteLength: Buffer.byteLength("ARK_SMOKE_OK:ark-agent-plan\n"),
       resultFileRawSha256: sha256("ARK_SMOKE_OK:ark-agent-plan\n"),
       resultFileNormalizedSha256: sha256("ARK_SMOKE_OK:ark-agent-plan"),
-      expectedResultNormalizedSha256: sha256(
-        "ARK_SMOKE_OK:ark-agent-plan",
-      ),
+      expectedResultNormalizedSha256: sha256("ARK_SMOKE_OK:ark-agent-plan"),
       resultFileNormalizedLineCount: 1,
       resultFileContainsExpectedLine: true,
       checks: {
@@ -377,8 +424,166 @@ describe("Ark Pi real-smoke harness", () => {
       buildPiDelegateSmokeContract("ark-agent-plan").prompt,
     );
     expect(receivedPrompt).not.toContain("ARK_SMOKE_OK:ark-agent-plan;");
+    expect(evidence).not.toHaveProperty("writeCommandObservations");
     expect(await readdir(root)).toEqual([]);
   });
+
+  it("records only sanitized lifecycle evidence for a qualification delegate", async () => {
+    const root = await tempRoot();
+    const contract = buildPiDelegateSmokeContract(
+      "ark-agent-deepseek-v4-flash",
+    );
+    const service: PiSmokeService = {
+      review: async () => {
+        throw new Error("not used");
+      },
+      delegate: async (_input, context) => {
+        context?.onExecutionTelemetry?.(validPiTelemetry);
+        context?.onPiCommandLifecycleObservations?.([
+          {
+            source: "raw_input",
+            command: contract.writeCommand,
+            origin: "raw_input",
+            outcome: "error",
+          },
+          {
+            source: "raw_input",
+            command: "git status --short",
+            origin: "raw_input",
+            outcome: "success",
+          },
+        ]);
+        return {
+          ok: true,
+          status: "completed",
+          llm: "ark-agent-deepseek-v4-flash",
+          actualModel: "deepseek-v4-flash",
+          elapsedMs: 15,
+          diagnostics: [],
+          filesChanged: [],
+          summary: "qualification delegate completed",
+          commandsRun: [contract.writeCommand, "git status --short"],
+          verification: [],
+          risks: [],
+        };
+      },
+    };
+
+    const evidence = await runPiSmoke(
+      {
+        llm: "ark-agent-deepseek-v4-flash",
+        task: "delegate",
+        tempRoot: root,
+        qualificationContext: delegateQualificationContext,
+      },
+      {
+        service,
+        runtimeEvidence: runtimeEvidence(),
+        readPiVersion: async () => "0.80.10",
+        listPiRpcProcessIds: async () => [100],
+      },
+    );
+
+    expect(evidence).toMatchObject({
+      schemaVersion: 3,
+      passed: false,
+      failureReason: "acceptance_failed",
+      commandCount: 2,
+      resultFileReadStatus: "missing",
+      writeCommandObservations: [
+        { source: "raw_input", match: "exact", outcome: "error" },
+        { source: "raw_input", match: "other", outcome: "success" },
+      ],
+    });
+    expect(evidence.checks).toMatchObject({
+      resultFileValid: false,
+      resultFileObserved: false,
+      onlyExpectedFileChanged: false,
+      requiredCommandObserved: true,
+      executionTelemetryValid: true,
+    });
+    const serialized = JSON.stringify(evidence);
+    expect(serialized).not.toContain(contract.writeCommand);
+    expect(serialized).not.toContain(contract.resultFileName);
+    expect(serialized).not.toContain(
+      Buffer.from(`${contract.expectedLine}\n`, "utf8").toString("base64"),
+    );
+    expect(serialized).not.toContain("tool-call");
+    expect(serialized).not.toContain('"origin"');
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  it.each([
+    ["missing", 0],
+    ["duplicate", 2],
+    ["oversized", 257],
+  ] as const)(
+    "fails qualification task execution for a %s lifecycle observer report",
+    async (_label, reportCount) => {
+      const root = await tempRoot();
+      const contract = buildPiDelegateSmokeContract(
+        "ark-agent-deepseek-v4-flash",
+      );
+      const service: PiSmokeService = {
+        review: async () => {
+          throw new Error("not used");
+        },
+        delegate: async (_input, context) => {
+          context?.onExecutionTelemetry?.(validPiTelemetry);
+          if (reportCount === 257) {
+            context?.onPiCommandLifecycleObservations?.(
+              Array.from({ length: reportCount }, () => ({
+                source: "unextractable" as const,
+                command: null,
+                origin: null,
+                outcome: "unknown" as const,
+              })),
+            );
+          } else {
+            for (let index = 0; index < reportCount; index += 1) {
+              context?.onPiCommandLifecycleObservations?.([]);
+            }
+          }
+          return {
+            ok: true,
+            status: "completed",
+            llm: "ark-agent-deepseek-v4-flash",
+            actualModel: "deepseek-v4-flash",
+            elapsedMs: 15,
+            diagnostics: [],
+            filesChanged: [],
+            summary: "qualification delegate completed",
+            commandsRun: [contract.writeCommand, "git status --short"],
+            verification: [],
+            risks: [],
+          };
+        },
+      };
+
+      const failure = await runPiSmoke(
+        {
+          llm: "ark-agent-deepseek-v4-flash",
+          task: "delegate",
+          tempRoot: root,
+          qualificationContext: delegateQualificationContext,
+        },
+        {
+          service,
+          runtimeEvidence: runtimeEvidence(),
+          readPiVersion: async () => "0.80.10",
+          listPiRpcProcessIds: async () => [100],
+        },
+      ).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(SmokeInfrastructureError);
+      expect(failure).toMatchObject({
+        message: "Smoke infrastructure failure",
+        stage: "task_execution",
+      });
+      expect(String(failure)).not.toContain(contract.writeCommand);
+      expect(await readdir(root)).toEqual([]);
+    },
+  );
 
   it.each([
     [["pwd"], "unrelated command"],
@@ -482,42 +687,45 @@ describe("Ark Pi real-smoke harness", () => {
       "reported fallback",
       { ...validPiTelemetry, adapterReportedFallbackUsed: true },
     ],
-  ] as const)("fails qualification telemetry gate for %s", async (_name, telemetry) => {
-    const root = await tempRoot();
-    const service: PiSmokeService = {
-      review: async (_input, context) => {
-        if (telemetry !== undefined) {
-          context?.onExecutionTelemetry?.(telemetry);
-        }
-        return {
-          ok: true,
-          status: "completed",
-          llm: "ark-agent-plan",
-          actualModel: "ark-code-latest",
-          elapsedMs: 12,
-          diagnostics: [],
-          filesChanged: [],
-          review: "Empty input has length zero and produces NaN.",
-        };
-      },
-      delegate: async () => {
-        throw new Error("not used");
-      },
-    };
+  ] as const)(
+    "fails qualification telemetry gate for %s",
+    async (_name, telemetry) => {
+      const root = await tempRoot();
+      const service: PiSmokeService = {
+        review: async (_input, context) => {
+          if (telemetry !== undefined) {
+            context?.onExecutionTelemetry?.(telemetry);
+          }
+          return {
+            ok: true,
+            status: "completed",
+            llm: "ark-agent-plan",
+            actualModel: "ark-code-latest",
+            elapsedMs: 12,
+            diagnostics: [],
+            filesChanged: [],
+            review: "Empty input has length zero and produces NaN.",
+          };
+        },
+        delegate: async () => {
+          throw new Error("not used");
+        },
+      };
 
-    const evidence = await runPiSmoke(
-      { llm: "ark-agent-plan", task: "review", tempRoot: root },
-      {
-        service,
-        runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [100],
-      },
-    );
+      const evidence = await runPiSmoke(
+        { llm: "ark-agent-plan", task: "review", tempRoot: root },
+        {
+          service,
+          runtimeEvidence: runtimeEvidence(),
+          readPiVersion: async () => "0.80.10",
+          listPiRpcProcessIds: async () => [100],
+        },
+      );
 
-    expect(evidence.passed).toBe(false);
-    expect(evidence.checks.executionTelemetryValid).toBe(false);
-  });
+      expect(evidence.passed).toBe(false);
+      expect(evidence.checks.executionTelemetryValid).toBe(false);
+    },
+  );
 
   it("labels a Pi version-probe exception without exposing its original message", async () => {
     const root = await tempRoot();

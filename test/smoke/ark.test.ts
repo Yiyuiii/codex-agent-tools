@@ -6,10 +6,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { AdapterExecutionTelemetry } from "../../src/adapters/adapter.js";
-import {
-  parseArkSmokeArguments,
-  runArkSmoke,
-} from "../../src/smoke/ark.js";
+import { parseArkSmokeArguments, runArkSmoke } from "../../src/smoke/ark.js";
 import {
   buildPiDelegateSmokeContract,
   type PiSmokeService,
@@ -58,24 +55,18 @@ const qualificationContext = {
 };
 
 describe("Ark real-smoke harness", () => {
-  it.each([
-    "ark-coding-plan",
-    "ark-agent-plan",
-    "ark-agent-deepseek-v4-flash",
-  ])("accepts registered Ark Pi profile %s", (llm) => {
-    expect(
-      parseArkSmokeArguments(["--llm", llm, "--task", "review"]),
-    ).toEqual({ llm, task: "review" });
-  });
+  it.each(["ark-coding-plan", "ark-agent-plan", "ark-agent-deepseek-v4-flash"])(
+    "accepts registered Ark Pi profile %s",
+    (llm) => {
+      expect(
+        parseArkSmokeArguments(["--llm", llm, "--task", "review"]),
+      ).toEqual({ llm, task: "review" });
+    },
+  );
 
   it("rejects non-Ark and incomplete arguments", () => {
     expect(() =>
-      parseArkSmokeArguments([
-        "--llm",
-        "gemini-3.5-flash",
-        "--task",
-        "review",
-      ]),
+      parseArkSmokeArguments(["--llm", "gemini-3.5-flash", "--task", "review"]),
     ).toThrow(/Ark Pi profile/u);
     expect(() => parseArkSmokeArguments(["--task", "review"])).toThrow(
       /--llm/u,
@@ -95,7 +86,8 @@ describe("Ark real-smoke harness", () => {
           elapsedMs: 10,
           diagnostics: [],
           filesChanged: [],
-          review: "Empty input has length zero, so division returns NaN at average.js:2.",
+          review:
+            "Empty input has length zero, so division returns NaN at average.js:2.",
         };
       },
       delegate: async () => {
@@ -181,6 +173,9 @@ describe("Ark real-smoke harness", () => {
           throw new Error("not used");
         },
         delegate: async (input, context) => {
+          expect(context).not.toHaveProperty(
+            "onPiCommandLifecycleObservations",
+          );
           context?.onExecutionTelemetry?.(validPiTelemetry);
           receivedPrompt = input.prompt;
           await writeFile(
@@ -222,6 +217,7 @@ describe("Ark real-smoke harness", () => {
 
       expect(receivedPrompt).toBe(contract.prompt);
       expect(evidence.passed).toBe(true);
+      expect(evidence).not.toHaveProperty("writeCommandObservations");
       expect(evidence).toMatchObject({
         llm,
         actualModel,
@@ -230,9 +226,7 @@ describe("Ark real-smoke harness", () => {
         credentialEnv,
         filesChanged: [contract.resultFileName],
         resultFileReadStatus: "read",
-        resultFileByteLength: Buffer.byteLength(
-          `${contract.expectedLine}\n`,
-        ),
+        resultFileByteLength: Buffer.byteLength(`${contract.expectedLine}\n`),
         resultFileRawSha256: sha256(`${contract.expectedLine}\n`),
         resultFileNormalizedSha256: sha256(contract.expectedLine),
         expectedResultNormalizedSha256: sha256(contract.expectedLine),

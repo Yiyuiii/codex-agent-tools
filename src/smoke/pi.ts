@@ -17,7 +17,11 @@ import {
   type IsolatedPiConfig,
 } from "../adapters/pi/config.js";
 import { locatePi } from "../adapters/pi/locator.js";
-import type { LlmProfile, NetworkPolicy, RuntimeKind } from "../domain/types.js";
+import type {
+  LlmProfile,
+  NetworkPolicy,
+  RuntimeKind,
+} from "../domain/types.js";
 import { createLlmRegistry, resolveLlm } from "../llms/registry.js";
 import type {
   ExternalDelegateResult,
@@ -27,7 +31,11 @@ import type {
   ExternalDelegateInput,
   ExternalReviewInput,
 } from "../tasks/schemas.js";
-import { ExternalAgentService, type TaskExecutionContext } from "../tasks/service.js";
+import type { PiCommandLifecycleObservation } from "../tasks/pi-command-lifecycle.js";
+import {
+  ExternalAgentService,
+  type TaskExecutionContext,
+} from "../tasks/service.js";
 import { VERSION } from "../version.js";
 import {
   assertSmokeQualificationIdentity,
@@ -36,6 +44,10 @@ import {
   type SmokeEvidenceEnvelope,
   type SmokeQualificationContext,
 } from "./evidence.js";
+import {
+  sanitizePiWriteCommandObservations,
+  type SanitizedPiWriteCommandObservation,
+} from "./pi-write-command-observation.js";
 import {
   inspectResultFile,
   type ResultFileEvidence,
@@ -111,10 +123,10 @@ interface PiSmokeEvidencePayload {
   expectedResultNormalizedSha256?: string;
   resultFileNormalizedLineCount?: number;
   resultFileContainsExpectedLine?: boolean;
+  writeCommandObservations?: SanitizedPiWriteCommandObservation[];
 }
 
-export type PiSmokeEvidence =
-  SmokeEvidenceEnvelope<PiSmokeEvidencePayload>;
+export type PiSmokeEvidence = SmokeEvidenceEnvelope<PiSmokeEvidencePayload>;
 
 export interface PiSmokeService {
   review(
@@ -148,9 +160,8 @@ export async function createPiSmokeRuntime(
   qualification: SmokeQualificationContext | null,
   dependencies: PiSmokeRuntimeFactoryDependencies = {},
 ): Promise<{ service: PiSmokeService; evidence: PiSmokeRuntimeEvidence }> {
-  const normalizedQualification = normalizeSmokeQualificationContext(
-    qualification,
-  );
+  const normalizedQualification =
+    normalizeSmokeQualificationContext(qualification);
   assertSmokeQualificationIdentity(normalizedQualification, llm, task);
   const base = resolveLlm(llm);
   const profile = {
@@ -165,9 +176,7 @@ export async function createPiSmokeRuntime(
   const config = await buildConfig({
     version: VERSION,
     providers: ["ark"],
-    ...(normalizedQualification === null
-      ? {}
-      : { qualification: true }),
+    ...(normalizedQualification === null ? {} : { qualification: true }),
   });
   const evidence: PiSmokeRuntimeEvidence = {
     configSha256: config.contentSha256,
@@ -259,7 +268,10 @@ async function runGit(cwd: string, args: readonly string[]): Promise<string> {
   return result.stdout;
 }
 
-async function initializeFixture(cwd: string, task: PiSmokeTask): Promise<void> {
+async function initializeFixture(
+  cwd: string,
+  task: PiSmokeTask,
+): Promise<void> {
   await runGit(cwd, ["init", "--quiet"]);
   await runGit(cwd, ["config", "user.name", "codex-agent-tools smoke"]);
   await runGit(cwd, ["config", "user.email", "smoke@example.invalid"]);
@@ -340,7 +352,10 @@ function knownDefectFound(review: string): boolean {
   );
 }
 
-function hasNoNewProcesses(before: readonly number[], after: readonly number[]): boolean {
+function hasNoNewProcesses(
+  before: readonly number[],
+  after: readonly number[],
+): boolean {
   const baseline = new Set(before);
   return after.every((pid) => baseline.has(pid));
 }
@@ -365,8 +380,7 @@ function inspectEnvironment(
     (name) =>
       /^(?:ANTHROPIC|OPENAI|DEEPSEEK|ARK|VOLCENGINE|KIMI|GEMINI|GOOGLE|CODEX_AGENT)_/u.test(
         name,
-      ) &&
-      !expectedCredentialNames.includes(name),
+      ) && !expectedCredentialNames.includes(name),
   );
   const proxyEntries = Object.entries(environment).filter(([name]) =>
     /^(?:HTTP|HTTPS|ALL|SOCKS5)_PROXY$/iu.test(name),
@@ -490,18 +504,13 @@ function commonEvidence(
     adapterRetryCount: telemetry?.adapterRetryCount ?? null,
     runtimeReportedAutoRetryCount:
       telemetry?.runtimeReportedAutoRetryCount ?? null,
-    adapterReportedFallbackUsed:
-      telemetry?.adapterReportedFallbackUsed ?? null,
-    orchestratorFallbackUsed:
-      qualification?.orchestratorFallbackUsed ?? null,
+    adapterReportedFallbackUsed: telemetry?.adapterReportedFallbackUsed ?? null,
+    orchestratorFallbackUsed: qualification?.orchestratorFallbackUsed ?? null,
     executionTelemetrySource: telemetry?.source ?? null,
     checks: {
       ...checks,
       environmentIsolated: environment.isolated,
-      noNewPiRpcProcesses: hasNoNewProcesses(
-        processIdsBefore,
-        processIdsAfter,
-      ),
+      noNewPiRpcProcesses: hasNoNewProcesses(processIdsBefore, processIdsAfter),
     },
   };
   return qualification === null
@@ -524,27 +533,21 @@ export async function runPiSmoke(
   const qualification = normalizeSmokeQualificationContext(
     options.qualificationContext,
   );
-  assertSmokeQualificationIdentity(
-    qualification,
-    options.llm,
-    options.task,
-  );
+  assertSmokeQualificationIdentity(qualification, options.llm, options.task);
   const profile = resolveLlm(options.llm);
-  if (
-    profile.runtime !== "pi-rpc" ||
-    profile.provider === undefined
-  ) {
+  if (profile.runtime !== "pi-rpc" || profile.provider === undefined) {
     throw new Error(`Logical llm ${options.llm} is not a Pi profile`);
   }
   let service = dependencies.service;
   let runtimeEvidence = dependencies.runtimeEvidence;
   if (service === undefined || runtimeEvidence === undefined) {
     if (service !== undefined || runtimeEvidence !== undefined) {
-      throw new Error("Pi smoke service and runtimeEvidence must be injected together");
+      throw new Error(
+        "Pi smoke service and runtimeEvidence must be injected together",
+      );
     }
-    const runtime = await inSmokeInfrastructureStage(
-      "runtime_setup",
-      () => createPiSmokeRuntime(options.llm, options.task, qualification),
+    const runtime = await inSmokeInfrastructureStage("runtime_setup", () =>
+      createPiSmokeRuntime(options.llm, options.task, qualification),
     );
     service = runtime.service;
     runtimeEvidence = runtime.evidence;
@@ -553,18 +556,13 @@ export async function runPiSmoke(
   const listPiRpcProcessIds =
     dependencies.listPiRpcProcessIds ?? defaultListPiRpcProcessIds;
   const now = dependencies.now ?? (() => new Date());
-  const cwd = await inSmokeInfrastructureStage(
-    "workspace_setup",
-    () =>
-      mkdtemp(
-        path.join(options.tempRoot ?? os.tmpdir(), "codex-pi-smoke-"),
-      ),
+  const cwd = await inSmokeInfrastructureStage("workspace_setup", () =>
+    mkdtemp(path.join(options.tempRoot ?? os.tmpdir(), "codex-pi-smoke-")),
   );
 
   try {
-    await inSmokeInfrastructureStage(
-      "fixture_setup",
-      () => initializeFixture(cwd, options.task),
+    await inSmokeInfrastructureStage("fixture_setup", () =>
+      initializeFixture(cwd, options.task),
     );
     const piVersion = await inSmokeInfrastructureStage(
       "version_probe",
@@ -577,7 +575,8 @@ export async function runPiSmoke(
     let executionTelemetry: AdapterExecutionTelemetry | null | undefined;
     let executionTelemetryReportCount = 0;
     const context: TaskExecutionContext = {};
-    if (options.onProgress !== undefined) context.onProgress = options.onProgress;
+    if (options.onProgress !== undefined)
+      context.onProgress = options.onProgress;
     context.onExecutionTelemetry = (telemetry) => {
       executionTelemetryReportCount += 1;
       executionTelemetry = telemetry;
@@ -585,21 +584,19 @@ export async function runPiSmoke(
     const timeoutMs = options.timeoutMs ?? profile.timeoutMs;
 
     if (options.task === "review") {
-      const result = await inSmokeInfrastructureStage(
-        "task_execution",
-        () =>
-          service.review(
-            {
-              llm: options.llm,
-              task: "review_diff",
-              prompt:
-                "Read average.js and average.test.js. Identify the concrete correctness defect that makes the test fail. Cite the relevant expression. Do not modify files and do not execute commands.",
-              cwd,
-              includeGitDiff: true,
-              timeoutMs,
-            },
-            context,
-          ),
+      const result = await inSmokeInfrastructureStage("task_execution", () =>
+        service.review(
+          {
+            llm: options.llm,
+            task: "review_diff",
+            prompt:
+              "Read average.js and average.test.js. Identify the concrete correctness defect that makes the test fail. Cite the relevant expression. Do not modify files and do not execute commands.",
+            cwd,
+            includeGitDiff: true,
+            timeoutMs,
+          },
+          context,
+        ),
       );
       const gitClean = await inSmokeInfrastructureStage(
         "acceptance_check",
@@ -648,12 +645,21 @@ export async function runPiSmoke(
       );
     }
 
-    const { resultFileName, expectedLine, prompt } =
+    const { resultFileName, expectedLine, prompt, writeCommand } =
       buildPiDelegateSmokeContract(options.llm);
+    let lifecycleObservations:
+      readonly PiCommandLifecycleObservation[] | undefined;
+    let lifecycleReportCount = 0;
+    if (qualification !== null) {
+      context.onPiCommandLifecycleObservations = (observations) => {
+        lifecycleReportCount += 1;
+        lifecycleObservations = observations;
+      };
+    }
     const result = await inSmokeInfrastructureStage(
       "task_execution",
-      () =>
-        service.delegate(
+      async () => {
+        const delegateResult = await service.delegate(
           {
             llm: options.llm,
             prompt,
@@ -661,7 +667,19 @@ export async function runPiSmoke(
             timeoutMs,
           },
           context,
-        ),
+        );
+        if (
+          qualification !== null &&
+          (lifecycleReportCount !== 1 ||
+            lifecycleObservations === undefined ||
+            lifecycleObservations.length > 256)
+        ) {
+          throw new Error(
+            "Internal Pi command lifecycle report contract violated",
+          );
+        }
+        return delegateResult;
+      },
     );
     const resultFile = await inspectResultFile({
       filePath: path.join(cwd, resultFileName),
@@ -677,21 +695,19 @@ export async function runPiSmoke(
       runtimeEvidence.childEnvironment,
       profile,
     );
-    const normalizedFiles = result.filesChanged.map((name) => name.replaceAll("\\", "/"));
+    const normalizedFiles = result.filesChanged.map((name) =>
+      name.replaceAll("\\", "/"),
+    );
     const checks: PiSmokeChecks = {
       actualModelMatches: result.actualModel === profile.model,
       environmentIsolated: environment.isolated,
-      noNewPiRpcProcesses: hasNoNewProcesses(
-        processIdsBefore,
-        processIdsAfter,
-      ),
+      noNewPiRpcProcesses: hasNoNewProcesses(processIdsBefore, processIdsAfter),
       resultFileValid: resultFile.valid,
       resultFileObserved: normalizedFiles.includes(resultFileName),
       onlyExpectedFileChanged:
         normalizedFiles.length === 1 && normalizedFiles[0] === resultFileName,
-      requiredCommandObserved: result.commandsRun.includes(
-        "git status --short",
-      ),
+      requiredCommandObserved:
+        result.commandsRun.includes("git status --short"),
       executionTelemetryValid: telemetryIsValid(
         executionTelemetry,
         executionTelemetryReportCount,
@@ -716,11 +732,18 @@ export async function runPiSmoke(
         qualification,
       ),
       ...resultFileArtifactFields(resultFile),
+      ...(qualification === null
+        ? {}
+        : {
+            writeCommandObservations: sanitizePiWriteCommandObservations(
+              lifecycleObservations!,
+              writeCommand,
+            ),
+          }),
     };
   } finally {
-    await inSmokeInfrastructureStage(
-      "workspace_cleanup",
-      () => rm(cwd, { recursive: true, force: true }),
+    await inSmokeInfrastructureStage("workspace_cleanup", () =>
+      rm(cwd, { recursive: true, force: true }),
     );
   }
 }
