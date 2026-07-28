@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pi 写入命令脱敏诊断设计审阅</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          Inter,
+          "Noto Sans SC",
+          "Microsoft YaHei",
+          system-ui,
+          sans-serif;
+        --ink: #18212f;
+        --muted: #5f6b7a;
+        --line: #d8dee8;
+        --panel: #f7f9fc;
+        --blue: #1d4ed8;
+        --blue-bg: #eff6ff;
+        --green: #166534;
+        --green-bg: #f0fdf4;
+        --amber: #9a3412;
+        --amber-bg: #fff7ed;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #eef2f7;
+        color: var(--ink);
+        line-height: 1.65;
+      }
+      main {
+        width: min(1040px, calc(100% - 28px));
+        margin: 24px auto;
+        padding: clamp(22px, 4vw, 38px);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: 0 18px 45px rgb(15 23 42 / 8%);
+      }
+      h1,
+      h2 {
+        color: #111827;
+        line-height: 1.25;
+      }
+      h1 {
+        margin-top: 0;
+        font-size: clamp(1.65rem, 4vw, 2.4rem);
+      }
+      h2 {
+        margin-top: 2rem;
+        font-size: 1.3rem;
+      }
+      code {
+        padding: 0.1em 0.35em;
+        border-radius: 4px;
+        background: #eef2f7;
+        overflow-wrap: anywhere;
+      }
+      a {
+        color: var(--blue);
+      }
+      .status,
+      .verified,
+      .decision,
+      .warning {
+        margin: 1rem 0;
+        padding: 16px 18px;
+        border-radius: 12px;
+      }
+      .status {
+        border: 2px solid var(--amber);
+        background: var(--amber-bg);
+      }
+      .verified {
+        border-left: 5px solid var(--green);
+        background: var(--green-bg);
+      }
+      .decision {
+        border: 2px solid var(--blue);
+        background: var(--blue-bg);
+      }
+      .warning {
+        border-left: 5px solid var(--amber);
+        background: #fef2f2;
+      }
+      .table-wrap {
+        width: 100%;
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+      }
+      th,
+      td {
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+        overflow-wrap: anywhere;
+      }
+      th {
+        background: var(--panel);
+      }
+      .recommended {
+        color: var(--green);
+        font-weight: 700;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      pre {
+        padding: 14px;
+        border-radius: 10px;
+        background: #111827;
+        color: #f8fafc;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      @media (max-width: 560px) {
+        main {
+          width: min(100% - 16px, 1040px);
+          margin: 8px auto;
+          border-radius: 12px;
+        }
+        th,
+        td {
+          padding: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Pi 写入命令脱敏诊断设计审阅</h1>
+      <p class="muted">
+        审阅日期：2026-07-28。本文只用于批准下一轮离线实现设计，不授权第二个真实模型批次。
+      </p>
+
+      <div class="status">
+        <strong>当前终态：</strong>新批次
+        <code>2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678</code>
+        完成全部八项，但只有前七项通过；最后一项
+        <code>ark-agent-deepseek-v4-flash/delegate</code>
+        因结果文件缺失而失败，批次仍为 <code>blocked / case_failed</code>。
+      </div>
+
+      <h2>已经由机器确认的事实</h2>
+      <div class="verified">
+        <ul>
+          <li>冻结提交、预飞、模型、provider、direct 路由、凭据隔离、单次调用、零重试/回退均正确。</li>
+          <li>此前失败的 Kimi delegate 已通过，证明 Kimi late command observation 修复生效。</li>
+          <li>同一新 Pi 写入合同在 Ark Coding Plan 和 Ark Agent Plan delegate 中通过。</li>
+          <li>DeepSeek Flash 正常结束并执行了 6 条命令；精确 <code>git status --short</code> 被观察到。</li>
+          <li>最终没有任何文件变化，目标结果文件的读取状态是 <code>missing</code>。</li>
+          <li>不可变 verifier 通过，资格锁已释放，目标进程为 0/0/0。</li>
+        </ul>
+      </div>
+
+      <h2>机器现在无法回答的问题</h2>
+      <p>
+        现有 evidence 只保存命令数量与“是否看到精确
+        <code>git status --short</code>”，没有保存第一条写入命令的脱敏分类，也没有关联工具结束事件。
+        因此不能区分以下四种情况：
+      </p>
+      <ol>
+        <li>模型跳过了写入命令；</li>
+        <li>模型改写或包裹了命令；</li>
+        <li>精确命令已经发出，但工具返回错误；</li>
+        <li>命令成功写入后，后续动作又删除了文件。</li>
+      </ol>
+      <p>
+        <code>diagnosticCount=0</code> 不能排除工具错误，因为 Pi 的 tool-level error 当前没有进入 adapter diagnostics。
+      </p>
+
+      <h2>三个方案</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>方案</th>
+              <th>内容</th>
+              <th>优点</th>
+              <th>缺点</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>A：只记录命令匹配</td>
+              <td>保存写入命令的来源及 <code>exact / trim_only / embedded / other</code>。</td>
+              <td>改动最小。</td>
+              <td>若看到 exact 但文件仍缺失，仍无法判断工具错误还是后续删除，可能再浪费一个真实批次。</td>
+            </tr>
+            <tr>
+              <td class="recommended">B：完整生命周期脱敏诊断（推荐）</td>
+              <td>在 A 的基础上，按内部 tool-call ID 关联开始与结束事件，只持久化 <code>success / error / missing / unknown</code> 结果枚举。</td>
+              <td>一次新 evidence 即可区分主要失败层；仍不保存命令、ID 或输出正文。</td>
+              <td>需要同时加固 Pi event sanitizer、内部 observation folding、producer 与 verifier，TDD 面更大。</td>
+            </tr>
+            <tr>
+              <td>C：立即改提示词</td>
+              <td>缩短或重写当前 Node + Base64 指令。</td>
+              <td>若失败只是模型偶发遵循问题，可能提高下一次通过概率。</td>
+              <td>当前没有证据指向提示词缺陷；同一合同已有两个同批通过反例，属于猜测性修复。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>推荐设计：方案 B</h2>
+      <ol>
+        <li>
+          <strong>内部事件层：</strong>Pi 的超大工具结束事件仍保留非秘密
+          <code>isError</code>；普通事件保持现状。按 tool-call ID 折叠开始与结束事件，冲突或缺失形成
+          <code>unknown / missing</code>，不猜测成功。
+        </li>
+        <li>
+          <strong>资格 producer：</strong>Pi delegate 的内部 observer 必须恰好回调一次；沿用当前
+          compatibility 策略，不改变公开 <code>commandsRun</code> 或历史 <code>commandCount</code> 语义。
+        </li>
+        <li>
+          <strong>脱敏 evidence：</strong>新增可选 <code>writeCommandObservations</code>。每项只含
+          <code>source</code>、<code>match</code>、<code>outcome</code> 三个闭合枚举；禁止 command、hash、rawInput、
+          tool-call ID、cwd、模型正文和工具输出。
+        </li>
+        <li>
+          <strong>严格 verifier：</strong>历史 evidence 缺字段仍通过；新字段出现时只允许当前
+          <code>four-llm-v1</code> 的 Pi delegate schema v3，检查普通数组/对象、精确键、枚举、最多 256 项和计数一致性。
+        </li>
+        <li>
+          <strong>验收中立：</strong>新字段只用于诊断。结果文件、唯一文件范围和精确
+          <code>git status --short</code> 仍决定通过；不把命令 start 或 tool success 冒充最终文件成功。
+        </li>
+      </ol>
+
+      <div class="warning">
+        <strong>本设计明确不做：</strong>不修改提示词，不放宽 validator，不改变模型、provider、route、credential、
+        retry/fallback，不改 manifest/checkpoint/qualification plan，不回填历史 JSON，不修改公开 MCP 结果。
+      </div>
+
+      <h2>测试与收口</h2>
+      <ul>
+        <li>RED→GREEN 覆盖 exact、trim-only、embedded、other、title spoof、截断 start/end、end error、缺 end、冲突 end 和超限。</li>
+        <li>验证 evidence JSON 不含任何命令正文、Base64 参数、tool-call ID、路径或输出。</li>
+        <li>保持所有历史 batch 的 SHA 与 immutable verifier 不变。</li>
+        <li>任务级规格审阅、代码质量审阅与全范围复审后，运行全量测试、类型检查、构建、release smoke、隔离 check-report、包闭包、锁/进程检查并冻结 clean candidate。</li>
+        <li>冻结后停止在第二个真实批次的精确 SHA 授权边界；本页本身不授权真实调用。</li>
+      </ul>
+
+      <h2>需要你的判断</h2>
+      <div class="decision">
+        <p>推荐批准方案 B。你可以直接回复：</p>
+        <pre>批准方案 B：只增加 Pi 写入命令生命周期的脱敏诊断，不改提示词、validator、公开 MCP、模型/路由/凭据和重试策略；按 TDD 实施、双审、全量离线验证并冻结新候选。</pre>
+        <p>
+          批准后，Codex 会先写正式 spec 和逐步实施计划，再持续自主实现；只有新的 clean frozen SHA 需要再次真实调用时才会停下索取精确授权。
+        </p>
+      </div>
+
+      <h2>可追溯证据</h2>
+      <ul>
+        <li>
+          <a href="four-llm-qualification-result-review.html">上一轮阻断结果历史审阅</a>
+        </li>
+        <li>
+          <a href="../smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/manifest.json">本轮批次 manifest</a>
+        </li>
+        <li>
+          <a href="../smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T02-05-37.999Z-ark-agent-deepseek-v4-flash-delegate-ark.json">失败 case 的脱敏 evidence</a>
+        </li>
+        <li>
+          <a href="../superpowers/specs/2026-07-27-ark-coding-qualification-prompt-disambiguation-design.md">当前 Pi 写入合同设计</a>
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

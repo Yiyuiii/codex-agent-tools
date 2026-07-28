@@ -97,6 +97,7 @@
 - [历史：已执行且授权已消费的四模型资格批次与结果收敛实施计划](docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md)
 - [历史：已消费的四模型八项资格批次授权审阅](docs/release/four-llm-qualification-authorization-review.html)
 - [最新：四模型八项资格批次阻断结果审阅](docs/release/four-llm-qualification-result-review.html)
+- [待批准：Pi 写入命令脱敏诊断设计审阅](docs/release/pi-write-command-diagnostics-design-review.html)
 - [历史：十门禁原子重认证实施计划](docs/superpowers/plans/2026-07-26-gate-requalification.md)
 - [历史：五模型官方插件集成实施计划](docs/superpowers/plans/2026-07-25-official-plugin-integration.md)
 - [Kimi 可用 MVP 实施计划](docs/superpowers/plans/2026-07-18-kimi-mvp.md)
