@@ -26,7 +26,9 @@ export function sanitizePiWriteCommandObservations(
   return observations.map((observation) => ({
     source: observation.source,
     match:
-      observation.origin === "raw_input" && observation.command !== null
+      observation.source === "raw_input" &&
+      observation.origin === "raw_input" &&
+      observation.command !== null
         ? matchCommand(observation.command, target)
         : "other",
     outcome: observation.outcome,

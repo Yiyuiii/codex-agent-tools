@@ -30,6 +30,18 @@ describe("Pi write command observation sanitizer", () => {
             toolCallId: privateSentinels.toolCallId,
           },
         ),
+        {
+          source: "title_fallback",
+          command: "write",
+          origin: "raw_input",
+          outcome: "success",
+        },
+        {
+          source: "unextractable",
+          command: "write",
+          origin: "raw_input",
+          outcome: "error",
+        },
         Object.assign(
           {
             source: "raw_input",
@@ -84,6 +96,8 @@ describe("Pi write command observation sanitizer", () => {
 
     expect(sanitized).toEqual([
       { source: "raw_input", match: "exact", outcome: "success" },
+      { source: "title_fallback", match: "other", outcome: "success" },
+      { source: "unextractable", match: "other", outcome: "error" },
       { source: "raw_input", match: "trim_only", outcome: "error" },
       { source: "raw_input", match: "embedded", outcome: "unknown" },
       { source: "title_fallback", match: "other", outcome: "missing" },
