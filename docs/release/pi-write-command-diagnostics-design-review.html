@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
     <title>Pi 写入命令脱敏诊断设计审阅</title>
     <style>
       :root {
@@ -167,7 +168,7 @@
       <p>
         现有 evidence 只保存命令数量与“是否看到精确
         <code>git status --short</code>”，没有保存第一条写入命令的脱敏分类，也没有关联工具结束事件。
-        因此不能区分以下四种情况：
+        因此当前连失败发生在哪一层都无法可靠判断，可能涉及以下情况：
       </p>
       <ol>
         <li>模型跳过了写入命令；</li>
@@ -200,7 +201,7 @@
             <tr>
               <td class="recommended">B：完整生命周期脱敏诊断（推荐）</td>
               <td>在 A 的基础上，按内部 tool-call ID 关联开始与结束事件，只持久化 <code>success / error / missing / unknown</code> 结果枚举。</td>
-              <td>一次新 evidence 即可区分主要失败层；仍不保存命令、ID 或输出正文。</td>
+              <td>一次新 evidence 可判断精确命令是否发出、工具是否报错，并把失败范围收窄到命令形成、工具执行或最终制品层；仍不保存命令、ID 或输出正文。</td>
               <td>需要同时加固 Pi event sanitizer、内部 observation folding、producer 与 verifier，TDD 面更大。</td>
             </tr>
             <tr>
@@ -214,24 +215,37 @@
       </div>
 
       <h2>推荐设计：方案 B</h2>
+      <p>
+        该方案的目标是<strong>定位失败层并指导下一步</strong>，不是仅凭三个枚举宣称证明四个具体根因。
+        它可以确认 <code>exact + error</code>，也可以确认 <code>exact + success</code> 后最终制品仍不一致；
+        但 <code>other</code> 或没有精确匹配不能严格区分“完全跳过”与“完全改写”，
+        <code>success + missing</code> 也不能单独证明发生了删除动作。
+      </p>
       <ol>
         <li>
           <strong>内部事件层：</strong>Pi 的超大工具结束事件仍保留非秘密
-          <code>isError</code>；普通事件保持现状。按 tool-call ID 折叠开始与结束事件，冲突或缺失形成
-          <code>unknown / missing</code>，不猜测成功。
+          boolean <code>isError</code>；普通事件保持现状。缺失或非 boolean 值绝不能按
+          <code>false</code> 解释。按内部 tool-call ID 折叠开始与结束事件：首次开始事件确定顺序，
+          唯一且合法的结束事件形成 <code>success / error</code>，没有结束事件形成 <code>missing</code>，
+          重复、冲突或协议异常形成 <code>unknown</code>，不猜测成功。
         </li>
         <li>
-          <strong>资格 producer：</strong>Pi delegate 的内部 observer 必须恰好回调一次；沿用当前
-          compatibility 策略，不改变公开 <code>commandsRun</code> 或历史 <code>commandCount</code> 语义。
+          <strong>独立观察通道：</strong>新增 Pi-only 生命周期 observer，不修改现有
+          <code>CommandObservation</code>、命令提取器或 policy。它覆盖所有 Pi execute start，并按首次 start
+          顺序输出；Pi delegate 的资格 producer 必须验证 observer 恰好回调一次。
         </li>
         <li>
           <strong>脱敏 evidence：</strong>新增可选 <code>writeCommandObservations</code>。每项只含
           <code>source</code>、<code>match</code>、<code>outcome</code> 三个闭合枚举；禁止 command、hash、rawInput、
-          tool-call ID、cwd、模型正文和工具输出。
+          tool-call ID、cwd、模型正文和工具输出。该字段只由当前资格协议的 Pi delegate schema v3 producer
+          产生；standalone、review、Kimi 和历史 evidence 均不新增或回填该字段。
         </li>
         <li>
           <strong>严格 verifier：</strong>历史 evidence 缺字段仍通过；新字段出现时只允许当前
-          <code>four-llm-v1</code> 的 Pi delegate schema v3，检查普通数组/对象、精确键、枚举、最多 256 项和计数一致性。
+          <code>four-llm-v1</code> 的 Pi delegate schema v3，检查普通稠密数组、普通对象、精确键、枚举和最多
+          256 项。沿用 Pi 的 <code>compatibility</code> 策略，因此
+          <code>source != unextractable</code> 的条目数必须等于现有 <code>commandCount</code>；
+          不能照抄 Kimi <code>raw_only</code> 的计数规则。
         </li>
         <li>
           <strong>验收中立：</strong>新字段只用于诊断。结果文件、唯一文件范围和精确
@@ -246,8 +260,9 @@
 
       <h2>测试与收口</h2>
       <ul>
-        <li>RED→GREEN 覆盖 exact、trim-only、embedded、other、title spoof、截断 start/end、end error、缺 end、冲突 end 和超限。</li>
+        <li>RED→GREEN 覆盖 exact、trim-only、embedded、other、title spoof、截断 start/end、boolean/non-boolean end、end error、缺 end、重复/冲突事件、乱序、重复 ID 和超限。</li>
         <li>验证 evidence JSON 不含任何命令正文、Base64 参数、tool-call ID、路径或输出。</li>
+        <li>证明现有 <code>commandsRun</code>、<code>commandCount</code>、公开 MCP structured content 和验收判定逐字节保持原语义。</li>
         <li>保持所有历史 batch 的 SHA 与 immutable verifier 不变。</li>
         <li>任务级规格审阅、代码质量审阅与全范围复审后，运行全量测试、类型检查、构建、release smoke、隔离 check-report、包闭包、锁/进程检查并冻结 clean candidate。</li>
         <li>冻结后停止在第二个真实批次的精确 SHA 授权边界；本页本身不授权真实调用。</li>
