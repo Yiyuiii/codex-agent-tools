@@ -49,7 +49,8 @@
     "acceptance:local": "npm run build && node scripts/local-acceptance.mjs",
     "acceptance:plugin:isolated": "npm run build && node scripts/plugin-isolated-acceptance.mjs",
     "qualify:gates": "tsx scripts/gate-requalification.ts",
-    "verify:qualification": "tsx scripts/verify-qualification.ts"
+    "verify:qualification": "tsx scripts/verify-qualification.ts",
+    "verify:capabilities": "tsx scripts/verify-capabilities.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.2.1",

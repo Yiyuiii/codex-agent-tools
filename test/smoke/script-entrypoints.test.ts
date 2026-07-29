@@ -470,11 +470,17 @@ describe("qualification maintainer script entrypoints", () => {
     expect(packageJson.scripts?.["verify:qualification"]).toBe(
       "tsx scripts/verify-qualification.ts",
     );
+    expect(packageJson.scripts?.["verify:capabilities"]).toBe(
+      "tsx scripts/verify-capabilities.ts",
+    );
     expect(Object.values(packageJson.bin ?? {})).not.toContain(
       "scripts/gate-requalification.ts",
     );
     expect(Object.values(packageJson.bin ?? {})).not.toContain(
       "scripts/verify-qualification.ts",
+    );
+    expect(Object.values(packageJson.bin ?? {})).not.toContain(
+      "scripts/verify-capabilities.ts",
     );
   });
 
@@ -578,6 +584,10 @@ describe("qualification maintainer script entrypoints", () => {
     {
       script: "scripts/verify-qualification.ts",
       expected: "Usage: npm run verify:qualification --",
+    },
+    {
+      script: "scripts/verify-capabilities.ts",
+      expected: "Usage: npm run verify:capabilities",
     },
   ])(
     "$script exposes help without entering production work",

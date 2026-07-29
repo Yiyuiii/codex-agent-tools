@@ -21,6 +21,9 @@ import {
   assertPackageDocumentLinkClosure,
   resolveAllowedPackInspectionPaths,
 } from "../dist/release-assurance.js";
+import {
+  verifyCapabilityIndex,
+} from "../dist/capability-qualification.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = path.join(root, "dist");
@@ -494,6 +497,7 @@ await checkDoctorJson();
 await checkPluginArtifact();
 await checkCodexPluginHelp();
 await checkPackage();
+await verifyCapabilityIndex({ repositoryRoot: root });
 checkNpmNameAvailability();
 
 process.stdout.write("release smoke passed\n");

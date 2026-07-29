@@ -14,6 +14,7 @@ export default defineConfig({
     "plugin-state-snapshot": "src/plugin/state-snapshot.ts",
     "release-assurance": "src/release/assurance.ts",
     qualification: "src/qualification/manifest.ts",
+    "capability-qualification": "src/qualification/capability-index.ts",
   },
   format: ["esm"],
   dts: true,
