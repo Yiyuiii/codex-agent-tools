@@ -6,6 +6,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  capabilityDependencyInputFromPackageLock,
   capabilityRuntimeInputRoots,
   CAPABILITY_INDEX_RELATIVE_PATH,
   collectCapabilityRuntimeInputs,
@@ -42,15 +43,168 @@ describe("capability qualification runtime fingerprint", () => {
     const kimiRoots = capabilityRuntimeInputRoots("kimi-acp");
 
     expect(piRoots).toContain("src/adapters/pi");
-    expect(piRoots).toContain("src/qualification");
+    expect(piRoots).toContain("src/qualification/verifier.ts");
     expect(kimiRoots).toContain("src/adapters/kimi");
-    expect(kimiRoots).toContain("src/qualification");
+    expect(kimiRoots).toContain("src/qualification/verifier.ts");
+    expect(piRoots).not.toContain("package-lock.json");
+    expect(kimiRoots).not.toContain("package-lock.json");
+    expect(piRoots).not.toContain("src/qualification");
+    expect(kimiRoots).not.toContain("src/qualification");
+    expect(piRoots).not.toContain(
+      "src/qualification/capability-index.ts",
+    );
+    expect(kimiRoots).not.toContain(
+      "src/qualification/capability-index.ts",
+    );
     expect(piRoots).not.toContain("src/llms/registry.ts");
     expect(kimiRoots).not.toContain("src/llms/registry.ts");
     expect(piRoots.some((entry) => entry.startsWith("docs/"))).toBe(false);
     expect(kimiRoots.some((entry) => entry.startsWith("docs/"))).toBe(false);
     expect(Object.isFrozen(piRoots)).toBe(true);
     expect(Object.isFrozen(kimiRoots)).toBe(true);
+  });
+
+  it("fingerprints only the locked dependency closure used by each model runtime", () => {
+    const packageLock = {
+      name: "codex-agent-tools",
+      version: "0.1.0-alpha.1",
+      lockfileVersion: 3,
+      packages: {
+        "": {
+          name: "codex-agent-tools",
+          version: "0.1.0-alpha.1",
+          dependencies: {
+            "@agentclientprotocol/sdk": "1.2.1",
+            "@modelcontextprotocol/sdk": "1.30.0",
+            execa: "9.6.0",
+            zod: "4.0.0",
+          },
+        },
+        "node_modules/@agentclientprotocol/sdk": {
+          version: "1.2.1",
+          integrity: "sha512-acp",
+          dependencies: { "acp-child": "1.0.0" },
+        },
+        "node_modules/acp-child": {
+          version: "1.0.0",
+          integrity: "sha512-acp-child",
+        },
+        "node_modules/@modelcontextprotocol/sdk": {
+          version: "1.30.0",
+          integrity: "sha512-mcp",
+          dependencies: { "@hono/node-server": "^2.0.5" },
+        },
+        "node_modules/@hono/node-server": {
+          version: "2.0.12",
+          integrity: "sha512-hono",
+        },
+        "node_modules/execa": {
+          version: "9.6.0",
+          integrity: "sha512-execa",
+          dependencies: { "execa-child": "1.0.0" },
+        },
+        "node_modules/execa-child": {
+          version: "1.0.0",
+          integrity: "sha512-execa-child",
+        },
+        "node_modules/zod": {
+          version: "4.0.0",
+          integrity: "sha512-zod",
+        },
+      },
+    };
+
+    const pi = capabilityDependencyInputFromPackageLock(
+      packageLock,
+      "pi-rpc",
+    );
+    const kimi = capabilityDependencyInputFromPackageLock(
+      packageLock,
+      "kimi-acp",
+    );
+    const packagingOnlyChange = structuredClone(packageLock);
+    packagingOnlyChange.version = "0.1.0-beta.0";
+    packagingOnlyChange.packages[""].version = "0.1.0-beta.0";
+    packagingOnlyChange.packages[
+      "node_modules/@modelcontextprotocol/sdk"
+    ].version = "1.31.0";
+    packagingOnlyChange.packages[
+      "node_modules/@modelcontextprotocol/sdk"
+    ].integrity = "sha512-mcp-new";
+    packagingOnlyChange.packages[
+      "node_modules/@hono/node-server"
+    ].version = "2.1.0";
+    packagingOnlyChange.packages[
+      "node_modules/@hono/node-server"
+    ].integrity = "sha512-hono-new";
+
+    expect(
+      capabilityDependencyInputFromPackageLock(
+        packagingOnlyChange,
+        "pi-rpc",
+      ),
+    ).toEqual(pi);
+    expect(
+      capabilityDependencyInputFromPackageLock(
+        packagingOnlyChange,
+        "kimi-acp",
+      ),
+    ).toEqual(kimi);
+    expect(pi.content).not.toContain("modelcontextprotocol");
+    expect(kimi.content).not.toContain("modelcontextprotocol");
+    expect(pi.content).not.toContain("agentclientprotocol");
+    expect(kimi.content).toContain("agentclientprotocol");
+
+    const sharedRuntimeChange = structuredClone(packageLock);
+    sharedRuntimeChange.packages["node_modules/execa"].integrity =
+      "sha512-execa-changed";
+    expect(
+      capabilityDependencyInputFromPackageLock(
+        sharedRuntimeChange,
+        "pi-rpc",
+      ),
+    ).not.toEqual(pi);
+    expect(
+      capabilityDependencyInputFromPackageLock(
+        sharedRuntimeChange,
+        "kimi-acp",
+      ),
+    ).not.toEqual(kimi);
+
+    const kimiRuntimeChange = structuredClone(packageLock);
+    kimiRuntimeChange.packages[
+      "node_modules/@agentclientprotocol/sdk"
+    ].integrity = "sha512-acp-changed";
+    expect(
+      capabilityDependencyInputFromPackageLock(
+        kimiRuntimeChange,
+        "pi-rpc",
+      ),
+    ).toEqual(pi);
+    expect(
+      capabilityDependencyInputFromPackageLock(
+        kimiRuntimeChange,
+        "kimi-acp",
+      ),
+    ).not.toEqual(kimi);
+  });
+
+  it("fails closed when a required runtime dependency cannot be resolved", () => {
+    expect(() =>
+      capabilityDependencyInputFromPackageLock(
+        {
+          lockfileVersion: 3,
+          packages: {
+            "": {},
+            "node_modules/execa": {
+              version: "9.6.0",
+              integrity: "sha512-execa",
+            },
+          },
+        },
+        "pi-rpc",
+      ),
+    ).toThrow(/capability runtime inputs/iu);
   });
 
   it("fingerprints normalized profile identity, task, paths, and contents", () => {

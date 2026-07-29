@@ -4,6 +4,14 @@
   "description": "Codex-facing external LLM review and delegation tools",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yiyuiii/codex-agent-tools.git"
+  },
+  "homepage": "https://github.com/Yiyuiii/codex-agent-tools#readme",
+  "bugs": {
+    "url": "https://github.com/Yiyuiii/codex-agent-tools/issues"
+  },
   "engines": {
     "node": ">=20"
   },
@@ -52,11 +60,12 @@
     "acceptance:plugin:isolated": "npm run build && node scripts/plugin-isolated-acceptance.mjs",
     "qualify:gates": "tsx scripts/gate-requalification.ts",
     "verify:qualification": "tsx scripts/verify-qualification.ts",
-    "verify:capabilities": "tsx scripts/verify-capabilities.ts"
+    "verify:capabilities": "tsx scripts/verify-capabilities.ts",
+    "prepublishOnly": "npm run smoke:release"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.2.1",
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "commander": "^14.0.0",
     "commonmark": "0.31.2",
     "execa": "^9.6.0",

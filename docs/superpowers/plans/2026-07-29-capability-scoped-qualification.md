@@ -208,4 +208,11 @@ npm run smoke:release
 - Kimi ACP / Pi RPC / real-smoke 目标进程为 0/0/0，资格锁不存在，没有持久 `.tgz`；
 - 没有运行任何产品资格 smoke，没有读取或修改活动配置，也没有安装、发布、推送、合并或 fast-forward。
 
+发布准备期随后发现原实现把整个 `package-lock.json` 纳入每项能力指纹，
+导致无关 MCP 依赖或 package 版本变化也会错误撤销全部资格。获维护者发布
+授权后，该边界按原设计的“相关输入”原则通过 TDD 收窄为 Pi/direct 的
+`execa + zod` 依赖闭包与 Kimi/ACP 额外的
+`@agentclientprotocol/sdk` 闭包；MCP SDK/Hono 和根版本由确定性发布门禁
+承担。八项摘要据此重算，历史 evidence/manifest 未修改，也未调用真实模型。
+
 下一授权节点是维护者决定是否把隔离分支 fast-forward 到正式工作树；本计划本身不授权该动作。

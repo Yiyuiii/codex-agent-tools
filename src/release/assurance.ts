@@ -41,6 +41,88 @@ export interface SensitiveContentOptions {
   secrets: readonly string[];
 }
 
+interface CommandResult {
+  readonly status: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+interface ExpectedNpmPackageIdentity {
+  readonly packageName: string;
+  readonly repositoryUrl: string;
+}
+
+type PlainRecord = Record<string, unknown>;
+
+function plainRecord(value: unknown): PlainRecord | undefined {
+  return typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+    ? (value as PlainRecord)
+    : undefined;
+}
+
+export function assertNpmPackageIdentity(
+  result: CommandResult,
+  expected: ExpectedNpmPackageIdentity,
+): "available" | "registered" {
+  const output = `${result.stdout}\n${result.stderr}`;
+  if (result.status !== 0) {
+    if (/E404|Not Found/iu.test(output)) {
+      return "available";
+    }
+    throw new Error("Unable to verify npm package identity");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch {
+    throw new Error("npm registry response is invalid");
+  }
+  const record = plainRecord(parsed);
+  if (
+    record?.name !== expected.packageName ||
+    record["repository.url"] !== expected.repositoryUrl
+  ) {
+    throw new Error("npm package identity does not match this repository");
+  }
+  return "registered";
+}
+
+export function assertReleasePackageMetadata(options: {
+  readonly packageManifest: unknown;
+  readonly pluginManifest: unknown;
+  readonly runtimeVersion: unknown;
+}): void {
+  const packageManifest = plainRecord(options.packageManifest);
+  const pluginManifest = plainRecord(options.pluginManifest);
+  const repository = plainRecord(packageManifest?.repository);
+  const bugs = plainRecord(packageManifest?.bugs);
+  const version = packageManifest?.version;
+
+  if (
+    packageManifest?.name !== "codex-agent-tools" ||
+    repository?.type !== "git" ||
+    repository.url !==
+      "git+https://github.com/Yiyuiii/codex-agent-tools.git" ||
+    packageManifest.homepage !==
+      "https://github.com/Yiyuiii/codex-agent-tools#readme" ||
+    bugs?.url !== "https://github.com/Yiyuiii/codex-agent-tools/issues"
+  ) {
+    throw new Error("Package public repository metadata is invalid");
+  }
+  if (
+    typeof version !== "string" ||
+    !/^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/u.test(version) ||
+    pluginManifest?.name !== "codex-external-agents" ||
+    pluginManifest.version !== version ||
+    options.runtimeVersion !== version
+  ) {
+    throw new Error("Package, runtime, and plugin release versions differ");
+  }
+}
+
 const EXACT_PUBLIC_FILES = new Set([
   "LICENSE",
   "README.md",

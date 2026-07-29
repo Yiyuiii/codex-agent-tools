@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main, next]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      matrix:
+        node-version: [20, 22, 24]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --maxWorkers=1
+      - run: npm run smoke:release
+
+      - name: Upload package evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-node-${{ matrix.node-version }}-package-evidence
+          path: |
+            dist/
+            plugins/codex-external-agents/runtime/
+          if-no-files-found: error
+          retention-days: 7

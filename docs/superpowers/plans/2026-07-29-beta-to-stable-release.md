@@ -45,6 +45,11 @@
 2. 最小实现至绿。
 3. 运行聚焦测试、类型检查、release smoke。
 
+执行记录：release smoke 首轮发现能力指纹错误纳入整个 lockfile，使 MCP SDK
+升级和未来版本号变更会误伤全部模型资格。该边界已先按 TDD 修正为能力执行
+依赖闭包；MCP SDK/Hono 改由 MCP、供应链与发布门禁覆盖，八项历史证据本身
+保持不变。
+
 ## Task 2：准备并 bootstrap `0.1.0-beta.0`
 
 **文件**

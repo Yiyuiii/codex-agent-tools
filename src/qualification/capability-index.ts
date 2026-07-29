@@ -19,13 +19,22 @@ import {
 
 const MAX_RUNTIME_INPUT_BYTES = 4 * 1024 * 1024;
 
+const QUALIFICATION_RUNTIME_INPUT_ROOTS = Object.freeze([
+  "src/qualification/coordinator.ts",
+  "src/qualification/lock.ts",
+  "src/qualification/manifest.ts",
+  "src/qualification/preflight.ts",
+  "src/qualification/protocol.ts",
+  "src/qualification/types.ts",
+  "src/qualification/verifier.ts",
+] as const);
+
 const SHARED_RUNTIME_INPUT_ROOTS = Object.freeze([
-  "package-lock.json",
   "src/adapters/adapter.ts",
   "src/mcp",
   "src/runtime",
   "src/tasks",
-  "src/qualification",
+  ...QUALIFICATION_RUNTIME_INPUT_ROOTS,
   "src/smoke/evidence.ts",
   "src/smoke/command-observation.ts",
   "src/smoke/result-file-evidence.ts",
@@ -49,6 +58,12 @@ const KIMI_RUNTIME_INPUT_ROOTS = Object.freeze([
   "src/adapters/kimi",
   "src/smoke/kimi.ts",
 ] as const);
+
+const SHARED_RUNTIME_DEPENDENCIES = Object.freeze(["execa", "zod"]);
+const KIMI_RUNTIME_DEPENDENCIES = Object.freeze([
+  ...SHARED_RUNTIME_DEPENDENCIES,
+  "@agentclientprotocol/sdk",
+]);
 
 export interface CapabilityRuntimeInput {
   readonly path: string;
@@ -128,6 +143,144 @@ function capabilityInputError(): Error {
 
 function capabilityQualificationError(): Error {
   return new Error("Capability qualification evidence is invalid");
+}
+
+function inputRecord(value: unknown): Record<string, unknown> {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    Array.isArray(value) ||
+    nodeUtilTypes.isProxy(value) ||
+    (Object.getPrototypeOf(value) !== Object.prototype &&
+      Object.getPrototypeOf(value) !== null)
+  ) {
+    throw capabilityInputError();
+  }
+  return value as Record<string, unknown>;
+}
+
+function dependencyRanges(value: unknown): Readonly<Record<string, string>> {
+  if (value === undefined) return Object.freeze({});
+  const record = inputRecord(value);
+  const entries = Object.entries(record)
+    .map(([name, range]) => {
+      if (typeof range !== "string" || name.length === 0) {
+        throw capabilityInputError();
+      }
+      return [name, range] as const;
+    })
+    .sort(([left], [right]) => left.localeCompare(right, "en"));
+  return Object.freeze(Object.fromEntries(entries));
+}
+
+function resolveLockedDependencyPath(
+  packages: Readonly<Record<string, unknown>>,
+  fromPackagePath: string,
+  dependencyName: string,
+): string | undefined {
+  let current = fromPackagePath;
+  while (true) {
+    const candidate =
+      current === ""
+        ? `node_modules/${dependencyName}`
+        : `${current}/node_modules/${dependencyName}`;
+    if (Object.hasOwn(packages, candidate)) return candidate;
+
+    const nestedBoundary = current.lastIndexOf("/node_modules/");
+    if (nestedBoundary >= 0) {
+      current = current.slice(0, nestedBoundary);
+      continue;
+    }
+    if (current.startsWith("node_modules/")) {
+      current = "";
+      continue;
+    }
+    return undefined;
+  }
+}
+
+export function capabilityDependencyInputFromPackageLock(
+  value: unknown,
+  runtime: RuntimeKind,
+): CapabilityRuntimeInput {
+  const lock = inputRecord(value);
+  if (lock.lockfileVersion !== 3) throw capabilityInputError();
+  const packages = inputRecord(lock.packages);
+  const seeds =
+    runtime === "kimi-acp"
+      ? KIMI_RUNTIME_DEPENDENCIES
+      : SHARED_RUNTIME_DEPENDENCIES;
+  const pending = seeds.map((dependencyName) => {
+    const resolved = resolveLockedDependencyPath(
+      packages,
+      "",
+      dependencyName,
+    );
+    if (resolved === undefined) throw capabilityInputError();
+    return resolved;
+  });
+  const visited = new Set<string>();
+  const snapshot: Array<{
+    path: string;
+    version: string;
+    integrity: string;
+    dependencies: Readonly<Record<string, string>>;
+    optionalDependencies: Readonly<Record<string, string>>;
+    peerDependencies: Readonly<Record<string, string>>;
+  }> = [];
+
+  while (pending.length > 0) {
+    const packagePath = pending.shift();
+    if (packagePath === undefined || visited.has(packagePath)) continue;
+    visited.add(packagePath);
+    const packageEntry = inputRecord(packages[packagePath]);
+    const version = packageEntry.version;
+    const integrity = packageEntry.integrity;
+    if (typeof version !== "string" || typeof integrity !== "string") {
+      throw capabilityInputError();
+    }
+    const dependencies = dependencyRanges(packageEntry.dependencies);
+    const optionalDependencies = dependencyRanges(
+      packageEntry.optionalDependencies,
+    );
+    const peerDependencies = dependencyRanges(
+      packageEntry.peerDependencies,
+    );
+    snapshot.push({
+      path: packagePath,
+      version,
+      integrity,
+      dependencies,
+      optionalDependencies,
+      peerDependencies,
+    });
+
+    for (const dependencyName of [
+      ...Object.keys(dependencies),
+      ...Object.keys(optionalDependencies),
+      ...Object.keys(peerDependencies),
+    ]) {
+      const resolved = resolveLockedDependencyPath(
+        packages,
+        packagePath,
+        dependencyName,
+      );
+      if (resolved !== undefined) pending.push(resolved);
+      else if (Object.hasOwn(dependencies, dependencyName)) {
+        throw capabilityInputError();
+      }
+    }
+  }
+
+  snapshot.sort((left, right) => left.path.localeCompare(right.path, "en"));
+  return Object.freeze({
+    path: "package-lock.capability-runtime.json",
+    content: JSON.stringify({
+      schemaVersion: 1,
+      runtime,
+      packages: snapshot,
+    }),
+  });
 }
 
 function normalizedRelativePath(value: string): string {
@@ -893,10 +1046,25 @@ export async function computeCapabilityRuntimeFingerprint(options: {
     repositoryRoot: options.repositoryRoot,
     roots: capabilityRuntimeInputRoots(profile.runtime),
   });
+  const [packageLockInput] = await collectCapabilityRuntimeInputs({
+    repositoryRoot: options.repositoryRoot,
+    roots: ["package-lock.json"],
+  });
+  if (packageLockInput === undefined) throw capabilityInputError();
+  let packageLock: unknown;
+  try {
+    packageLock = JSON.parse(packageLockInput.content);
+  } catch {
+    throw capabilityInputError();
+  }
+  const dependencyInput = capabilityDependencyInputFromPackageLock(
+    packageLock,
+    profile.runtime,
+  );
   return fingerprintCapabilitySnapshot({
     llm: options.llm,
     task: options.task,
     profile: fingerprintProfile(profile),
-    inputs,
+    inputs: Object.freeze([...inputs, dependencyInput]),
   });
 }

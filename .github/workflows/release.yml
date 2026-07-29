@@ -1,0 +1,240 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      npm_tag: ${{ steps.channel.outputs.npm_tag }}
+      tag_version: ${{ steps.version.outputs.tag_version }}
+      validation_file: ${{ steps.validation.outputs.validation_file }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Resolve release channel
+        id: channel
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if [[ "$tag" == *-* ]]; then
+            echo "npm_tag=next" >> "$GITHUB_OUTPUT"
+            echo "required_branch=origin/next" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "required_branch=origin/main" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify package version matches tag
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_version="$(node -p "require('./package.json').version")"
+          tag_version="${GITHUB_REF_NAME#v}"
+          echo "tag_version=${tag_version}" >> "$GITHUB_OUTPUT"
+          if [[ "$package_version" != "$tag_version" ]]; then
+            echo "::error::package.json version $package_version does not match tag $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+      - name: Verify tag ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_branch="${{ steps.channel.outputs.required_branch }}"
+          branch_name="${required_branch#origin/}"
+          git fetch origin "+refs/heads/${branch_name}:refs/remotes/origin/${branch_name}"
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "$required_branch"; then
+            echo "::error::Tag $GITHUB_REF_NAME at $GITHUB_SHA is not reachable from $required_branch"
+            exit 1
+          fi
+
+      - name: Verify stable release validation evidence
+        id: validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_version="${{ steps.version.outputs.tag_version }}"
+          validation_file=".release-validation/v${tag_version}.md"
+          echo "validation_file=${validation_file}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ steps.channel.outputs.npm_tag }}" != "latest" ]]; then
+            exit 0
+          fi
+          if [[ ! -s "$validation_file" ]]; then
+            echo "::error::Stable release requires $validation_file at the tagged commit."
+            exit 1
+          fi
+          sed -i 's/\r$//' "$validation_file"
+          for marker in \
+            "Doctor: pass" \
+            "Local-Npm-Smoke: pass" \
+            "MCP-Smoke: pass" \
+            "Plugin-Isolated: pass" \
+            "Capability-Index: pass" \
+            "Release-Review: pass"; do
+            grep -Fxq "$marker" "$validation_file" || {
+              echo "::error::$validation_file must contain exact marker: $marker"
+              exit 1
+            }
+          done
+          grep -Eq '^RC: v[0-9]+\.[0-9]+\.[0-9]+-' "$validation_file" || {
+            echo "::error::$validation_file must contain an RC marker such as RC: v0.1.0-beta.1"
+            exit 1
+          }
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --maxWorkers=1
+      - run: npm run smoke:release
+
+      - name: Create npm pack dry-run manifest
+        run: npm pack --dry-run --json > npm-pack-dry-run.json
+
+      - name: Upload package evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.ref_name }}-package-evidence
+          path: |
+            npm-pack-dry-run.json
+            dist/
+            plugins/codex-external-agents/runtime/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Check whether the version already exists
+        id: existing
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.tag_version }}"
+          existing="$(npm view "codex-agent-tools@${version}" version 2>/dev/null || true)"
+          if [[ -n "$existing" && "$existing" != "$version" ]]; then
+            echo "::error::npm returned unexpected version '$existing' for codex-agent-tools@${version}"
+            exit 1
+          fi
+          if [[ "$existing" == "$version" ]]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish package through npm OIDC
+        if: steps.existing.outputs.published != 'true'
+        run: npm publish --ignore-scripts --tag "${{ steps.channel.outputs.npm_tag }}" --access public
+
+      - name: Verify published package and dist-tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.tag_version }}"
+          npm_tag="${{ steps.channel.outputs.npm_tag }}"
+          for attempt in {1..12}; do
+            package_version="$(npm view "codex-agent-tools@${version}" version 2>/dev/null || true)"
+            dist_tag_version="$(npm view "codex-agent-tools@${npm_tag}" version 2>/dev/null || true)"
+            if [[ "$package_version" == "$version" && "$dist_tag_version" == "$version" ]]; then
+              exit 0
+            fi
+            echo "Waiting for npm registry propagation, attempt ${attempt}/12..."
+            sleep 10
+          done
+          echo "::error::npm did not report codex-agent-tools@${version} on dist-tag ${npm_tag}"
+          exit 1
+
+  github-release:
+    runs-on: ubuntu-latest
+    needs: publish
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Write GitHub Release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          tag_version="${{ needs.publish.outputs.tag_version }}"
+          npm_tag="${{ needs.publish.outputs.npm_tag }}"
+          validation_file="${{ needs.publish.outputs.validation_file }}"
+          {
+            echo "## Validation"
+            echo "- CI matrix: Node 20/22/24"
+            echo "- release smoke: passed"
+            echo "- npm package and dist-tag: verified"
+            if [[ "$npm_tag" == "latest" ]]; then
+              echo "- beta local npm acceptance: passed (see \`${validation_file}\`)"
+            else
+              echo "- beta local npm acceptance: required before stable promotion"
+            fi
+            echo
+            echo "Published npm package: \`codex-agent-tools@${tag_version}\`"
+            echo "Git tag: \`${tag}\`"
+          } > release-notes.md
+
+      - name: Create or update GitHub Release
+        uses: actions/github-script@v8
+        env:
+          RELEASE_NOTES_PATH: release-notes.md
+          IS_PRERELEASE: ${{ needs.publish.outputs.npm_tag == 'next' }}
+        with:
+          script: |
+            const fs = require("node:fs");
+            const tagName = context.ref.replace("refs/tags/", "");
+            const body = fs.readFileSync(process.env.RELEASE_NOTES_PATH, "utf8");
+            const prerelease = process.env.IS_PRERELEASE === "true";
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            try {
+              const existing = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: tagName
+              });
+              await github.rest.repos.updateRelease({
+                owner,
+                repo,
+                release_id: existing.data.id,
+                tag_name: tagName,
+                name: tagName,
+                body,
+                prerelease
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+              await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: tagName,
+                target_commitish: context.sha,
+                name: tagName,
+                body,
+                prerelease
+              });
+            }

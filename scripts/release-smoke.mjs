@@ -17,15 +17,18 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { execa } from "execa";
 
 import {
+  assertNpmPackageIdentity,
   assertNoSensitiveContent,
   assertCapabilitySourcesPackaged,
   assertPackageDocumentLinkClosure,
+  assertReleasePackageMetadata,
   capabilitySourcePathsFromIndex,
   resolveAllowedPackInspectionPaths,
 } from "../dist/release-assurance.js";
 import {
   verifyCapabilityIndex,
 } from "../dist/capability-qualification.js";
+import { VERSION } from "../dist/index.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = path.join(root, "dist");
@@ -110,21 +113,39 @@ function checkNpmNameAvailability() {
   const result = npmExecPath
     ? spawnSync(
         process.execPath,
-        [npmExecPath, "view", "codex-agent-tools", "name", "version", "--json"],
+        [
+          npmExecPath,
+          "view",
+          "codex-agent-tools",
+          "name",
+          "repository.url",
+          "--json",
+        ],
         { cwd: root, encoding: "utf8", windowsHide: true },
       )
     : spawnSync(
         process.platform === "win32" ? "npm.cmd" : "npm",
-        ["view", "codex-agent-tools", "name", "version", "--json"],
+        [
+          "view",
+          "codex-agent-tools",
+          "name",
+          "repository.url",
+          "--json",
+        ],
         { cwd: root, encoding: "utf8", windowsHide: true },
       );
-  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-  if (result.status === 0) {
-    throw new Error("npm package name codex-agent-tools is already registered");
-  }
-  if (!/E404|Not Found/iu.test(output)) {
-    throw new Error("Unable to verify npm package name availability");
-  }
+  assertNpmPackageIdentity(
+    {
+      status: result.status,
+      stdout: result.stdout ?? "",
+      stderr: result.stderr ?? "",
+    },
+    {
+      packageName: "codex-agent-tools",
+      repositoryUrl:
+        "git+https://github.com/Yiyuiii/codex-agent-tools.git",
+    },
+  );
 }
 
 function releaseSecrets(environment) {
@@ -271,9 +292,11 @@ async function checkPluginArtifact() {
       readJson(pluginMcpPath),
     ]);
 
-  if (packageManifest.version !== pluginManifest.version) {
-    throw new Error("package and plugin versions differ");
-  }
+  assertReleasePackageMetadata({
+    packageManifest,
+    pluginManifest,
+    runtimeVersion: VERSION,
+  });
   if (
     !Array.isArray(packageManifest.files) ||
     ![

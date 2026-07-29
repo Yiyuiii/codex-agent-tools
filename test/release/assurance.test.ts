@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   assertAllowedPackFiles,
   assertCapabilitySourcesPackaged,
+  assertNpmPackageIdentity,
   assertNoSensitiveContent,
   assertPackageDocumentLinkClosure,
   assertPackageLocalLinks,
+  assertReleasePackageMetadata,
   capabilitySourcePathsFromIndex,
   resolveAllowedPackInspectionPaths,
   resolvePackInspectionPath,
@@ -23,6 +25,135 @@ function assertBundleContent(content: string): void {
 }
 
 describe("release assurance", () => {
+  it("accepts an available npm name or the package owned by the canonical repository", () => {
+    expect(
+      assertNpmPackageIdentity(
+        {
+          status: 1,
+          stdout: "",
+          stderr: "npm error code E404\nnpm error 404 Not Found",
+        },
+        {
+          packageName: "codex-agent-tools",
+          repositoryUrl:
+            "git+https://github.com/Yiyuiii/codex-agent-tools.git",
+        },
+      ),
+    ).toBe("available");
+
+    expect(
+      assertNpmPackageIdentity(
+        {
+          status: 0,
+          stdout: JSON.stringify({
+            name: "codex-agent-tools",
+            "repository.url":
+              "git+https://github.com/Yiyuiii/codex-agent-tools.git",
+          }),
+          stderr: "",
+        },
+        {
+          packageName: "codex-agent-tools",
+          repositoryUrl:
+            "git+https://github.com/Yiyuiii/codex-agent-tools.git",
+        },
+      ),
+    ).toBe("registered");
+  });
+
+  it("fails closed on npm package identity drift or an indeterminate registry response", () => {
+    const expected = {
+      packageName: "codex-agent-tools",
+      repositoryUrl:
+        "git+https://github.com/Yiyuiii/codex-agent-tools.git",
+    };
+
+    expect(() =>
+      assertNpmPackageIdentity(
+        {
+          status: 0,
+          stdout: JSON.stringify({
+            name: "codex-agent-tools",
+            "repository.url":
+              "git+https://github.com/another-owner/codex-agent-tools.git",
+          }),
+          stderr: "",
+        },
+        expected,
+      ),
+    ).toThrow(/identity does not match/u);
+    expect(() =>
+      assertNpmPackageIdentity(
+        {
+          status: 0,
+          stdout: "{not-json",
+          stderr: "",
+        },
+        expected,
+      ),
+    ).toThrow(/registry response is invalid/u);
+    expect(() =>
+      assertNpmPackageIdentity(
+        {
+          status: 1,
+          stdout: "",
+          stderr: "npm error code E500",
+        },
+        expected,
+      ),
+    ).toThrow(/Unable to verify npm package identity/u);
+  });
+
+  it("binds package, runtime, plugin, and public repository release metadata", () => {
+    const packageManifest = {
+      name: "codex-agent-tools",
+      version: "0.1.0-beta.0",
+      repository: {
+        type: "git",
+        url: "git+https://github.com/Yiyuiii/codex-agent-tools.git",
+      },
+      homepage: "https://github.com/Yiyuiii/codex-agent-tools#readme",
+      bugs: {
+        url: "https://github.com/Yiyuiii/codex-agent-tools/issues",
+      },
+    };
+    const pluginManifest = {
+      name: "codex-external-agents",
+      version: "0.1.0-beta.0",
+    };
+
+    expect(() =>
+      assertReleasePackageMetadata({
+        packageManifest,
+        pluginManifest,
+        runtimeVersion: "0.1.0-beta.0",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertReleasePackageMetadata({
+        packageManifest,
+        pluginManifest: {
+          ...pluginManifest,
+          version: "0.1.0-beta.1",
+        },
+        runtimeVersion: "0.1.0-beta.0",
+      }),
+    ).toThrow(/release versions differ/u);
+    expect(() =>
+      assertReleasePackageMetadata({
+        packageManifest: {
+          ...packageManifest,
+          repository: {
+            type: "git",
+            url: "git+https://github.com/another-owner/codex-agent-tools.git",
+          },
+        },
+        pluginManifest,
+        runtimeVersion: "0.1.0-beta.0",
+      }),
+    ).toThrow(/public repository metadata is invalid/u);
+  });
+
   it("resolves an npm-redacted package path to exactly one local file", () => {
     const actual =
       "docs/smoke/evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json";

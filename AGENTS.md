@@ -93,6 +93,8 @@
 - 2026-07-28：冻结前 fresh 全量矩阵已经通过：49 个测试文件、853 passed / 1 个平台条件 skipped / 0 failed，类型检查、构建、release smoke、隔离官方插件 `--check-report`、6/6 retained manifests immutable verifier 与最新 evidence 不变检查均通过。npm pack dry-run 为 191 files 且没有持久 `.tgz`；生产隔离环境中的 Pi resolver 找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0，精确 Ark Agent Plan 写入探针以 exit 0 产生 28 bytes、SHA-256 `81fcf915...`。Kimi ACP 全量测试曾暴露 client 早于 child close 返回的既有竞态，98/100 时序探针可观察；提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试，独立复审 PASS、无 P0–P3，最终全量已包含该修复。目标进程 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁 absent。
 - 2026-07-28（历史，阻碍结论已被 2026-07-29 资格策略更新取代）：standing authorization 首批已在 frozen SHA `0113da97a6b1fef35cc4c45025caa9e36a002176` 上运行并由提交 `6b4217d` 保存 20 个不可变证据文件。批次以 `account_quota_exceeded` 在 ordinal 6 首错停止；ordinal 1–5 均 passed，ordinal 1 与 6 的规定命令都真实 success，所有已执行项均为 `1 / 0 / 0 / false / false`，immutable-evidence verifier、进程 0/0/0 与锁 absent 均通过。当时把额度恢复视为下一次整批重跑的人工前置；当前只把它视为 Agent Plan 路线可用性，不再要求全量重跑。活动插件/config、Claude Code、`codex_cc_tools`、发布、推送、合并与 fast-forward 均未操作。
 
+- 2026-07-29：正式发布准备已获授权并在 `next` 推进。首轮 release smoke 发现能力指纹错误包含整个 `package-lock.json`，会因无关 MCP SDK/Hono 或 package 版本变化误撤销八项资格；现按 TDD 收窄为 Pi/direct 的 `execa + zod` 依赖闭包与 Kimi/ACP 额外的 `@agentclientprotocol/sdk` 闭包，缺失版本、完整性摘要或必需传递依赖均 fail closed。MCP SDK/Hono 由 MCP 集成、供应链、打包和 npm 安装门禁承担；历史 evidence/manifest 未改写，也未调用真实模型。
+
 ## 架构与计划索引
 
 - [产品设计历史基线](docs/superpowers/specs/2026-07-18-codex-external-agents-design.md)

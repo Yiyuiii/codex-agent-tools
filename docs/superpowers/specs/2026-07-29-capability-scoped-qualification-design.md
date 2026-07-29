@@ -109,7 +109,23 @@ Plan”的要求，索引允许一个显式标记的 `legacy-standalone` 来源�
 - review/delegate 公共任务执行路径；
 - 影响该任务验收语义的严格 validator；
 - Pi/Kimi 隔离配置生成逻辑；
-- 直接影响上述运行路径的锁定生产依赖。
+- 直接影响上述运行路径的锁定生产依赖闭包。
+
+依赖输入不是整个 `package-lock.json` 的字节哈希。验证器从 npm lockfile
+v3 中按 Node 解析规则提取固定的能力执行种子及其递归
+`dependencies`、`optionalDependencies`、`peerDependencies` 闭包，再把每个
+已安装包的路径、版本、完整性摘要和依赖边转换成确定性合成输入：
+
+- Pi/direct 路径固定从 `execa` 与 `zod` 开始；
+- Kimi/ACP 路径在上述基础上增加 `@agentclientprotocol/sdk`；
+- 缺少种子、必需传递依赖、版本或完整性摘要时 fail closed。
+
+`@modelcontextprotocol/sdk`、Hono 等只属于 MCP 服务承载而不进入真实能力
+smoke 执行路径的依赖，不进入模型能力指纹；它们由 MCP 集成测试、打包检查、
+release smoke 和 npm 安装验收负责。根 package 版本、lockfile 根元数据以及
+资格索引实现文件本身也不进入指纹，避免仅发布版本号或更新索引摘要就让证据
+自我失效。MCP 源码、公开任务路径和资格 verifier 仍是显式源码输入，因此产品
+语义变化继续使相应能力 fail closed。
 
 下列变化不使能力自动失效：
 
@@ -125,7 +141,7 @@ Plan”的要求，索引允许一个显式标记的 `legacy-standalone` 来源�
 - runtime adapter、网络/环境隔离或进程生命周期变化；
 - review/delegate 工具语义、权限或文件写入边界变化；
 - 相关提示合同或严格验收语义变化；
-- 相关生产依赖升级；
+- 上述能力执行依赖闭包中的版本、完整性摘要或依赖边变化；
 - 真实调用暴露可归因于产品实现的系统性回归。
 
 无法可靠判断影响范围时，保守地只使可能受影响的 runtime 或任务族失效，而不是重跑完全无关的 LLM。
