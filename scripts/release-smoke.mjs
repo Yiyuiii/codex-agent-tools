@@ -72,6 +72,8 @@ const requiredReviewPackageSources = [
   "docs/release/real-plugin-install-review.md",
   "docs/release/plugin-isolated-state.md",
   "docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md",
+  "docs/superpowers/plans/2026-07-29-capability-scoped-qualification.md",
+  "docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md",
 ];
 const worktreeMarker = `${path.sep}.worktrees${path.sep}`;
 const worktreeMarkerIndex = root

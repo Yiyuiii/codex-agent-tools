@@ -1,14 +1,16 @@
 # 四模型八项资格批次执行承载手册
 
+> 2026-07-29 状态：本手册继续约束需要真实运行的 batch 承载、首错停止、证据冻结和 fail-closed 行为，但“必须同批 8/8 才能形成任何资格”的晋级规则已被[能力粒度资格设计](../superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)取代。当前资格以固定 [`capabilities.json`](../smoke/evidence/capabilities.json) 为准；只有 stale、缺失、新增或证据失效的能力才需要运行。历史 batch 的终态不得修改。
+
 状态：维护者运行合同；不是可执行授权脚本，也不授予任何资格批次、安装或发布权限。
 
 ## 当前状态
 
-standing authorization 下的最新真实 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c` 绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，已由一个 `functions.exec` cell 和一个四小时预算的前台 shell 从 ordinal 1 承载到可信首错终态。ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的模型、provider、direct route、凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` failed；ordinal 7–8 notRun。终态为 `blocked / case_failed`、6 completed / 5 passed 且 `promotionEligible=false`；manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，证据提交为 `6b4217d`。活动注册表仍为 6 passed / 2 pending，安装仍为 `blocked / not ready`。
+standing authorization 下的最新真实 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c` 绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，已由一个 `functions.exec` cell 和一个四小时预算的前台 shell 从 ordinal 1 承载到可信首错终态。ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的模型、provider、direct route、凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` failed；ordinal 7–8 notRun。终态为 `blocked / case_failed`、6 completed / 5 passed 且 `promotionEligible=false`；manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，证据提交为 `6b4217d`。该批整体仍为 blocked；当前活动注册表则由能力索引验证为 8 passed / 0 pending。
 
-本轮没有发生 cell 丢失或 recovery，也没有 resume、retry、fallback、补跑、第二入口或第二批。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。ordinal 1 与 ordinal 6 的精确写入和精确状态命令均各一次 success，结果文件与文件范围都通过；这把上批的 Windows shell 与资格假阳性缺口真实闭合。当前 `account_quota_exceeded` 已成为独立、可复现的外部账户额度阻碍；无外部状态变化时不得再开新批。
+本轮没有发生 cell 丢失或 recovery，也没有 resume、retry、fallback、补跑、第二入口或第二批。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。ordinal 1 与 ordinal 6 的精确写入和精确状态命令均各一次 success，结果文件与文件范围都通过；这把上批的 Windows shell 与资格假阳性缺口真实闭合。`account_quota_exceeded` 作为当时 Agent Plan 可用性事实保留；它不再要求全量重跑，也不撤销其它能力资格。
 
-离线根因确认是 Pi Windows 子进程环境缺少 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 已修复，生产隔离环境中的 resolver 找到 `C:\Program Files\Git\bin\bash.exe`，两个系统根变量存在且代理变量为 0，精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`。提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 还要求未来资格 Pi delegate 的精确写入与精确 `git status --short` 生命周期各一次且均 success，并由未来整批 passed verifier 重算；历史 blocked/interrupted 证据保持兼容，资格 schema/plan 与公共运行边界不变。当前收尾 fresh 全量为 49 files / 853 passed / 1 skipped / 0 failed，类型检查、构建、release smoke、隔离 `--check-report`、retained manifests 7/7、证据不变、目标进程 0/0/0、资格锁 absent 与 211-file pack dry-run 均通过。该结果证明本手册的长时承载路径可以取得正常终态，但不允许把同批任一通过项与历史证据拼接晋级。
+离线根因确认是 Pi Windows 子进程环境缺少 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 已修复，生产隔离环境中的 resolver 找到 `C:\Program Files\Git\bin\bash.exe`，两个系统根变量存在且代理变量为 0，精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`。提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 要求资格 Pi delegate 的精确写入与精确 `git status --short` 生命周期各一次且均 success；历史 blocked/interrupted 证据保持兼容，资格 schema/plan 与公共运行边界不变。该结果证明本手册的长时承载路径可以取得正常终态；当前能力 verifier 会对每个被索引的 passed case 重算精确合同，而不是依赖 batch 聚合标签。
 
 105 秒承载演练只构成离线基础设施证据：`functions.exec` 约 1 秒后 yield，同一个 cell 随后经 4 次 `functions.wait` 完成；事件严格为 1 个 `started`、7 个有序 `heartbeat`、1 个 `completed`，shell exit code 为 0，观测 wall time 为 111.4 秒；演练后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。它不证明 cell 可存活 4 小时，不证明任何模型资格，也不授权真实批次。
 

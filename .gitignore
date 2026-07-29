@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .worktrees/
+.playwright-cli/
 plugins/codex-external-agents/runtime/
 coverage/
 *.tgz

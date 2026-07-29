@@ -1,6 +1,6 @@
 # 能力级资格复用与 Ark Coding Plan 晋级实施计划
 
-> 执行位置：`D:\Codes\codex-agent-tools\.worktrees\gemini-retirement`
+> 执行位置：`codex/gemini-retirement` 分支的隔离 worktree
 >
 > 分支：`codex/gemini-retirement`
 >
@@ -191,3 +191,19 @@ npm run smoke:release
 - 最新 blocked batch 保持不可变且不再连带阻断 passed case；
 - 完整确定性矩阵与独立审阅通过；
 - 活动配置、活动插件、Claude Code、旧工具、发布与远端 Git 状态均未改变。
+
+## 中断恢复状态（2026-07-29）
+
+已恢复并重新验证：
+
+- 行为实现已由 `79e70c8`、`78a276f`、`d9d0179`、`27b3b85` 分四步提交；
+- 51 个测试文件独占运行通过，871 passed / 1 个平台条件 skipped；
+- 类型检查、build、8/8 能力索引、release smoke 与 `git diff --check` 通过；
+- 7 份 retained manifest 全部通过 `immutable-evidence` verifier，历史 blocked/interrupted 状态未改写；
+- 隔离官方插件 `--check-report` 通过；
+- Kimi ACP / Pi RPC / real-smoke 目标进程为 0/0/0，资格锁不存在，没有持久 `.tgz`；
+- 没有调用产品真实模型，没有读取或修改活动配置，也没有安装、发布、推送、合并或 fast-forward。
+
+恢复时第一次把全量测试与能力 verifier、类型检查并行，导致一个 manifest 文件系统用例命中 30 秒超时；该用例单独复跑耗时 1.73 秒且通过，全量测试独占复跑全绿。该结果按资源竞争处理，没有修改生产代码或放宽测试超时。
+
+尚未闭合：设计阶段外审已有记录，但能力级实现完成后的独立规格/质量复审没有可核验证据。本轮恢复遵守“不调用任何真实模型”，因此不补跑外部模型审阅。完成该复审并重新执行受影响的确定性门禁后，才能把 Task 6 和本计划标为全部完成。

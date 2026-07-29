@@ -100,10 +100,10 @@ describe("doctor diagnostics", () => {
     expect(
       report.checks.find((check) => check.name === "LLM ark-coding-plan"),
     ).toMatchObject({
-      ok: false,
-      level: "warn",
+      ok: true,
+      level: "ok",
       detail:
-        "ark-code-latest via pi-rpc; route=direct; review=pending; delegate=pending",
+        "ark-code-latest via pi-rpc; route=direct; review=passed; delegate=passed",
     });
     expect(
       report.checks.find((check) => check.name === "LLM ark-agent-plan"),

@@ -1,232 +1,61 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" href="data:," />
-    <title>需要维护者处理：Ark Agent Plan 账户额度</title>
-    <style>
-      :root {
-        color-scheme: light;
-        font-family:
-          Inter, "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
-        --ink: #172033;
-        --muted: #64748b;
-        --line: #d6dde8;
-        --panel: #f7f9fc;
-        --red: #b42318;
-        --red-bg: #fff1f0;
-        --green: #067647;
-        --green-bg: #ecfdf3;
-        --blue: #175cd3;
-        --blue-bg: #eff6ff;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        color: var(--ink);
-        background: #edf2f7;
-        line-height: 1.65;
-      }
-      main {
-        width: min(920px, calc(100% - 28px));
-        margin: 24px auto;
-        padding: clamp(22px, 4vw, 40px);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: white;
-        box-shadow: 0 18px 50px rgb(15 23 42 / 8%);
-      }
-      h1,
-      h2 {
-        color: #111827;
-        line-height: 1.25;
-      }
-      h1 {
-        margin-top: 0;
-        font-size: clamp(1.7rem, 4vw, 2.35rem);
-      }
-      h2 {
-        margin-top: 2rem;
-        font-size: 1.25rem;
-      }
-      code {
-        padding: 0.1em 0.35em;
-        border-radius: 4px;
-        background: #f1f5f9;
-        overflow-wrap: anywhere;
-      }
-      a {
-        color: var(--blue);
-      }
-      .action,
-      .verified,
-      .reply,
-      .boundary {
-        margin: 1rem 0;
-        padding: 15px 17px;
-        border-radius: 11px;
-      }
-      .action {
-        border: 2px solid var(--red);
-        background: var(--red-bg);
-      }
-      .verified {
-        border-left: 5px solid var(--green);
-        background: var(--green-bg);
-      }
-      .reply {
-        border: 2px solid var(--blue);
-        background: var(--blue-bg);
-      }
-      .boundary {
-        border: 1px solid var(--line);
-        background: var(--panel);
-      }
-      li {
-        margin: 0.42em 0;
-      }
-      footer {
-        margin-top: 2rem;
-        padding-top: 1rem;
-        border-top: 1px solid var(--line);
-        color: var(--muted);
-      }
-      @media (max-width: 640px) {
-        main {
-          width: min(100% - 16px, 920px);
-          margin: 8px auto;
-          padding: 20px 14px;
-          border-radius: 12px;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>需要维护者处理：Ark Agent Plan 账户额度</h1>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>能力资格迁移完成状态</title>
+  <style>
+    :root { color-scheme:dark; --bg:#07131b; --panel:#10232d; --line:#285064; --text:#eefaff; --muted:#b0c8d2; --ok:#55dfa3; --blue:#83bdff; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(145deg,#07131b,#102436); color:var(--text); font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { width:min(920px,calc(100% - 30px)); margin:36px auto 64px; }
+    h1 { font-size:clamp(2rem,5vw,3rem); line-height:1.1; margin:8px 0 12px; }
+    h2 { font-size:1.2rem; margin:0 0 10px; }
+    .tag { color:var(--ok); font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .lead { color:var(--muted); max-width:760px; }
+    .card { border:1px solid var(--line); border-radius:18px; background:rgba(16,35,45,.9); padding:22px; margin:16px 0; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    .metric { font-size:2.1rem; font-weight:850; color:var(--ok); }
+    code { color:#d9eeff; overflow-wrap:anywhere; }
+    a { color:var(--blue); }
+    ul { margin:8px 0 0; padding-left:21px; }
+    @media (max-width:680px) { .grid { grid-template-columns:1fr; } .card { padding:18px; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="tag">Supersedes quota intervention request</div>
+  <h1>当前不需要处理 Ark Agent Plan 额度</h1>
+  <p class="lead">旧页面曾要求先恢复额度再运行一整批八项。该要求已经被能力粒度资格替代：历史上通过且仍匹配当前运行时的精确 case 可以复用，无关路线不再重复消耗。</p>
 
-      <div class="action">
-        <strong>当前已确认且需要人工处理的问题：</strong>
-        请补充或恢复 <code>OPENAI_API_KEY_DOUBAO</code> 所属账户的 Ark Agent
-        Plan 计划额度，或者等待额度重置。无需也不应向 Codex 提供密钥值。第 7–8
-        项尚未运行，因此本页不声称后续绝无其它问题。
-      </div>
+  <section class="grid">
+    <article class="card">
+      <div class="metric">8 / 8</div>
+      <h2>能力索引通过</h2>
+      <p>四个逻辑 LLM × review/delegate 均为 passed。</p>
+    </article>
+    <article class="card">
+      <div class="metric">0</div>
+      <h2>当前需人工处理的资格问题</h2>
+      <p>没有。额度只在实际调用受影响路线时表现为可用性问题。</p>
+    </article>
+  </section>
 
-      <h2>发生了什么</h2>
-      <p>
-        standing authorization 下的最新 <code>four-llm-v1</code>
-        完整批次绑定 frozen commit
-        <code>0113da97a6b1fef35cc4c45025caa9e36a002176</code>，批次为
-        <code
-          >2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c</code
-        >。它从 ordinal 1 串行运行到首错：第 1–5 项通过，第 6 项
-        <code>ark-agent-plan / delegate</code> 返回
-        <code>account_quota_exceeded</code>，第 7–8 项按协议未运行。
-      </p>
-      <p>
-        终态是 6 completed / 5 passed、<code>blocked / case_failed</code>、
-        <code>promotionEligible=false</code>。manifest SHA-256 为
-        <code
-          >f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7</code
-        >；20 个证据文件由提交 <code>6b4217d</code> 保存。
-      </p>
+  <section class="card">
+    <h2>未来何时才会运行真实门禁</h2>
+    <ul>
+      <li>相关运行时代码、固定模型、路由、凭据来源或验收语义发生变化；</li>
+      <li>现有 source evidence、哈希或 registry anchor 校验失败；</li>
+      <li>新增逻辑 LLM 或新增任务能力。</li>
+    </ul>
+    <p>届时只运行受影响能力；不因为无关额度恢复而重新硬跑全部模型。</p>
+  </section>
 
-      <h2>Codex 已自动排除的事项</h2>
-      <div class="verified">
-        这不是此前的 Windows shell、命令观测、资格假阳性、模型选择、网络代理、
-        凭据路由、重试或 fallback 问题。
-      </div>
-      <ul>
-        <li>
-          ordinal 1 与 6 的规定写入和规定
-          <code>git status --short</code> 都各一次 success；结果文件精确通过，
-          文件范围只含预期结果。
-        </li>
-        <li>
-          ordinal 6 的实际/预期模型均为 <code>ark-code-latest</code>，provider
-          为 <code>ark-agent-plan</code>，网络为 direct，凭据隔离正确。
-        </li>
-        <li>
-          所有已执行项均为一次 client invocation、零 adapter/runtime retry、 零
-          adapter/orchestrator fallback。
-        </li>
-        <li>
-          immutable-evidence verifier 通过；结束后目标进程 0/0/0，资格锁不存在。
-        </li>
-      </ul>
-
-      <h2>建议的处理方式</h2>
-      <ol>
-        <li>
-          在火山方舟账户侧核查并补充 Ark Agent Plan
-          的计划额度，或等待其配额周期重置。
-        </li>
-        <li>
-          如果控制台显示仍有额度，请确认查看的是同一账户的 Agent Plan
-          权益、计费与计划状态，而不是 Ark Coding Plan 的独立额度池。
-        </li>
-        <li>不要粘贴或发送 API key；Codex 只需要知道外部状态已经改变。</li>
-      </ol>
-
-      <div class="reply">
-        <strong>处理完成后，回复“已处理”即可。</strong>
-        不需要再次批准实验或提供 frozen SHA。Codex 会依据 standing authorization
-        自行完成状态提交、完整复核、新 clean frozen SHA、fresh
-        内部执行引用，并从 ordinal 1 运行新的完整八项批次。
-      </div>
-
-      <h2>为什么现在停止而不重跑</h2>
-      <p>
-        同一正确 Agent Plan 路由在本地缺口闭合后仍返回明确的账户额度错误。
-        外部状态没有变化时再次运行不会增加诊断信息，只会重复消耗其它已通过路线的额度，
-        因此协议要求在这里停止。
-      </p>
-
-      <h2>明确未触碰的边界</h2>
-      <div class="boundary">
-        未访问或修改活动
-        <code>~/.codex/config.toml</code>；未安装、升级或卸载活动 Codex
-        插件；未调用或修改 Claude Code；未移除
-        <code>codex_cc_tools</code>；未发布、推送、合并或 fast-forward。
-      </div>
-
-      <h2>最小证据</h2>
-      <ul>
-        <li>
-          <a href="four-llm-qualification-result-review.html"
-            >最新资格批次结果审阅</a
-          >
-        </li>
-        <li>
-          <a
-            href="../smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json"
-            >最新 blocked manifest</a
-          >
-        </li>
-        <li>
-          <a
-            href="../smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-39-09.502Z-ark-agent-plan-delegate-ark.json"
-            >ordinal 6 原始脱敏 evidence</a
-          >
-        </li>
-        <li>
-          <a
-            href="../superpowers/specs/2026-07-28-standing-experiment-authorization-design.md"
-            >长期默认授权与停止边界</a
-          >
-        </li>
-        <li><a href="checklist.md">四层发布门禁</a></li>
-        <li><a href="../operations.md">运维与外部状态边界</a></li>
-      </ul>
-
-      <footer>
-        本页是当前最小人工处理材料。用户处理额度后，Codex
-        将继续自主推进；本页不请求也不授权任何活动安装、活动配置、旧工具移除、
-        Claude Code、发布或正式工作树变更。
-      </footer>
-    </main>
-  </body>
+  <section class="card">
+    <h2>下一道真正的人工作用点</h2>
+    <p>候选完成离线验证后，真实 Codex App 插件 add/remove 仍需要逐动作许可，因为官方机制可能更新活动插件状态。此前实验授权不自动扩张为安装授权。</p>
+    <p><a href="real-plugin-install-review.md">查看安装权限包候选</a> · <a href="../smoke/evidence/capabilities.json">查看能力资格索引</a></p>
+  </section>
+</main>
+</body>
 </html>

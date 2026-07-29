@@ -1,5 +1,7 @@
 # 长期默认授权与自主资格收敛实施计划
 
+> 2026-07-29 状态：本计划已经结束并作为历史执行记录保留。其“同批 8/8”停止目标被后续[能力粒度资格实施计划](2026-07-29-capability-scoped-qualification.md)取代；真实调用的 standing authorization 与 batch fail-closed 边界继续有效。
+
 > 执行方式：在 `codex/gemini-retirement` 隔离 worktree 中由 active long-term goal 持续执行。维护者已默认授权项目内真实资格实验，不设置逐批人工停点。
 
 **目标：** 把长期默认实验授权持久化为不削弱原子资格协议的操作合同，并自主运行、诊断和收敛 `four-llm-v1`，直到同批 8/8 通过或出现确需维护者处理的外部阻碍。

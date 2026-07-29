@@ -1,269 +1,86 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" href="#" />
-    <title>四模型八项资格：Ark Agent Plan 额度阻断结果</title>
-    <style>
-      :root {
-        color-scheme: light;
-        font-family:
-          Inter, "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
-        --ink: #172033;
-        --muted: #64748b;
-        --line: #d6dde8;
-        --panel: #f7f9fc;
-        --amber: #9a5a00;
-        --amber-bg: #fff8e8;
-        --green: #067647;
-        --green-bg: #ecfdf3;
-        --red: #b42318;
-        --red-bg: #fff1f0;
-        --blue: #175cd3;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        color: var(--ink);
-        background: #edf2f7;
-        line-height: 1.65;
-      }
-      main {
-        width: min(980px, calc(100% - 28px));
-        margin: 24px auto;
-        padding: clamp(22px, 4vw, 40px);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: white;
-        box-shadow: 0 18px 50px rgb(15 23 42 / 8%);
-      }
-      h1,
-      h2 {
-        color: #111827;
-        line-height: 1.25;
-      }
-      h1 {
-        margin-top: 0;
-        font-size: clamp(1.7rem, 4vw, 2.35rem);
-      }
-      h2 {
-        margin-top: 2rem;
-        font-size: 1.25rem;
-      }
-      code {
-        padding: 0.1em 0.35em;
-        border-radius: 4px;
-        background: #f1f5f9;
-        overflow-wrap: anywhere;
-      }
-      a {
-        color: var(--blue);
-      }
-      .status,
-      .verified,
-      .action,
-      .boundary {
-        margin: 1rem 0;
-        padding: 15px 17px;
-        border-radius: 11px;
-      }
-      .status {
-        border: 2px solid var(--amber);
-        background: var(--amber-bg);
-      }
-      .verified {
-        border-left: 5px solid var(--green);
-        background: var(--green-bg);
-      }
-      .action {
-        border-left: 5px solid var(--red);
-        background: var(--red-bg);
-      }
-      .boundary {
-        border: 1px solid var(--line);
-        background: var(--panel);
-      }
-      .table-wrap {
-        width: 100%;
-        overflow-x: auto;
-      }
-      table {
-        width: 100%;
-        margin: 1rem 0;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        padding: 10px 12px;
-        border: 1px solid var(--line);
-        text-align: left;
-        vertical-align: top;
-        overflow-wrap: anywhere;
-      }
-      th {
-        background: var(--panel);
-      }
-      li {
-        margin: 0.42em 0;
-      }
-      footer {
-        margin-top: 2rem;
-        padding-top: 1rem;
-        border-top: 1px solid var(--line);
-        color: var(--muted);
-      }
-      @media (max-width: 640px) {
-        main {
-          width: min(100% - 16px, 980px);
-          margin: 8px auto;
-          padding: 20px 14px;
-          border-radius: 12px;
-        }
-        table {
-          font-size: 0.9rem;
-        }
-        th,
-        td {
-          padding: 8px 7px;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>四模型八项资格：Ark Agent Plan 额度阻断结果</h1>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>四模型资格结果与当前解释</title>
+  <style>
+    :root { color-scheme: dark; --bg:#09111f; --panel:#111c2e; --line:#29405f; --text:#edf5ff; --muted:#a9bad1; --ok:#48d597; --warn:#ffc568; --accent:#79aaff; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at top right,#17335b 0,transparent 36%),var(--bg); color:var(--text); font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { width:min(980px,calc(100% - 32px)); margin:40px auto 72px; }
+    h1 { font-size:clamp(2rem,5vw,3.3rem); line-height:1.08; margin:0 0 14px; }
+    h2 { margin:0 0 12px; font-size:1.25rem; }
+    p { margin:8px 0; }
+    .eyebrow { color:var(--accent); text-transform:uppercase; letter-spacing:.12em; font-weight:700; font-size:.78rem; }
+    .lead { color:var(--muted); max-width:760px; font-size:1.08rem; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:28px 0; }
+    .card { background:color-mix(in srgb,var(--panel) 92%,transparent); border:1px solid var(--line); border-radius:18px; padding:22px; }
+    .status { display:inline-flex; padding:5px 10px; border-radius:999px; font-weight:750; font-size:.82rem; margin-bottom:12px; }
+    .ok { color:#04150e; background:var(--ok); }
+    .warn { color:#201500; background:var(--warn); }
+    ul { margin:8px 0 0; padding-left:21px; }
+    code { overflow-wrap:anywhere; color:#d7e7ff; }
+    a { color:#9fc1ff; }
+    .decision { border-left:4px solid var(--ok); }
+    .history { border-left:4px solid var(--warn); }
+    @media (max-width:700px) { main { margin-top:24px; } .grid { grid-template-columns:1fr; } .card { padding:18px; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">codex external agents · 2026-07-29</div>
+  <h1>批次仍被阻断，八项能力已经合格</h1>
+  <p class="lead">这里同时保留两个不冲突的事实：最新整批执行按首错停止，仍是 blocked；产品资格现在按“逻辑 LLM × 任务”验证，八项精确能力均有可机器复核的 passed evidence。</p>
 
-      <div class="status">
-        <strong>结论：本地实现缺口已经闭合，当前阻碍是外部账户额度。</strong>
-        最新批次从 ordinal 1 串行运行到首错：前五项通过，第 6 项
-        <code>ark-agent-plan / delegate</code> 返回
-        <code>account_quota_exceeded</code>，第 7–8 项按协议未运行。当前仍是
-        <code>blocked / not ready</code>，不能安装、替代旧工具或发布。
-      </div>
+  <section class="grid">
+    <article class="card decision">
+      <span class="status ok">当前产品状态</span>
+      <h2>8 passed / 0 stale</h2>
+      <p><code>npm run verify:capabilities</code> 校验八项索引、source evidence、精确 case、注册表 anchor 与运行时指纹。只有相关输入变化才重跑受影响能力。</p>
+    </article>
+    <article class="card history">
+      <span class="status warn">历史批次状态</span>
+      <h2>6 completed / 5 passed</h2>
+      <p>批次 <code>2026-07-28T14-33-04.239Z-…</code> 在 ordinal 6 因 <code>account_quota_exceeded</code> 停止；manifest 保持 <code>blocked / case_failed</code>，不会被改写。</p>
+    </article>
+  </section>
 
-      <h2>批次身份</h2>
-      <div class="table-wrap">
-        <table>
-          <tbody>
-            <tr>
-              <th>协议 / 批次</th>
-              <td>
-                <code>four-llm-v1</code> /
-                <code
-                  >2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c</code
-                >
-              </td>
-            </tr>
-            <tr>
-              <th>Frozen commit</th>
-              <td>
-                <code>0113da97a6b1fef35cc4c45025caa9e36a002176</code>
-              </td>
-            </tr>
-            <tr>
-              <th>终态</th>
-              <td>
-                <code>blocked / case_failed</code>；6 completed / 5 passed；
-                <code>promotionEligible=false</code>
-              </td>
-            </tr>
-            <tr>
-              <th>Manifest SHA-256</th>
-              <td>
-                <code
-                  >f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7</code
-                >
-              </td>
-            </tr>
-            <tr>
-              <th>证据提交</th>
-              <td><code>6b4217d</code>；20 个不可变证据文件</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+  <section class="card">
+    <h2>为什么不再全量硬跑</h2>
+    <ul>
+      <li>已通过的 case 是对应能力的真实证据，不会因为无关路线临时缺额度而失效。</li>
+      <li>运行时指纹覆盖代码、固定模型、路由、凭据来源与验收语义；相关变化会 fail closed。</li>
+      <li>额度与服务状态单独作为“当前可用性”报告，不混同于能力资格。</li>
+      <li>唯一 legacy standalone 例外被固定为既有 DeepSeek delegate 证据，不能复用于其它能力。</li>
+    </ul>
+  </section>
 
-      <h2>为什么可以排除本地 shell、路由和门禁问题</h2>
-      <div class="verified">
-        ordinal 1 与 ordinal 6 的规定写入和规定
-        <code>git status --short</code> 都各观察到一次
-        <code>raw_input / exact-or-status_exact / success</code
-        >；结果文件精确通过， 变更范围只含预期 smoke 文件。上批暴露的 Windows
-        Git Bash resolver 失败与旧资格假阳性因此得到真实闭环。
-      </div>
+  <section class="grid">
+    <article class="card">
+      <h2>已经自动过滤</h2>
       <ul>
-        <li>
-          ordinal 6 的实际/预期模型都是 <code>ark-code-latest</code>，provider
-          为 <code>ark-agent-plan</code>，网络为 direct。
-        </li>
-        <li>
-          凭据只以隔离子进程变量 <code>CODEX_AGENT_ARK_AGENT_KEY</code>
-          注入；项目记录不包含密钥值。
-        </li>
-        <li>
-          六个已执行项均为一次 client invocation、零 adapter/runtime retry、 零
-          adapter/orchestrator fallback。
-        </li>
-        <li>
-          immutable-evidence verifier 通过；批次结束后 Kimi ACP / Pi RPC /
-          real-smoke 进程为 0/0/0，资格锁不存在。
-        </li>
+        <li>不可变 manifest 与 evidence SHA</li>
+        <li>逻辑 LLM、任务、模型、provider 和 route</li>
+        <li>review/delegate 精确验收检查</li>
+        <li>注册表 anchor 与代码指纹漂移</li>
       </ul>
-
-      <h2>当前需要处理的事项</h2>
-      <div class="action">
-        需要维护者补充或恢复
-        <code>OPENAI_API_KEY_DOUBAO</code> 所属账户的 Ark Agent Plan
-        计划额度，或者等待额度重置。无需也不应在对话中提供密钥值。如果控制台显示仍有额度，
-        请核查同一账户的 Agent Plan 权益、计费和计划状态，而不是 Coding Plan
-        额度。
-      </div>
-      <p>
-        处理后只需告知“已处理”。standing authorization 已生效；Codex
-        会自行完成状态提交、完整复核、新 clean frozen SHA、fresh
-        内部执行引用，并从 ordinal 1
-        启动新的完整八项批次。外部状态没有变化前不会重复烧批。
-      </p>
-
-      <h2>明确排除</h2>
-      <div class="boundary">
-        未访问或修改活动
-        <code>~/.codex/config.toml</code>，未安装、升级或卸载活动 Codex
-        插件，未调用或修改 Claude Code，未移除
-        <code>codex_cc_tools</code>，未发布、推送、合并或 fast-forward。
-      </div>
-
-      <h2>最小可追溯证据</h2>
+    </article>
+    <article class="card">
+      <h2>仍未发生</h2>
       <ul>
-        <li>
-          <a
-            href="../smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json"
-            >最新 blocked manifest</a
-          >
-        </li>
-        <li>
-          <a
-            href="../smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-39-09.502Z-ark-agent-plan-delegate-ark.json"
-            >ordinal 6 Ark Agent Plan delegate evidence</a
-          >
-        </li>
-        <li>
-          <a
-            href="../smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-37-11.799Z-ark-coding-plan-delegate-ark.json"
-            >ordinal 1 Ark Coding Plan delegate 成功 evidence</a
-          >
-        </li>
-        <li><a href="../smoke/ark.md">Ark 资格状态与证据索引</a></li>
-        <li><a href="../smoke/kimi.md">Kimi 资格状态与证据索引</a></li>
+        <li>没有活动插件 add/remove</li>
+        <li>没有读取或修改活动 Codex 配置</li>
+        <li>没有移除旧工具或调用 Claude Code</li>
+        <li>没有 npm 发布、推送或合并</li>
       </ul>
+    </article>
+  </section>
 
-      <footer>
-        本页只记录最新真实资格批次的可信终态和当前外部阻碍，不构成活动安装、
-        活动配置、旧工具移除、Claude Code、发布或正式工作树变更许可。
-      </footer>
-    </main>
-  </body>
+  <section class="card">
+    <h2>可追溯材料</h2>
+    <p><a href="../smoke/evidence/capabilities.json">能力资格索引</a> · <a href="../superpowers/specs/2026-07-29-capability-scoped-qualification-design.md">能力粒度资格设计</a> · <a href="checklist.md">四层发布清单</a> · <a href="real-plugin-install-review.md">真实安装权限包候选</a></p>
+  </section>
+</main>
+</body>
 </html>

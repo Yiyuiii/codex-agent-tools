@@ -1,18 +1,18 @@
 # 官方插件运维流程
 
-本文只描述 `codex_external_agents` 的官方插件候选构建、隔离验收、逐动作授权安装与官方回滚。它不是当前真实安装授权；活动 Codex 尚未安装本插件，四模型八项能力当前为 6 passed / 2 pending，因此仍处于 `blocked / not ready`。
+本文只描述 `codex_external_agents` 的官方插件候选构建、隔离验收、逐动作授权安装与官方回滚。它不是当前真实安装授权；活动 Codex 尚未安装本插件。四模型八项能力当前均由能力资格索引验证为 passed，候选可以进入安装权限包准备，但真实安装仍必须单独授权。
 
 standing authorization 下的最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`。标准入口和 `functions.exec` cell 各只有一个；批次按首错停为 6 completed / 5 passed、`blocked / case_failed`、`promotionEligible=false`，ordinal 7–8 notRun。没有 resume、retry、fallback、补跑、第二入口或第二批。manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，证据提交为 `6b4217d`。
 
-ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、model、direct route、凭据来源和 telemetry 正确，结果文件精确通过，但以 `account_quota_exceeded` 失败。ordinal 1 与 6 的精确写入和状态命令均各一次 success，文件范围只含预期结果；此前 Pi Windows shell 与资格假阳性缺口已经真实闭合。当前已确认且需要人工处理的阻碍是 Ark Agent Plan 账户额度；ordinal 7–8 尚未运行，不能据此排除后续可能出现其它问题。维护者需补充/恢复 `OPENAI_API_KEY_DOUBAO` 所属计划额度或等待重置，无需提供密钥值。
+ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、model、direct route、凭据来源和 telemetry 正确，结果文件精确通过，但以 `account_quota_exceeded` 失败。ordinal 1 与 6 的精确写入和状态命令均各一次 success，文件范围只含预期结果；此前 Pi Windows shell 与资格假阳性缺口已经真实闭合。该错误记录的是当时 Agent Plan 的账户可用性，不再撤销其它已通过能力，也不要求为产品资格重跑完整八项；实际调用该路线时仍可能受当前额度影响。
 
 离线调查确认 Pi Windows 子进程环境遗漏 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 修复后，真实 resolver 与精确 Node spawn 探针离线成功，代理和凭据边界保持不变。资格合同提交 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 要求未来资格 Pi delegate 的精确写入与精确 `git status --short` 生命周期各恰好一次且均为 success，并由未来整批 passed verifier 重算；历史 blocked/interrupted 继续兼容。schema/plan、公开 MCP、provider/model/route/credential、提示词、结果 validator、retry/fallback 均未改变；独立质量复审为 PASS、无 P0–P3。
 
-48 个测试文件、837 passed / 1 skipped / 0 failed 与 171 files / 15 Markdown/HTML / 3 plugin files 是旧候选历史数字。当前收尾 fresh 矩阵已经通过：49 个测试文件、853 passed / 1 skipped / 0 failed，类型检查、构建、release smoke、隔离官方插件 `--check-report`、7/7 retained manifests immutable verifier 与最新 evidence 不变检查均通过；npm pack dry-run 为 211 files / 15 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。生产隔离环境中的 Pi resolver 找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0，精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`；目标进程为 0/0/0，资格锁 absent。
+48 个测试文件、837 passed / 1 skipped / 0 failed 与 171 files / 15 Markdown/HTML / 3 plugin files 是旧候选历史数字。当前 fresh 矩阵已经通过：51 个测试文件、871 passed / 1 skipped / 0 failed，类型检查、构建、能力索引、release smoke 与隔离官方插件 `--check-report` 均通过；npm pack dry-run 为 221 files / 17 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。
 
 全量测试曾暴露 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察；提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试，独立复审 PASS、无 P0–P3，最终全量已经包含。状态文档提交与最终 clean frozen SHA 仍由主线程完成。
 
-当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。standing authorization 继续有效，但相同额度错误在无外部状态变化时不得重复烧批。维护者处理 Ark Agent Plan 额度后只需告知已处理；Codex 会完成状态提交、完整复核和 clean freeze，自行生成 fresh 内部执行引用并运行新的完整 `four-llm-v1` 八项。仓库内 `docs/release/four-llm-qualification-next-authorization-review.html` 是当前人工处理材料但不随 npm 包发布；[旧重新授权材料](release/four-llm-qualification-reauthorization-review.html)与[更早授权材料](release/four-llm-qualification-authorization-review.html)只作历史审计，[阻断结果审阅](release/four-llm-qualification-result-review.html)记录最新终态。
+当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。standing authorization 继续有效，但只有运行时指纹、精确证据或能力集合发生相关变化时才运行受影响的真实门禁。`npm run verify:capabilities` 是当前机器资格入口；历史授权页与批次结果页只作审计，不再要求维护者先处理 Agent Plan 额度才能继续离线发布准备。
 
 2026-07-27 的 105 秒演练只构成离线基础设施证据；后续真实批次证明同一 cell 可以承载到协调器正常终态，但不证明四小时存活。standing authorization 下的唯一承载和 fail-closed 边界见[执行承载手册](release/four-llm-qualification-execution-runbook.md)，演练原始结论见[承载演练报告](release/qualification-carrier-rehearsal.md)。package/release assurance 只证明离线候选，不构成资格、安装或发布。
 
@@ -60,7 +60,13 @@ npm run acceptance:plugin:isolated
 
 ## 5. 准备真实安装权限包
 
-只有四个活动逻辑 LLM 的 review/delegate 在同一个 `four-llm-v1` 批次中 8/8 passed，才能准备可供授权的 ready 权限包。当前过渡注册表为 6 passed / 2 pending，只有 Ark Coding Plan 的 review/delegate pending；历史五模型结果以及所有 blocked/interrupted 批次，包括最新 6 completed / 5 passed 批次，都不能参与当前晋级，也不能与其它批次拼接。最新历史批次没有 retry、fallback、resume 或第二批；未来重入仍须绑定新的 clean frozen SHA、生成 fresh 内部执行引用并从 ordinal 1 运行全新的完整八项，但 standing authorization 已取代逐批人工许可。本阶段在真实批次 8/8 前只保持 `blocked / not ready` 状态包，不提出真实安装授权问题；默认实验授权不能越过活动安装门禁。
+只有以下条件同时成立，才能准备可供授权的 ready 权限包：
+
+- `npm run verify:capabilities` 验证四个逻辑 LLM 的八项能力、不可变 evidence、精确 case、注册表 anchor 与当前运行时指纹；
+- 类型检查、测试、构建、release smoke 和隔离官方插件生命周期通过；
+- 权限包明确真实安装仍未执行，并给出预计影响、验证与官方回滚。
+
+能力索引允许不同能力复用各自不可变的 passed case，但绝不允许用失败 case、模型别名、不同能力或指纹已变化的旧证据替代。最新 blocked 批次仍是不可改写的批次历史；它不再把其中 passed case 降为 pending。默认实验授权不能越过活动安装门禁。
 
 权限包必须列出：
 

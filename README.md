@@ -9,19 +9,19 @@
 - `ark-agent-plan`：隔离 Pi RPC / Ark Agent Plan / `ark-code-latest`，直连；
 - `ark-agent-deepseek-v4-flash`：隔离 Pi RPC / Ark Agent Plan / `deepseek-v4-flash`，直连。
 
-当前八项 review/delegate 能力的过渡状态为 6 passed / 2 pending：`kimi-k3`、`ark-agent-plan` 与 `ark-agent-deepseek-v4-flash` 各两项 passed，只有 `ark-coding-plan` 的两项能力 pending。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用和 2026-07-26 五模型 blocked 批次只作为历史审计证据保留。pending 能力会明确拒绝，不会复用单项通过、旧模型证据或静默切换到其它 LLM。
+当前八项 review/delegate 能力均已通过机器可验证的能力资格索引。资格单位是一个精确的“逻辑 LLM × 任务”组合；每项记录固定运行时指纹，并引用不可变、已通过的真实 case evidence。相关运行时代码、模型绑定、路由、凭据来源或验收语义变化后，只有受影响能力会变为 stale 并需要重跑，不再因无关能力的临时额度或服务状态重复烧完整八项。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用只作为历史审计证据保留。
 
 standing authorization 下的最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`。标准入口和 `functions.exec` cell 各只有一个；批次按首错停在 ordinal 6，形成 6 completed / 5 passed、`blocked / case_failed`、`promotionEligible=false`，ordinal 7–8 为 notRun。没有 resume、retry、fallback、补跑、第二入口或第二批。manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，20 个不可变证据文件由提交 `6b4217d` 保存。
 
 ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`ark-code-latest` 模型、direct route、Agent Plan 凭据来源、single-attempt 和零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` 失败。ordinal 1 与 ordinal 6 的精确写入和精确 `git status --short` 都各观察到一次 `raw_input / exact-or-status_exact / success`，文件范围也只包含预期结果文件；这证明此前 Pi Windows shell 与资格假阳性缺口已经由真实批次闭合，当前失败不是本地 shell、validator、route 或 fallback 问题。
 
-离线根因提交 `2a815c7` 与资格合同提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 已得到上述真实命令成功证据。所有六个已执行项均保持一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁 absent。当前已确认且需要人工处理的阻碍是 `OPENAI_API_KEY_DOUBAO` 所属 Ark Agent Plan 账户返回额度耗尽；ordinal 7–8 尚未运行，不能据此排除后续可能出现其它问题。维护者需要补充/恢复该计划额度或等待其重置，不应在聊天中提供密钥值。
+离线根因提交 `2a815c7` 与资格合同提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 已得到上述真实命令成功证据。所有六个已执行项均保持一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁 absent。该批次的 `account_quota_exceeded` 仍是 Ark Agent Plan 当时的服务可用性事实，但不再撤销其它已通过能力，也不阻断 Coding Plan；需要实际调用 Agent Plan 时仍可能受当前账户额度影响。
 
-此前 48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed 及 171 files / 15 Markdown/HTML / 3 plugin files 的 pack 数字只描述 `cb9434b...` 之前的历史候选。当前收尾 fresh 矩阵已通过：49 个测试文件、853 passed / 1 skipped / 0 failed，类型检查、构建、release smoke、隔离官方插件 `--check-report`、7/7 retained manifests immutable verifier 与最新 evidence 不变检查均通过；npm pack dry-run 为 211 files / 15 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。目标进程 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁 absent。
+此前 48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed 及 171 files / 15 Markdown/HTML / 3 plugin files 的 pack 数字只描述 `cb9434b...` 之前的历史候选。当前 fresh 矩阵已通过：51 个测试文件、871 passed / 1 skipped / 0 failed，类型检查、构建、能力索引、release smoke 与隔离官方插件 `--check-report` 均通过；npm pack dry-run 为 221 files / 17 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。
 
 全量测试还暴露并闭合了一个既有 Kimi ACP 时序竞态：client 可能早于 child close 返回，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49 文件矩阵已包含该修复。Pi resolver 在生产隔离环境中找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`。
 
-注册表继续保持 6 passed / 2 pending，安装继续保持 `blocked / not ready`。当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。真实资格实验的 standing authorization 仍有效，但无外部额度状态变化时不得无意义重复同一批次；维护者处理 Ark Agent Plan 额度后，只需告知“已处理”，Codex 即会在新 clean frozen SHA 上自行生成 fresh 内部批次执行引用并从 ordinal 1 运行完整八项，无需逐 SHA 批准。现行合同见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)，最新[阻断结果审阅](docs/release/four-llm-qualification-result-review.html)给出最小证据。
+注册表现在保持 8 passed / 0 pending，并由 [`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 与 `npm run verify:capabilities` 约束。当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。真实资格实验的 standing authorization 仍有效，但只有能力指纹失效、证据失效或新增能力时才需要针对性重跑；临时额度恢复本身不触发全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
 2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
@@ -54,9 +54,9 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 要求 Node.js 20+，并已安装、登录本机 Kimi Code。Kimi 使用本机 OAuth 会话，本项目不复制或保存其令牌。
 
-仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。44 files / 584 passed、46 files / 759 passed 与 48 files / 837 passed 都只描述各自历史候选；当前 fresh 全量为 49 files / 853 passed / 1 skipped / 0 failed。第 2 层隔离官方插件生命周期与本轮 `--check-report` 均已通过：Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。
+仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。44 files / 584 passed、46 files / 759 passed 与 48 files / 837 passed 都只描述各自历史候选；当前 fresh 全量为 51 files / 871 passed / 1 skipped / 0 failed。第 2 层隔离官方插件生命周期与本轮 `--check-report` 均已通过：Codex CLI 0.135.0 已在唯一临时 `CODEX_HOME` 中完成官方 marketplace/plugin 的 add、list、缓存副本启动与 remove 生命周期；这只证明隔离 CLI 生命周期，不代表活动 Codex App 已安装或可用。
 
-当前尚未执行真实官方安装。项目代码绝不直接读取或写入活动 `~/.codex/config.toml`；只有 `four-llm-v1` 同批八项全部 passed、隔离验收完成、阻断状态包重新收敛为 ready 权限包，并取得针对本次动作的明确许可后，维护者才可使用官方 `codex plugin` 命令。当前仍有两项注册表能力 pending，最新批次也以 `blocked / case_failed` 结束，因此真实安装授权准备处于 blocked / not ready。任何真实安装、升级或回滚都必须逐次授权，且不得用手工编辑配置代替官方机制。
+当前尚未执行真实官方安装。项目代码绝不直接读取或写入活动 `~/.codex/config.toml`；八项能力索引验证、确定性检查与隔离验收通过后，可以准备 ready 权限包，但只有取得针对本次动作的明确许可后，维护者才可使用官方 `codex plugin` 命令。最新批次的 blocked 终态作为历史事实保留，不再覆盖八项独立能力资格。任何真实安装、升级或回滚都必须逐次授权，且不得用手工编辑配置代替官方机制。
 
 完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](docs/release/checklist.md)。
 
@@ -64,7 +64,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 - 当前 Kimi 只支持 K3；K2.7 记录仅作为历史证据保留，见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
 - Gemini 已退役，不再是当前 provider；旧 Google / `proxy-10808` 路由、额度失败和 blocked 批次只作为历史证据保留，见 [Pi / Gemini 退役历史](docs/smoke/pi-gemini.md)。
-- 三条 Ark 路线全部固定直连；Coding Plan 的 review 原始门禁通过但 delegate 失败，成对策略使两项注册表能力均为 pending；两个 Agent Plan profile 各自的 review/delegate 均为 passed，见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
+- 三条 Ark 路线全部固定直连；Coding Plan 最新批次的 review/delegate 都通过，两个 Agent Plan profile 的 review/delegate 也各有已验证的通过证据。八项当前资格的唯一机器入口是 [能力资格索引](docs/smoke/evidence/capabilities.json)，叙述与历史见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
 
 终端用户不需要手工维护 Pi 模型配置；Pi 使用由本项目在应用缓存下生成的版本化隔离配置，不读取或修改用户日常 `~/.pi/agent`。
 
@@ -75,6 +75,7 @@ npm ci
 npm run typecheck
 npm test
 npm run build
+npm run verify:capabilities
 npm run smoke:release
 npm run acceptance:plugin:isolated
 ```
@@ -96,4 +97,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。收尾 fresh 全量矩阵为 49 files / 853 passed / 1 skipped / 0 failed；类型检查、构建、release smoke、隔离 `--check-report`、retained manifests 7/7、证据不变、进程/锁与 211-file pack dry-run 均通过。四模型八项能力仍处于 6 passed / 2 pending；最新 `four-llm-v1` 批次按首错停为 6 completed / 5 passed，ordinal 6 因 `account_quota_exceeded` 失败，ordinal 7–8 notRun，未产生同批 8/8 资格。shell 环境、资格命令成功语义与 Kimi ACP close 竞态已经真实或离线闭合；当前需维护者补充/恢复 Ark Agent Plan 额度或等待重置，真实 Codex App 宿主门禁仍未执行。因此当前仍是 `blocked / not ready` 的官方插件候选，不能称为已安装、已替代旧工具或可公开发布。
+当前版本为开发期 `0.1.0-alpha.1`，尚未执行 `npm publish`，也尚未获得真实官方安装许可。四模型八项能力已由固定能力索引验证为 8 passed / 0 pending；release smoke 会在打包前重新校验不可变 evidence、精确 case、注册表 anchor 与运行时指纹。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`，但其中已通过的精确 case 可以支持对应能力，批次聚合状态不再覆盖能力状态。真实 Codex App 宿主门禁仍未执行，因此当前只是通过离线资格、可准备安装权限包的候选，不能称为已安装、已替代旧工具或已公开发布。

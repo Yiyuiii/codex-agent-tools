@@ -4,23 +4,23 @@
 
 当前 Ark 公开面共有三项固定 Pi/direct 路线：
 
-- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；最新批次的 delegate/review 均通过，但同一原子批次随后在 ordinal 6 `ark-agent-plan/delegate` 因 `account_quota_exceeded` 停止，未形成 8/8，因此这两项不能单独晋级，注册表仍为 pending/pending。
-- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；2026-07-25 review/delegate 均为 passed，注册表两项已晋级。
-- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；2026-07-25 review/delegate 均为 passed，注册表两项已晋级。
+- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；最新批次的 delegate/review 均通过，能力索引两项均为 passed。
+- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；review/delegate 均有精确 passed evidence，能力索引两项均为 passed。
+- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；review 与受限 legacy delegate evidence 均已验证，能力索引两项均为 passed。
 
 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的 `ark-agent-plan` 配额池。2026-07-20 对旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 完成的四项 passed 证据现仅作为历史事实保留，不属于当前公开面，也不得用于晋级两个新 Agent Plan 路线。原始 evidence JSON 保持不变。
 
-Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力，过渡注册表为 6 passed / 2 pending；两个 pending 项都属于 `ark-coding-plan`，安装状态保持 `blocked / not ready`。最新 `four-llm-v1` 批次按首错停为 6 completed / 5 passed、ordinal 7–8 notRun，并以 `blocked / case_failed` 结束；虽然 Coding Plan 两项在该批内通过，但原子晋级要求仍是完整同批 8/8。不能只补跑失败项，也不能把本轮任一通过项与既有证据拼接。
+Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力，注册表为 8 passed / 0 pending。资格单位现在是精确的逻辑 LLM × 任务；[`capabilities.json`](evidence/capabilities.json) 验证 evidence 哈希、case 身份、注册表 anchor 与运行时指纹。最新 `four-llm-v1` 批次仍以 `blocked / case_failed` 结束，但其 passed case 可用于对应能力，失败 case 与批次聚合状态都不能冒充其它能力。只有指纹变化、证据失效或新增能力才需定向重跑。
 
-2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据。后续真实批次由单个 `functions.exec` cell 正常承载到协调器终态，证明控制层承载路径有效，但不证明四小时存活。执行边界见[承载手册](../release/four-llm-qualification-execution-runbook.md)，演练事实见[承载演练报告](../release/qualification-carrier-rehearsal.md)。171 files / 15 Markdown/HTML / 3 plugin files 是旧候选的 npm dry-run 历史数字；当前 pack dry-run 为 211 files / 15 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。该闭包不改变任何 Ark 路由、证据或资格状态，也不表示已经发布或安装。
+2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据。后续真实批次由单个 `functions.exec` cell 正常承载到协调器终态，证明控制层承载路径有效，但不证明四小时存活。执行边界见[承载手册](../release/four-llm-qualification-execution-runbook.md)，演练事实见[承载演练报告](../release/qualification-carrier-rehearsal.md)。当前 pack dry-run 为 221 files / 17 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。该闭包不改变任何 Ark 路由、证据或资格状态，也不表示已经发布或安装。
 
 最新审计记录：2026-07-28 在 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176` 上只调用一次标准入口，启动 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`。ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider `ark-agent-plan`、模型 `ark-code-latest`、direct route、Agent Plan 凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` failed；ordinal 7–8 notRun。ordinal 1 与 6 的规定写入、规定状态命令均各一次 success，文件范围只含预期文件，证明此前 Windows shell 与资格假阳性缺口已经真实闭合。
 
-最新 [manifest](evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json) SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`；终态为 6 completed / 5 passed、`blocked / case_failed`、`promotionEligible=false`，immutable-evidence verifier 通过，锁 absent，目标进程 0/0/0，20 个证据文件由提交 `6b4217d` 保存。没有 resume、retry、fallback、补跑、第二入口或第二批。当前需要维护者补充/恢复 `OPENAI_API_KEY_DOUBAO` 所属 Ark Agent Plan 计划额度或等待重置；无需提供密钥值。
+最新 [manifest](evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json) SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`；终态为 6 completed / 5 passed、`blocked / case_failed`、`promotionEligible=false`，immutable-evidence verifier 通过，锁 absent，目标进程 0/0/0，20 个证据文件由提交 `6b4217d` 保存。没有 resume、retry、fallback、补跑、第二入口或第二批。`account_quota_exceeded` 作为当时 Agent Plan 可用性警告保留；不要求为 Coding Plan 或其它已通过能力恢复额度并全量重跑。
 
-上一批（batch 2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef）ordinal 1 Ark Coding Plan delegate 暴露了旧资格门禁假阳性：case passed，但 5 个 bash 生命周期全部为 error，精确写入命令也是 error。离线根因确认为 Pi Windows 子进程环境缺少 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 修复后，生产隔离环境中的 resolver 找到 `C:\Program Files\Git\bin\bash.exe`，两个系统根变量存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`，代理与凭据边界不变。提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 又要求未来资格 Pi delegate 的精确写入与精确 `git status --short` 生命周期各恰好一次且均 success，并由未来整批 passed verifier 重算；历史 blocked/interrupted 证据兼容，schema/plan、公开 MCP、provider/model/route/credential、提示词、validator、retry/fallback 均未改变。独立质量复审为 PASS、无 P0–P3；该批修复后的 frozen 前全量为 49 files / 853 passed / 1 skipped / 0 failed，typecheck、build、release smoke、隔离 `--check-report`、retained manifests 6/6、证据不变、进程/锁与 191-file pack dry-run 均通过。下一批仍须绑定新的 clean frozen SHA、使用 fresh 内部执行引用并从 ordinal 1 开始；standing authorization 已取代逐批人工批准。
+上一批（batch 2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef）ordinal 1 Ark Coding Plan delegate 暴露了旧资格门禁假阳性：case passed，但 5 个 bash 生命周期全部为 error，精确写入命令也是 error。离线根因确认为 Pi Windows 子进程环境缺少 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 修复后，生产隔离环境中的 resolver 找到 `C:\Program Files\Git\bin\bash.exe`，两个系统根变量存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`，代理与凭据边界不变。提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 又要求资格 Pi delegate 的精确写入与精确 `git status --short` 生命周期各恰好一次且均 success；历史 blocked/interrupted 证据兼容，schema/plan、公开 MCP、provider/model/route/credential、提示词、validator、retry/fallback 均未改变。独立质量复审为 PASS、无 P0–P3。后续最新批次已经形成满足这些合同的 Coding Plan delegate passed case。
 
-更早 blocked 历史：2026-07-28 在 frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上只调用一次标准入口，启动批次 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678`。该轮 8 completed / 7 passed，因 ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 结果文件缺失而停止；manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`，证据提交 `1d5d2c4`。它只作历史审计，不能参与当前原子晋级。
+更早 blocked 历史：2026-07-28 在 frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上只调用一次标准入口，启动批次 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678`。该轮 8 completed / 7 passed，因 ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 结果文件缺失而停止；manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`，证据提交 `1d5d2c4`。该批整体仍是 blocked；其中 Agent Plan delegate 与 DeepSeek review 的 passed case 由能力索引精确复用。
 
 上一轮 blocked 历史：2026-07-27 在 frozen commit `652e14ac637bfc04d90c448179ecc5838f2f8450` 上只调用一次标准入口，启动 `four-llm-v1` 批次 `2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa`。Ark Coding Plan delegate 使用 Pi RPC / `ark-coding-plan` / `ark-code-latest` / direct，结果、精确命令、隔离、进程清理和 `1 / 0 / 0 / false / false` telemetry 全部通过；[evidence](evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/cases/2026-07-27T10-23-27.732Z-ark-coding-plan-delegate-ark.json) SHA-256 为 `9c08437b18874512b2313109bb3a7526b0414099c6d530bee082e2fbe92fd5e1`。Ark Coding Plan review 同样使用固定模型与 direct 路由，识别预置缺陷且工作区不变；[evidence](evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/cases/2026-07-27T10-23-49.991Z-ark-coding-plan-review-ark.json) SHA-256 为 `1a6092f716fa2c0a107421f7f91eaecb1208c17f6499db80a8cc684b228fbc06`。该轮 [manifest](evidence/batches/2026-07-27T10-08-39.404Z-3d2f7d30-45a6-43c1-9bd6-09a7557285fa/manifest.json) 为 4 completed / 4 notRun，SHA-256 `d7be5e6ba3884075d80fe399dd3c2d72caaa1a3833f92e529928655e623b7b69`；因 ordinal 4 Kimi delegate 失败而停止，只作历史审计。
 
@@ -30,7 +30,7 @@ Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力，过渡
 
 上一轮历史记录：2026-07-27 只在冻结 commit `b57382ed4f2fddce4946613b5aa5739c6eed5c8f` 上启动一次四模型批次 `2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d`。第 1 项 Ark Coding Plan delegate 的实际模型、provider、direct 路由、凭据隔离、变更范围、命令和进程清理均正确，telemetry 为 `1 / 0 / 0 / false / false`，但安全读取到的 30 字节单行结果文件不含预期行，故以 `acceptance_failed` 停止。case [evidence](evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/cases/2026-07-26T17-23-31.295Z-ark-coding-plan-delegate-ark.json) SHA-256 为 `166947716c19d435155e4ce0d041e4c88b7ef9b79f302787e0c27572eb39e6c9`；blocked [manifest](evidence/batches/2026-07-26T17-20-48.464Z-b49aed1d-48fa-40cd-9c73-1388bc91369d/manifest.json) SHA-256 为 `f374987c475c291baaef553771ee56562654275bfbd8c15e4b11b26141baa58c`，`promotionEligible=false`，后七项 not run。该轮授权已经消费，批次后目标进程为 0/0/0；没有 retry、fallback、resume、跳项或第二批。
 
-该 case 保存的 raw/normalized 双哈希可确定实际文件是 `ARK_SMOKE_OK:ark-coding-plan;\n`，分号来自旧生产提示词紧邻期望 payload 的自然语言分隔符。实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 已把三个 Ark delegate profile 统一到精确 Node + Base64 Bash 写入命令，并把 payload 放在独立代码块中；严格结果 validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、schema/protocol 和全部 evidence 均未修改。独立规格与代码质量审阅均 PASS；fresh 离线验证为 44 个测试文件、569 passed / 1 skipped / 0 failed，类型检查、构建、release smoke、临时 `CODEX_HOME` 隔离 check-report、当时 evidence 5/5、历史 Gemini 14/14、两代 blocked immutable verifier 及进程 0/0/0 均通过。Node `spawnSync(bash, ["-c", command])` 探针精确写入 29 bytes、LF 结尾、SHA-256 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。这些结果只证明当时的离线夹具已修复；后续真实批次已形成 Ark Coding Plan 两项 passed evidence，但都因同批其它 delegate 失败而不能晋级。此段只作历史根因与修复记录。
+该 case 保存的 raw/normalized 双哈希可确定实际文件是 `ARK_SMOKE_OK:ark-coding-plan;\n`，分号来自旧生产提示词紧邻期望 payload 的自然语言分隔符。实现提交 `76504d7d165366ad291e6ff08026b7236f862fc8` 已把三个 Ark delegate profile 统一到精确 Node + Base64 Bash 写入命令，并把 payload 放在独立代码块中；严格结果 validator、provider/model/direct route、凭据、single-attempt、无 retry/fallback、telemetry、schema/protocol 和全部 evidence 均未修改。独立规格与代码质量审阅均 PASS；fresh 离线验证为 44 个测试文件、569 passed / 1 skipped / 0 failed，类型检查、构建、release smoke、临时 `CODEX_HOME` 隔离 check-report、当时 evidence 5/5、历史 Gemini 14/14、两代 blocked immutable verifier 及进程 0/0/0 均通过。Node `spawnSync(bash, ["-c", command])` 探针精确写入 29 bytes、LF 结尾、SHA-256 `7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59`。这些结果只证明当时的离线夹具已修复；后续真实批次形成的 Coding Plan passed cases现由能力索引使用。此段只作历史根因与修复记录。
 
 2026-07-26 的旧五模型原子重认证批次在第 1 项 Gemini delegate 失败后立即停止，六项 Ark case 均为 not run。该历史批次没有替换下述 2026-07-25 Ark 证据；blocked [manifest](evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json) 的 SHA-256 为 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`，批次后目标进程分类为 0，未重试或另开批次。它现在只作为 `five-llm-v1` 历史审计材料保留，不能参与当前四模型晋级。
 
@@ -44,11 +44,21 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 
 ## 当前证据矩阵
 
+机器可验证的当前来源、精确 SHA-256 与运行时指纹统一保存在 [`capabilities.json`](evidence/capabilities.json)。三条 Ark 路线的六项能力均为 passed；以下 2026-07-25 条目保留为历史基线，不再代表当前注册表状态。
+
+| 逻辑 LLM                      | review | delegate | 当前来源摘要 |
+| ----------------------------- | ------ | -------- | ------------ |
+| `ark-coding-plan`             | passed | passed   | 最新 2026-07-28 batch passed cases |
+| `ark-agent-plan`              | passed | passed   | 最新 batch review + 更早 2026-07-28 batch delegate |
+| `ark-agent-deepseek-v4-flash` | passed | passed   | 更早 2026-07-28 batch review + 固定 legacy standalone delegate |
+
+## 历史 2026-07-25 逐项基线
+
 <a id="ark-coding-plan-review"></a>
 
 ### ark-coding-plan review
 
-- 本次任务结果：passed；注册表状态：pending（同 profile 的 delegate 未通过）。
+- 当时任务结果：passed；当时注册表状态：pending（同 profile 的 delegate 当时未通过）。
 - 实际/预期模型均为 `ark-code-latest`；provider 为 `ark-coding-plan`；route 为 `direct`；耗时 11.803 秒。
 - 缺陷识别、环境隔离、工作区零变更、evidence 清理检查与独立系统进程快照均通过。
 - 证据：[JSON](evidence/2026-07-25T15-49-40.932Z-ark-coding-plan-review-ark.json)；SHA-256 `a4c2b6ba19e8226f8c641426c5ad9c81826fcd32adb77200ad7c90731dbb3dd4`。
@@ -57,7 +67,7 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 
 ### ark-coding-plan delegate
 
-- 本次任务结果：failed；注册表状态：pending；稳定失败类别为 `acceptance_failed`。
+- 当时任务结果：failed；当时注册表状态：pending；稳定失败类别为 `acceptance_failed`。该失败已被后续 passed case 取代为当前资格来源。
 - 实际/预期模型均为 `ark-code-latest`；provider 为 `ark-coding-plan`；route 为 `direct`；耗时 75.889 秒。
 - 只变更 `ark-coding-plan-smoke.txt` 并观测到命令，但 `resultFileValid` 为 false；其它环境隔离、变更范围与进程清理检查均通过，独立系统进程快照也为零残留。
 - 证据：[JSON](evidence/2026-07-25T15-51-44.134Z-ark-coding-plan-delegate-ark.json)；SHA-256 `7d7af81493dd9e94a9669efb12eb90c83c1c7535959b81c385091aa3eef461eb`。
