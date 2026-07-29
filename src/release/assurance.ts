@@ -719,6 +719,92 @@ export function assertAllowedPackFiles(fileNames: readonly string[]): void {
   }
 }
 
+export function assertCapabilitySourcesPackaged(
+  fileNames: readonly string[],
+  verification: Readonly<{
+    indexPath: string;
+    sourcePaths: readonly string[];
+  }>,
+): void {
+  const packaged = new Set(fileNames.map(assertSafePackPath));
+  const required = [
+    verification.indexPath,
+    ...verification.sourcePaths,
+  ].map(assertSafePackPath);
+  for (const sourcePath of required) {
+    if (!packaged.has(sourcePath)) {
+      throw new Error(
+        `Capability qualification source is missing from npm package: ${sourcePath}`,
+      );
+    }
+  }
+}
+
+function capabilitySourcePath(value: unknown): string {
+  if (typeof value !== "string") {
+    throw new Error("Capability qualification index is invalid");
+  }
+  const normalized = assertSafePackPath(value);
+  if (
+    normalized !== value.replaceAll("\\", "/") ||
+    !normalized.startsWith("docs/smoke/evidence/") ||
+    !normalized.endsWith(".json")
+  ) {
+    throw new Error("Capability qualification index is invalid");
+  }
+  return normalized;
+}
+
+export function capabilitySourcePathsFromIndex(
+  value: unknown,
+): readonly string[] {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    Array.isArray(value)
+  ) {
+    throw new Error("Capability qualification index is invalid");
+  }
+  const index = value as Record<string, unknown>;
+  if (index.schemaVersion !== 1 || !Array.isArray(index.entries)) {
+    throw new Error("Capability qualification index is invalid");
+  }
+  const sourcePaths: string[] = [];
+  for (const entryValue of index.entries) {
+    if (
+      typeof entryValue !== "object" ||
+      entryValue === null ||
+      Array.isArray(entryValue)
+    ) {
+      throw new Error("Capability qualification index is invalid");
+    }
+    const source = (entryValue as Record<string, unknown>).source;
+    if (
+      typeof source !== "object" ||
+      source === null ||
+      Array.isArray(source)
+    ) {
+      throw new Error("Capability qualification index is invalid");
+    }
+    const sourceRecord = source as Record<string, unknown>;
+    if (sourceRecord.kind === "batch-case") {
+      sourcePaths.push(
+        capabilitySourcePath(sourceRecord.manifestPath),
+        capabilitySourcePath(sourceRecord.evidencePath),
+      );
+    } else if (sourceRecord.kind === "legacy-standalone") {
+      sourcePaths.push(capabilitySourcePath(sourceRecord.evidencePath));
+    } else {
+      throw new Error("Capability qualification index is invalid");
+    }
+  }
+  return Object.freeze(
+    [...new Set(sourcePaths)].sort((left, right) =>
+      left.localeCompare(right, "en"),
+    ),
+  );
+}
+
 export function assertNoSensitiveContent(
   entries: readonly ReleaseTextEntry[],
   options: SensitiveContentOptions,

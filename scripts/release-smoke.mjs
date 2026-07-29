@@ -18,7 +18,9 @@ import { execa } from "execa";
 
 import {
   assertNoSensitiveContent,
+  assertCapabilitySourcesPackaged,
   assertPackageDocumentLinkClosure,
+  capabilitySourcePathsFromIndex,
   resolveAllowedPackInspectionPaths,
 } from "../dist/release-assurance.js";
 import {
@@ -401,7 +403,7 @@ async function checkCodexPluginHelp() {
   }
 }
 
-async function checkPackage() {
+async function checkPackage(capabilitySources) {
   const packOutput = runNpm(["pack", "--dry-run", "--json"]);
   const packResult = JSON.parse(packOutput)?.[0];
   if (!packResult || !Array.isArray(packResult.files)) {
@@ -451,6 +453,7 @@ async function checkPackage() {
   const textEntries = [];
   const inspectedPackNames = new Set();
   const actualPackFileNames = new Set(resolvedFileNames);
+  assertCapabilitySourcesPackaged(resolvedFileNames, capabilitySources);
   for (const [index, name] of fileNames.entries()) {
     const inspectionName = resolvedFileNames[index];
     if (inspectionName === undefined) {
@@ -498,8 +501,15 @@ await checkMcpContract(pluginBundlePath, pluginRoot);
 await checkDoctorJson();
 await checkPluginArtifact();
 await checkCodexPluginHelp();
-await checkPackage();
-await verifyCapabilityIndex({ repositoryRoot: root });
+const capabilityVerification = await verifyCapabilityIndex({
+  repositoryRoot: root,
+});
+await checkPackage({
+  indexPath: capabilityVerification.indexPath,
+  sourcePaths: capabilitySourcePathsFromIndex(
+    await readJson(path.join(root, capabilityVerification.indexPath)),
+  ),
+});
 checkNpmNameAvailability();
 
 process.stdout.write("release smoke passed\n");

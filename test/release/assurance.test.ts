@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   assertAllowedPackFiles,
+  assertCapabilitySourcesPackaged,
   assertNoSensitiveContent,
   assertPackageDocumentLinkClosure,
   assertPackageLocalLinks,
+  capabilitySourcePathsFromIndex,
   resolveAllowedPackInspectionPaths,
   resolvePackInspectionPath,
 } from "../../src/release/assurance.js";
@@ -179,6 +181,95 @@ describe("release assurance", () => {
     expect(() => assertAllowedPackFiles(["../../***"])).toThrow(
       /Unsafe npm package path/u,
     );
+  });
+
+  it("requires the actual npm package to contain every verified capability source", () => {
+    const capabilityIndex = "docs/smoke/evidence/capabilities.json";
+    const manifest =
+      "docs/smoke/evidence/batches/current/manifest.json";
+    const evidence =
+      "docs/smoke/evidence/batches/current/cases/review.json";
+    const verifiedSources = {
+      indexPath: capabilityIndex,
+      sourcePaths: [manifest, evidence],
+    };
+
+    expect(() =>
+      assertCapabilitySourcesPackaged(
+        [capabilityIndex, manifest, evidence, "package.json"],
+        verifiedSources,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertCapabilitySourcesPackaged(
+        [capabilityIndex, manifest, "package.json"],
+        verifiedSources,
+      ),
+    ).toThrow(/Capability qualification source is missing/u);
+    expect(() =>
+      assertCapabilitySourcesPackaged(
+        [manifest, evidence, "package.json"],
+        verifiedSources,
+      ),
+    ).toThrow(/Capability qualification source is missing/u);
+    expect(() =>
+      assertCapabilitySourcesPackaged(
+        [capabilityIndex, manifest, evidence],
+        {
+          indexPath: capabilityIndex,
+          sourcePaths: ["../outside.json"],
+        },
+      ),
+    ).toThrow(/Unsafe npm package path/u);
+  });
+
+  it("extracts only canonical evidence paths from batch and legacy capability sources", () => {
+    const manifest =
+      "docs/smoke/evidence/batches/current/manifest.json";
+    const batchEvidence =
+      "docs/smoke/evidence/batches/current/cases/review.json";
+    const legacyEvidence = "docs/smoke/evidence/legacy.json";
+
+    expect(
+      capabilitySourcePathsFromIndex({
+        schemaVersion: 1,
+        entries: [
+          {
+            source: {
+              kind: "batch-case",
+              manifestPath: manifest,
+              evidencePath: batchEvidence,
+            },
+          },
+          {
+            source: {
+              kind: "legacy-standalone",
+              evidencePath: legacyEvidence,
+            },
+          },
+        ],
+      }),
+    ).toEqual([legacyEvidence, manifest, batchEvidence].sort());
+    expect(() =>
+      capabilitySourcePathsFromIndex({
+        schemaVersion: 1,
+        entries: [
+          {
+            source: {
+              kind: "batch-case",
+              manifestPath: manifest,
+              evidencePath: "docs/smoke/evidence/../outside.json",
+            },
+          },
+        ],
+      }),
+    ).toThrow(/Capability qualification index is invalid/u);
+    expect(() =>
+      capabilitySourcePathsFromIndex({
+        schemaVersion: 1,
+        entries: [{ source: { kind: "unknown" } }],
+      }),
+    ).toThrow(/Capability qualification index is invalid/u);
   });
 
   it("accepts closed HTML and Markdown package-local links while ignoring external links", () => {
