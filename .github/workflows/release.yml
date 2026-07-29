@@ -29,6 +29,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify tag ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "::error::Release workflow requires a refs/tags/v* ref, got $GITHUB_REF"
+            exit 1
+          fi
+
       - uses: actions/setup-node@v6
         with:
           node-version: 24

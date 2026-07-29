@@ -18,6 +18,7 @@ describe("GitHub release workflows", () => {
 
     expect(content).toContain("branches: [main, next]");
     expect(content).toContain("node-version: [20, 22, 24]");
+    expect(content).toContain("fail-fast: false");
     expect(content).toContain("CODEX_CLI_VERSION: 0.146.0");
     expect(content).toContain(
       'npm install --global "@openai/codex@${CODEX_CLI_VERSION}"',
@@ -36,6 +37,10 @@ describe("GitHub release workflows", () => {
 
     expect(content).toContain('tags:\n      - "v*"');
     expect(content).toContain("id-token: write");
+    expect(content).toContain("Verify tag ref");
+    expect(content).toContain(
+      'if [[ "$GITHUB_REF" != refs/tags/v* ]]; then',
+    );
     expect(content).toContain("CODEX_CLI_VERSION: 0.146.0");
     expect(content).toContain(
       'npm install --global "@openai/codex@${CODEX_CLI_VERSION}"',

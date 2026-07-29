@@ -76,8 +76,13 @@
 6. 验证精确版本与 `next` dist-tag，再配置：
 
    ```powershell
-   npm trust github codex-agent-tools --file release.yml --repo Yiyuiii/codex-agent-tools --allow-publish
+   npx --yes npm@11.18.0 trust github codex-agent-tools --file release.yml --repo Yiyuiii/codex-agent-tools --allow-publish
    ```
+
+   npm 11.11.0 与 11.18.0 的 `trust github` 权限参数不同，因此此步骤固定
+   npm 11.18.0，不依赖执行机默认 npm。相同命令加 `--dry-run` 已确认 package、
+   repository、workflow filename 与 publish 权限解析正确；真实执行仍要求 2FA，
+   且只在 beta.0 已存在后进行。
 
 7. 推送 `v0.1.0-beta.0`；workflow 对已存在版本只做幂等验证并创建 prerelease，不重复发布。
 
@@ -91,8 +96,10 @@ settled 前。聚焦测试连续三轮和全量单 worker 回归均通过。第�
 Node 22 已通过全部测试，随后因 hosted runner 未预装 Codex CLI 而在插件
 release smoke 以 ENOENT 失败；Node 20/24 被 fail-fast 取消。CI 与 release
 workflow 现按官方安装路径固定 `@openai/codex@0.146.0` 并核对版本，插件
-门禁本身不降级。修正后的远端 CI、npm 首包与独立复审仍是本 Task 的未完成
-门禁。
+门禁本身不降级。固定 CLI 后的第三轮 Node 20/22/24 CI 已全绿。发布控制自审
+继续补充 `fail-fast: false` 与强制 `refs/tags/v*` ref 校验，避免矩阵结果被
+连带取消，也拒绝普通 branch 上的手动发布；契约测试先红后绿。最终远端 CI、
+npm 首包与独立复审仍是本 Task 的未完成门禁。
 
 ## Task 3：用 `0.1.0-beta.1` 验证 OIDC 并做本地 npm 验收
 
