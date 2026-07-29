@@ -116,6 +116,10 @@ describe("release assurance", () => {
       bugs: {
         url: "https://github.com/Yiyuiii/codex-agent-tools/issues",
       },
+      publishConfig: {
+        access: "public",
+        registry: "https://registry.npmjs.org/",
+      },
     };
     const pluginManifest = {
       name: "codex-external-agents",
@@ -146,6 +150,19 @@ describe("release assurance", () => {
           repository: {
             type: "git",
             url: "git+https://github.com/another-owner/codex-agent-tools.git",
+          },
+        },
+        pluginManifest,
+        runtimeVersion: "0.1.0-beta.0",
+      }),
+    ).toThrow(/public repository metadata is invalid/u);
+    expect(() =>
+      assertReleasePackageMetadata({
+        packageManifest: {
+          ...packageManifest,
+          publishConfig: {
+            access: "restricted",
+            registry: "https://registry.example.test/",
           },
         },
         pluginManifest,

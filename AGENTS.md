@@ -97,6 +97,7 @@
 - 2026-07-29：beta.0 本地候选已完成。版本统一为 `0.1.0-beta.0`；新增公共 npm 精确版本验收入口，强制官方 registry、禁 lifecycle scripts、用伪 Kimi/Pi 在临时应用目录运行 doctor，从已安装 package 和官方插件缓存副本分别验证 MCP，并只在临时 `CODEX_HOME` 做 add/list/remove，结束时要求目标进程 0/0/0 与资格锁 absent；连接或工具合同失败时 helper 会立即清理自有 MCP transport。fresh 本地矩阵为 53 files / 889 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖 0 vulnerabilities、228 files / 17 Markdown/HTML / 4 plugin files pack dry-run 均通过；没有运行真实模型或触碰活动配置/插件。公开 GitHub 仓库与 `main` / `next` 已建立。首轮 CI 在 Linux 暴露测试夹具于 Pi settled 后才写入 stderr flood 的跨平台时序问题；仅将 flood 移到 settled 前，生产客户端、错误上限和能力指纹均未修改，聚焦测试连续三轮和全量单 worker 复验通过。第二轮 Node 22 已通过全部测试，随后因 hosted runner 未预装 Codex CLI 而在插件 release smoke 失败；Node 20/24 被 fail-fast 取消。CI 与 release workflow 现固定安装并核对 `@openai/codex@0.146.0`，没有跳过插件门禁。修正后的 GitHub CI、独立复审与 npm 首包尚未完成，不能把 beta.0 写成已发布。
 - 2026-07-29：Trusted Publisher 配置命令固定使用 `npm@11.18.0`，因为本机 npm 11.11.0 的 `trust github` 权限参数面不同。只读 `--dry-run` 已确认 package、GitHub repository、`release.yml` 与 publish 权限解析正确；真实信任关系只能在 beta.0 首包存在后以 2FA 建立。
 - 2026-07-29：固定 Codex CLI 后的第三轮 GitHub CI `30448518755` 已在 Node 20/22/24 全绿，三项均完成类型检查、全部测试、release smoke 和包工件上传。后续发布控制自审又增加两项 fail-closed 契约：CI matrix `fail-fast: false` 保留各 Node 版本独立结果；release workflow 在任何入口先要求 `GITHUB_REF` 为 `refs/tags/v*`，普通分支上的手动 dispatch 不得进入发布路径。最终 CI 与独立复审仍待完成。
+- 2026-07-29：npm 发布目标由 package `publishConfig`、手工 bootstrap 命令和 OIDC workflow 三层固定为 `https://registry.npmjs.org/` 且 access 为 public；release assurance 与安装包合同拒绝 registry/access 漂移，避免执行机自定义 npm 配置把首包投递到错误 registry。
 
 ## 架构与计划索引
 

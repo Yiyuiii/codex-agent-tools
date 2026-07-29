@@ -25,6 +25,10 @@ function packageManifest(version = "0.1.0-beta.1") {
     bugs: {
       url: "https://github.com/Yiyuiii/codex-agent-tools/issues",
     },
+    publishConfig: {
+      access: "public",
+      registry: PUBLIC_NPM_REGISTRY,
+    },
   };
 }
 

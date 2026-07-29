@@ -70,7 +70,7 @@
 5. 通过交互式 npm web login 完成首包发布：
 
    ```powershell
-   npm publish --ignore-scripts --tag next --access public
+   npm publish --ignore-scripts --tag next --access public --registry=https://registry.npmjs.org/
    ```
 
 6. 验证精确版本与 `next` dist-tag，再配置：

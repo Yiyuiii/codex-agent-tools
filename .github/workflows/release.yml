@@ -161,7 +161,7 @@ jobs:
 
       - name: Publish package through npm OIDC
         if: steps.existing.outputs.published != 'true'
-        run: npm publish --ignore-scripts --tag "${{ steps.channel.outputs.npm_tag }}" --access public
+        run: npm publish --ignore-scripts --tag "${{ steps.channel.outputs.npm_tag }}" --access public --registry=https://registry.npmjs.org/
 
       - name: Verify published package and dist-tag
         shell: bash

@@ -99,6 +99,7 @@ export function assertReleasePackageMetadata(options: {
   const pluginManifest = plainRecord(options.pluginManifest);
   const repository = plainRecord(packageManifest?.repository);
   const bugs = plainRecord(packageManifest?.bugs);
+  const publishConfig = plainRecord(packageManifest?.publishConfig);
   const version = packageManifest?.version;
 
   if (
@@ -108,7 +109,9 @@ export function assertReleasePackageMetadata(options: {
       "git+https://github.com/Yiyuiii/codex-agent-tools.git" ||
     packageManifest.homepage !==
       "https://github.com/Yiyuiii/codex-agent-tools#readme" ||
-    bugs?.url !== "https://github.com/Yiyuiii/codex-agent-tools/issues"
+    bugs?.url !== "https://github.com/Yiyuiii/codex-agent-tools/issues" ||
+    publishConfig?.access !== "public" ||
+    publishConfig.registry !== "https://registry.npmjs.org/"
   ) {
     throw new Error("Package public repository metadata is invalid");
   }

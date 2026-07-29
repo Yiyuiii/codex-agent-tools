@@ -69,7 +69,7 @@ describe("GitHub release workflows", () => {
     expect(content).toContain("npm test -- --maxWorkers=1");
     expect(content).toContain("npm run smoke:release");
     expect(content).toContain(
-      'npm publish --ignore-scripts --tag "${{ steps.channel.outputs.npm_tag }}" --access public',
+      'npm publish --ignore-scripts --tag "${{ steps.channel.outputs.npm_tag }}" --access public --registry=https://registry.npmjs.org/',
     );
     expect(content).toContain("Waiting for npm registry propagation");
     expect(content).toContain("Create or update GitHub Release");
