@@ -105,7 +105,9 @@ HOME/CODEX_HOME/AppData/TEMP/TMP/TMPDIR、npm userconfig/globalconfig/cache
 全部移入一次性目录，并让 npm view/install/version 使用空 install cwd 与该
 环境，定向复审 PASS。宿主 `codex plugin` 是官方插件生命周期测试器，不是本包
 CLI 的替代关系；该建议经产品边界复核后未采纳。隔离修复的最终远端 CI 与 npm
-首包是本 Task 当前未完成门禁。
+首包是本 Task 当前未完成门禁。隔离修复提交 `4cc9c33` 的最终 CI
+`30454587529` 已在 Node 20/22/24 全绿；当前只剩 npm web login、beta.0
+bootstrap、Trusted Publisher 配置与 beta tag 幂等 workflow。
 
 ## Task 3：用 `0.1.0-beta.1` 验证 OIDC 并做本地 npm 验收
 

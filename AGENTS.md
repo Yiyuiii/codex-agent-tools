@@ -99,6 +99,7 @@
 - 2026-07-29：固定 Codex CLI 后的第三轮 GitHub CI `30448518755` 已在 Node 20/22/24 全绿，三项均完成类型检查、全部测试、release smoke 和包工件上传。后续发布控制自审又增加两项 fail-closed 契约：CI matrix `fail-fast: false` 保留各 Node 版本独立结果；release workflow 在任何入口先要求 `GITHUB_REF` 为 `refs/tags/v*`，普通分支上的手动 dispatch 不得进入发布路径。最终 CI 与独立复审仍待完成。
 - 2026-07-29：npm 发布目标由 package `publishConfig`、手工 bootstrap 命令和 OIDC workflow 三层固定为 `https://registry.npmjs.org/` 且 access 为 public；release assurance 与安装包合同拒绝 registry/access 漂移，避免执行机自定义 npm 配置把首包投递到错误 registry。
 - 2026-07-29：beta.0 发布复审已按范围拆分收敛。发布/OIDC 窄审 PASS；npm 隔离初审命中 `npm view/install` 继承宿主 `.npmrc`/cache/token 的 HIGH blocker，现由 `buildIsolatedNpmEnvironment` 只保留系统执行变量，并把 HOME/USERPROFILE/CODEX_HOME/AppData/TEMP/TMP/TMPDIR、npm userconfig/globalconfig/cache 全部定向到一次性目录；npm view/install/version 均使用空 install cwd 与该环境，定向复审 PASS。初审提出用本包 CLI 替代裸 `codex` 的建议被反驳：本包 CLI 只提供 doctor，官方插件生命周期必须由隔离 HOME/CODEX_HOME 中的宿主 `codex plugin` 驱动，且插件缓存副本 MCP 另有合同验证。最新本地矩阵为 53 files / 890 passed / 1 skipped / 0 failed，类型检查、8/8、release smoke 与 228-file pack dry-run 通过；隔离修复的最终 CI 和 npm 首包待完成。
+- 2026-07-29：npm 隔离修复提交 `4cc9c33` 的最终 GitHub CI `30454587529` 已在 Node 20/22/24 全绿，每项均完成固定 Codex CLI、类型检查、891 项测试、release smoke 与 package artifact upload。beta.0 代码门禁已完成；当前外部状态仅剩 npm web login、首包 bootstrap、Trusted Publisher 与 beta tag workflow。
 
 ## 架构与计划索引
 
