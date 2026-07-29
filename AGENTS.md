@@ -21,6 +21,7 @@
 - 2026-07-28：用户已批准 Pi 写入命令生命周期脱敏诊断的推荐方案 B。批准范围是独立 Pi-only 生命周期 observer、超大结束事件的 boolean `isError` 安全保留、qualification-only schema v3 producer、严格 optional verifier、TDD、规格/质量双审、全量离线/隔离验证和新 clean candidate 冻结；不修改提示词、validator、公开 MCP、模型/provider/route/credential、retry/fallback、资格协议或历史 evidence，也不授权第二个真实批次及其它上一条列明的外部状态动作。
 - 2026-07-28：用户随后明确授权仅在 frozen SHA `cb9434b4b540e70f5384224e4e98823a3ea2dbae` 上自主推进一次真实资格实验，并授权失败后的离线调查、TDD 修复、审阅、验证与重新冻结。该授权已经被批次 `2026-07-28T10-56-09.704Z-649886e3-233e-4da1-ac80-185227342bef` 消费；不授权在任何新 SHA 上运行第二个真实批次，也不授权活动插件/config、Claude Code、`codex_cc_tools`、发布、推送、合并或 fast-forward。
 - 2026-07-28（当前覆盖性要求）：用户把项目内真实资格实验改为长期默认授权，要求 Codex 自主推进到确实需要维护者处理的位置，不再逐批或逐 SHA 等待人工批准。该授权覆盖 clean frozen candidate 上的完整 `four-llm-v1` 批次、真实模型额度开销、失败后的离线诊断/TDD 修复/复核/重冻结，以及终态证据提交后在新 clean frozen SHA 上启动新批。每批仍必须生成 fresh 内部执行引用并只保存其哈希，严格遵守 one-entry/one-cell、固定八项串行、single-attempt、首错停、无 resume/retry/fallback/补跑；没有代码或外部状态变化时不得无意义重跑。活动 `~/.codex/config.toml`、活动插件、Claude Code、`codex_cc_tools`、发布、推送、合并和 fast-forward 仍不在本授权内。正式边界见[长期默认授权设计](docs/superpowers/specs/2026-07-28-standing-experiment-authorization-design.md)与[自主资格收敛计划](docs/superpowers/plans/2026-07-28-standing-authorization-and-autonomous-qualification.md)。
+- 2026-07-29（当前资格政策）：用户明确要求，历史上已经真实跑通且仍代表当前实现的能力不必在每次候选中全部重跑；暂不调试 Ark Agent Plan，只需使 Ark Coding Plan 与产品按预期运行。资格单位改为独立的“逻辑 LLM × 任务类型”，immutable verifier 接受的 passed case 可以支持对应能力，即使所属批次因其它 case 而 blocked；批次本身仍不得改写或拼接为 passed。只有相关运行输入发生实质变化时才使对应能力失效，额度/凭据/服务瞬时状态与代码能力资格分离。正式边界见[能力级资格复用与变更影响失效设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)。
 
 ## 当前事实状态
 
@@ -102,6 +103,7 @@
 - [Pi Windows shell 环境闭环设计](docs/superpowers/specs/2026-07-28-pi-windows-shell-environment-design.md)
 - [Pi 资格规定命令成功语义设计](docs/superpowers/specs/2026-07-28-qualification-required-command-success-design.md)
 - [当前：真实资格实验长期默认授权设计](docs/superpowers/specs/2026-07-28-standing-experiment-authorization-design.md)
+- [当前：能力级资格复用与变更影响失效设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)
 - [当前：长期默认授权与自主资格收敛实施计划](docs/superpowers/plans/2026-07-28-standing-authorization-and-autonomous-qualification.md)
 - [Pi 写入命令生命周期脱敏诊断实施计划](docs/superpowers/plans/2026-07-28-pi-write-command-lifecycle-diagnostics.md)
 - [Pi Windows shell 环境闭环实施计划](docs/superpowers/plans/2026-07-28-pi-windows-shell-environment.md)
