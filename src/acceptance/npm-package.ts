@@ -67,6 +67,35 @@ export interface InstalledMcpSession<TClient, TTransport> {
   readonly transport: TTransport;
 }
 
+export interface IsolatedNpmEnvironmentOptions {
+  readonly sourceEnvironment: NodeJS.ProcessEnv;
+  readonly isolatedUserHome: string;
+  readonly isolatedCodexHome: string;
+  readonly isolatedLocalAppData: string;
+  readonly isolatedAppData: string;
+  readonly temporaryRoot: string;
+  readonly npmUserConfig: string;
+  readonly npmGlobalConfig: string;
+  readonly npmCache: string;
+}
+
+const SYSTEM_ENVIRONMENT_ALLOWLIST = new Set([
+  "COMSPEC",
+  "ComSpec",
+  "PATH",
+  "Path",
+  "PATHEXT",
+  "SystemDrive",
+  "SYSTEMDRIVE",
+  "SystemRoot",
+  "SYSTEMROOT",
+  "WINDIR",
+  "ProgramFiles",
+  "ProgramFiles(x86)",
+  "PROGRAMFILES",
+  "PROGRAMFILES(X86)",
+]);
+
 function acceptanceArgumentError(): Error {
   return new Error("Invalid npm package acceptance arguments");
 }
@@ -83,6 +112,32 @@ function parseVersion(value: unknown): string {
     throw acceptanceArgumentError();
   }
   return value;
+}
+
+export function buildIsolatedNpmEnvironment(
+  options: IsolatedNpmEnvironmentOptions,
+): NodeJS.ProcessEnv {
+  const systemEnvironment = Object.fromEntries(
+    Object.entries(options.sourceEnvironment).filter(
+      ([name, value]) =>
+        SYSTEM_ENVIRONMENT_ALLOWLIST.has(name) &&
+        typeof value === "string",
+    ),
+  );
+  return Object.freeze({
+    ...systemEnvironment,
+    HOME: options.isolatedUserHome,
+    USERPROFILE: options.isolatedUserHome,
+    LOCALAPPDATA: options.isolatedLocalAppData,
+    APPDATA: options.isolatedAppData,
+    CODEX_HOME: options.isolatedCodexHome,
+    TEMP: options.temporaryRoot,
+    TMP: options.temporaryRoot,
+    TMPDIR: options.temporaryRoot,
+    NPM_CONFIG_USERCONFIG: options.npmUserConfig,
+    NPM_CONFIG_GLOBALCONFIG: options.npmGlobalConfig,
+    NPM_CONFIG_CACHE: options.npmCache,
+  });
 }
 
 export function parseNpmPackageAcceptanceArguments(

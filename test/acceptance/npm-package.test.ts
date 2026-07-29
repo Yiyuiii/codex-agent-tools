@@ -6,6 +6,7 @@ import {
   assertDoctorAcceptance,
   assertInstalledPackageContract,
   assertNpmRegistryMetadata,
+  buildIsolatedNpmEnvironment,
   establishInstalledMcpSession,
   npmAcceptanceReportRelativePath,
   parseNpmPackageAcceptanceArguments,
@@ -33,6 +34,46 @@ function packageManifest(version = "0.1.0-beta.1") {
 }
 
 describe("npm-installed package acceptance contract", () => {
+  it("builds an npm environment that cannot inherit active homes, config, cache, or credentials", () => {
+    const environment = buildIsolatedNpmEnvironment({
+      sourceEnvironment: {
+        PATH: "system-bin",
+        HOME: "/active/home",
+        USERPROFILE: "C:\\active-home",
+        CODEX_HOME: "C:\\active-codex",
+        NPM_TOKEN: "real-npm-token",
+        NPM_CONFIG_REGISTRY: "https://registry.example.test/",
+        ARK_API_KEY: "real-model-key",
+      },
+      isolatedUserHome: "C:\\temp\\user-home",
+      isolatedCodexHome: "C:\\temp\\codex-home",
+      isolatedLocalAppData: "C:\\temp\\local-app-data",
+      isolatedAppData: "C:\\temp\\app-data",
+      temporaryRoot: "C:\\temp",
+      npmUserConfig: "C:\\temp\\npm-userconfig",
+      npmGlobalConfig: "C:\\temp\\npm-globalconfig",
+      npmCache: "C:\\temp\\npm-cache",
+    });
+
+    expect(environment).toMatchObject({
+      PATH: "system-bin",
+      HOME: "C:\\temp\\user-home",
+      USERPROFILE: "C:\\temp\\user-home",
+      CODEX_HOME: "C:\\temp\\codex-home",
+      LOCALAPPDATA: "C:\\temp\\local-app-data",
+      APPDATA: "C:\\temp\\app-data",
+      TEMP: "C:\\temp",
+      TMP: "C:\\temp",
+      TMPDIR: "C:\\temp",
+      NPM_CONFIG_USERCONFIG: "C:\\temp\\npm-userconfig",
+      NPM_CONFIG_GLOBALCONFIG: "C:\\temp\\npm-globalconfig",
+      NPM_CONFIG_CACHE: "C:\\temp\\npm-cache",
+    });
+    expect(environment).not.toHaveProperty("NPM_TOKEN");
+    expect(environment).not.toHaveProperty("NPM_CONFIG_REGISTRY");
+    expect(environment).not.toHaveProperty("ARK_API_KEY");
+  });
+
   it("pins consumer installation to the public npm registry", () => {
     expect(PUBLIC_NPM_REGISTRY).toBe("https://registry.npmjs.org/");
   });

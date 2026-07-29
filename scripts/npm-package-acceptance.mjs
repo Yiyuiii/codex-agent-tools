@@ -22,6 +22,7 @@ import {
   assertDoctorAcceptance,
   assertInstalledPackageContract,
   assertNpmRegistryMetadata,
+  buildIsolatedNpmEnvironment,
   classifyAgentProcesses,
   establishInstalledMcpSession,
   npmAcceptanceReportRelativePath,
@@ -53,6 +54,9 @@ const isolatedHome = path.join(temporaryRoot, "codex-home");
 const isolatedUserHome = path.join(temporaryRoot, "user-home");
 const isolatedLocalAppData = path.join(temporaryRoot, "local-app-data");
 const isolatedAppData = path.join(temporaryRoot, "roaming-app-data");
+const npmUserConfig = path.join(temporaryRoot, "npm-userconfig");
+const npmGlobalConfig = path.join(temporaryRoot, "npm-globalconfig");
+const npmCache = path.join(temporaryRoot, "npm-cache");
 const fakeRuntimeScript = path.join(temporaryRoot, "fake-runtime.mjs");
 const qualificationLockRoot = path.join(
   os.tmpdir(),
@@ -113,41 +117,6 @@ async function run(command, args, options = {}) {
     );
   }
   return result.stdout;
-}
-
-function safeSystemEnvironment(overrides = {}) {
-  const allowed = new Set([
-    "COMSPEC",
-    "ComSpec",
-    "PATH",
-    "Path",
-    "PATHEXT",
-    "SystemDrive",
-    "SYSTEMDRIVE",
-    "SystemRoot",
-    "SYSTEMROOT",
-    "WINDIR",
-    "ProgramFiles",
-    "ProgramFiles(x86)",
-    "PROGRAMFILES",
-    "PROGRAMFILES(X86)",
-  ]);
-  const environment = Object.fromEntries(
-    Object.entries(process.env).filter(
-      ([name, value]) => allowed.has(name) && typeof value === "string",
-    ),
-  );
-  return {
-    ...environment,
-    HOME: isolatedUserHome,
-    USERPROFILE: isolatedUserHome,
-    LOCALAPPDATA: isolatedLocalAppData,
-    APPDATA: isolatedAppData,
-    CODEX_HOME: isolatedHome,
-    TEMP: temporaryRoot,
-    TMP: temporaryRoot,
-    ...overrides,
-  };
 }
 
 function quoteWindowsArgument(value) {
@@ -479,7 +448,21 @@ try {
     mkdir(isolatedUserHome, { recursive: true }),
     mkdir(isolatedLocalAppData, { recursive: true }),
     mkdir(isolatedAppData, { recursive: true }),
+    mkdir(npmCache, { recursive: true }),
+    writeFile(npmUserConfig, "", "utf8"),
+    writeFile(npmGlobalConfig, "", "utf8"),
   ]);
+  const npmEnvironment = buildIsolatedNpmEnvironment({
+    sourceEnvironment: process.env,
+    isolatedUserHome,
+    isolatedCodexHome: isolatedHome,
+    isolatedLocalAppData,
+    isolatedAppData,
+    temporaryRoot,
+    npmUserConfig,
+    npmGlobalConfig,
+    npmCache,
+  });
   await assertNoQualificationLocks();
   await assertNoAgentProcesses();
   await verifyCapabilityIndex({ repositoryRoot });
@@ -496,7 +479,11 @@ try {
       "--json",
       `--registry=${PUBLIC_NPM_REGISTRY}`,
     ],
-    { label: "npm registry identity" },
+    {
+      cwd: installRoot,
+      env: npmEnvironment,
+      label: "npm registry identity",
+    },
   );
   const registry = assertNpmRegistryMetadata(
     JSON.parse(registryOutput),
@@ -516,7 +503,12 @@ try {
       packageSpec,
       `--registry=${PUBLIC_NPM_REGISTRY}`,
     ],
-    { label: "public npm package installation", timeout: 300_000 },
+    {
+      cwd: installRoot,
+      env: npmEnvironment,
+      label: "public npm package installation",
+      timeout: 300_000,
+    },
   );
 
   const packageMetadata = await lstat(packageRoot);
@@ -559,12 +551,13 @@ try {
   }
 
   const fakeRuntimes = await createFakeRuntimes();
-  const isolatedEnvironment = safeSystemEnvironment({
+  const isolatedEnvironment = {
+    ...npmEnvironment,
     KIMI_COMMAND: fakeRuntimes.kimi,
     PI_COMMAND: fakeRuntimes.pi,
     ARK_API_KEY: "npm-acceptance-coding-fixture",
     OPENAI_API_KEY_DOUBAO: "npm-acceptance-agent-fixture",
-  });
+  };
   const cliPath = path.join(packageRoot, "dist", "cli.js");
   const cliVersion = (
     await run(process.execPath, [cliPath, "--version"], {
@@ -611,7 +604,11 @@ try {
   await assertNoQualificationLocks();
   await assertNoAgentProcesses();
   const npmVersion = (
-    await run(npmCommand(), ["--version"], { label: "npm version" })
+    await run(npmCommand(), ["--version"], {
+      cwd: installRoot,
+      env: npmEnvironment,
+      label: "npm version",
+    })
   ).trim();
   const report = renderNpmPackageAcceptanceReport({
     version,

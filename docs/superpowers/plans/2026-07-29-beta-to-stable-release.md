@@ -87,7 +87,7 @@
 7. 推送 `v0.1.0-beta.0`；workflow 对已存在版本只做幂等验证并创建 prerelease，不重复发布。
 
 执行进度：发布基础设施由 `8f46d81` 提交；beta.0 已完成版本统一、公共 npm
-精确版本验收入口和本地候选矩阵。当前 fresh 结果为 53 files / 889 passed /
+精确版本验收入口和本地候选矩阵。当前 fresh 结果为 53 files / 890 passed /
 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖审计和
 228-file pack dry-run 均通过。公开 GitHub 仓库与 `main` / `next` 已建立。
 首轮 GitHub CI 在 Linux 暴露 fake Pi 于 settled 后才写 stderr flood 的夹具
@@ -99,7 +99,13 @@ workflow 现按官方安装路径固定 `@openai/codex@0.146.0` 并核对版本�
 门禁本身不降级。固定 CLI 后的第三轮 Node 20/22/24 CI 已全绿。发布控制自审
 继续补充 `fail-fast: false` 与强制 `refs/tags/v*` ref 校验，避免矩阵结果被
 连带取消，也拒绝普通 branch 上的手动发布；契约测试先红后绿。最终远端 CI、
-npm 首包与独立复审仍是本 Task 的未完成门禁。
+npm 首包与独立复审仍是本 Task 的未完成门禁。随后发布/OIDC 窄审 PASS；npm
+隔离初审命中 npm 子进程继承宿主 `.npmrc`/token 的 HIGH blocker，现已把
+HOME/CODEX_HOME/AppData/TEMP/TMP/TMPDIR、npm userconfig/globalconfig/cache
+全部移入一次性目录，并让 npm view/install/version 使用空 install cwd 与该
+环境，定向复审 PASS。宿主 `codex plugin` 是官方插件生命周期测试器，不是本包
+CLI 的替代关系；该建议经产品边界复核后未采纳。隔离修复的最终远端 CI 与 npm
+首包是本 Task 当前未完成门禁。
 
 ## Task 3：用 `0.1.0-beta.1` 验证 OIDC 并做本地 npm 验收
 
