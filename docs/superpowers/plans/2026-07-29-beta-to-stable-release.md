@@ -111,6 +111,11 @@ bootstrap、Trusted Publisher 配置与 beta tag 幂等 workflow。
 
 ## Task 3：用 `0.1.0-beta.1` 验证 OIDC 并做本地 npm 验收
 
+2026-07-29 进度：为避免 npm web login 等待浪费确定性准备时间，已从 beta.0
+候选提交创建隔离 `codex/beta1-prep` 工作树。该工作树只准备 beta.1 版本元数据、
+测试与审阅记录；在 beta.0 bootstrap 和 Trusted Publisher 建立前不得推送
+`v0.1.0-beta.1`，也不得把预备分支误记为公开发布。
+
 **文件**
 
 - Create: `scripts/npm-package-acceptance.mjs`

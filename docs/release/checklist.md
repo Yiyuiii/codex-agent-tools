@@ -4,11 +4,11 @@
 
 最近复核：2026-07-29
 
-分支：`next`
+目标发布分支：`next`；当前预备分支：`codex/beta1-prep`
 
-包版本：`0.1.0-beta.0`
+包版本：`0.1.0-beta.1`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`；它的聚合终态不再把其中通过的精确 case 降级。Ark Agent Plan 当时的额度错误属于路线可用性警告，不是 Coding Plan 或整个产品的资格阻碍。`0.1.0-beta.0` 正在执行公开 beta 发布门禁；第 4 层真实 Codex App 宿主门禁仍未执行，且公开发布不授权安装到活动 Codex、替代旧工具或改写活动配置。**
+当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`；它的聚合终态不再把其中通过的精确 case 降级。Ark Agent Plan 当时的额度错误属于路线可用性警告，不是 Coding Plan 或整个产品的资格阻碍。`0.1.0-beta.1` 是 OIDC 与公共 npm 隔离消费者验收候选，只有在 `0.1.0-beta.0` bootstrap 和 Trusted Publisher 建立后才能打标签发布；第 4 层真实 Codex App 宿主门禁仍未执行，且公开发布不授权安装到活动 Codex、替代旧工具或改写活动配置。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 

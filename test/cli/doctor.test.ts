@@ -56,7 +56,7 @@ describe("doctor diagnostics", () => {
       buildPiConfig: () =>
         buildIsolatedPiConfig({
           root: tempDirectory,
-          version: "0.1.0-beta.0",
+          version: "0.1.0-beta.1",
           providers: ["ark"],
         }),
     });
@@ -78,7 +78,7 @@ describe("doctor diagnostics", () => {
       detail: "C:\\Users\\test\\npm\\pi.cmd",
     });
     expect(report.checks.find((check) => check.name === "Pi isolated config")?.detail).toContain(
-      path.join(tempDirectory, "pi", "0.1.0-beta.0"),
+      path.join(tempDirectory, "pi", "0.1.0-beta.1"),
     );
     expect(report.checks.find((check) => check.name === "Ark Pi models")).toMatchObject({
       ok: true,

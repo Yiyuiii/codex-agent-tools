@@ -104,4 +104,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前候选版本为 `0.1.0-beta.0`，正在执行“公开 beta → 从 npm 隔离安装验收 → OIDC beta → stable”的发布门禁。四模型八项能力已由固定能力索引验证为 8 passed / 0 pending；release smoke 会在打包前重新校验不可变 evidence、精确 case、注册表 anchor 与运行时指纹。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`，但其中已通过的精确 case 可以支持对应能力，批次聚合状态不再覆盖能力状态。公开发布不构成活动 Codex 安装授权；真实 Codex App 宿主门禁仍未执行，不能称为已安装或已替代旧工具。
+当前分支候选版本为 `0.1.0-beta.1`，用于在 `0.1.0-beta.0` 首包完成后验证 GitHub OIDC 发布，并执行“从公共 npm 隔离安装验收 → stable”的后续门禁。四模型八项能力已由固定能力索引验证为 8 passed / 0 pending；release smoke 会在打包前重新校验不可变 evidence、精确 case、注册表 anchor 与运行时指纹。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`，但其中已通过的精确 case 可以支持对应能力，批次聚合状态不再覆盖能力状态。公开发布不构成活动 Codex 安装授权；真实 Codex App 宿主门禁仍未执行，不能称为已安装或已替代旧工具。

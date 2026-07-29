@@ -100,6 +100,7 @@
 - 2026-07-29：npm 发布目标由 package `publishConfig`、手工 bootstrap 命令和 OIDC workflow 三层固定为 `https://registry.npmjs.org/` 且 access 为 public；release assurance 与安装包合同拒绝 registry/access 漂移，避免执行机自定义 npm 配置把首包投递到错误 registry。
 - 2026-07-29：beta.0 发布复审已按范围拆分收敛。发布/OIDC 窄审 PASS；npm 隔离初审命中 `npm view/install` 继承宿主 `.npmrc`/cache/token 的 HIGH blocker，现由 `buildIsolatedNpmEnvironment` 只保留系统执行变量，并把 HOME/USERPROFILE/CODEX_HOME/AppData/TEMP/TMP/TMPDIR、npm userconfig/globalconfig/cache 全部定向到一次性目录；npm view/install/version 均使用空 install cwd 与该环境，定向复审 PASS。初审提出用本包 CLI 替代裸 `codex` 的建议被反驳：本包 CLI 只提供 doctor，官方插件生命周期必须由隔离 HOME/CODEX_HOME 中的宿主 `codex plugin` 驱动，且插件缓存副本 MCP 另有合同验证。最新本地矩阵为 53 files / 890 passed / 1 skipped / 0 failed，类型检查、8/8、release smoke 与 228-file pack dry-run 通过；隔离修复的最终 CI 和 npm 首包待完成。
 - 2026-07-29：npm 隔离修复提交 `4cc9c33` 的最终 GitHub CI `30454587529` 已在 Node 20/22/24 全绿，每项均完成固定 Codex CLI、类型检查、891 项测试、release smoke 与 package artifact upload。beta.0 代码门禁已完成；当前外部状态仅剩 npm web login、首包 bootstrap、Trusted Publisher 与 beta tag workflow。
+- 2026-07-29：npm web login 等待期间，从 beta.0 冻结提交 `bde8aff` 创建隔离 `codex/beta1-prep` 工作树，仅预备 `0.1.0-beta.1` 的版本元数据、测试和发布审阅记录。版本 TDD 发现并修正三处 preflight 当前版本夹具，生产资格逻辑未改变；最终 53 files / 890 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、生产依赖审计、228-file pack dry-run，以及本机 Codex CLI 0.135.0 与一次性 CI 固定 CLI 0.146.0 下的 release smoke 均通过。一次性 CLI 的首次主包安装因缺失 Windows optional dependency 正确失败并已清理，显式安装公开 alias 工件后复验通过；全局 CLI 未修改。该分支仍必须在 beta.0 首包与 Trusted Publisher 建立后才能进入 `next` 和打标签，预备分支本身不构成公开发布，也不授权访问活动 Codex 配置或插件。
 
 ## 架构与计划索引
 
