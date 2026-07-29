@@ -84,6 +84,21 @@ logical LLM × task kind
 
 索引不能保存密钥、原始提示输出或未脱敏事件。
 
+### 4.1 受限的历史 standalone 兼容
+
+现有八项公开能力中，`ark-agent-deepseek-v4-flash/delegate` 的既有
+passed gate 建立于资格批次 manifest 机制之前；当前没有一个可用的
+passed batch case 可以替换它。为遵守维护者“暂不调试或重跑 Ark Agent
+Plan”的要求，索引允许一个显式标记的 `legacy-standalone` 来源，但必须：
+
+- 只用于迁移本设计生效前已经在注册表中 passed 的能力；
+- 记录 evidence 路径、SHA-256、schema、观测时间和当前运行输入指纹；
+- 由验证器按该历史 schema 的完整严格字段集合重新校验；
+- 不允许新增第二个 legacy 条目，也不允许用 legacy evidence 晋级新能力；
+- 任何相关运行输入变化都会使它失效；失效后只能由新的 batch case 恢复。
+
+这是一次性历史兼容，不降低新能力的证据要求。
+
 ## 5. 相关运行输入与失效
 
 指纹按能力声明相关输入，而不是对整个仓库或整个四模型面做一个全局哈希。
