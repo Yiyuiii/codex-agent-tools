@@ -87,8 +87,12 @@
 228-file pack dry-run 均通过。公开 GitHub 仓库与 `main` / `next` 已建立。
 首轮 GitHub CI 在 Linux 暴露 fake Pi 于 settled 后才写 stderr flood 的夹具
 时序问题；生产代码按完成合同清理进程是正确行为，因此只把 flood 调整到
-settled 前。聚焦测试连续三轮和全量单 worker 回归均通过。修正后的远端 CI、
-npm 首包与独立复审仍是本 Task 的未完成门禁。
+settled 前。聚焦测试连续三轮和全量单 worker 回归均通过。第二轮 CI 的
+Node 22 已通过全部测试，随后因 hosted runner 未预装 Codex CLI 而在插件
+release smoke 以 ENOENT 失败；Node 20/24 被 fail-fast 取消。CI 与 release
+workflow 现按官方安装路径固定 `@openai/codex@0.146.0` 并核对版本，插件
+门禁本身不降级。修正后的远端 CI、npm 首包与独立复审仍是本 Task 的未完成
+门禁。
 
 ## Task 3：用 `0.1.0-beta.1` 验证 OIDC 并做本地 npm 验收
 

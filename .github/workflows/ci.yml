@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  CODEX_CLI_VERSION: 0.146.0
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -29,6 +32,13 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+
+      - name: Install pinned Codex CLI for plugin smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global "@openai/codex@${CODEX_CLI_VERSION}"
+          test "$(codex --version)" = "codex-cli ${CODEX_CLI_VERSION}"
 
       - run: npm ci
       - run: npm run typecheck

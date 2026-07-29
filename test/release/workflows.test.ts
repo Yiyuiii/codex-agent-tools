@@ -18,6 +18,13 @@ describe("GitHub release workflows", () => {
 
     expect(content).toContain("branches: [main, next]");
     expect(content).toContain("node-version: [20, 22, 24]");
+    expect(content).toContain("CODEX_CLI_VERSION: 0.146.0");
+    expect(content).toContain(
+      'npm install --global "@openai/codex@${CODEX_CLI_VERSION}"',
+    );
+    expect(content).toContain(
+      'test "$(codex --version)" = "codex-cli ${CODEX_CLI_VERSION}"',
+    );
     expect(content).toContain("npm ci");
     expect(content).toContain("npm run typecheck");
     expect(content).toContain("npm test -- --maxWorkers=1");
@@ -29,6 +36,13 @@ describe("GitHub release workflows", () => {
 
     expect(content).toContain('tags:\n      - "v*"');
     expect(content).toContain("id-token: write");
+    expect(content).toContain("CODEX_CLI_VERSION: 0.146.0");
+    expect(content).toContain(
+      'npm install --global "@openai/codex@${CODEX_CLI_VERSION}"',
+    );
+    expect(content).toContain(
+      'test "$(codex --version)" = "codex-cli ${CODEX_CLI_VERSION}"',
+    );
     expect(content).toContain("npm_tag=next");
     expect(content).toContain("required_branch=origin/next");
     expect(content).toContain("npm_tag=latest");

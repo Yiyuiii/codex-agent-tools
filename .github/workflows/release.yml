@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  CODEX_CLI_VERSION: 0.146.0
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -31,6 +34,13 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
+
+      - name: Install pinned Codex CLI for plugin smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global "@openai/codex@${CODEX_CLI_VERSION}"
+          test "$(codex --version)" = "codex-cli ${CODEX_CLI_VERSION}"
 
       - name: Resolve release channel
         id: channel
