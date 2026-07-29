@@ -54,12 +54,12 @@ describe("logical LLM registry", () => {
         review: {
           status: "passed",
           evidence:
-            "docs/smoke/ark.md#ark-agent-deepseek-v4-flash-review",
+            "docs/smoke/evidence/capabilities.json#ark-agent-deepseek-v4-flash-review",
         },
         delegate: {
           status: "passed",
           evidence:
-            "docs/smoke/ark.md#ark-agent-deepseek-v4-flash-delegate",
+            "docs/smoke/evidence/capabilities.json#ark-agent-deepseek-v4-flash-delegate",
         },
       },
       credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
@@ -147,19 +147,18 @@ describe("logical LLM registry", () => {
     }
   });
 
-  it("continues to resolve valid passed and pending profiles", () => {
+  it("continues to resolve valid passed profiles", () => {
     const registry = createLlmRegistry([
       resolveLlm("kimi-k3"),
       resolveLlm("ark-coding-plan"),
     ]);
 
     expect(registry.resolve("kimi-k3", "review").model).toBe("kimi-code/k3");
-    expect(registry.resolve("ark-coding-plan").qualityGates).toEqual({
-      review: { status: "pending" },
-      delegate: { status: "pending" },
-    });
-    expect(() => registry.resolve("ark-coding-plan", "review")).toThrow(
-      /disabled pending real smoke/u,
+    expect(registry.resolve("ark-coding-plan", "review").model).toBe(
+      "ark-code-latest",
+    );
+    expect(registry.resolve("ark-coding-plan", "delegate").model).toBe(
+      "ark-code-latest",
     );
   });
 
@@ -180,7 +179,7 @@ describe("logical LLM registry", () => {
     );
   });
 
-  it("keeps both Ark Coding Plan tasks pending after its delegate gate failed", () => {
+  it("enables both Ark Coding Plan tasks from capability-scoped evidence", () => {
     const profile = resolveLlm("ark-coding-plan");
     expect(profile).toMatchObject({
       runtime: "pi-rpc",
@@ -198,15 +197,23 @@ describe("logical LLM registry", () => {
       maxConcurrency: 1,
       capabilities: { review: true, delegate: true },
       qualityGates: {
-        review: { status: "pending" },
-        delegate: { status: "pending" },
+        review: {
+          status: "passed",
+          evidence:
+            "docs/smoke/evidence/capabilities.json#ark-coding-plan-review",
+        },
+        delegate: {
+          status: "passed",
+          evidence:
+            "docs/smoke/evidence/capabilities.json#ark-coding-plan-delegate",
+        },
       },
     });
-    expect(() => resolveLlm("ark-coding-plan", "review")).toThrow(
-      /disabled pending real smoke/u,
+    expect(resolveLlm("ark-coding-plan", "review").model).toBe(
+      "ark-code-latest",
     );
-    expect(() => resolveLlm("ark-coding-plan", "delegate")).toThrow(
-      /disabled pending real smoke/u,
+    expect(resolveLlm("ark-coding-plan", "delegate").model).toBe(
+      "ark-code-latest",
     );
   });
 
@@ -239,11 +246,13 @@ describe("logical LLM registry", () => {
         qualityGates: {
           review: {
             status: "passed",
-            evidence: `docs/smoke/ark.md#${id}-review`,
+            evidence:
+              `docs/smoke/evidence/capabilities.json#${id}-review`,
           },
           delegate: {
             status: "passed",
-            evidence: `docs/smoke/ark.md#${id}-delegate`,
+            evidence:
+              `docs/smoke/evidence/capabilities.json#${id}-delegate`,
           },
         },
       });
@@ -294,7 +303,7 @@ describe("logical LLM registry", () => {
       expect(profile.capabilities[task]).toBe(true);
       expect(profile.qualityGates[task]).toEqual({
         status: "passed",
-        evidence: `docs/smoke/kimi.md#${anchor}`,
+        evidence: `docs/smoke/evidence/capabilities.json#${anchor}`,
       });
     },
   );

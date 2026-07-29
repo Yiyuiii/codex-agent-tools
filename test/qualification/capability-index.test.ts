@@ -7,9 +7,11 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   capabilityRuntimeInputRoots,
+  CAPABILITY_INDEX_RELATIVE_PATH,
   collectCapabilityRuntimeInputs,
   computeCapabilityRuntimeFingerprint,
   fingerprintCapabilitySnapshot,
+  verifyCapabilityIndex,
   verifyCapabilityEvidenceSource,
   type BatchCaseCapabilitySource,
   type CapabilityQualificationEntry,
@@ -613,5 +615,18 @@ describe("capability qualification evidence source", () => {
         profile,
       }),
     ).rejects.toThrow(/capability qualification/iu);
+  });
+});
+
+describe("checked-in capability qualification index", () => {
+  it("covers every public LLM task with fresh machine-verifiable evidence", async () => {
+    await expect(
+      verifyCapabilityIndex({ repositoryRoot: process.cwd() }),
+    ).resolves.toEqual({
+      verified: true,
+      indexPath: CAPABILITY_INDEX_RELATIVE_PATH,
+      entryCount: 8,
+      legacyEntryCount: 1,
+    });
   });
 });

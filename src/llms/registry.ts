@@ -24,6 +24,12 @@ const qualifiedTasks = (evidenceDocument: string, anchorPrefix: string) =>
     },
   }) as const;
 
+const capabilityQualifiedTasks = (anchorPrefix: string) =>
+  qualifiedTasks(
+    "docs/smoke/evidence/capabilities.json",
+    anchorPrefix,
+  );
+
 const pendingTasks = () =>
   ({
     capabilities: { review: true, delegate: true },
@@ -50,7 +56,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-coding-plan",
-    ...pendingTasks(),
+    ...capabilityQualifiedTasks("ark-coding-plan"),
   },
   {
     id: "ark-agent-plan",
@@ -64,7 +70,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-agent-plan",
-    ...qualifiedTasks("docs/smoke/ark.md", "ark-agent-plan"),
+    ...capabilityQualifiedTasks("ark-agent-plan"),
   },
   {
     id: "ark-agent-deepseek-v4-flash",
@@ -78,8 +84,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-agent-plan",
-    ...qualifiedTasks(
-      "docs/smoke/ark.md",
+    ...capabilityQualifiedTasks(
       "ark-agent-deepseek-v4-flash",
     ),
   },
@@ -92,7 +97,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     credentialEnv: [],
     timeoutMs: 600_000,
     maxConcurrency: 1,
-    ...qualifiedTasks("docs/smoke/kimi.md", "kimi-k3"),
+    ...capabilityQualifiedTasks("kimi-k3"),
   },
 ];
 

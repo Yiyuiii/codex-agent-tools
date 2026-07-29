@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "llm": "ark-agent-deepseek-v4-flash",
+      "task": "delegate",
+      "runtimeFingerprintSha256": "3640364c90a46e73577b1ba8511ffda632bb2570c6a5daa1ba790f6fb5ac0db2",
+      "source": {
+        "kind": "legacy-standalone",
+        "evidencePath": "docs/smoke/evidence/2026-07-25T16-10-32.796Z-ark-agent-deepseek-v4-flash-delegate-ark.json",
+        "evidenceSha256": "38869fd3844a2e5ab933cc438bcdbb364eaf16182dbc3c650452d04c3c3bbe92",
+        "evidenceSchemaVersion": 1,
+        "observedAt": "2026-07-25T16:10:32.796Z"
+      }
+    },
+    {
+      "llm": "ark-agent-deepseek-v4-flash",
+      "task": "review",
+      "runtimeFingerprintSha256": "85e308e735baac1ea665bd19c0c343da572b1ac226907212330aa6b8214bd448",
+      "source": {
+        "kind": "batch-case",
+        "manifestPath": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/manifest.json",
+        "manifestSha256": "eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556",
+        "evidencePath": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T02-04-38.189Z-ark-agent-deepseek-v4-flash-review-ark.json",
+        "evidenceSha256": "2f024490e66daf4f2e724ac329a3d43071828ab21a77124b36f56aefea91eef0",
+        "frozenCommit": "07fd0d79e6885ee1e0af4a021e12170ef6c9f470",
+        "buildIdentitySha256": "ebf3782fba278f46c21aa9854f2d2b9788078fce8093bc9f0f03b8bb669e1402"
+      }
+    },
+    {
+      "llm": "ark-agent-plan",
+      "task": "delegate",
+      "runtimeFingerprintSha256": "20b0d0d16ac1113636cf92fd994122476a3c3b77795fb0b5952a95d0e7e0a2cd",
+      "source": {
+        "kind": "batch-case",
+        "manifestPath": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/manifest.json",
+        "manifestSha256": "eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556",
+        "evidencePath": "docs/smoke/evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/cases/2026-07-28T02-04-08.782Z-ark-agent-plan-delegate-ark.json",
+        "evidenceSha256": "5d9231a1ef175a7017d754d80f531b12cb7f59c0481171ddd2d14331d1d71352",
+        "frozenCommit": "07fd0d79e6885ee1e0af4a021e12170ef6c9f470",
+        "buildIdentitySha256": "ebf3782fba278f46c21aa9854f2d2b9788078fce8093bc9f0f03b8bb669e1402"
+      }
+    },
+    {
+      "llm": "ark-agent-plan",
+      "task": "review",
+      "runtimeFingerprintSha256": "864aded20297f2c27b29fe00e800a3283944f34c7578aa279eed2559c6fd5e23",
+      "source": {
+        "kind": "batch-case",
+        "manifestPath": "docs/smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json",
+        "manifestSha256": "f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7",
+        "evidencePath": "docs/smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-38-53.652Z-ark-agent-plan-review-ark.json",
+        "evidenceSha256": "7f95a842a15d00782b738a6f27c8c12d5791b6006fc960d5a54fe2c0f7f5b78c",
+        "frozenCommit": "0113da97a6b1fef35cc4c45025caa9e36a002176",
+        "buildIdentitySha256": "ee9a70d003b1a83a391c71b543be847096ecb286f1b27fe1bccab840e644fbe4"
+      }
+    },
+    {
+      "llm": "ark-coding-plan",
+      "task": "delegate",
+      "runtimeFingerprintSha256": "e737f2aa7ef6e4631fabffc9f2862cd1f7b0f5a7d5ad2b6124474aa12e025d3e",
+      "source": {
+        "kind": "batch-case",
+        "manifestPath": "docs/smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json",
+        "manifestSha256": "f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7",
+        "evidencePath": "docs/smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-37-11.799Z-ark-coding-plan-delegate-ark.json",
+        "evidenceSha256": "c82203c3ade0e40d354fe95c26c81f8e18c9aec1b74095bbab78337d4c99d520",
+        "frozenCommit": "0113da97a6b1fef35cc4c45025caa9e36a002176",
+        "buildIdentitySha256": "ee9a70d003b1a83a391c71b543be847096ecb286f1b27fe1bccab840e644fbe4"
+      }
+    },
+    {
+      "llm": "ark-coding-plan",
+      "task": "review",
+      "runtimeFingerprintSha256": "12bf9106e4de298a895366f947fd8af98a7aba83b8485d039786eeec60c3d222",
+      "source": {
+        "kind": "batch-case",
+        "manifestPath": "docs/smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json",
+        "manifestSha256": "f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7",
+        "evidencePath": "docs/smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-37-32.617Z-ark-coding-plan-review-ark.json",
+        "evidenceSha256": "1571ab94188510c778a21d7e050d21275ede1584ebc210969c4ad43a38cddc8a",
+        "frozenCommit": "0113da97a6b1fef35cc4c45025caa9e36a002176",
+        "buildIdentitySha256": "ee9a70d003b1a83a391c71b543be847096ecb286f1b27fe1bccab840e644fbe4"
+      }
+    },
+    {
+      "llm": "kimi-k3",
+      "task": "delegate",
+      "runtimeFingerprintSha256": "85cdbb6f6f54954a44ed612f256e3a01d61bc76a5ca9c90321af20aae1b0a216",
+      "source": {
+        "kind": "batch-case",
+        "manifestPath": "docs/smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json",
+        "manifestSha256": "f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7",
+        "evidencePath": "docs/smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-38-33.375Z-kimi-k3-delegate.json",
+        "evidenceSha256": "f05c547907757faa4a69bd81f6b643030c765ae9392d81beba3d79dbc8ba5f69",
+        "frozenCommit": "0113da97a6b1fef35cc4c45025caa9e36a002176",
+        "buildIdentitySha256": "ee9a70d003b1a83a391c71b543be847096ecb286f1b27fe1bccab840e644fbe4"
+      }
+    },
+    {
+      "llm": "kimi-k3",
+      "task": "review",
+      "runtimeFingerprintSha256": "ff4e511cc26f1ea4de9fb2139661508b6aabe29ab33022b1a346d53349d2b53d",
+      "source": {
+        "kind": "batch-case",
+        "manifestPath": "docs/smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json",
+        "manifestSha256": "f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7",
+        "evidencePath": "docs/smoke/evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-38-02.020Z-kimi-k3-review.json",
+        "evidenceSha256": "b1d9fa46d31e87841baf5c797c7448c39d7641f4accba826cc3c1dcdc3d4c2f9",
+        "frozenCommit": "0113da97a6b1fef35cc4c45025caa9e36a002176",
+        "buildIdentitySha256": "ee9a70d003b1a83a391c71b543be847096ecb286f1b27fe1bccab840e644fbe4"
+      }
+    }
+  ]
+}

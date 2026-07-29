@@ -8,7 +8,10 @@ import type {
   RuntimeKind,
   TaskKind,
 } from "../domain/types.js";
-import { resolveLlm } from "../llms/registry.js";
+import {
+  resolveLlm,
+  supportedLlmIds,
+} from "../llms/registry.js";
 import {
   verifyQualification,
   type QualificationVerificationResult,
@@ -107,6 +110,16 @@ export interface CapabilityEvidenceVerifierDependencies {
   verifyBatchManifest?: (
     manifestPath: string,
   ) => Promise<QualificationVerificationResult>;
+}
+
+export const CAPABILITY_INDEX_RELATIVE_PATH =
+  "docs/smoke/evidence/capabilities.json" as const;
+
+export interface CapabilityIndexVerificationResult {
+  readonly verified: true;
+  readonly indexPath: typeof CAPABILITY_INDEX_RELATIVE_PATH;
+  readonly entryCount: number;
+  readonly legacyEntryCount: number;
 }
 
 function capabilityInputError(): Error {
@@ -312,6 +325,20 @@ function plainRecord(value: unknown): Record<string, unknown> {
       descriptor.value,
     ]),
   );
+}
+
+function exactRecordKeys(
+  record: Record<string, unknown>,
+  expectedKeys: readonly string[],
+): void {
+  const actual = Object.keys(record).sort();
+  const expected = [...expectedKeys].sort();
+  if (
+    actual.length !== expected.length ||
+    actual.some((key, index) => key !== expected[index])
+  ) {
+    throw capabilityQualificationError();
+  }
 }
 
 function exactTrueChecks(
@@ -611,6 +638,182 @@ export async function verifyCapabilityEvidenceSource(
         dependencies,
       )
     : verifyLegacyCapabilityEvidence(options, options.entry.source);
+}
+
+function parseBatchSource(value: unknown): BatchCaseCapabilitySource {
+  const source = plainRecord(value);
+  exactRecordKeys(source, [
+    "buildIdentitySha256",
+    "evidencePath",
+    "evidenceSha256",
+    "frozenCommit",
+    "kind",
+    "manifestPath",
+    "manifestSha256",
+  ]);
+  if (
+    source.kind !== "batch-case" ||
+    typeof source.manifestPath !== "string" ||
+    typeof source.manifestSha256 !== "string" ||
+    typeof source.evidencePath !== "string" ||
+    typeof source.evidenceSha256 !== "string" ||
+    typeof source.frozenCommit !== "string" ||
+    typeof source.buildIdentitySha256 !== "string"
+  ) {
+    throw capabilityQualificationError();
+  }
+  return Object.freeze({
+    kind: "batch-case",
+    manifestPath: source.manifestPath,
+    manifestSha256: source.manifestSha256,
+    evidencePath: source.evidencePath,
+    evidenceSha256: source.evidenceSha256,
+    frozenCommit: source.frozenCommit,
+    buildIdentitySha256: source.buildIdentitySha256,
+  });
+}
+
+function parseLegacySource(value: unknown): LegacyStandaloneCapabilitySource {
+  const source = plainRecord(value);
+  exactRecordKeys(source, [
+    "evidencePath",
+    "evidenceSchemaVersion",
+    "evidenceSha256",
+    "kind",
+    "observedAt",
+  ]);
+  if (
+    source.kind !== "legacy-standalone" ||
+    typeof source.evidencePath !== "string" ||
+    typeof source.evidenceSha256 !== "string" ||
+    source.evidenceSchemaVersion !== 1 ||
+    typeof source.observedAt !== "string"
+  ) {
+    throw capabilityQualificationError();
+  }
+  return Object.freeze({
+    kind: "legacy-standalone",
+    evidencePath: source.evidencePath,
+    evidenceSha256: source.evidenceSha256,
+    evidenceSchemaVersion: 1,
+    observedAt: source.observedAt,
+  });
+}
+
+function parseCapabilityEntry(value: unknown): CapabilityQualificationEntry {
+  const entry = plainRecord(value);
+  exactRecordKeys(entry, [
+    "llm",
+    "runtimeFingerprintSha256",
+    "source",
+    "task",
+  ]);
+  if (
+    typeof entry.llm !== "string" ||
+    (entry.task !== "review" && entry.task !== "delegate") ||
+    typeof entry.runtimeFingerprintSha256 !== "string" ||
+    !SHA256_PATTERN.test(entry.runtimeFingerprintSha256)
+  ) {
+    throw capabilityQualificationError();
+  }
+  const sourceRecord = plainRecord(entry.source);
+  const source =
+    sourceRecord.kind === "batch-case"
+      ? parseBatchSource(entry.source)
+      : parseLegacySource(entry.source);
+  return Object.freeze({
+    llm: entry.llm,
+    task: entry.task,
+    runtimeFingerprintSha256: entry.runtimeFingerprintSha256,
+    source,
+  });
+}
+
+function capabilityEvidenceAnchor(llm: string, task: TaskKind): string {
+  return `${CAPABILITY_INDEX_RELATIVE_PATH}#${llm}-${task}`;
+}
+
+export async function verifyCapabilityIndex(options: {
+  repositoryRoot: string;
+}): Promise<CapabilityIndexVerificationResult> {
+  const indexFile = await readQualificationJson(
+    options.repositoryRoot,
+    CAPABILITY_INDEX_RELATIVE_PATH,
+  );
+  const index = plainRecord(indexFile.value);
+  exactRecordKeys(index, ["entries", "schemaVersion"]);
+  if (index.schemaVersion !== 1 || !Array.isArray(index.entries)) {
+    throw capabilityQualificationError();
+  }
+  const entries = index.entries.map(parseCapabilityEntry);
+  const expectedKeys = supportedLlmIds()
+    .flatMap((llm) => ["delegate", "review"].map((task) => `${llm}/${task}`))
+    .sort((left, right) => left.localeCompare(right, "en"));
+  const actualKeys = entries.map(
+    (entry) => `${entry.llm}/${entry.task}`,
+  );
+  if (
+    entries.length !== expectedKeys.length ||
+    actualKeys.some((key, index) => key !== expectedKeys[index]) ||
+    entries.filter(
+      (entry) => entry.source.kind === "legacy-standalone",
+    ).length !== 1
+  ) {
+    throw capabilityQualificationError();
+  }
+
+  const manifestVerificationCache = new Map<
+    string,
+    Promise<QualificationVerificationResult>
+  >();
+  const verifyBatchManifest = (
+    manifestPath: string,
+  ): Promise<QualificationVerificationResult> => {
+    let pending = manifestVerificationCache.get(manifestPath);
+    if (pending === undefined) {
+      pending = verifyQualification({
+        repositoryRoot: options.repositoryRoot,
+        manifestPath,
+        mode: "immutable-evidence",
+      });
+      manifestVerificationCache.set(manifestPath, pending);
+    }
+    return pending;
+  };
+
+  for (const entry of entries) {
+    const profile = resolveLlm(entry.llm);
+    const gate = profile.qualityGates[entry.task];
+    if (
+      gate.status !== "passed" ||
+      gate.evidence !== capabilityEvidenceAnchor(entry.llm, entry.task)
+    ) {
+      throw capabilityQualificationError();
+    }
+    const currentFingerprint = await computeCapabilityRuntimeFingerprint({
+      repositoryRoot: options.repositoryRoot,
+      llm: entry.llm,
+      task: entry.task,
+    });
+    if (currentFingerprint !== entry.runtimeFingerprintSha256) {
+      throw capabilityQualificationError();
+    }
+    await verifyCapabilityEvidenceSource(
+      {
+        repositoryRoot: options.repositoryRoot,
+        entry,
+        profile,
+      },
+      { verifyBatchManifest },
+    );
+  }
+
+  return Object.freeze({
+    verified: true,
+    indexPath: CAPABILITY_INDEX_RELATIVE_PATH,
+    entryCount: entries.length,
+    legacyEntryCount: 1,
+  });
 }
 
 function normalizedFingerprintProfile(
