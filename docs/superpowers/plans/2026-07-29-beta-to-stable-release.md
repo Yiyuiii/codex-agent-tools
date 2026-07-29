@@ -84,8 +84,11 @@
 执行进度：发布基础设施由 `8f46d81` 提交；beta.0 已完成版本统一、公共 npm
 精确版本验收入口和本地候选矩阵。当前 fresh 结果为 53 files / 889 passed /
 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖审计和
-228-file pack dry-run 均通过。npm 首包、GitHub CI 与独立复审仍是本 Task 的
-未完成门禁。
+228-file pack dry-run 均通过。公开 GitHub 仓库与 `main` / `next` 已建立。
+首轮 GitHub CI 在 Linux 暴露 fake Pi 于 settled 后才写 stderr flood 的夹具
+时序问题；生产代码按完成合同清理进程是正确行为，因此只把 flood 调整到
+settled 前。聚焦测试连续三轮和全量单 worker 回归均通过。修正后的远端 CI、
+npm 首包与独立复审仍是本 Task 的未完成门禁。
 
 ## Task 3：用 `0.1.0-beta.1` 验证 OIDC 并做本地 npm 验收
 

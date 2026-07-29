@@ -470,12 +470,12 @@ function handle(command) {
       };
       emit(endEvent);
       emit({ type: "agent_end", messages: [], willRetry: false });
-      emit({ type: "agent_settled" });
       const stderrBytes = Number.parseInt(
         process.env.FAKE_PI_STDERR_BYTES ?? "0",
         10,
       );
       if (stderrBytes > 0) process.stderr.write("x".repeat(stderrBytes));
+      emit({ type: "agent_settled" });
       process.stderr.write("Authorization: Bearer fake-secret\n");
     }, 5);
     return;
