@@ -4,11 +4,11 @@
 
 最近复核：2026-07-29
 
-分支：`codex/gemini-retirement`
+分支：`next`
 
-包版本：`0.1.0-alpha.1`
+包版本：`0.1.0-beta.0`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`；它的聚合终态不再把其中通过的精确 case 降级。Ark Agent Plan 当时的额度错误属于路线可用性警告，不是 Coding Plan 或整个产品的资格阻碍。第 4 层真实 Codex App 宿主门禁仍未执行；当前是通过离线资格、可以准备逐动作安装权限包的候选，不是已安装、已替代旧工具或已公开发布状态。**
+当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`；它的聚合终态不再把其中通过的精确 case 降级。Ark Agent Plan 当时的额度错误属于路线可用性警告，不是 Coding Plan 或整个产品的资格阻碍。`0.1.0-beta.0` 正在执行公开 beta 发布门禁；第 4 层真实 Codex App 宿主门禁仍未执行，且公开发布不授权安装到活动 Codex、替代旧工具或改写活动配置。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 
@@ -50,7 +50,7 @@ git diff --check
 
 ### 当前证据
 
-任务 5 的 release assurance 24/24、全量 191/191，Task 12 的 44 files / 560 passed、阻断收敛的 44 files / 584 passed、Kimi/package 阶段的 46 files / 759 passed，以及方案 B 阶段的 48 files / 837 passed / 1 skipped，都只描述各自历史候选。当前 fresh 结果为 51 files / 871 passed / 1 skipped / 0 failed；类型检查、构建、能力索引、release smoke 与隔离 `--check-report` 均通过，221-file / 17 Markdown/HTML pack dry-run 没有持久 `.tgz`。
+任务 5 的 release assurance 24/24、全量 191/191，Task 12 的 44 files / 560 passed、阻断收敛的 44 files / 584 passed、Kimi/package 阶段的 46 files / 759 passed，以及方案 B 阶段的 48 files / 837 passed / 1 skipped，都只描述各自历史候选。当前 beta.0 fresh 结果为 53 files / 889 passed / 1 skipped / 0 failed；类型检查、构建、8/8 能力索引与 release smoke 均通过，最终 pack 数字记录在 beta.0 审阅文件中。
 
 首次全量曾暴露 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁和两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49-file 全量已经包含该修复。
 

@@ -8,7 +8,7 @@ describe("package identity", () => {
     expect(SERVER_NAME).toBe("codex_external_agents");
   });
 
-  it("starts from the documented prerelease version", () => {
-    expect(VERSION).toBe("0.1.0-alpha.1");
+  it("uses the current beta release version", () => {
+    expect(VERSION).toBe("0.1.0-beta.0");
   });
 });

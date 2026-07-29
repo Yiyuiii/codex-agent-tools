@@ -1,0 +1,275 @@
+import { spawnSync } from "node:child_process";
+import { describe, expect, it, vi } from "vitest";
+import { resolve } from "node:path";
+
+import {
+  assertDoctorAcceptance,
+  assertInstalledPackageContract,
+  assertNpmRegistryMetadata,
+  establishInstalledMcpSession,
+  npmAcceptanceReportRelativePath,
+  parseNpmPackageAcceptanceArguments,
+  PUBLIC_NPM_REGISTRY,
+  renderNpmPackageAcceptanceReport,
+} from "../../src/acceptance/npm-package.js";
+
+const repositoryUrl =
+  "git+https://github.com/Yiyuiii/codex-agent-tools.git";
+
+function packageManifest(version = "0.1.0-beta.1") {
+  return {
+    name: "codex-agent-tools",
+    version,
+    repository: { type: "git", url: repositoryUrl },
+    homepage: "https://github.com/Yiyuiii/codex-agent-tools#readme",
+    bugs: {
+      url: "https://github.com/Yiyuiii/codex-agent-tools/issues",
+    },
+  };
+}
+
+describe("npm-installed package acceptance contract", () => {
+  it("pins consumer installation to the public npm registry", () => {
+    expect(PUBLIC_NPM_REGISTRY).toBe("https://registry.npmjs.org/");
+  });
+
+  it("fails closed at the entrypoint before registry access without an exact version", () => {
+    const result = spawnSync(
+      process.execPath,
+      [resolve("scripts", "npm-package-acceptance.mjs")],
+      {
+        cwd: resolve("."),
+        encoding: "utf8",
+        windowsHide: true,
+      },
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(`${result.stdout}\n${result.stderr}`).toMatch(
+      /Invalid npm package acceptance arguments/iu,
+    );
+  });
+
+  it("accepts one exact semver version and rejects ambiguous arguments", () => {
+    expect(
+      parseNpmPackageAcceptanceArguments(["--version", "0.1.0-beta.1"]),
+    ).toEqual({ version: "0.1.0-beta.1" });
+    expect(
+      parseNpmPackageAcceptanceArguments(["--version=0.1.0"]),
+    ).toEqual({ version: "0.1.0" });
+
+    for (const args of [
+      [],
+      ["0.1.0-beta.1"],
+      ["--version", "latest"],
+      ["--version", "0.1.0", "--version", "0.1.1"],
+      ["--version", "0.1.0", "--registry", "https://example.invalid"],
+    ]) {
+      expect(() => parseNpmPackageAcceptanceArguments(args)).toThrow(
+        /acceptance arguments/iu,
+      );
+    }
+  });
+
+  it("derives a safe repository-relative evidence path", () => {
+    expect(npmAcceptanceReportRelativePath("0.1.0-beta.1")).toBe(
+      "docs/release/0.1.0-beta.1-npm-acceptance.md",
+    );
+    expect(() => npmAcceptanceReportRelativePath("../outside")).toThrow(
+      /acceptance arguments/iu,
+    );
+  });
+
+  it("requires the exact public registry identity and immutable dist metadata", () => {
+    expect(
+      assertNpmRegistryMetadata(
+        {
+          version: "0.1.0-beta.1",
+          "dist.integrity": "sha512-ZmFrZS1pbnRlZ3JpdHk=",
+          "dist.shasum": "0123456789abcdef0123456789abcdef01234567",
+          "repository.url": repositoryUrl,
+        },
+        "0.1.0-beta.1",
+      ),
+    ).toEqual({
+      integrity: "sha512-ZmFrZS1pbnRlZ3JpdHk=",
+      shasum: "0123456789abcdef0123456789abcdef01234567",
+    });
+
+    for (const drift of [
+      { version: "0.1.0-beta.2" },
+      { "repository.url": "git+https://github.com/other/repo.git" },
+      { "dist.integrity": "sha1-weak" },
+      { "dist.shasum": "not-a-sha1" },
+    ]) {
+      expect(() =>
+        assertNpmRegistryMetadata(
+          {
+            version: "0.1.0-beta.1",
+            "dist.integrity": "sha512-ZmFrZS1pbnRlZ3JpdHk=",
+            "dist.shasum":
+              "0123456789abcdef0123456789abcdef01234567",
+            "repository.url": repositoryUrl,
+            ...drift,
+          },
+          "0.1.0-beta.1",
+        ),
+      ).toThrow(/registry metadata/iu);
+    }
+  });
+
+  it("binds installed package, runtime, and plugin to the requested version", () => {
+    expect(() =>
+      assertInstalledPackageContract({
+        packageManifest: packageManifest(),
+        pluginManifest: {
+          name: "codex-external-agents",
+          version: "0.1.0-beta.1",
+        },
+        runtimeVersion: "0.1.0-beta.1",
+        expectedVersion: "0.1.0-beta.1",
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      assertInstalledPackageContract({
+        packageManifest: packageManifest(),
+        pluginManifest: {
+          name: "codex-external-agents",
+          version: "0.1.0-beta.0",
+        },
+        runtimeVersion: "0.1.0-beta.1",
+        expectedVersion: "0.1.0-beta.1",
+      }),
+    ).toThrow(/installed package contract/iu);
+  });
+
+  it("accepts only an all-green doctor report with the four qualified llms", () => {
+    const checks = [
+      { name: "Kimi executable", ok: true, level: "ok", detail: "fake" },
+      { name: "Kimi version", ok: true, level: "ok", detail: "fixture" },
+      {
+        name: "Kimi authentication",
+        ok: true,
+        level: "ok",
+        detail: "fixture",
+      },
+      { name: "Pi executable", ok: true, level: "ok", detail: "fake" },
+      { name: "Pi version", ok: true, level: "ok", detail: "fixture" },
+      {
+        name: "Pi isolated config",
+        ok: true,
+        level: "ok",
+        detail: "temp",
+      },
+      { name: "Ark Pi models", ok: true, level: "ok", detail: "models=3" },
+      {
+        name: "Ark Coding authentication",
+        ok: true,
+        level: "ok",
+        detail: "fixture",
+      },
+      {
+        name: "Ark Agent authentication",
+        ok: true,
+        level: "ok",
+        detail: "fixture",
+      },
+      {
+        name: "Public MCP tools",
+        ok: true,
+        level: "ok",
+        detail: "external_review, external_delegate",
+      },
+      ...[
+        "ark-agent-deepseek-v4-flash",
+        "ark-agent-plan",
+        "ark-coding-plan",
+        "kimi-k3",
+      ].map((llm) => ({
+        name: `LLM ${llm}`,
+        ok: true,
+        level: "ok",
+        detail: "route=direct; review=passed; delegate=passed",
+      })),
+    ];
+
+    expect(() =>
+      assertDoctorAcceptance({ ok: true, checks }),
+    ).not.toThrow();
+    expect(() =>
+      assertDoctorAcceptance({
+        ok: true,
+        checks: checks.filter(({ name }) => name !== "LLM kimi-k3"),
+      }),
+    ).toThrow(/doctor acceptance/iu);
+    expect(() =>
+      assertDoctorAcceptance({
+        ok: false,
+        checks: checks.map((check) =>
+          check.name === "Ark Pi models"
+            ? { ...check, ok: false, level: "error" }
+            : check,
+        ),
+      }),
+    ).toThrow(/doctor acceptance/iu);
+  });
+
+  it("cleans up an owned MCP transport when connect or tool validation fails", async () => {
+    const transport = { id: "owned" };
+    const cleanup = vi.fn(async () => undefined);
+    const connectFailure = new Error("connect failed");
+
+    await expect(
+      establishInstalledMcpSession({
+        client: {
+          connect: vi.fn(async () => {
+            throw connectFailure;
+          }),
+          listTools: vi.fn(),
+        },
+        transport,
+        cleanup,
+      }),
+    ).rejects.toBe(connectFailure);
+    expect(cleanup).toHaveBeenCalledOnce();
+
+    cleanup.mockClear();
+    await expect(
+      establishInstalledMcpSession({
+        client: {
+          connect: vi.fn(async () => undefined),
+          listTools: vi.fn(async () => ({ tools: [] })),
+        },
+        transport,
+        cleanup,
+      }),
+    ).rejects.toThrow(/Unexpected MCP tools/iu);
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it("renders a redacted, machine-readable beta acceptance record", () => {
+    const report = renderNpmPackageAcceptanceReport({
+      version: "0.1.0-beta.1",
+      observedAt: "2026-07-29T11:00:00.000Z",
+      integrity: "sha512-ZmFrZS1pbnRlZ3JpdHk=",
+      shasum: "0123456789abcdef0123456789abcdef01234567",
+      nodeVersion: "v24.14.1",
+      npmVersion: "11.11.0",
+    });
+
+    for (const marker of [
+      "Doctor: pass",
+      "Local-Npm-Smoke: pass",
+      "MCP-Smoke: pass",
+      "Plugin-Isolated: pass",
+      "Capability-Index: pass",
+      "Kimi ACP / Pi RPC / real-smoke：`0 / 0 / 0`",
+      "真实模型调用：`0`",
+    ]) {
+      expect(report).toContain(marker);
+    }
+    expect(report).not.toContain("C:\\");
+    expect(report).not.toContain("CODEX_HOME=");
+  });
+});

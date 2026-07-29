@@ -1,6 +1,6 @@
 {
   "name": "codex-agent-tools",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-beta.0",
   "description": "Codex-facing external LLM review and delegation tools",
   "type": "module",
   "license": "MIT",
@@ -57,6 +57,7 @@
     "smoke:kimi": "npm run build && node scripts/real-kimi-smoke.mjs",
     "smoke:ark": "npm run build && node scripts/real-ark-smoke.mjs",
     "acceptance:local": "npm run build && node scripts/local-acceptance.mjs",
+    "acceptance:npm-package": "npm run build && node scripts/npm-package-acceptance.mjs",
     "acceptance:plugin:isolated": "npm run build && node scripts/plugin-isolated-acceptance.mjs",
     "qualify:gates": "tsx scripts/gate-requalification.ts",
     "verify:qualification": "tsx scripts/verify-qualification.ts",

@@ -1,0 +1,277 @@
+import { assertReleasePackageMetadata } from "../release/assurance.js";
+import {
+  assertLocalToolContract,
+  type LocalToolContract,
+} from "./local.js";
+export { classifyAgentProcesses } from "../runtime/agent-processes.js";
+
+const PUBLIC_REPOSITORY_URL =
+  "git+https://github.com/Yiyuiii/codex-agent-tools.git";
+export const PUBLIC_NPM_REGISTRY = "https://registry.npmjs.org/";
+const VERSION_PATTERN =
+  /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/u;
+const EXPECTED_DOCTOR_CHECKS = Object.freeze([
+  "Kimi executable",
+  "Kimi version",
+  "Kimi authentication",
+  "Pi executable",
+  "Pi version",
+  "Pi isolated config",
+  "Ark Pi models",
+  "Ark Coding authentication",
+  "Ark Agent authentication",
+  "Public MCP tools",
+  "LLM ark-agent-deepseek-v4-flash",
+  "LLM ark-agent-plan",
+  "LLM ark-coding-plan",
+  "LLM kimi-k3",
+] as const);
+const EXPECTED_LLMS = Object.freeze([
+  "ark-agent-deepseek-v4-flash",
+  "ark-agent-plan",
+  "ark-coding-plan",
+  "kimi-k3",
+] as const);
+
+export interface NpmPackageAcceptanceArguments {
+  readonly version: string;
+}
+
+export interface RegistryPackageMetadata {
+  readonly integrity: string;
+  readonly shasum: string;
+}
+
+export interface InstalledPackageContractOptions {
+  readonly packageManifest: unknown;
+  readonly pluginManifest: unknown;
+  readonly runtimeVersion: unknown;
+  readonly expectedVersion: string;
+}
+
+export interface NpmPackageAcceptanceReportOptions
+  extends RegistryPackageMetadata {
+  readonly version: string;
+  readonly observedAt: string;
+  readonly nodeVersion: string;
+  readonly npmVersion: string;
+}
+
+export interface InstalledMcpClient {
+  connect(transport: unknown): Promise<void>;
+  listTools(): Promise<{ tools: readonly LocalToolContract[] }>;
+}
+
+export interface InstalledMcpSession<TClient, TTransport> {
+  readonly client: TClient;
+  readonly transport: TTransport;
+}
+
+function acceptanceArgumentError(): Error {
+  return new Error("Invalid npm package acceptance arguments");
+}
+
+function recordOf(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Invalid npm package acceptance record");
+  }
+  return value as Record<string, unknown>;
+}
+
+function parseVersion(value: unknown): string {
+  if (typeof value !== "string" || !VERSION_PATTERN.test(value)) {
+    throw acceptanceArgumentError();
+  }
+  return value;
+}
+
+export function parseNpmPackageAcceptanceArguments(
+  args: readonly string[],
+): NpmPackageAcceptanceArguments {
+  let version: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    let candidate: string | undefined;
+    if (argument === "--version") {
+      candidate = args[index + 1];
+      index += 1;
+    } else if (argument?.startsWith("--version=")) {
+      candidate = argument.slice("--version=".length);
+    } else {
+      throw acceptanceArgumentError();
+    }
+    if (version !== undefined || candidate === undefined) {
+      throw acceptanceArgumentError();
+    }
+    version = parseVersion(candidate);
+  }
+  if (version === undefined) throw acceptanceArgumentError();
+  return Object.freeze({ version });
+}
+
+export function npmAcceptanceReportRelativePath(version: string): string {
+  return `docs/release/${parseVersion(version)}-npm-acceptance.md`;
+}
+
+export function assertNpmRegistryMetadata(
+  value: unknown,
+  expectedVersion: string,
+): RegistryPackageMetadata {
+  const version = parseVersion(expectedVersion);
+  const record = recordOf(value);
+  const integrity = record["dist.integrity"];
+  const shasum = record["dist.shasum"];
+  if (
+    record.version !== version ||
+    record["repository.url"] !== PUBLIC_REPOSITORY_URL ||
+    typeof integrity !== "string" ||
+    !/^sha512-[A-Za-z0-9+/]+={0,2}$/u.test(integrity) ||
+    typeof shasum !== "string" ||
+    !/^[0-9a-f]{40}$/u.test(shasum)
+  ) {
+    throw new Error("Public npm registry metadata is invalid");
+  }
+  return Object.freeze({ integrity, shasum });
+}
+
+export function assertInstalledPackageContract(
+  options: InstalledPackageContractOptions,
+): void {
+  const expectedVersion = parseVersion(options.expectedVersion);
+  try {
+    assertReleasePackageMetadata({
+      packageManifest: options.packageManifest,
+      pluginManifest: options.pluginManifest,
+      runtimeVersion: options.runtimeVersion,
+    });
+    if (recordOf(options.packageManifest).version !== expectedVersion) {
+      throw new Error("version mismatch");
+    }
+  } catch {
+    throw new Error("Installed package contract is invalid");
+  }
+}
+
+export function assertDoctorAcceptance(value: unknown): void {
+  try {
+    const report = recordOf(value);
+    if (report.ok !== true || !Array.isArray(report.checks)) {
+      throw new Error("doctor failed");
+    }
+    const checks = report.checks.map((value) => recordOf(value));
+    const names = checks.map(({ name }) => name);
+    if (
+      names.length !== EXPECTED_DOCTOR_CHECKS.length ||
+      new Set(names).size !== names.length ||
+      JSON.stringify([...names].sort()) !==
+        JSON.stringify([...EXPECTED_DOCTOR_CHECKS].sort())
+    ) {
+      throw new Error("doctor check set drifted");
+    }
+    for (const check of checks) {
+      if (
+        check.ok !== true ||
+        check.level !== "ok" ||
+        typeof check.detail !== "string"
+      ) {
+        throw new Error("doctor check failed");
+      }
+    }
+    const publicTools = checks.find(
+      ({ name }) => name === "Public MCP tools",
+    );
+    if (publicTools?.detail !== "external_review, external_delegate") {
+      throw new Error("public tool surface drifted");
+    }
+    for (const llm of EXPECTED_LLMS) {
+      const check = checks.find(({ name }) => name === `LLM ${llm}`);
+      if (
+        typeof check?.detail !== "string" ||
+        !/route=direct; review=passed; delegate=passed$/u.test(check.detail)
+      ) {
+        throw new Error("qualified llm surface drifted");
+      }
+    }
+  } catch {
+    throw new Error("Installed doctor acceptance is invalid");
+  }
+}
+
+export async function establishInstalledMcpSession<
+  TClient extends InstalledMcpClient,
+  TTransport,
+>(options: {
+  readonly client: TClient;
+  readonly transport: TTransport;
+  readonly cleanup: (
+    client: TClient,
+    transport: TTransport,
+  ) => Promise<void>;
+}): Promise<InstalledMcpSession<TClient, TTransport>> {
+  try {
+    await options.client.connect(options.transport);
+    const listed = await options.client.listTools();
+    assertLocalToolContract(listed.tools);
+    return Object.freeze({
+      client: options.client,
+      transport: options.transport,
+    });
+  } catch (error) {
+    await options.cleanup(options.client, options.transport).catch(
+      () => undefined,
+    );
+    throw error;
+  }
+}
+
+export function renderNpmPackageAcceptanceReport(
+  options: NpmPackageAcceptanceReportOptions,
+): string {
+  const version = parseVersion(options.version);
+  const registry = assertNpmRegistryMetadata(
+    {
+      version,
+      "dist.integrity": options.integrity,
+      "dist.shasum": options.shasum,
+      "repository.url": PUBLIC_REPOSITORY_URL,
+    },
+    version,
+  );
+  if (
+    new Date(options.observedAt).toISOString() !== options.observedAt ||
+    !/^v[0-9]+\.[0-9]+\.[0-9]+/u.test(options.nodeVersion) ||
+    !/^[0-9]+\.[0-9]+\.[0-9]+/u.test(options.npmVersion)
+  ) {
+    throw new Error("Invalid npm package acceptance report metadata");
+  }
+
+  return `# codex-agent-tools ${version} 公共 npm 隔离验收
+
+## 制品身份
+
+- 验收时间：\`${options.observedAt}\`
+- 公共包：\`codex-agent-tools@${version}\`
+- npm integrity：\`${registry.integrity}\`
+- npm shasum：\`${registry.shasum}\`
+- Node.js：\`${options.nodeVersion}\`
+- npm：\`${options.npmVersion}\`
+
+## 机器门禁
+
+Doctor: pass
+Local-Npm-Smoke: pass
+MCP-Smoke: pass
+Plugin-Isolated: pass
+Capability-Index: pass
+
+## 验收边界
+
+- 包从公共 npm registry 按精确版本安装到一次性临时目录，安装时禁用 lifecycle scripts。
+- CLI version/help 与使用伪 Kimi/Pi 的 doctor 全绿；doctor 的 Pi 配置只写入临时应用数据目录。
+- 已安装包的 stdio MCP 与官方插件缓存副本都只暴露 \`external_review\`、\`external_delegate\`，且 \`llm\` 必填和读写注解正确。
+- 官方插件只在一次性临时 Codex home 中完成 marketplace add、plugin add/list、缓存副本 MCP 启动、plugin remove 与 marketplace remove；活动 Codex home 未读取或修改。
+- Kimi ACP / Pi RPC / real-smoke：\`0 / 0 / 0\`。
+- 资格锁：\`absent\`。
+- 真实模型调用：\`0\`。
+`;
+}

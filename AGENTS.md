@@ -94,6 +94,7 @@
 - 2026-07-28（历史，阻碍结论已被 2026-07-29 资格策略更新取代）：standing authorization 首批已在 frozen SHA `0113da97a6b1fef35cc4c45025caa9e36a002176` 上运行并由提交 `6b4217d` 保存 20 个不可变证据文件。批次以 `account_quota_exceeded` 在 ordinal 6 首错停止；ordinal 1–5 均 passed，ordinal 1 与 6 的规定命令都真实 success，所有已执行项均为 `1 / 0 / 0 / false / false`，immutable-evidence verifier、进程 0/0/0 与锁 absent 均通过。当时把额度恢复视为下一次整批重跑的人工前置；当前只把它视为 Agent Plan 路线可用性，不再要求全量重跑。活动插件/config、Claude Code、`codex_cc_tools`、发布、推送、合并与 fast-forward 均未操作。
 
 - 2026-07-29：正式发布准备已获授权并在 `next` 推进。首轮 release smoke 发现能力指纹错误包含整个 `package-lock.json`，会因无关 MCP SDK/Hono 或 package 版本变化误撤销八项资格；现按 TDD 收窄为 Pi/direct 的 `execa + zod` 依赖闭包与 Kimi/ACP 额外的 `@agentclientprotocol/sdk` 闭包，缺失版本、完整性摘要或必需传递依赖均 fail closed。MCP SDK/Hono 由 MCP 集成、供应链、打包和 npm 安装门禁承担；历史 evidence/manifest 未改写，也未调用真实模型。
+- 2026-07-29：beta.0 本地候选已完成。版本统一为 `0.1.0-beta.0`；新增公共 npm 精确版本验收入口，强制官方 registry、禁 lifecycle scripts、用伪 Kimi/Pi 在临时应用目录运行 doctor，从已安装 package 和官方插件缓存副本分别验证 MCP，并只在临时 `CODEX_HOME` 做 add/list/remove，结束时要求目标进程 0/0/0 与资格锁 absent；连接或工具合同失败时 helper 会立即清理自有 MCP transport。fresh 本地矩阵为 53 files / 889 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖 0 vulnerabilities、228 files / 17 Markdown/HTML / 4 plugin files pack dry-run 均通过；没有运行真实模型或触碰活动配置/插件。GitHub CI、独立复审与 npm 首包尚未完成，不能把 beta.0 写成已发布。
 
 ## 架构与计划索引
 

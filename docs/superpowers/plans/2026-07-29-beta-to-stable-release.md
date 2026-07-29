@@ -81,6 +81,12 @@
 
 7. 推送 `v0.1.0-beta.0`；workflow 对已存在版本只做幂等验证并创建 prerelease，不重复发布。
 
+执行进度：发布基础设施由 `8f46d81` 提交；beta.0 已完成版本统一、公共 npm
+精确版本验收入口和本地候选矩阵。当前 fresh 结果为 53 files / 889 passed /
+1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖审计和
+228-file pack dry-run 均通过。npm 首包、GitHub CI 与独立复审仍是本 Task 的
+未完成门禁。
+
 ## Task 3：用 `0.1.0-beta.1` 验证 OIDC 并做本地 npm 验收
 
 **文件**

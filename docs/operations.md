@@ -8,7 +8,7 @@ ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、model�
 
 离线调查确认 Pi Windows 子进程环境遗漏 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 修复后，真实 resolver 与精确 Node spawn 探针离线成功，代理和凭据边界保持不变。资格合同提交 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 要求未来资格 Pi delegate 的精确写入与精确 `git status --short` 生命周期各恰好一次且均为 success，并由未来整批 passed verifier 重算；历史 blocked/interrupted 继续兼容。schema/plan、公开 MCP、provider/model/route/credential、提示词、结果 validator、retry/fallback 均未改变；独立质量复审为 PASS、无 P0–P3。
 
-48 个测试文件、837 passed / 1 skipped / 0 failed 与 171 files / 15 Markdown/HTML / 3 plugin files 是旧候选历史数字。当前 fresh 矩阵已经通过：51 个测试文件、871 passed / 1 skipped / 0 failed，类型检查、构建、能力索引、release smoke 与隔离官方插件 `--check-report` 均通过；npm pack dry-run 为 221 files / 17 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。
+48 个测试文件、837 passed / 1 skipped / 0 failed 与 171 files / 15 Markdown/HTML / 3 plugin files 是旧候选历史数字。当前 beta.0 fresh 矩阵已经通过：53 个测试文件、889 passed / 1 skipped / 0 failed，类型检查、构建、8/8 能力索引与 release smoke 均通过；最终 pack 数字以对应 beta 审阅记录为准，且不得保留 `.tgz`。
 
 全量测试曾暴露 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察；提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试，独立复审 PASS、无 P0–P3，最终全量已经包含。状态文档提交与最终 clean frozen SHA 仍由主线程完成。
 
@@ -58,7 +58,23 @@ npm run acceptance:plugin:isolated
 
 任一项失败即停止，不准备真实安装。
 
-## 5. 准备真实安装权限包
+## 5. 验收公共 npm 精确版本
+
+只有版本已存在于公共 npm registry 后才运行：
+
+```powershell
+npm run acceptance:npm-package -- --version 0.1.0-beta.1
+```
+
+脚本把 registry 固定为 `https://registry.npmjs.org/`，按精确版本安装到一次性
+临时目录且禁用 lifecycle scripts。随后用伪 Kimi/Pi 检查 CLI/doctor，从已
+安装 package 与官方插件缓存副本分别启动 stdio MCP，并在临时 `CODEX_HOME`
+中完成 marketplace/plugin add/list/remove。它不调用真实模型，不继承活动
+插件状态，不读取或修改活动 Codex home；结束前还要求 Kimi ACP、Pi RPC、
+real-smoke 进程为 0 且资格锁不存在。成功后生成对应版本的
+`docs/release/<version>-npm-acceptance.md`，供稳定版发布证据引用。
+
+## 6. 准备真实安装权限包
 
 只有以下条件同时成立，才能准备可供授权的 ready 权限包：
 
@@ -81,7 +97,7 @@ npm run acceptance:plugin:isolated
 
 权限包必须先交给用户审阅。过去关于采用官方插件机制的同意不能推定为本次 add/remove 的许可。
 
-## 6. 仅在明确许可后执行真实安装
+## 7. 仅在明确许可后执行真实安装
 
 只有收到针对本次真实安装的明确许可后，才可在本仓库根目录逐条执行：
 
@@ -95,7 +111,7 @@ if ($LASTEXITCODE -ne 0) { throw "Codex plugin add 失败，停止安装。" }
 
 执行后必须使用官方列表和真实 Codex App 完成工具发现、代表性调用、取消与进程清理门禁。不得直接打开、比较或修改活动 `config.toml`。命令结果若与权限包或隔离证据不一致，立即停止，不追加自定义配置修复。
 
-## 7. 失败时使用官方回滚
+## 8. 失败时使用官方回滚
 
 本次权限包必须明确包含失败回滚授权。宿主门禁失败时只执行：
 
