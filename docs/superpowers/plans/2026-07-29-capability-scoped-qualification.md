@@ -192,18 +192,20 @@ npm run smoke:release
 - 完整确定性矩阵与独立审阅通过；
 - 活动配置、活动插件、Claude Code、旧工具、发布与远端 Git 状态均未改变。
 
-## 中断恢复状态（2026-07-29）
+## 完成状态（2026-07-29）
 
-已恢复并重新验证：
+本计划已完成：
 
-- 行为实现已由 `79e70c8`、`78a276f`、`d9d0179`、`27b3b85` 分四步提交；
-- 51 个测试文件独占运行通过，871 passed / 1 个平台条件 skipped；
-- 类型检查、build、8/8 能力索引、release smoke 与 `git diff --check` 通过；
-- 7 份 retained manifest 全部通过 `immutable-evidence` verifier，历史 blocked/interrupted 状态未改写；
-- 隔离官方插件 `--check-report` 通过；
+- 行为实现由 `79e70c8`、`78a276f`、`d9d0179`、`27b3b85` 分四步提交，状态与文档收尾由 `f3f6a94` 保存；
+- 独立 Ark Coding Plan 实现复审没有发现 P0/P1，命中了 release smoke 未把索引引用的每一份 manifest/evidence 与真实 npm pack 文件集合闭合的问题；
+- 该问题按 TDD 修复为 `7ffcdc9`：release smoke 先验证能力索引，再从索引安全提取 batch 与受限 legacy 来源，并要求索引及全部来源实际进入 `npm pack --dry-run --json` 返回的规范化文件集合；
+- 修复后 Ark 聚焦复审确认核心逻辑成立；其两个 P3 建议已分别通过参数改名和“索引本身缺失”回归用例闭合；
+- 没有采纳把 evidence-source helper 强行耦合 registry gate、为 legacy schema 再加解释字段、或把纯文档变化测试成指纹输入的建议，因为这些会混淆现有职责边界或与既有覆盖重复；
+- 没有引入临时 tar 字节复读：当前发布门禁的边界是同一冻结工作树上的能力验证与 npm dry-run 文件集合闭包，不把并发恶意改写作为来源鉴真边界；若未来发布威胁模型扩展到包字节级鉴真，应单独设计真实 tar/hash 协议；
+- Kimi 质量复审重试在约 601 秒后超时、无结论且无文件改动，不计 PASS；Anthropic 备选因本机 OAuth 过期立即失败，也不计 PASS。可核验的独立通过证据来自 Ark 两轮复审，最终裁决由 Codex 逐条复核；
+- 最终全量测试采用单 worker 运行，51 个文件、873 passed / 1 个平台条件 skipped / 0 failed；默认文件并行曾使两个临时文件系统用例命中 30 秒超时，但目标文件单独 94/94 通过，其中两项分别为 2.03 秒和 2.67 秒，因此没有修改生产代码或放宽测试超时；
+- 类型检查、build、8/8 能力索引、release smoke、7/7 retained manifest immutable verifier、隔离官方插件 `--check-report`、`git diff --check` 均通过；
 - Kimi ACP / Pi RPC / real-smoke 目标进程为 0/0/0，资格锁不存在，没有持久 `.tgz`；
-- 没有调用产品真实模型，没有读取或修改活动配置，也没有安装、发布、推送、合并或 fast-forward。
+- 没有运行任何产品资格 smoke，没有读取或修改活动配置，也没有安装、发布、推送、合并或 fast-forward。
 
-恢复时第一次把全量测试与能力 verifier、类型检查并行，导致一个 manifest 文件系统用例命中 30 秒超时；该用例单独复跑耗时 1.73 秒且通过，全量测试独占复跑全绿。该结果按资源竞争处理，没有修改生产代码或放宽测试超时。
-
-尚未闭合：设计阶段外审已有记录，但能力级实现完成后的独立规格/质量复审没有可核验证据。本轮恢复遵守“不调用任何真实模型”，因此不补跑外部模型审阅。完成该复审并重新执行受影响的确定性门禁后，才能把 Task 6 和本计划标为全部完成。
+下一授权节点是维护者决定是否把隔离分支 fast-forward 到正式工作树；本计划本身不授权该动作。
