@@ -22,7 +22,7 @@
 
 ### plugin add
 
-- 新增：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.0/.codex-plugin/plugin.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.0/.mcp.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.0/runtime/codex-external-agents-mcp.mjs`
+- 新增：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/.codex-plugin/plugin.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/.mcp.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/runtime/codex-external-agents-mcp.mjs`
 - 变化：`config.toml`
 - 删除：无
 
@@ -36,7 +36,7 @@
 
 - 新增：无
 - 变化：`config.toml`
-- 删除：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.0/.codex-plugin/plugin.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.0/.mcp.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.0/runtime/codex-external-agents-mcp.mjs`
+- 删除：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/.codex-plugin/plugin.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/.mcp.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/runtime/codex-external-agents-mcp.mjs`
 
 ### plugin list after remove
 
@@ -72,7 +72,7 @@
 ## 已安装副本验收
 
 - 官方安装器接受仓库插件中的直接 server-map `.mcp.json`。
-- 官方缓存相对位置：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.0`。
+- 官方缓存相对位置：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1`。
 - 已安装副本声明并强制校验 `cwd: "."`；宿主将其解析到上述缓存目录后，MCP initialize/listTools 成功。
 - 工具严格为 `external_review` 与 `external_delegate`；二者输入均要求 `llm`。
 - `external_review` 为只读且非破坏性；`external_delegate` 为可写且具破坏性提示。

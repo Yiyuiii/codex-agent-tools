@@ -4,11 +4,11 @@
 
 最近复核：2026-07-30
 
-目标发布分支：`next`；当前预备分支：`codex/plugin-cwd-0.1.1-beta.0`
+目标发布分支：`next`；当前证据分支：`codex/beta-0.1.1-host-evidence`
 
-包版本：`0.1.1-beta.0`
+包版本：`0.1.1-beta.1`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`；`0.1.1-beta.0` 是尚未发布的宿主启动修复候选。完整重启后的新任务仍未加载 0.1.0 插件工具；诊断发现其相对 runtime 入口缺少 `cwd`，CLI 显示 `cwd: -`，而官方本地 stdio 插件用 `cwd: "."` 解析到版本化缓存根目录。修复候选已补齐该声明，并让 artifact、release smoke、隔离插件与公共 npm 验收全部 fail closed 地验证 manifest 工作目录；本地 53 files / 891 passed / 1 skipped / 0 failed、类型检查、8/8 能力索引、release smoke、生产依赖审计和隔离官方插件生命周期已通过。第 4 层仍等待 beta 发布、官方升级和 App 刷新后的真实调用，保持 partial。**
+当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`，`0.1.1-beta.0` 仍是当前 npm `next`。真正的宿主进程重启已证明 beta.0 能发现新旧四项工具共存，且真实 Kimi review 通过；Ark Coding review 因插件 manifest 未声明父环境变量白名单而在启动 Pi 前失败。`0.1.1-beta.1` 候选已按 TDD 增加四项精确 `env_vars`，不保存凭据值；本地 53 files / 891 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖 0 vulnerabilities、228 文件 dry-run 包、隔离官方插件生命周期及 `--check-report` 已通过。第 4 层等待 beta.1 完成发布、公共 npm 验收、官方升级与再次完整宿主重启后的 Pi review、隔离 delegate 和取消门禁，保持 partial。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 
@@ -21,7 +21,7 @@
 | 1    | 确定性单测、类型检查、构建、release smoke | passed                                                                      | typecheck、测试、build、能力索引验证、release smoke 与隔离 `--check-report`                                                                                                                                                |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
 | 3    | 四个逻辑 LLM 的八项真实模型门禁           | passed：8 capabilities / 0 stale                                            | [能力资格索引](../smoke/evidence/capabilities.json)、[Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)                                                                                                                      |
-| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：0.1.0 重启后仍失败；0.1.1-beta.0 修复候选等待发布、升级和刷新后复验 | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                            |
+| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta 已发布并升级；窗口重启未结束后台宿主，等待完整进程重启后真实调用 | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                         |
 
 ## 第 1 层：确定性单测与构建
 
@@ -164,7 +164,7 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 ### 前置权限
 
-2026-07-30 已取得针对本次 add 与失败 remove 的明确许可，并成功完成官方 marketplace/plugin add；项目代码没有直接读取或写入活动 `~/.codex/config.toml`，也没有执行回滚。后续授权已允许用官方命令移除同名开发期 `codex_external_agents` MCP、创建新任务并运行真实门禁。开发注册移除成功，CLI 随即显示插件相对入口且旧 `codex_cc_tools` 保持 enabled；但新任务未发现插件工具，因此在真实模型、临时目录和取消测试前首错停止。当前人工节点是刷新或重启 App，而不是重试调用、恢复直连或手工修改配置。
+2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。维护者后来真正终止旧宿主进程并重开，新任务发现新旧四项工具共存；真实 Kimi review 通过，Ark Coding review 因 MCP 没有收到父 App 已存在的 Coding Plan 凭据而在启动 Pi 前失败。根因是 `.mcp.json` 缺少官方 stdio MCP `env_vars` 白名单。0.1.1-beta.1 候选已增加精确四项变量名并禁止静态 `env`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。当前自动节点是完成 beta.1 离线门禁、PR/CI、OIDC 发布、公共 npm 验收和官方升级；下一人工节点是升级后完整重启宿主。
 
 ### 通过标准
 
@@ -181,10 +181,11 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 ### 失败停止条件
 
-官方命令输出、工具发现、代表性调用、取消或进程清理任一异常时立即停止，且只使用权限包内的官方 remove 命令回滚。不得手工恢复、编辑或修补活动 `config.toml`。若官方回滚也异常，停止并报告，不执行旧工具移除或发布。
+官方命令输出、工具发现、代表性调用、取消或进程清理任一异常时立即停止。只有安装或缓存本身失败时才使用权限包内的官方 remove 命令回滚；单纯的 App 工具清单未刷新先保留已验证安装并要求完整重启。不得手工恢复、编辑或修补活动 `config.toml`。若官方回滚也异常，停止并报告，不执行旧工具移除或稳定发布。
 
 ## 替代与发布边界
 
 - 第四层通过只表示新插件具备替代条件，不会自动移除旧 `codex_cc_tools`。
 - 旧工具移除是后续独立变更，需要新的影响评估、验证、回滚方案与明确授权。
-- 本轮不调用或修改 Claude Code，不执行 `npm publish`，不发布公共 marketplace。
+- 本轮不调用或修改 Claude Code；beta 只通过 GitHub Actions OIDC 发布到 npm
+  `next`，没有本地手工 `npm publish`，也不发布公共 marketplace。

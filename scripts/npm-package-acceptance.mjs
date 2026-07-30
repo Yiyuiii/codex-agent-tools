@@ -67,6 +67,32 @@ const plugin = "codex-external-agents";
 const selector = `${plugin}@${marketplace}`;
 const repositoryUrl =
   "git+https://github.com/Yiyuiii/codex-agent-tools.git";
+const expectedPluginEnvironmentVariables = [
+  "ARK_API_KEY",
+  "VOLCENGINE_API_KEY",
+  "API_KEY_DOUBAO_CODING",
+  "OPENAI_API_KEY_DOUBAO",
+];
+const mcpBaseEnvironmentVariables = new Set([
+  "PATH",
+  "Path",
+  "PATHEXT",
+  "SystemRoot",
+  "SYSTEMROOT",
+  "SystemDrive",
+  "ComSpec",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "HOME",
+  "USERPROFILE",
+  "LOCALAPPDATA",
+  "APPDATA",
+  "CODEX_HOME",
+  "ProgramData",
+  "ProgramFiles",
+  "ProgramFiles(x86)",
+]);
 let directClient;
 let directTransport;
 let cachedClient;
@@ -99,6 +125,15 @@ function isAbsoluteOnAnyPlatform(value) {
     path.isAbsolute(value) ||
     path.win32.isAbsolute(value) ||
     path.posix.isAbsolute(value)
+  );
+}
+
+function manifestForwardedMcpEnvironment(environment, envVars) {
+  const allowed = new Set([...mcpBaseEnvironmentVariables, ...envVars]);
+  return Object.fromEntries(
+    Object.entries(environment).filter(
+      ([name, value]) => allowed.has(name) && typeof value === "string",
+    ),
   );
 }
 
@@ -238,7 +273,13 @@ async function assertNoAgentProcesses() {
   }
 }
 
-async function listInstalledMcpTools(command, args, cwd, environment) {
+async function listInstalledMcpTools(
+  command,
+  args,
+  cwd,
+  environment,
+  envVars = [],
+) {
   const client = new Client({
     name: "codex-agent-tools-npm-acceptance",
     version: "1.0.0",
@@ -247,7 +288,7 @@ async function listInstalledMcpTools(command, args, cwd, environment) {
     command,
     args,
     cwd,
-    env: environment,
+    env: manifestForwardedMcpEnvironment(environment, envVars),
     stderr: "pipe",
   });
   return establishInstalledMcpSession({
@@ -301,10 +342,20 @@ async function installedPluginServer(installedPluginRoot) {
       "Installed plugin MCP cwd must resolve relative launch paths from the plugin root",
     );
   }
+  if (
+    JSON.stringify(server.env_vars) !==
+      JSON.stringify(expectedPluginEnvironmentVariables) ||
+    Object.hasOwn(server, "env")
+  ) {
+    throw new Error(
+      "Installed plugin MCP credential environment contract is invalid",
+    );
+  }
   return {
     command: server.command,
     args: [...server.args],
     cwd: path.resolve(installedPluginRoot, server.cwd),
+    envVars: [...server.env_vars],
   };
 }
 
@@ -388,6 +439,7 @@ async function officialPluginLifecycle(environment) {
         server.args,
         server.cwd,
         environment,
+        server.envVars,
       ));
     await cleanupOwnedMcpTransport(cachedClient, cachedTransport);
     cachedClient = undefined;

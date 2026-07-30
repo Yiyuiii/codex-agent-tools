@@ -56,7 +56,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。44 files / 584 passed、46 files / 759 passed 与 48 files / 837 passed 都只描述各自历史候选；当前 stable fresh 全量为 53 files / 890 passed / 1 skipped / 0 failed。第 2 层隔离官方插件生命周期与既有 `--check-report` 均已通过；公共 npm 验收脚本还会在每个待晋级版本上重新执行临时 home 的官方生命周期。这些证据都不代表活动 Codex App 已安装或可用。
 
-维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents@0.1.0`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。后续又用官方命令移除同名开发期直连，旧 `codex_cc_tools` 保持 enabled。完整重启后的第二个新任务仍未发现插件工具，且 0.1.0 的 `codex mcp get` 显示相对 runtime 入口没有工作目录；官方本地 stdio 插件则用 `cwd: "."` 把相对入口绑定到插件缓存根目录。`0.1.1-beta.0` 修复候选已补齐该声明，并让隔离与 npm 验收从 manifest 读取、强制验证和解析工作目录，不再由测试隐式补齐。真实 App 宿主门禁仍为 partial，须在 beta 发布、官方升级和 App 刷新后的新任务中闭环，不能称为已替代旧工具。
+维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。后续又用官方命令移除同名开发期直连，旧 `codex_cc_tools` 保持 enabled。`0.1.1-beta.0` 补齐 `cwd: "."` 后由 GitHub Actions OIDC 发布到 npm `next` 并完成官方升级。维护者真正终止后台宿主并重开后，新任务已发现 `external_review` / `external_delegate` 与旧两项工具共存，真实 Kimi K3 review 通过；Ark Coding Plan review 在启动 Pi 前报告缺少凭据。根因是插件 manifest 没有声明 stdio MCP `env_vars`，宿主按隔离边界没有把父 App 中已存在的 Coding Plan 凭据转发给 MCP。`0.1.1-beta.1` 候选已增加精确四项变量名白名单且不保存任何值，正在完成发布门禁。真实 App 宿主门禁仍为 partial，不能称为已替代旧工具。
 
 完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](docs/release/checklist.md)。
 
@@ -104,4 +104,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前稳定版本为 `0.1.0`，已由 GitHub Actions OIDC 发布到 npm `latest` 并完成公共 registry 隔离复验；`next` 当前仍为 `0.1.0-beta.1`。`0.1.1-beta.0` 是尚未发布的宿主启动修复候选：补齐插件 `cwd: "."`，其本地确定性矩阵为 53 files / 891 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖审计和隔离官方插件生命周期均通过。完整真实 Codex App 宿主门禁等待 beta 自动发布、公共 npm 隔离验收、活动插件官方升级和 App 刷新后的真实调用，仍为 partial。公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。
+当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；当前 npm `next` 为 `0.1.1-beta.0`。`0.1.1-beta.1` 是尚未发布的凭据环境白名单修复候选；本地单 worker 矩阵为 53 files / 891 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖审计、228 文件 dry-run 包、隔离官方插件生命周期和报告复核均已通过。Node 20/22/24 CI、公共 npm 精确版本验收与修复版真实宿主验收仍待完成。维护者本机活动插件暂时仍是 beta.0，旧 `codex_cc_tools` 保持 enabled。公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。

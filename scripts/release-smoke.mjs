@@ -64,6 +64,12 @@ const exactLogicalLlms = [
   "ark-coding-plan",
   "kimi-k3",
 ];
+const expectedPluginEnvironmentVariables = [
+  "ARK_API_KEY",
+  "VOLCENGINE_API_KEY",
+  "API_KEY_DOUBAO_CODING",
+  "OPENAI_API_KEY_DOUBAO",
+];
 const retainedHistoricalPackageSources = [
   "docs/smoke/pi-gemini.md",
   "docs/smoke/evidence",
@@ -353,6 +359,9 @@ async function checkPluginArtifact() {
     server.args.length !== 1 ||
     server.args[0] !== "./runtime/codex-external-agents-mcp.mjs" ||
     server.cwd !== "." ||
+    JSON.stringify(server.env_vars) !==
+      JSON.stringify(expectedPluginEnvironmentVariables) ||
+    Object.hasOwn(server, "env") ||
     path.isAbsolute(server.args[0]) ||
     path.win32.isAbsolute(server.args[0]) ||
     path.posix.isAbsolute(server.args[0])

@@ -118,11 +118,16 @@ describe("Codex plugin artifact", () => {
         command: "node",
         args: ["./runtime/codex-external-agents-mcp.mjs"],
         cwd: ".",
+        env_vars: [
+          "ARK_API_KEY",
+          "VOLCENGINE_API_KEY",
+          "API_KEY_DOUBAO_CODING",
+          "OPENAI_API_KEY_DOUBAO",
+        ],
       },
     });
-    expect(JSON.stringify(mcpManifest)).not.toMatch(
-      /(?:\benv\b|[A-Za-z]:[\\/]|(?:api[_-]?key|secret|token))/iu,
-    );
+    expect(mcpManifest.codex_external_agents).not.toHaveProperty("env");
+    expect(JSON.stringify(mcpManifest)).not.toMatch(/[A-Za-z]:[\\/]/u);
   });
 
   it("makes public npm acceptance reject launch paths absolute on either platform", () => {
