@@ -2,7 +2,7 @@
 
 日期：2026-07-30
 
-状态：**partial — 官方安装完成，确定性宿主检查通过；完整第 4 层门禁尚未通过**
+状态：**partial — 官方安装和来源消歧完成；当前 App 进程尚未加载插件 MCP**
 
 ## 授权与边界
 
@@ -14,6 +14,10 @@
 - 不调用或修改 Claude Code；
 - 本轮不调用真实 Kimi 或 Pi 模型；
 - 安装成功，因此没有执行回滚。
+
+维护者随后明确授权移除同名开发期 MCP、创建一个新 Codex 任务，并在插件加载后
+运行真实 Kimi/Pi、隔离 delegate 与取消门禁。新任务在工具发现阶段首错停止，因此
+没有消耗任何真实模型调用，也没有进入可写或取消测试。
 
 ## 发布身份
 
@@ -92,37 +96,77 @@ codex plugin add codex-external-agents@codex-external-agents-local
 LLM。该结果证明宿主参数能到达当前 `codex_external_agents` 路由层，但由于安装前
 已有同名开发期 MCP，它不用于证明版本化缓存是当前任务的实际调用来源。
 
+## 来源消歧与新任务结果
+
+收到后续授权后，使用官方命令：
+
+```powershell
+codex mcp remove codex_external_agents
+```
+
+命令成功移除了指向仓库 `dist/mcp.js` 的开发期全局注册。随后官方只读列表仍显示
+`codex_external_agents`，但来源已经变为已安装插件：
+
+- command：`node`；
+- args：`./runtime/codex-external-agents-mcp.mjs`；
+- 不再包含 `dist/mcp.js`；
+- `codex_cc_tools` 继续 enabled；
+- `codex-external-agents@codex-external-agents-local` 继续为
+  `installed, enabled`、版本 `0.1.0`。
+
+来源消歧完成后创建了一个新的 Codex App projectless 验收任务。该任务严格先做工具
+发现，结果只发现旧 `cc_review` / `cc_delegate`，没有发现插件应提供的
+`external_review` / `external_delegate`，因此按首错停止：
+
+- 没有创建临时目录；
+- Kimi review 调用 0 次；
+- Pi review 调用 0 次；
+- delegate 调用 0 次；
+- 取消测试未开始；
+- 被测仓库和旧 `codex_cc_tools` 均未修改。
+
+这证明在当前桌面 App 进程中，官方 CLI 状态已经更新且创建新任务仍不足以让插件
+MCP 进入任务工具面。它不能再归因于同名开发注册，也不能用重复创建任务、恢复直连
+或手工修改配置绕过。
+
+[官方 MCP 手册](https://learn.chatgpt.com/docs/extend/mcp)对桌面端手工 MCP
+配置要求保存后选择 Restart；[官方插件构建说明](https://learn.chatgpt.com/docs/build-plugins.md)
+要求刷新 ChatGPT 或 Codex，并在新会话测试；[插件连接与测试说明](https://developers.openai.com/plugins/deploy/connect-chatgpt)
+也要求刷新元数据后启动新会话。当前实测与这些安全边界一致。
+
 ## 尚未通过的门禁
 
 完整第 4 层仍缺少以下证据：
 
-1. 来源消歧：活动 Codex 中已有同名开发期 MCP 注册。未经新的明确许可，不执行
-   `codex mcp remove codex_external_agents`，也不改写活动配置。
-2. 新任务加载：插件更新流程要求在新 Codex 任务中重新发现插件；本轮没有把
-   “继续推进”扩张为创建新任务的授权。
-3. 真实宿主调用：本轮明确排除真实模型调用，因此尚未从新任务完成 Kimi 与至少一条
-   Pi 路线的代表性 review。
-4. 可写与取消：尚未在隔离临时仓库完成 delegate，也未从真实宿主验证取消长任务后
+1. App 刷新：当前运行中的桌面 App 需要由维护者刷新或重启；本任务不能在不终止
+   自身的情况下替用户完成该动作。
+2. 刷新后的新任务加载：必须在刷新后创建新任务，确认新旧四项工具共存，并再次用
+   官方只读列表核对插件相对入口。
+3. 真实宿主调用：插件进入工具面后，完成 Kimi 与至少一条 Pi 路线的代表性 review。
+4. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主验证取消长任务后的
    Kimi/Pi 进程回收。
 
 在这些缺口闭合前：
 
 - 官方插件可以称为“已安装、已启用，缓存协议验收通过”；
+- 开发期直连可以称为“已通过官方命令移除，CLI 已解析到插件相对入口”；
 - 不得称为“真实 App 宿主门禁全部通过”；
 - 不得称为“已替代旧 `codex_cc_tools`”；
-- 不得删除旧工具或开发期 MCP 注册。
+- 不得删除旧工具、恢复开发期直连或手工修改活动配置。
 
-## 下一授权节点
+## 下一人工节点
 
-下一步需要维护者分别明确允许：
+下一步需要维护者刷新或重启 Codex 桌面 App，然后回到本任务继续。刷新完成后才可
+创建新的验收任务并消费已经批准但尚未使用的真实调用：
 
-1. 用官方 `codex mcp remove codex_external_agents` 移除同名开发期直连注册；旧
-   `codex_cc_tools` 保持不动；
-2. 启动一个新的 Codex 任务，从插件缓存重新发现工具；
+1. 从插件缓存重新发现 `external_review` / `external_delegate`；
+2. 复核旧 `cc_review` / `cc_delegate` 仍存在；
 3. 在脱敏、隔离边界内运行一项 Kimi review、一项 Pi review、一项 delegate 和
    一项可取消长任务。
 
-若来源消歧或新任务加载失败，只对本次新插件使用已授权的官方回滚：
+当前失败是 App 进程未刷新，不是安装状态或缓存工件失败，因此不执行插件回滚。若
+刷新后的新任务仍无法发现工具，再单独审计 App 插件加载，而不是恢复开发直连。只有
+确认安装本身失败时，才对本次新插件使用已授权的官方回滚：
 
 ```powershell
 codex plugin remove codex-external-agents@codex-external-agents-local

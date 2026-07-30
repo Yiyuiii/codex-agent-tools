@@ -8,7 +8,7 @@
 
 包版本：`0.1.0`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`；它的聚合终态不再把其中通过的精确 case 降级。Ark Agent Plan 当时的额度错误属于路线可用性警告，不是 Coding Plan 或整个产品的资格阻碍。`0.1.0` 已由 GitHub Actions OIDC 发布到 npm `latest` 并通过公共 registry 隔离消费者复验，`next` 保持为 `0.1.0-beta.1`。维护者本机已获逐动作授权并完成官方 0.1.0 插件安装与版本化缓存协议检查；第 4 层仍因安装前同名开发期 MCP、尚未从新任务加载缓存和未执行真实宿主调用而保持 partial。公开发布不授权其它活动 Codex 安装、替代旧工具或改写活动配置。**
+当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`；它的聚合终态不再把其中通过的精确 case 降级。Ark Agent Plan 当时的额度错误属于路线可用性警告，不是 Coding Plan 或整个产品的资格阻碍。`0.1.0` 已由 GitHub Actions OIDC 发布到 npm `latest` 并通过公共 registry 隔离消费者复验，`next` 保持为 `0.1.0-beta.1`。维护者本机已获逐动作授权并完成官方 0.1.0 插件安装、版本化缓存协议检查和开发期直连移除；CLI 已解析到插件相对入口，但当前 App 进程创建的新任务仍未发现插件工具并在真实调用前首错停止。第 4 层等待 App 刷新/重启后的新任务验收，保持 partial。公开发布不授权其它活动 Codex 安装、替代旧工具或改写活动配置。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 
@@ -21,7 +21,7 @@
 | 1    | 确定性单测、类型检查、构建、release smoke | passed                                                                      | typecheck、测试、build、能力索引验证、release smoke 与隔离 `--check-report`                                                                                                                                                |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
 | 3    | 四个逻辑 LLM 的八项真实模型门禁           | passed：8 capabilities / 0 stale                                            | [能力资格索引](../smoke/evidence/capabilities.json)、[Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)                                                                                                                      |
-| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：官方安装与确定性缓存检查通过；来源消歧、新任务和真实调用待授权       | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                            |
+| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：安装、缓存与 CLI 来源消歧通过；等待 App 刷新后的新任务和真实调用     | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                            |
 
 ## 第 1 层：确定性单测与构建
 
@@ -164,7 +164,7 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 ### 前置权限
 
-2026-07-30 已取得针对本次 add 与失败 remove 的明确许可，并成功完成官方 marketplace/plugin add；项目代码没有直接读取或写入活动 `~/.codex/config.toml`，也没有执行回滚。安装前官方只读列表发现同名开发期 `codex_external_agents` MCP 已指向仓库 `dist/mcp.js`，所以当前任务的工具发现不能单独归因于版本化插件缓存。移除该开发注册、创建新任务和真实调用属于下一授权节点，不从本次 add 许可推定。
+2026-07-30 已取得针对本次 add 与失败 remove 的明确许可，并成功完成官方 marketplace/plugin add；项目代码没有直接读取或写入活动 `~/.codex/config.toml`，也没有执行回滚。后续授权已允许用官方命令移除同名开发期 `codex_external_agents` MCP、创建新任务并运行真实门禁。开发注册移除成功，CLI 随即显示插件相对入口且旧 `codex_cc_tools` 保持 enabled；但新任务未发现插件工具，因此在真实模型、临时目录和取消测试前首错停止。当前人工节点是刷新或重启 App，而不是重试调用、恢复直连或手工修改配置。
 
 ### 通过标准
 
