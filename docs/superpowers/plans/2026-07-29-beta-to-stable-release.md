@@ -76,13 +76,13 @@
 6. 验证精确版本与 `next` dist-tag，再配置：
 
    ```powershell
-   npx --yes npm@11.18.0 trust github codex-agent-tools --file release.yml --repo Yiyuiii/codex-agent-tools --allow-publish
+   npm trust github codex-agent-tools --file release.yml --repo Yiyuiii/codex-agent-tools --yes
    ```
 
-   npm 11.11.0 与 11.18.0 的 `trust github` 权限参数不同，因此此步骤固定
-   npm 11.18.0，不依赖执行机默认 npm。相同命令加 `--dry-run` 已确认 package、
-   repository、workflow filename 与 publish 权限解析正确；真实执行仍要求 2FA，
-   且只在 beta.0 已存在后进行。
+   本次使用执行机 npm 11.11.0 的参数面；相同命令加 `--dry-run --json` 先确认
+   package、repository 与 workflow filename，真实执行在 beta.0 已存在后经
+   单次 2FA 确认并以 exit 0 建立信任。未来若升级 npm，应先按目标版本
+   `npm trust github --help` 复核参数，不复用已变化的历史参数。
 
 7. 推送 `v0.1.0-beta.0`；workflow 对已存在版本只做幂等验证并创建 prerelease，不重复发布。
 
@@ -98,16 +98,17 @@ release smoke 以 ENOENT 失败；Node 20/24 被 fail-fast 取消。CI 与 relea
 workflow 现按官方安装路径固定 `@openai/codex@0.146.0` 并核对版本，插件
 门禁本身不降级。固定 CLI 后的第三轮 Node 20/22/24 CI 已全绿。发布控制自审
 继续补充 `fail-fast: false` 与强制 `refs/tags/v*` ref 校验，避免矩阵结果被
-连带取消，也拒绝普通 branch 上的手动发布；契约测试先红后绿。最终远端 CI、
+连带取消，也拒绝普通 branch 上的手动发布；契约测试先红后绿。当时最终远端 CI、
 npm 首包与独立复审仍是本 Task 的未完成门禁。随后发布/OIDC 窄审 PASS；npm
 隔离初审命中 npm 子进程继承宿主 `.npmrc`/token 的 HIGH blocker，现已把
 HOME/CODEX_HOME/AppData/TEMP/TMP/TMPDIR、npm userconfig/globalconfig/cache
 全部移入一次性目录，并让 npm view/install/version 使用空 install cwd 与该
 环境，定向复审 PASS。宿主 `codex plugin` 是官方插件生命周期测试器，不是本包
-CLI 的替代关系；该建议经产品边界复核后未采纳。隔离修复的最终远端 CI 与 npm
-首包是本 Task 当前未完成门禁。隔离修复提交 `4cc9c33` 的最终 CI
-`30454587529` 已在 Node 20/22/24 全绿；当前只剩 npm web login、beta.0
-bootstrap、Trusted Publisher 配置与 beta tag 幂等 workflow。
+CLI 的替代关系；该建议经产品边界复核后未采纳。隔离修复提交 `4cc9c33` 的最终
+CI `30454587529` 已在 Node 20/22/24 全绿。2026-07-30 已手工 bootstrap
+`codex-agent-tools@0.1.0-beta.0`，配置 `Yiyuiii/codex-agent-tools` /
+`release.yml` Trusted Publisher，并推送 `v0.1.0-beta.0`；幂等 release run
+`30506918996` 完整通过并创建 GitHub prerelease，Task 2 完成。
 
 ## Task 3：用 `0.1.0-beta.1` 验证 OIDC 并做本地 npm 验收
 
@@ -115,6 +116,13 @@ bootstrap、Trusted Publisher 配置与 beta tag 幂等 workflow。
 候选提交创建隔离 `codex/beta1-prep` 工作树。该工作树只准备 beta.1 版本元数据、
 测试与审阅记录；在 beta.0 bootstrap 和 Trusted Publisher 建立前不得推送
 `v0.1.0-beta.1`，也不得把预备分支误记为公开发布。
+
+2026-07-30 结果：预备提交 `31e61cb` 已 fast-forward 到 `next`；CI run
+`30507055208` 的 Node 20/22/24 全绿。`v0.1.0-beta.1` release run
+`30507178009` 通过真实 npm OIDC 发布、registry/`next` dist-tag 复核与 GitHub
+prerelease 创建。随后从公共 registry 精确安装 beta.1 的隔离验收通过：CLI、
+doctor、stdio MCP、官方插件 add/list/remove、缓存副本 MCP、8/8 能力索引与
+零残留门禁全部为 pass，真实模型调用为 0；Task 3 完成。
 
 **文件**
 
