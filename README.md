@@ -56,7 +56,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。44 files / 584 passed、46 files / 759 passed 与 48 files / 837 passed 都只描述各自历史候选；当前 stable fresh 全量为 53 files / 890 passed / 1 skipped / 0 failed。第 2 层隔离官方插件生命周期与既有 `--check-report` 均已通过；公共 npm 验收脚本还会在每个待晋级版本上重新执行临时 home 的官方生命周期。这些证据都不代表活动 Codex App 已安装或可用。
 
-当前尚未执行真实官方安装。项目代码绝不直接读取或写入活动 `~/.codex/config.toml`；八项能力索引验证、确定性检查与隔离验收通过后，可以准备 ready 权限包，但只有取得针对本次动作的明确许可后，维护者才可使用官方 `codex plugin` 命令。最新批次的 blocked 终态作为历史事实保留，不再覆盖八项独立能力资格。任何真实安装、升级或回滚都必须逐次授权，且不得用手工编辑配置代替官方机制。
+维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents@0.1.0`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。版本化缓存、MCP 契约和新旧工具共存的确定性检查已经通过，但安装前存在同名开发期 MCP 注册，因此缓存来源消歧、新任务加载和真实调用仍未完成，真实 App 宿主门禁保持 partial，不能称为已替代旧工具。公开 npm 包不会自动安装到用户的活动 Codex；任何真实安装、升级或回滚仍须逐次授权，且不得用手工编辑配置代替官方机制。最新批次的 blocked 终态作为历史事实保留，不再覆盖八项独立能力资格。
 
 完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](docs/release/checklist.md)。
 
@@ -104,4 +104,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前稳定版本为 `0.1.0`，已由 GitHub Actions OIDC 发布到 npm `latest`，并从公共 registry 通过 CLI、doctor、stdio MCP 与隔离官方插件生命周期复验；`next` 保持为 `0.1.0-beta.1`。四模型八项能力已由固定能力索引验证为 8 passed / 0 pending；release smoke 会在打包前重新校验不可变 evidence、精确 case、注册表 anchor 与运行时指纹。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`，但其中已通过的精确 case 可以支持对应能力，批次聚合状态不再覆盖能力状态。公开发布不构成活动 Codex 安装授权；真实 Codex App 宿主门禁仍未执行，不能称为已安装或已替代旧工具。
+当前稳定版本为 `0.1.0`，已由 GitHub Actions OIDC 发布到 npm `latest`，并从公共 registry 通过 CLI、doctor、stdio MCP 与隔离官方插件生命周期复验；`next` 保持为 `0.1.0-beta.1`。四模型八项能力已由固定能力索引验证为 8 passed / 0 pending；release smoke 会在打包前重新校验不可变 evidence、精确 case、注册表 anchor 与运行时指纹。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`，但其中已通过的精确 case 可以支持对应能力，批次聚合状态不再覆盖能力状态。维护者本机的官方 0.1.0 插件安装与缓存协议检查已经完成，完整真实 Codex App 宿主门禁仍因来源消歧、新任务和真实调用缺口保持 partial；公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。

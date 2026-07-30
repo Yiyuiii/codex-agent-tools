@@ -1,4 +1,4 @@
-# 真实插件安装审阅状态包 — ready for authorization
+# 真实插件安装审阅状态包 — authorization consumed / host acceptance partial
 
 日期：2026-07-30
 
@@ -13,14 +13,14 @@
 
 ## 状态摘要
 
-本状态包表示候选已经满足离线资格与隔离插件门禁，可以在未来请求一次明确的真实安装许可；它本身**不是安装授权**。
+本状态包最初用于请求一次明确的真实安装许可；维护者已于 2026-07-30 授权本次 add 与失败 remove，官方安装成功，因此该许可已经消费。完整结果记录在仓库内 `docs/release/real-host-acceptance.md`；本文件仍保留当时的动作和回滚边界，不能复用为下一次升级、移除开发注册或真实模型调用授权。
 
 - 当前活动产品面是四个逻辑 LLM、八项 review/delegate 能力，全部固定使用 direct。
 - 八项能力均由 [`capabilities.json`](../smoke/evidence/capabilities.json) 记录为 passed；`npm run verify:capabilities` 会验证不可变 source evidence、精确 passed case、registry anchor 和当前运行时指纹。
 - 第 2 层临时 `CODEX_HOME` 官方插件生命周期已经通过。
 - release smoke 已接入能力索引验证，并继续检查包文件面、秘密/绝对路径、文档链接闭包、MCP 契约和自包含 runtime。
-- 第 4 层真实 Codex App 宿主门禁尚未执行。
-- 当前没有执行活动 Codex 的 marketplace/plugin add 或 remove，没有读取、写入、备份或恢复活动 `~/.codex/config.toml`，也没有移除旧 `codex_cc_tools`。
+- 第 4 层真实 Codex App 宿主门禁为 partial：官方安装、版本化缓存 MCP 契约和确定性宿主检查通过；来源消歧、新任务加载和真实调用尚未完成。
+- 活动 Codex 的 marketplace/plugin add 已按授权成功执行；没有执行 remove，没有读取、写入、备份或恢复活动 `~/.codex/config.toml`，也没有移除旧 `codex_cc_tools`。
 
 最新 `four-llm-v1` 批次仍按不可改写的历史事实保留为 6 completed / 5 passed、`blocked / case_failed`。其中 passed case 可在逻辑 LLM、任务、运行时指纹和 evidence 哈希全部精确匹配时支持对应能力；批次聚合失败不再把这些 case 降级。ordinal 6 的 `account_quota_exceeded` 表示 Ark Agent Plan 当时的服务可用性，不是 Coding Plan 或整个产品的资格阻碍；实际调用 Agent Plan 时仍可能受当前额度影响。
 
@@ -99,6 +99,10 @@ codex plugin marketplace remove codex-external-agents-local
 
 回滚后重新检查官方列表和工具发现。不得手工编辑、备份还原或覆盖活动 `config.toml`；如果官方 remove 失败，停止并保留最小脱敏证据。
 
-## 仍需维护者判断的唯一问题
+## 下一授权节点
 
-是否授权未来某一次真实 `codex plugin marketplace add`、`codex plugin add`，以及失败时的官方 remove。当前实现工作不会把此前原则性同意或实验 standing authorization 推定为该许可。
+本次安装许可已经消费。完整第 4 层仍需维护者另行明确允许：用官方
+`codex mcp remove codex_external_agents` 移除安装前已有的同名开发期直连注册，
+创建新 Codex 任务，以及在脱敏和隔离边界内运行代表性 Kimi/Pi review、delegate
+与取消门禁。旧 `codex_cc_tools` 继续保持不动；本文件不把本次 add 许可扩张为上述
+后续动作或未来升级许可。
