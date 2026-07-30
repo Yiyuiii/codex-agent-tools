@@ -111,6 +111,8 @@ codex-agent-tools/
 
 - `plugin.json` 通过顶层 `mcpServers` 引用插件根目录内的 `./.mcp.json`。
 - `.mcp.json` 只声明一个名为 `codex_external_agents` 的 stdio 服务。
+- 该 stdio 服务必须显式声明 `cwd: "."`，使相对 runtime 参数由 Codex 解析到
+  版本化插件根目录；验收不得在 manifest 之外替宿主隐式补齐该工作目录。
 - `runtime/codex-external-agents-mcp.mjs` 是包含生产依赖的单文件 bundle，只要求系统提供兼容的 Node.js。
 - 支持的最低 Node.js 版本为 20；doctor 和隔离插件验收都必须检查。
 - 产物不能依赖仓库 `node_modules`、npm 全局包或开发仓库绝对路径。
@@ -125,6 +127,11 @@ codex-agent-tools/
 4. 官方安装和卸载对隔离 `CODEX_HOME` 中 `config.toml` 及其它状态文件产生的差异是可解释、可逆且仅限目标插件。
 
 若任一假设不成立，停止真实安装并修订设计；不得用项目代码写活动 `config.toml` 作为后备方案。
+
+2026-07-30 的真实 App 验收证明原隔离门禁不充分：0.1.0 的 manifest 未声明
+`cwd`，但测试客户端无条件以安装根目录启动，掩盖了宿主实际显示 `cwd: -` 的
+缺口。完整重启后的新任务仍无法发现工具。`0.1.1-beta.0` 起，兼容性门禁必须从
+已安装 manifest 读取并验证 `cwd: "."` 后再解析启动目录。
 
 ## 6. 公共工具契约
 

@@ -8,7 +8,7 @@ ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、model�
 
 离线调查确认 Pi Windows 子进程环境遗漏 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 修复后，真实 resolver 与精确 Node spawn 探针离线成功，代理和凭据边界保持不变。资格合同提交 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 要求未来资格 Pi delegate 的精确写入与精确 `git status --short` 生命周期各恰好一次且均为 success，并由未来整批 passed verifier 重算；历史 blocked/interrupted 继续兼容。schema/plan、公开 MCP、provider/model/route/credential、提示词、结果 validator、retry/fallback 均未改变；独立质量复审为 PASS、无 P0–P3。
 
-48 个测试文件、837 passed / 1 skipped / 0 failed 与 171 files / 15 Markdown/HTML / 3 plugin files 是旧候选历史数字。当前 beta.0 fresh 矩阵已经通过：53 个测试文件、889 passed / 1 skipped / 0 failed，类型检查、构建、8/8 能力索引与 release smoke 均通过；最终 pack 数字以对应 beta 审阅记录为准，且不得保留 `.tgz`。
+48 个测试文件、837 passed / 1 skipped / 0 failed 与 171 files / 15 Markdown/HTML / 3 plugin files 是旧候选历史数字。`v0.1.0` tagged candidate 的 fresh 矩阵已经通过：53 个测试文件、890 passed / 1 skipped / 0 failed，类型检查、构建、8/8 能力索引、release smoke 与生产依赖审计均通过；tagged artifact 的 pack dry-run 为 228 个文件，且不得保留 `.tgz`。
 
 全量测试曾暴露 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察；提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试，独立复审 PASS、无 P0–P3，最终全量已经包含。状态文档提交与最终 clean frozen SHA 仍由主线程完成。
 
@@ -63,7 +63,7 @@ npm run acceptance:plugin:isolated
 只有版本已存在于公共 npm registry 后才运行：
 
 ```powershell
-npm run acceptance:npm-package -- --version 0.1.0-beta.1
+npm run acceptance:npm-package -- --version 0.1.0
 ```
 
 脚本把 registry 固定为 `https://registry.npmjs.org/`，按精确版本安装到一次性
@@ -110,6 +110,13 @@ if ($LASTEXITCODE -ne 0) { throw "Codex plugin add 失败，停止安装。" }
 ```
 
 执行后必须使用官方列表和真实 Codex App 完成工具发现、代表性调用、取消与进程清理门禁。不得直接打开、比较或修改活动 `config.toml`。命令结果若与权限包或隔离证据不一致，立即停止，不追加自定义配置修复。
+
+维护者本机已于 2026-07-30 消费一次上述 add 许可并成功安装 0.1.0。版本化缓存和
+MCP 契约已通过确定性检查；后续授权又通过官方命令移除同名开发期 MCP，CLI 已解析
+到插件相对入口，旧 `codex_cc_tools` 保持 enabled。但当前 App 进程创建的新任务仍
+未发现插件工具，并在任何真实模型调用前首错停止，因此完整宿主门禁仍为 partial；
+仓库内状态见 `docs/release/real-host-acceptance.md`。下一步必须先刷新或重启 App，
+不得恢复开发直连、重复调用或手工修改配置；未来升级仍需新的逐动作许可。
 
 ## 8. 失败时使用官方回滚
 

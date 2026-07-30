@@ -117,11 +117,31 @@ describe("Codex plugin artifact", () => {
       codex_external_agents: {
         command: "node",
         args: ["./runtime/codex-external-agents-mcp.mjs"],
+        cwd: ".",
       },
     });
     expect(JSON.stringify(mcpManifest)).not.toMatch(
       /(?:\benv\b|[A-Za-z]:[\\/]|(?:api[_-]?key|secret|token))/iu,
     );
+  });
+
+  it("makes public npm acceptance reject launch paths absolute on either platform", () => {
+    const acceptanceScript = readFileSync(
+      resolve(repositoryRoot, "scripts/npm-package-acceptance.mjs"),
+      "utf8",
+    );
+
+    expect(acceptanceScript).toContain(
+      "function isAbsoluteOnAnyPlatform(value)",
+    );
+    expect(acceptanceScript).toContain(
+      "isAbsoluteOnAnyPlatform(server.command)",
+    );
+    expect(acceptanceScript).toContain(
+      "!isAbsoluteOnAnyPlatform(argument)",
+    );
+    expect(acceptanceScript).toContain("path.win32.isAbsolute(value)");
+    expect(acceptanceScript).toContain("path.posix.isAbsolute(value)");
   });
 
   it("builds the MCP entry as a self-contained plugin runtime", () => {

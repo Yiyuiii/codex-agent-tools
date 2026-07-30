@@ -17,11 +17,11 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 离线根因提交 `2a815c7` 与资格合同提交链 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 已得到上述真实命令成功证据。所有六个已执行项均保持一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁 absent。该批次的 `account_quota_exceeded` 仍是 Ark Agent Plan 当时的服务可用性事实，但不再撤销其它已通过能力，也不阻断 Coding Plan；需要实际调用 Agent Plan 时仍可能受当前账户额度影响。
 
-此前 48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed 及 171 files / 15 Markdown/HTML / 3 plugin files 的 pack 数字只描述 `cb9434b...` 之前的历史候选。当前 beta.0 fresh 矩阵已通过：53 个测试文件、889 passed / 1 skipped / 0 failed，类型检查、构建、8/8 能力索引和 release smoke 均通过；最终 pack 数字以对应 beta 审阅记录为准。
+此前 48 个测试文件、837 passed / 1 个平台条件 skipped / 0 failed 及 171 files / 15 Markdown/HTML / 3 plugin files 的 pack 数字只描述 `cb9434b...` 之前的历史候选。`v0.1.0` tagged candidate 的 fresh 矩阵已通过：53 个测试文件、890 passed / 1 skipped / 0 failed，类型检查、构建、8/8 能力索引、release smoke 与生产依赖审计均通过；tagged artifact 的 pack dry-run 为 228 个文件。
 
 全量测试还暴露并闭合了一个既有 Kimi ACP 时序竞态：client 可能早于 child close 返回，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49 文件矩阵已包含该修复。Pi resolver 在生产隔离环境中找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`。
 
-注册表现在保持 8 passed / 0 pending，并由 [`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 与 `npm run verify:capabilities` 约束。当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。真实资格实验的 standing authorization 仍有效，但只有能力指纹失效、证据失效或新增能力时才需要针对性重跑；临时额度恢复本身不触发全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
+注册表现在保持 8 passed / 0 pending，并由 [`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 与 `npm run verify:capabilities` 约束。维护者本机已通过官方命令安装 0.1.0 插件并移除同名开发期直连；旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。真实资格实验的 standing authorization 仍有效，但只有能力指纹失效、证据失效或新增能力时才需要针对性重跑；临时额度恢复本身不触发全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
 2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
@@ -54,9 +54,9 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 要求 Node.js 20+，并已安装、登录本机 Kimi Code。Kimi 使用本机 OAuth 会话，本项目不复制或保存其令牌。
 
-仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。44 files / 584 passed、46 files / 759 passed 与 48 files / 837 passed 都只描述各自历史候选；当前 beta.0 fresh 全量为 53 files / 889 passed / 1 skipped / 0 failed。第 2 层隔离官方插件生命周期与既有 `--check-report` 均已通过；公共 npm 验收脚本还会在每个待晋级版本上重新执行临时 home 的官方生命周期。这些证据都不代表活动 Codex App 已安装或可用。
+仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。44 files / 584 passed、46 files / 759 passed 与 48 files / 837 passed 都只描述各自历史候选；当前 stable fresh 全量为 53 files / 890 passed / 1 skipped / 0 failed。第 2 层隔离官方插件生命周期与既有 `--check-report` 均已通过；公共 npm 验收脚本还会在每个待晋级版本上重新执行临时 home 的官方生命周期。这些证据都不代表活动 Codex App 已安装或可用。
 
-当前尚未执行真实官方安装。项目代码绝不直接读取或写入活动 `~/.codex/config.toml`；八项能力索引验证、确定性检查与隔离验收通过后，可以准备 ready 权限包，但只有取得针对本次动作的明确许可后，维护者才可使用官方 `codex plugin` 命令。最新批次的 blocked 终态作为历史事实保留，不再覆盖八项独立能力资格。任何真实安装、升级或回滚都必须逐次授权，且不得用手工编辑配置代替官方机制。
+维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents@0.1.0`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。后续又用官方命令移除同名开发期直连，旧 `codex_cc_tools` 保持 enabled。完整重启后的第二个新任务仍未发现插件工具，且 0.1.0 的 `codex mcp get` 显示相对 runtime 入口没有工作目录；官方本地 stdio 插件则用 `cwd: "."` 把相对入口绑定到插件缓存根目录。`0.1.1-beta.0` 修复候选已补齐该声明，并让隔离与 npm 验收从 manifest 读取、强制验证和解析工作目录，不再由测试隐式补齐。真实 App 宿主门禁仍为 partial，须在 beta 发布、官方升级和 App 刷新后的新任务中闭环，不能称为已替代旧工具。
 
 完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](docs/release/checklist.md)。
 
@@ -84,7 +84,7 @@ npm run acceptance:plugin:isolated
 真实模型、也不接触活动 Codex home 的消费者视角验收：
 
 ```powershell
-npm run acceptance:npm-package -- --version 0.1.0-beta.1
+npm run acceptance:npm-package -- --version 0.1.0
 ```
 
 真实 Kimi/Pi 烟测会实际消耗本机计划额度，并使用全机进程快照检查残留，因此只在精确能力门禁中串行运行。例如：
@@ -104,4 +104,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前分支候选版本为 `0.1.0-beta.1`，用于在 `0.1.0-beta.0` 首包完成后验证 GitHub OIDC 发布，并执行“从公共 npm 隔离安装验收 → stable”的后续门禁。四模型八项能力已由固定能力索引验证为 8 passed / 0 pending；release smoke 会在打包前重新校验不可变 evidence、精确 case、注册表 anchor 与运行时指纹。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`，但其中已通过的精确 case 可以支持对应能力，批次聚合状态不再覆盖能力状态。公开发布不构成活动 Codex 安装授权；真实 Codex App 宿主门禁仍未执行，不能称为已安装或已替代旧工具。
+当前稳定版本为 `0.1.0`，已由 GitHub Actions OIDC 发布到 npm `latest` 并完成公共 registry 隔离复验；`next` 当前仍为 `0.1.0-beta.1`。`0.1.1-beta.0` 是尚未发布的宿主启动修复候选：补齐插件 `cwd: "."`，其本地确定性矩阵为 53 files / 891 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖审计和隔离官方插件生命周期均通过。完整真实 Codex App 宿主门禁等待 beta 自动发布、公共 npm 隔离验收、活动插件官方升级和 App 刷新后的真实调用，仍为 partial。公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。

@@ -2,13 +2,13 @@
 
 建立日期：2026-07-25
 
-最近复核：2026-07-29
+最近复核：2026-07-30
 
-目标发布分支：`next`；当前预备分支：`codex/beta1-prep`
+目标发布分支：`next`；当前预备分支：`codex/plugin-cwd-0.1.1-beta.0`
 
-包版本：`0.1.0-beta.1`
+包版本：`0.1.1-beta.0`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`；它的聚合终态不再把其中通过的精确 case 降级。Ark Agent Plan 当时的额度错误属于路线可用性警告，不是 Coding Plan 或整个产品的资格阻碍。`0.1.0-beta.1` 是 OIDC 与公共 npm 隔离消费者验收候选，只有在 `0.1.0-beta.0` bootstrap 和 Trusted Publisher 建立后才能打标签发布；第 4 层真实 Codex App 宿主门禁仍未执行，且公开发布不授权安装到活动 Codex、替代旧工具或改写活动配置。**
+当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`；`0.1.1-beta.0` 是尚未发布的宿主启动修复候选。完整重启后的新任务仍未加载 0.1.0 插件工具；诊断发现其相对 runtime 入口缺少 `cwd`，CLI 显示 `cwd: -`，而官方本地 stdio 插件用 `cwd: "."` 解析到版本化缓存根目录。修复候选已补齐该声明，并让 artifact、release smoke、隔离插件与公共 npm 验收全部 fail closed 地验证 manifest 工作目录；本地 53 files / 891 passed / 1 skipped / 0 failed、类型检查、8/8 能力索引、release smoke、生产依赖审计和隔离官方插件生命周期已通过。第 4 层仍等待 beta 发布、官方升级和 App 刷新后的真实调用，保持 partial。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 
@@ -21,7 +21,7 @@
 | 1    | 确定性单测、类型检查、构建、release smoke | passed                                                                      | typecheck、测试、build、能力索引验证、release smoke 与隔离 `--check-report`                                                                                                                                                |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
 | 3    | 四个逻辑 LLM 的八项真实模型门禁           | passed：8 capabilities / 0 stale                                            | [能力资格索引](../smoke/evidence/capabilities.json)、[Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)                                                                                                                      |
-| 4    | 活动 Codex 的真实 App 宿主门禁            | not run / requires explicit authorization                                   | [real-plugin-install-review.md](real-plugin-install-review.md) 是权限包候选；获得逐动作许可后才可生成 `real-host-acceptance.md`                                                                                            |
+| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：0.1.0 重启后仍失败；0.1.1-beta.0 修复候选等待发布、升级和刷新后复验 | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                            |
 
 ## 第 1 层：确定性单测与构建
 
@@ -50,7 +50,7 @@ git diff --check
 
 ### 当前证据
 
-任务 5 的 release assurance 24/24、全量 191/191，Task 12 的 44 files / 560 passed、阻断收敛的 44 files / 584 passed、Kimi/package 阶段的 46 files / 759 passed，以及方案 B 阶段的 48 files / 837 passed / 1 skipped，都只描述各自历史候选。当前 beta.0 fresh 结果为 53 files / 889 passed / 1 skipped / 0 failed；类型检查、构建、8/8 能力索引与 release smoke 均通过，最终 pack 数字记录在 beta.0 审阅文件中。
+任务 5 的 release assurance 24/24、全量 191/191，Task 12 的 44 files / 560 passed、阻断收敛的 44 files / 584 passed、Kimi/package 阶段的 46 files / 759 passed，以及方案 B 阶段的 48 files / 837 passed / 1 skipped，都只描述各自历史候选。`v0.1.0` tagged candidate 的 fresh 结果为 53 files / 890 passed / 1 skipped / 0 failed；类型检查、构建、8/8 能力索引、release smoke 与生产依赖 0 vulnerabilities 均通过，tagged artifact 的 pack dry-run 为 228 files。
 
 首次全量曾暴露 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁和两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49-file 全量已经包含该修复。
 
@@ -164,7 +164,7 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 ### 前置权限
 
-当前尚未执行真实官方安装。项目代码不得直接读取或写入活动 `~/.codex/config.toml`；官方插件命令可能由官方机制触碰该文件，因此必须先提交 `real-plugin-install-review.md` 权限包并取得针对本次 add 与失败 remove 的明确许可。
+2026-07-30 已取得针对本次 add 与失败 remove 的明确许可，并成功完成官方 marketplace/plugin add；项目代码没有直接读取或写入活动 `~/.codex/config.toml`，也没有执行回滚。后续授权已允许用官方命令移除同名开发期 `codex_external_agents` MCP、创建新任务并运行真实门禁。开发注册移除成功，CLI 随即显示插件相对入口且旧 `codex_cc_tools` 保持 enabled；但新任务未发现插件工具，因此在真实模型、临时目录和取消测试前首错停止。当前人工节点是刷新或重启 App，而不是重试调用、恢复直连或手工修改配置。
 
 ### 通过标准
 
