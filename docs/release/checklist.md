@@ -8,7 +8,7 @@
 
 包版本：`0.1.1-beta.0`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`；`0.1.1-beta.0` 已由 GitHub Actions OIDC 发布到 `next`，Node 20/22/24 CI 和公共 npm 精确版本隔离验收通过。活动插件已按官方 remove/add 升级，CLI 把 `cwd: "."` 解析到 0.1.1-beta.0 缓存根目录，旧 `codex_cc_tools` 仍 enabled；但无重启立即创建的新任务仍只发现旧工具，证明桌面 App 工具清单不能在本次更新中热刷新。第 4 层等待维护者完整重启 App 后的真实 Kimi/Pi、隔离 delegate 与取消门禁，保持 partial。**
+当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`；`0.1.1-beta.0` 已由 GitHub Actions OIDC 发布到 `next`，Node 20/22/24 CI 和公共 npm 精确版本隔离验收通过。活动插件已按官方 remove/add 升级，CLI 把 `cwd: "."` 解析到 0.1.1-beta.0 缓存根目录，旧 `codex_cc_tools` 仍 enabled；但无重启立即创建的新任务仍只发现旧工具，证明桌面 App 工具清单不能在本次更新中热刷新。随后一次窗口级重启没有终止 12:03 启动的后台宿主，而 beta 缓存到 13:25 才创建；所以第 4 层等待维护者彻底退出后台进程并重开后的真实 Kimi/Pi、隔离 delegate 与取消门禁，保持 partial。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 
@@ -21,7 +21,7 @@
 | 1    | 确定性单测、类型检查、构建、release smoke | passed                                                                      | typecheck、测试、build、能力索引验证、release smoke 与隔离 `--check-report`                                                                                                                                                |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
 | 3    | 四个逻辑 LLM 的八项真实模型门禁           | passed：8 capabilities / 0 stale                                            | [能力资格索引](../smoke/evidence/capabilities.json)、[Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)                                                                                                                      |
-| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta 已发布并升级；无重启新任务仍失败，等待完整重启后真实调用      | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                            |
+| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta 已发布并升级；窗口重启未结束后台宿主，等待完整进程重启后真实调用 | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                         |
 
 ## 第 1 层：确定性单测与构建
 
@@ -164,7 +164,7 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 ### 前置权限
 
-2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。升级后不重启 App 创建的新任务仍只发现旧工具，因此在真实模型、临时目录和取消测试前首错停止。项目代码没有直接读取或写入活动 `~/.codex/config.toml`。当前人工节点是完整重启 App，而不是重试调用、恢复直连或手工修改配置。
+2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。升级后不重启 App 创建的新任务仍只发现旧工具，因此在真实模型、临时目录和取消测试前首错停止。维护者随后尝试重启，但活动 `ChatGPT.exe` / `codex.exe app-server` 的创建时间仍早于 beta 缓存，说明后台宿主没有退出；第三个探针同样首错停止，真实调用和文件修改为 0。项目代码没有直接读取或写入活动 `~/.codex/config.toml`。当前人工节点是从系统托盘彻底退出后台宿主并重开，而不是重试调用、恢复直连或手工修改配置。
 
 ### 通过标准
 

@@ -56,7 +56,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。44 files / 584 passed、46 files / 759 passed 与 48 files / 837 passed 都只描述各自历史候选；当前 stable fresh 全量为 53 files / 890 passed / 1 skipped / 0 failed。第 2 层隔离官方插件生命周期与既有 `--check-report` 均已通过；公共 npm 验收脚本还会在每个待晋级版本上重新执行临时 home 的官方生命周期。这些证据都不代表活动 Codex App 已安装或可用。
 
-维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。后续又用官方命令移除同名开发期直连，旧 `codex_cc_tools` 保持 enabled。完整重启后的新任务暴露 0.1.0 的相对 runtime 入口没有工作目录；`0.1.1-beta.0` 已补齐 `cwd: "."`，由 GitHub Actions OIDC 发布到 npm `next` 并通过公共 registry 隔离验收，活动插件也已按官方 remove/add 升级。CLI 现在把该字段解析到 0.1.1-beta.0 缓存根目录，但不重启 App 立即创建的新任务仍只发现旧工具。因此当前实测边界是 CLI/新进程立即生效，桌面 App 工具清单仍需完整重启；真实 App 宿主门禁保持 partial，不能称为已替代旧工具。
+维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。后续又用官方命令移除同名开发期直连，旧 `codex_cc_tools` 保持 enabled。完整重启后的新任务暴露 0.1.0 的相对 runtime 入口没有工作目录；`0.1.1-beta.0` 已补齐 `cwd: "."`，由 GitHub Actions OIDC 发布到 npm `next` 并通过公共 registry 隔离验收，活动插件也已按官方 remove/add 升级。CLI 现在把该字段解析到 0.1.1-beta.0 缓存根目录，但不重启 App 立即创建的新任务仍只发现旧工具。随后一次窗口/UI 级“重启”也没有终止早于 beta 安装启动的后台 `codex.exe app-server`，因此不能算修复后的完整复验。当前实测边界是 CLI/新进程立即生效，桌面 App 工具清单需要彻底退出后台宿主后重新打开；真实 App 宿主门禁保持 partial，不能称为已替代旧工具。
 
 完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](docs/release/checklist.md)。
 
@@ -104,4 +104,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；`next` 已由 GitHub Actions OIDC 更新为 `0.1.1-beta.0`。beta 的本地确定性矩阵为 53 files / 891 passed / 1 skipped / 0 failed，Node 20/22/24 CI、release smoke、8/8 能力索引、生产依赖审计、隔离官方插件生命周期和公共 npm 精确版本验收全部通过。维护者本机活动插件已升级到该 beta，CLI 已解析正确缓存工作目录；升级后无重启的新任务仍未加载插件工具，所以完整真实 Codex App 宿主门禁等待 App 重启后的真实调用，仍为 partial。公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。
+当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；`next` 已由 GitHub Actions OIDC 更新为 `0.1.1-beta.0`。beta 的本地确定性矩阵为 53 files / 891 passed / 1 skipped / 0 failed，Node 20/22/24 CI、release smoke、8/8 能力索引、生产依赖审计、隔离官方插件生命周期和公共 npm 精确版本验收全部通过。维护者本机活动插件已升级到该 beta，CLI 已解析正确缓存工作目录；升级后无重启的新任务仍未加载插件工具，随后窗口级重启也没有结束旧后台宿主。因此完整真实 Codex App 宿主门禁等待后台进程真正退出并重开后的真实调用，仍为 partial。公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。
