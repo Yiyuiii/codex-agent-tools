@@ -155,6 +155,12 @@ vulnerabilities 与 228-file pack dry-run 均通过。首轮全库仅有两个 v
 三项非阻断文档建议全部采纳；`.release-validation/v0.1.0.md` 已写入七项精确
 marker。当前剩余 `main` CI、stable tag OIDC 发布和公共 stable 包隔离复验。
 
+2026-07-30 完成：stable 提交 `20c6922` 已 fast-forward 到 `main`，CI run
+`30509477415` 的 Node 20/22/24 全绿。`v0.1.0` release run `30509627373`
+通过 stable validation、真实 npm OIDC 发布、registry/`latest` 校验与正式
+GitHub Release 创建。随后从公共 registry 精确安装 `0.1.0` 的隔离复验通过；
+最终 dist-tags 为 `latest=0.1.0`、`next=0.1.0-beta.1`。Task 4 与本计划完成。
+
 **文件**
 
 - Modify: version-bearing files to `0.1.0`
