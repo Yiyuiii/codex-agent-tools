@@ -109,6 +109,7 @@
 - 2026-07-30：维护者完成整 App 重启后，第二个全新 projectless 验收任务仍只发现旧 `cc_review` / `cc_delegate`，再次在真实调用前首错停止。精确诊断发现 0.1.0 的 `.mcp.json` 使用相对 runtime 参数却没有 `cwd`；`codex mcp get codex_external_agents` 因此显示 `cwd: -`，而官方内置 Sites 本地 stdio 插件使用 `cwd: "."`，CLI 会把它解析为版本化插件缓存根目录。`0.1.1-beta.0` 修复候选已按 TDD 增加 `cwd: "."`，并把 artifact、release smoke、隔离插件和公共 npm 消费者验收都改为强制读取并验证该声明，禁止测试代码继续替宿主隐式指定插件根目录。独立 `cc_review` 无 P0/P1；其指出的公共 npm 验收跨平台绝对路径一致性缺口已补失败测试并修复。fresh 本地结果为 53 files / 891 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖 0 vulnerabilities、隔离官方插件生命周期与 `git diff --check` 通过；尚未发布或安装该 beta，也尚未证明修复后的真实 App 工具发现。
 - 2026-07-30：`0.1.1-beta.0` 已由 PR #1 merge commit `cf7a702` 纳入 `next`；CI run `30516213749` 的 Node 20/22/24 全绿，release run `30516364128` 通过全量门禁、npm OIDC、registry/`next` 校验和 GitHub prerelease 创建。npm 最终为 `next=0.1.1-beta.0`、`latest=0.1.0`；精确公共包隔离验收通过 CLI、doctor、直接 MCP、官方临时插件生命周期、缓存副本 manifest `cwd` 解析、8/8 能力索引、目标进程 0/0/0 和资格锁 absent，真实模型调用为 0，报告见 [0.1.1-beta.0 公共 npm 隔离验收](docs/release/0.1.1-beta.0-npm-acceptance.md)。活动插件随后按官方 remove/add 从 0.1.0 升至 installed/enabled 0.1.1-beta.0；`codex mcp get` 已把 `cwd: "."` 解析到版本化缓存根目录，旧 `codex_cc_tools` 仍 enabled。未重启 App 立即创建的新任务仍只发现旧工具，因此实测结论是 CLI/新进程可立即看到更新，但当前桌面 App 工具清单不能无重启热更新；该探针真实模型调用与文件修改均为 0。下一人工节点是完整重启 App，再运行真实 Kimi/Pi、隔离 delegate 与取消门禁。
 - 2026-07-30：维护者报告重启后创建的第三个 projectless 探针仍缺少新工具，但进程时间线证明这不是一次完整宿主进程重启：活动 `ChatGPT.exe` 与 `codex.exe app-server` 分别创建于 12:03:40 / 12:03:47，早于 0.1.1-beta.0 缓存创建时间 13:25:34，且进程树没有启动 `codex-external-agents-mcp.mjs`。官方 CLI 同时确认插件 installed/enabled 0.1.1-beta.0、MCP cwd 已解析到版本化缓存根目录、旧 `codex_cc_tools` 仍 enabled。因此本次失败只证明 UI/窗口级重启没有刷新后台宿主，不能证明 beta 在真正进程重启后仍失败；真实调用、文件修改和配置修改均为 0。下一人工节点是从系统托盘彻底退出 Codex（必要时在任务管理器确认相关 `ChatGPT.exe` / `codex.exe` 已结束）后重新打开。
+- 2026-07-30：维护者随后完成真正的宿主进程重启；新 `ChatGPT.exe` / `codex.exe app-server` 创建于 16:32:37 / 16:32:45。新任务 `019fb22c-9206-7352-aed1-bc47fafce56b` 已发现 `external_review` / `external_delegate` 与旧 `cc_review` / `cc_delegate` 共存，证明 beta.0 的 `cwd: "."` 修复有效。一次真实 Kimi K3 review 完成，实际模型 `kimi-code/k3`，命中空数组平均值的 `NaN` 缺陷，文件哈希和 Git 状态不变，进程清理通过。Ark Coding Plan review 在启动 Pi 前因插件 MCP 缺少凭据失败；父 App 脱敏存在性检查确认 `API_KEY_DOUBAO_CODING` 存在。官方配置参考确认 stdio MCP 只通过 manifest `env_vars` 白名单转发本地父环境变量。`0.1.1-beta.1` 候选已按 TDD 增加 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING`、`OPENAI_API_KEY_DOUBAO` 四个变量名，禁止静态 `env`，并让 artifact、release smoke、隔离插件与公共 npm 验收按 manifest 白名单构造 MCP 环境；不保存任何凭据值。聚焦 42/42、类型检查、单 worker 全库 53 files / 891 passed / 1 skipped / 0 failed、8/8 能力索引、release smoke、生产依赖 0 vulnerabilities、228 文件 dry-run 包、隔离官方插件生命周期及 `--check-report` 已通过。首轮并行全库只有一个资格 ledger 用例触发旧 30 秒时限，单独复跑 7.96 秒与单 worker 全库均通过，未放宽时限。发布前 Kimi 窄外审 300 秒超时且无结论，不计 PASS；只清理了与调用时间对应的 owned 子进程，保留用户 Kimi 桌面进程，Pi 残留 0。发布、升级和修复版真实宿主 Pi/delegate/取消验证仍待完成。
 
 ## 架构与计划索引
 
@@ -151,6 +152,7 @@
 - [官方插件四层发布验收清单](docs/release/checklist.md)
 - [0.1.1-beta.0 宿主启动修复发布审阅](docs/release/0.1.1-beta.0-review.md)
 - [0.1.1-beta.0 公共 npm 隔离验收](docs/release/0.1.1-beta.0-npm-acceptance.md)
+- [0.1.1-beta.1 MCP 凭据环境转发修复发布审阅](docs/release/0.1.1-beta.1-review.md)
 
 ## 开发约定
 

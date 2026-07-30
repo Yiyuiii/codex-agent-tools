@@ -4,6 +4,12 @@
     "args": [
       "./runtime/codex-external-agents-mcp.mjs"
     ],
-    "cwd": "."
+    "cwd": ".",
+    "env_vars": [
+      "ARK_API_KEY",
+      "VOLCENGINE_API_KEY",
+      "API_KEY_DOUBAO_CODING",
+      "OPENAI_API_KEY_DOUBAO"
+    ]
   }
 }

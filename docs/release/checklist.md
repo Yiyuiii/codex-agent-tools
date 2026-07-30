@@ -6,9 +6,9 @@
 
 目标发布分支：`next`；当前证据分支：`codex/beta-0.1.1-host-evidence`
 
-包版本：`0.1.1-beta.0`
+包版本：`0.1.1-beta.1`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`；`0.1.1-beta.0` 已由 GitHub Actions OIDC 发布到 `next`，Node 20/22/24 CI 和公共 npm 精确版本隔离验收通过。活动插件已按官方 remove/add 升级，CLI 把 `cwd: "."` 解析到 0.1.1-beta.0 缓存根目录，旧 `codex_cc_tools` 仍 enabled；但无重启立即创建的新任务仍只发现旧工具，证明桌面 App 工具清单不能在本次更新中热刷新。随后一次窗口级重启没有终止 12:03 启动的后台宿主，而 beta 缓存到 13:25 才创建；所以第 4 层等待维护者彻底退出后台进程并重开后的真实 Kimi/Pi、隔离 delegate 与取消门禁，保持 partial。**
+当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`，`0.1.1-beta.0` 仍是当前 npm `next`。真正的宿主进程重启已证明 beta.0 能发现新旧四项工具共存，且真实 Kimi review 通过；Ark Coding review 因插件 manifest 未声明父环境变量白名单而在启动 Pi 前失败。`0.1.1-beta.1` 候选已按 TDD 增加四项精确 `env_vars`，不保存凭据值；本地 53 files / 891 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖 0 vulnerabilities、228 文件 dry-run 包、隔离官方插件生命周期及 `--check-report` 已通过。第 4 层等待 beta.1 完成发布、公共 npm 验收、官方升级与再次完整宿主重启后的 Pi review、隔离 delegate 和取消门禁，保持 partial。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 
@@ -164,7 +164,7 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 ### 前置权限
 
-2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。升级后不重启 App 创建的新任务仍只发现旧工具，因此在真实模型、临时目录和取消测试前首错停止。维护者随后尝试重启，但活动 `ChatGPT.exe` / `codex.exe app-server` 的创建时间仍早于 beta 缓存，说明后台宿主没有退出；第三个探针同样首错停止，真实调用和文件修改为 0。项目代码没有直接读取或写入活动 `~/.codex/config.toml`。当前人工节点是从系统托盘彻底退出后台宿主并重开，而不是重试调用、恢复直连或手工修改配置。
+2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。维护者后来真正终止旧宿主进程并重开，新任务发现新旧四项工具共存；真实 Kimi review 通过，Ark Coding review 因 MCP 没有收到父 App 已存在的 Coding Plan 凭据而在启动 Pi 前失败。根因是 `.mcp.json` 缺少官方 stdio MCP `env_vars` 白名单。0.1.1-beta.1 候选已增加精确四项变量名并禁止静态 `env`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。当前自动节点是完成 beta.1 离线门禁、PR/CI、OIDC 发布、公共 npm 验收和官方升级；下一人工节点是升级后完整重启宿主。
 
 ### 通过标准
 

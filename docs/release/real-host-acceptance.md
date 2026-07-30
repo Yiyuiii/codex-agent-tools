@@ -214,13 +214,43 @@ MCP 进入任务工具面。它不能再归因于同名开发注册，也不能�
 要求刷新 ChatGPT 或 Codex，并在新会话测试；[插件连接与测试说明](https://developers.openai.com/plugins/deploy/connect-chatgpt)
 也要求刷新元数据后启动新会话。当前实测与这些安全边界一致。
 
+## 完整宿主进程重启与凭据转发根因
+
+维护者随后从系统托盘完整退出并重开。只读进程时间线确认这是一次真正的宿主刷新：
+新 `ChatGPT.exe` 创建于 16:32:37，新 `codex.exe app-server` 创建于
+16:32:45，均晚于 0.1.1-beta.0 缓存。新建验收任务
+`019fb22c-9206-7352-aed1-bc47fafce56b` 得到：
+
+- `external_review` / `external_delegate` 与旧
+  `cc_review` / `cc_delegate` 四项工具共存；
+- 官方 CLI 仍显示插件 installed/enabled 0.1.1-beta.0，MCP cwd 解析到版本化
+  缓存根目录，旧 `codex_cc_tools` enabled；
+- 一次真实 Kimi K3 review 完成，实际模型为 `kimi-code/k3`，正确识别
+  `values.length === 0` 导致 `0 / 0 -> NaN`；工作区 Git 状态与两个文件
+  SHA-256 不变，Kimi 进程在调用后归零；
+- 一次 Ark Coding Plan review 在启动 Pi 前以缺少凭据失败；无 retry/fallback、
+  无文件变化、无 Pi 进程启动或残留。
+
+父 App 进程的脱敏存在性检查确认 `API_KEY_DOUBAO_CODING` 存在，但
+0.1.1-beta.0 的插件 `.mcp.json` 没有 `env_vars`。Codex 官方
+[配置参考](https://learn.chatgpt.com/docs/config-file/config-reference)明确：
+stdio MCP 的 `env_vars` 是从本地父环境转发的变量白名单，字符串条目默认来源为
+`local`；`env` 是静态值。因此失败发生在 App → MCP 的环境边界，不是 Pi、
+模型注册表、凭据优先级或 Coding Plan 路由内部。
+
+`0.1.1-beta.1` 候选按 TDD 增加四项精确变量名白名单，不写入任何值，并让
+artifact、release smoke、隔离插件和公共 npm 消费者验收都验证该合同。隔离插件
+生命周期及其 `--check-report` 复核已通过；修复版尚未发布、升级或在真实 App
+复验。
+
 ## 尚未通过的门禁
 
 完整第 4 层仍缺少以下证据：
 
-1. 升级后的 App 刷新：从系统托盘彻底退出后台宿主并重开，再创建新任务确认新旧
-   四项工具共存，并用官方只读列表核对插件入口及解析后的缓存工作目录。
-2. 真实宿主调用：插件进入工具面后，完成 Kimi 与至少一条 Pi 路线的代表性 review。
+1. 发布并通过公共 npm 隔离验收后，用官方 remove/add 升级到
+   `0.1.1-beta.1`，再完整重启宿主。
+2. 真实宿主调用：复用既有 Kimi 通过证据，重点完成至少一条 Pi 路线的代表性
+   review。
 3. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主验证取消长任务后的
    Kimi/Pi 进程回收。
 
@@ -234,18 +264,13 @@ MCP 进入任务工具面。它不能再归因于同名开发注册，也不能�
 
 ## 下一人工节点
 
-下一步需要维护者从系统托盘彻底退出 Codex 桌面 App，确认旧 `ChatGPT.exe` /
-`codex.exe app-server` 已结束，再重新打开。完成真正的宿主进程重启后，才创建
-新的验收任务并消费已经批准但尚未使用的真实调用：
+下一步由 Codex 完成 `0.1.1-beta.1` 的离线门禁、PR/CI、GitHub Actions OIDC
+beta 发布、公共 npm 隔离验收和官方插件升级。升级后仍需要维护者再做一次完整宿主
+重启，Codex 才能在新任务验证 Pi review、隔离 delegate 与取消清理。
 
-1. 从插件缓存重新发现 `external_review` / `external_delegate`；
-2. 复核旧 `cc_review` / `cc_delegate` 仍存在；
-3. 在脱敏、隔离边界内运行一项 Kimi review、一项 Pi review、一项 delegate 和
-   一项可取消长任务。
-
-当前失败已经证明不是单纯“App 未刷新”，而是 0.1.0 插件启动合同缺少工作目录。
-若修复版升级并刷新后的新任务仍无法发现工具，再单独审计 App 插件加载，而不是恢复
-开发直连。只有确认新插件安装本身失败时，才对本次新插件使用已授权的官方回滚：
+若修复版升级并刷新后的新任务仍报告缺少 Ark 凭据，应单独审计 App 对 `env_vars`
+的实际解析，不恢复开发直连。只有确认新插件安装本身失败时，才对本次新插件使用已
+授权的官方回滚：
 
 ```powershell
 codex plugin remove codex-external-agents@codex-external-agents-local

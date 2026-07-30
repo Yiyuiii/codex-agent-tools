@@ -60,6 +60,40 @@ const fakePiScript = path.join(
 const inheritedProxy = "http://parent-proxy.invalid:9999";
 const inheritedAllProxy = "socks5://parent-proxy.invalid:9999";
 const credentialSentinel = "isolated-plugin-sentinel";
+const expectedPluginEnvironmentVariables = [
+  "ARK_API_KEY",
+  "VOLCENGINE_API_KEY",
+  "API_KEY_DOUBAO_CODING",
+  "OPENAI_API_KEY_DOUBAO",
+];
+const mcpBaseEnvironmentVariables = new Set([
+  "PATH",
+  "Path",
+  "PATHEXT",
+  "SystemRoot",
+  "SYSTEMROOT",
+  "SystemDrive",
+  "ComSpec",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "HOME",
+  "USERPROFILE",
+  "LOCALAPPDATA",
+  "APPDATA",
+  "CODEX_HOME",
+  "ProgramData",
+  "ProgramFiles",
+  "ProgramFiles(x86)",
+  "PI_COMMAND",
+  "KIMI_COMMAND",
+  "HTTPS_PROXY",
+  "HTTP_PROXY",
+  "ALL_PROXY",
+  "https_proxy",
+  "http_proxy",
+  "all_proxy",
+]);
 const temporaryRoot = await mkdtemp(
   path.join(os.tmpdir(), "codex-plugin-isolated-acceptance-"),
 );
@@ -120,6 +154,15 @@ function childEnvironment(overrides = {}) {
       ...process.env,
       ...overrides,
     }).filter(([, value]) => typeof value === "string"),
+  );
+}
+
+function manifestForwardedMcpEnvironment(environment, envVars) {
+  const allowed = new Set([...mcpBaseEnvironmentVariables, ...envVars]);
+  return Object.fromEntries(
+    Object.entries(environment).filter(
+      ([name, value]) => allowed.has(name) && typeof value === "string",
+    ),
   );
 }
 
@@ -295,10 +338,20 @@ async function readInstalledMcpServer(installedPluginRoot) {
       "Installed MCP cwd must resolve relative launch paths from the plugin root",
     );
   }
+  if (
+    JSON.stringify(server.env_vars) !==
+      JSON.stringify(expectedPluginEnvironmentVariables) ||
+    Object.hasOwn(server, "env")
+  ) {
+    throw new Error(
+      "Installed MCP must whitelist the exact local credential environment names",
+    );
+  }
   return {
     command: server.command,
     args: [...server.args],
     cwd: path.resolve(installedPluginRoot, server.cwd),
+    envVars: [...server.env_vars],
   };
 }
 
@@ -545,20 +598,24 @@ try {
     name: "codex-plugin-isolated-acceptance",
     version: "1.0.0",
   });
+  const mcpEnvironment = childEnvironment({
+    CODEX_HOME: isolatedHome,
+    LOCALAPPDATA: isolatedLocalAppData,
+    APPDATA: isolatedAppData,
+    PI_COMMAND: fakePiCommand,
+    OPENAI_API_KEY_DOUBAO: credentialSentinel,
+    HTTPS_PROXY: inheritedProxy,
+    HTTP_PROXY: inheritedProxy,
+    ALL_PROXY: inheritedAllProxy,
+  });
   transport = new StdioClientTransport({
     command: server.command,
     args: server.args,
     cwd: server.cwd,
-    env: childEnvironment({
-      CODEX_HOME: isolatedHome,
-      LOCALAPPDATA: isolatedLocalAppData,
-      APPDATA: isolatedAppData,
-      PI_COMMAND: fakePiCommand,
-      OPENAI_API_KEY_DOUBAO: credentialSentinel,
-      HTTPS_PROXY: inheritedProxy,
-      HTTP_PROXY: inheritedProxy,
-      ALL_PROXY: inheritedAllProxy,
-    }),
+    env: manifestForwardedMcpEnvironment(
+      mcpEnvironment,
+      server.envVars,
+    ),
     stderr: "pipe",
   });
   await client.connect(transport);
