@@ -8,7 +8,7 @@
 
 包版本：`0.1.1-beta.1`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`，`0.1.1-beta.0` 仍是当前 npm `next`。真正的宿主进程重启已证明 beta.0 能发现新旧四项工具共存，且真实 Kimi review 通过；Ark Coding review 因插件 manifest 未声明父环境变量白名单而在启动 Pi 前失败。`0.1.1-beta.1` 候选已按 TDD 增加四项精确 `env_vars`，不保存凭据值；本地 53 files / 891 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖 0 vulnerabilities、228 文件 dry-run 包、隔离官方插件生命周期及 `--check-report` 已通过。第 4 层等待 beta.1 完成发布、公共 npm 验收、官方升级与再次完整宿主重启后的 Pi review、隔离 delegate 和取消门禁，保持 partial。**
+当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`；`0.1.1-beta.1` 已由 GitHub Actions OIDC 发布到 `next`，Node 20/22/24 CI 和公共 npm 精确版本隔离验收通过。活动插件也已通过官方 remove/add 升级到 installed/enabled beta.1，CLI 显示正确缓存 cwd、四项脱敏环境变量，旧 `codex_cc_tools` 仍 enabled。第 4 层等待再次完整宿主重启后的 Pi review、隔离 delegate 和取消门禁；发布前 Kimi 外审还证明外层超时不会自动取消 MCP 服务端请求，因此取消传播与子进程不重生是明确的 stable 阻断项，状态保持 partial。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 
