@@ -240,15 +240,60 @@ stdio MCP 的 `env_vars` 是从本地父环境转发的变量白名单，字符�
 
 `0.1.1-beta.1` 候选按 TDD 增加四项精确变量名白名单，不写入任何值，并让
 artifact、release smoke、隔离插件和公共 npm 消费者验收都验证该合同。隔离插件
-生命周期及其 `--check-report` 复核已通过；修复版尚未发布、升级或在真实 App
-复验。
+生命周期及其 `--check-report` 复核已通过。
+
+## beta.1 发布、公共验收与取消残留
+
+PR #2 merge commit `6d50a73` 已进入 `next`；CI run `30531374989` 的
+Node 20/22/24 全绿。标签 `v0.1.1-beta.1` 触发 release run
+`30531642511`，通过 GitHub Actions OIDC 发布、registry/`next` 校验和
+GitHub prerelease 创建；npm 最终为 `next=0.1.1-beta.1`、
+`latest=0.1.0`。
+
+公共 registry 精确版本验收最终通过 CLI、doctor、直接 MCP、官方临时插件
+add/list/remove、缓存副本 `cwd` / `env_vars` 合同、8/8 能力索引、目标进程
+0/0/0 与资格锁 absent；真实模型调用 0，见
+[0.1.1-beta.1 公共 npm 隔离验收](0.1.1-beta.1-npm-acceptance.md)。
+
+第一次公共验收在模型调用前首错停止：此前 300 秒超时的 Kimi 外审虽然已从调用方
+返回，但活动 beta.0 插件 MCP 仍在服务端运行请求，并延迟拉起一个 `kimi acp`
+进程。只终止该 ACP 子进程后，同一 MCP 又将其拉起。Codex 随后只清理了命令行
+精确匹配插件 runtime 且拥有该 ACP 子进程的 MCP 进程树；Kimi 桌面主进程、
+Codex App 与旧 `codex_cc_tools` 均保留。5 秒复核确认 ACP 为 0，公共验收才
+重新执行并通过。
+
+该事实证明“工具调用超时”目前不等于“服务端工作已取消”。这是稳定发布的独立阻断
+项，不能由 beta.1 的凭据转发修复自动视为通过。
+
+## 活动插件升级到 beta.1
+
+活动插件第一次执行官方 remove 时，Windows 拒绝删除仍被占用的 beta.0 缓存。
+该命令已移除 MCP 注册，但 plugin list 仍显示 beta.0 installed，因此没有继续
+add 或手工删除文件。只读进程核对发现当前 App 宿主下累积了多项命令行精确匹配
+`codex-external-agents-mcp.mjs` 的闲置 Node 进程，最高观测 24 项；它们没有
+子进程。
+
+Codex 只清理这些由当前 App 宿主启动的插件 MCP 进程树，未终止 App、Kimi 桌面、
+旧 `codex_cc_tools` 或其它 Node 进程。精确目标归零后：
+
+1. 官方 plugin remove 成功，列表显示 not installed；
+2. 官方 plugin add 成功安装 0.1.1-beta.1；
+3. 官方列表显示 installed/enabled 0.1.1-beta.1；
+4. `codex mcp get codex_external_agents` 把 `cwd` 解析到 beta.1 版本化缓存，
+   四项转发变量均只显示为 `*****`；
+5. `codex mcp get codex_cc_tools` 仍显示 enabled，工具为
+   `cc_review` / `cc_delegate`。
+
+没有直接读写活动 `config.toml`，也没有手工删除插件缓存。当前 app-server 在升级
+前已加载插件配置，既有实测表明版本更新不能热刷新，所以真实 Pi/delegate/取消调用
+必须等完整 App 重启后在新任务执行。
 
 ## 尚未通过的门禁
 
 完整第 4 层仍缺少以下证据：
 
-1. 发布并通过公共 npm 隔离验收后，用官方 remove/add 升级到
-   `0.1.1-beta.1`，再完整重启宿主。
+1. 完整重启宿主，并在新任务确认 beta.1 缓存与四项脱敏环境变量已经被新
+   app-server 加载。
 2. 真实宿主调用：复用既有 Kimi 通过证据，重点完成至少一条 Pi 路线的代表性
    review。
 3. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主验证取消长任务后的
@@ -264,9 +309,8 @@ artifact、release smoke、隔离插件和公共 npm 消费者验收都验证该
 
 ## 下一人工节点
 
-下一步由 Codex 完成 `0.1.1-beta.1` 的离线门禁、PR/CI、GitHub Actions OIDC
-beta 发布、公共 npm 隔离验收和官方插件升级。升级后仍需要维护者再做一次完整宿主
-重启，Codex 才能在新任务验证 Pi review、隔离 delegate 与取消清理。
+下一步需要维护者再做一次完整宿主重启。重启后 Codex 将在新任务验证 Pi review、
+隔离 delegate 与取消清理。
 
 若修复版升级并刷新后的新任务仍报告缺少 Ark 凭据，应单独审计 App 对 `env_vars`
 的实际解析，不恢复开发直连。只有确认新插件安装本身失败时，才对本次新插件使用已

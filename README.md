@@ -104,4 +104,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；当前 npm `next` 为 `0.1.1-beta.0`。`0.1.1-beta.1` 是尚未发布的凭据环境白名单修复候选；本地单 worker 矩阵为 53 files / 891 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖审计、228 文件 dry-run 包、隔离官方插件生命周期和报告复核均已通过。Node 20/22/24 CI、公共 npm 精确版本验收与修复版真实宿主验收仍待完成。维护者本机活动插件暂时仍是 beta.0，旧 `codex_cc_tools` 保持 enabled。公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。
+当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；npm `next` 已由 GitHub Actions OIDC 更新为 `0.1.1-beta.1`。本地单 worker 矩阵为 53 files / 891 passed / 1 skipped / 0 failed，Node 20/22/24 CI、类型检查、8/8 能力索引、release smoke、生产依赖审计、228 文件 dry-run 包、隔离官方插件生命周期和公共 npm 精确版本验收均已通过。维护者本机活动插件已通过官方 remove/add 升级到 beta.1，CLI 显示正确缓存 cwd 与四项脱敏环境变量，旧 `codex_cc_tools` 保持 enabled；完整重启后的修复版真实宿主 Pi/delegate/取消门禁仍待完成。一次 Kimi 外审还证明外层超时不会自动取消 MCP 服务端工作，因此取消传播与进程不重生必须在 stable 前闭合。公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。
