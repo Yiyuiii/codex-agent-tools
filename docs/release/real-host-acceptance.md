@@ -2,7 +2,7 @@
 
 日期：2026-07-30
 
-状态：**partial — 完整重启后仍复现；0.1.1-beta.0 已形成工作目录修复候选**
+状态：**partial — beta 已发布并升级；无重启热更新失败，等待完整重启后真实调用**
 
 ## 授权与边界
 
@@ -154,7 +154,7 @@ MCP 进入任务工具面。它不能再归因于同名开发注册，也不能�
 `cwd`，替宿主补齐了 manifest 没有声明的启动条件。它证明 bundle 本身可运行，却
 没有证明真实宿主能从 manifest 得到相同工作目录。
 
-`0.1.1-beta.0` 修复候选已经：
+`0.1.1-beta.0` 修复已经：
 
 1. 在插件 `.mcp.json` 显式声明 `cwd: "."`；
 2. 让 artifact 与 release smoke 强制验证该字段；
@@ -165,9 +165,32 @@ MCP 进入任务工具面。它不能再归因于同名开发注册，也不能�
 
 当前确定性矩阵为 53 个测试文件、891 passed / 1 skipped / 0 failed；类型检查、
 8/8 能力索引、release smoke、生产依赖 0 vulnerabilities、隔离官方插件生命周期
-与 `git diff --check` 通过。该结果仍只证明修复候选和 CLI/缓存启动合同；在 beta
-发布、活动插件官方升级、App 再刷新和新任务发现成功前，不把它写成真实 App 根因已
-闭环。
+与 `git diff --check` 通过。
+
+## beta 发布、公共验收与活动升级
+
+- PR #1 merge commit `cf7a702` 已进入 `next`；
+- CI run `30516213749` 的 Node 20/22/24 全绿；
+- release run `30516364128` 通过 npm OIDC、registry/`next` 校验和 GitHub
+  prerelease 创建；
+- npm dist-tags 为 `next=0.1.1-beta.0`、`latest=0.1.0`；
+- 公共 registry 精确版本验收通过 CLI、doctor、直接 MCP、官方临时插件生命周期、
+  缓存副本 manifest `cwd` 解析、8/8 能力索引、目标进程 0/0/0 和资格锁 absent；
+  真实模型调用为 0，见
+  [公共 npm 隔离验收](0.1.1-beta.0-npm-acceptance.md)；
+- 活动插件按官方 remove/add 从 0.1.0 升至 installed/enabled 0.1.1-beta.0；
+- `codex mcp get codex_external_agents` 已把 `cwd: "."` 解析到
+  `.../codex-external-agents/0.1.1-beta.0/.`；
+- 旧 `codex_cc_tools` 继续 enabled。
+
+升级后没有重启 App，立即创建新的 projectless 工具发现探针。该任务仍只发现旧
+`cc_review` / `cc_delegate`，没有发现 `external_review` /
+`external_delegate`，并按首错停止：真实模型调用 0、文件修改 0、指定 CLI 核对
+未继续执行。结合根任务已经取得的官方 CLI 结果，当前实测边界是：
+
+- CLI 和新启动的 CLI 进程可以立即读取更新后的 MCP 配置；
+- 当前桌面 App 的任务工具清单不能在本次插件升级中无重启刷新；
+- 下一次完整 App 重启后的新任务才是修复闭环证据。
 
 [官方 MCP 手册](https://learn.chatgpt.com/docs/extend/mcp)对桌面端手工 MCP
 配置要求保存后选择 Restart；[官方插件构建说明](https://learn.chatgpt.com/docs/build-plugins.md)
@@ -178,12 +201,10 @@ MCP 进入任务工具面。它不能再归因于同名开发注册，也不能�
 
 完整第 4 层仍缺少以下证据：
 
-1. beta 发布与升级：发布 `0.1.1-beta.0` 到 npm `next`，从公共 registry 完成
-   隔离消费者验收，再用官方插件命令把活动副本升级到该版本。
-2. 升级后的 App 刷新：活动插件升级后需要刷新或重启 App，再创建新任务确认新旧
+1. 升级后的 App 刷新：活动插件升级后需要完整重启 App，再创建新任务确认新旧
    四项工具共存，并用官方只读列表核对插件入口及解析后的缓存工作目录。
-3. 真实宿主调用：插件进入工具面后，完成 Kimi 与至少一条 Pi 路线的代表性 review。
-4. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主验证取消长任务后的
+2. 真实宿主调用：插件进入工具面后，完成 Kimi 与至少一条 Pi 路线的代表性 review。
+3. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主验证取消长任务后的
    Kimi/Pi 进程回收。
 
 在这些缺口闭合前：
@@ -196,9 +217,8 @@ MCP 进入任务工具面。它不能再归因于同名开发注册，也不能�
 
 ## 下一人工节点
 
-下一步先由自动化发布并隔离验收 `0.1.1-beta.0`，再通过官方插件 remove/add 流程
-升级活动副本。升级后的 App 工具清单仍以刷新边界为准；刷新完成后才创建新的验收
-任务并消费已经批准但尚未使用的真实调用：
+下一步需要维护者完整重启 Codex 桌面 App。重启完成后才创建新的验收任务并消费
+已经批准但尚未使用的真实调用：
 
 1. 从插件缓存重新发现 `external_review` / `external_delegate`；
 2. 复核旧 `cc_review` / `cc_delegate` 仍存在；
