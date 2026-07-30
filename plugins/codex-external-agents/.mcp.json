@@ -3,6 +3,7 @@
     "command": "node",
     "args": [
       "./runtime/codex-external-agents-mcp.mjs"
-    ]
+    ],
+    "cwd": "."
   }
 }

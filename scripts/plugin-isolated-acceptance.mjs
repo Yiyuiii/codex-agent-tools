@@ -290,7 +290,16 @@ async function readInstalledMcpServer(installedPluginRoot) {
   ) {
     throw new Error("Installed MCP args must all be relative strings");
   }
-  return { command: server.command, args: [...server.args] };
+  if (server.cwd !== ".") {
+    throw new Error(
+      "Installed MCP cwd must resolve relative launch paths from the plugin root",
+    );
+  }
+  return {
+    command: server.command,
+    args: [...server.args],
+    cwd: path.resolve(installedPluginRoot, server.cwd),
+  };
 }
 
 function assertToolContract(tools) {
@@ -450,7 +459,7 @@ ${configLines}
 
 - 官方安装器接受仓库插件中的直接 server-map \`.mcp.json\`。
 - 官方缓存相对位置：\`${installedRelativePath}\`。
-- 已安装副本从上述缓存目录作为工作目录启动，MCP initialize/listTools 成功。
+- 已安装副本声明并强制校验 \`cwd: "."\`；宿主将其解析到上述缓存目录后，MCP initialize/listTools 成功。
 - 工具严格为 \`external_review\` 与 \`external_delegate\`；二者输入均要求 \`llm\`。
 - \`external_review\` 为只读且非破坏性；\`external_delegate\` 为可写且具破坏性提示。
 - 已退役的 Gemini review 被已安装 MCP 以 unknown logical LLM 明确拒绝；错误列出精确四项活动 LLM，没有启动 Pi，也没有返回伪造的结构化成功结果。
@@ -539,7 +548,7 @@ try {
   transport = new StdioClientTransport({
     command: server.command,
     args: server.args,
-    cwd: installed.root,
+    cwd: server.cwd,
     env: childEnvironment({
       CODEX_HOME: isolatedHome,
       LOCALAPPDATA: isolatedLocalAppData,

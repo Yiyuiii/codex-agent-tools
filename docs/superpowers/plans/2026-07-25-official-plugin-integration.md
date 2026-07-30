@@ -502,6 +502,7 @@ expect(mcpManifest).toEqual({
   codex_external_agents: {
     command: "node",
     args: ["./runtime/codex-external-agents-mcp.mjs"],
+    cwd: ".",
   },
 });
 ```
@@ -571,7 +572,8 @@ Expected: 因三个 manifest 尚不存在而失败。
     "command": "node",
     "args": [
       "./runtime/codex-external-agents-mcp.mjs"
-    ]
+    ],
+    "cwd": "."
   }
 }
 ```
@@ -805,7 +807,10 @@ const installedPluginRoot = path.join(
 );
 ```
 
-读取该目录下 `.mcp.json`，拒绝绝对 `command`/`args`，然后以 `cwd: installedPluginRoot` 启动 manifest 声明的命令。使用 MCP SDK `initialize` 与 `listTools`，断言只返回：
+读取该目录下 `.mcp.json`，拒绝绝对 `command`/`args`，要求 manifest 精确声明
+`cwd: "."`，并把该字段相对 `installedPluginRoot` 解析后启动命令；不得由测试
+代码在 manifest 之外隐式指定插件根目录。使用 MCP SDK `initialize` 与
+`listTools`，断言只返回：
 
 ```js
 ["external_delegate", "external_review"]

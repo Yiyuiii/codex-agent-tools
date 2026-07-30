@@ -106,6 +106,7 @@
 - 2026-07-30：`0.1.0` stable 发布与发布后验收完成。提交 `20c6922` fast-forward 到 `main` 后，CI run `30509477415` 的 Node 20/22/24 全绿；`v0.1.0` release run `30509627373` 通过 stable validation、全量测试、release smoke、真实 npm OIDC publish、registry/`latest` 校验与正式 GitHub Release 创建。公共 registry 精确安装 `codex-agent-tools@0.1.0` 后，CLI、doctor、stdio MCP、官方插件 add/list/remove、缓存副本 MCP、8/8 能力索引、目标进程 0/0/0 与资格锁 absent 全部通过，真实模型调用为 0。最终 npm dist-tags 为 `latest=0.1.0`、`next=0.1.0-beta.1`；活动 Codex home/config/插件、Claude Code 与旧 `codex_cc_tools` 均未读取或修改。发布后脱敏报告为 `docs/release/0.1.0-npm-acceptance.md`。
 - 2026-07-30：维护者随后明确授权本次真实 Codex 官方 marketplace/plugin add 和失败时的官方回滚。Codex CLI 0.135.0 已把 `codex-external-agents@codex-external-agents-local` 安装为 enabled 的 0.1.0，版本化缓存三个文件与 `v0.1.0` 源文件 SHA-256 全部一致；缓存副本 initialize/listTools、工具必填字段/注解、transport 进程回收、当前任务新旧工具共存和退役模型负向拒绝均通过，未调用真实模型，也未读取活动配置或修改旧 `codex_cc_tools`。安装前活动配置已有同名开发期 `codex_external_agents` MCP 指向仓库 `dist/mcp.js`，所以当前任务的工具发现不能证明调用来自插件缓存；完整第 4 层仍需另行授权移除该开发注册、创建新任务并运行代表性 Kimi/Pi、隔离 delegate 与取消门禁。脱敏证据见 [真实宿主验收记录](docs/release/real-host-acceptance.md)。
 - 2026-07-30：维护者继续授权来源消歧、新任务和真实宿主门禁。官方 `codex mcp remove codex_external_agents` 成功移除指向仓库 `dist/mcp.js` 的开发期全局注册；随后 `codex mcp get` 仍显示同名 server，但 command/args 已变为插件相对的 `node ./runtime/codex-external-agents-mcp.mjs`，插件继续为 installed/enabled 0.1.0，旧 `codex_cc_tools` 继续 enabled。新建的 App projectless 验收任务只发现旧 `cc_review` / `cc_delegate`，没有发现 `external_review` / `external_delegate`，因此严格首错停止：临时目录未创建，Kimi/Pi/delegate 调用均为 0，取消测试未开始。官方手册对桌面手工 MCP 要求 Restart，插件流程要求刷新 Codex 后从新会话测试；当前下一人工节点是刷新或重启 App，不得恢复开发直连、重复真实调用或手工配置绕过。
+- 2026-07-30：维护者完成整 App 重启后，第二个全新 projectless 验收任务仍只发现旧 `cc_review` / `cc_delegate`，再次在真实调用前首错停止。精确诊断发现 0.1.0 的 `.mcp.json` 使用相对 runtime 参数却没有 `cwd`；`codex mcp get codex_external_agents` 因此显示 `cwd: -`，而官方内置 Sites 本地 stdio 插件使用 `cwd: "."`，CLI 会把它解析为版本化插件缓存根目录。`0.1.1-beta.0` 修复候选已按 TDD 增加 `cwd: "."`，并把 artifact、release smoke、隔离插件和公共 npm 消费者验收都改为强制读取并验证该声明，禁止测试代码继续替宿主隐式指定插件根目录。独立 `cc_review` 无 P0/P1；其指出的公共 npm 验收跨平台绝对路径一致性缺口已补失败测试并修复。fresh 本地结果为 53 files / 891 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖 0 vulnerabilities、隔离官方插件生命周期与 `git diff --check` 通过；尚未发布或安装该 beta，也尚未证明修复后的真实 App 工具发现。
 
 ## 架构与计划索引
 
@@ -146,6 +147,7 @@
 - [Pi/Gemini 适配实施计划](docs/superpowers/plans/2026-07-18-pi-gemini-adapter.md)
 - [Ark 迁移与本机切换实施计划](docs/superpowers/plans/2026-07-18-ark-migration-and-cutover.md)
 - [官方插件四层发布验收清单](docs/release/checklist.md)
+- [0.1.1-beta.0 宿主启动修复发布审阅](docs/release/0.1.1-beta.0-review.md)
 
 ## 开发约定
 

@@ -352,6 +352,7 @@ async function checkPluginArtifact() {
     !Array.isArray(server.args) ||
     server.args.length !== 1 ||
     server.args[0] !== "./runtime/codex-external-agents-mcp.mjs" ||
+    server.cwd !== "." ||
     path.isAbsolute(server.args[0]) ||
     path.win32.isAbsolute(server.args[0]) ||
     path.posix.isAbsolute(server.args[0])

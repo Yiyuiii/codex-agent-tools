@@ -4,11 +4,11 @@
 
 最近复核：2026-07-30
 
-目标发布分支：`main`；当前预备分支：`codex/stable-0.1.0`
+目标发布分支：`next`；当前预备分支：`codex/plugin-cwd-0.1.1-beta.0`
 
-包版本：`0.1.0`
+包版本：`0.1.1-beta.0`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`；它的聚合终态不再把其中通过的精确 case 降级。Ark Agent Plan 当时的额度错误属于路线可用性警告，不是 Coding Plan 或整个产品的资格阻碍。`0.1.0` 已由 GitHub Actions OIDC 发布到 npm `latest` 并通过公共 registry 隔离消费者复验，`next` 保持为 `0.1.0-beta.1`。维护者本机已获逐动作授权并完成官方 0.1.0 插件安装、版本化缓存协议检查和开发期直连移除；CLI 已解析到插件相对入口，但当前 App 进程创建的新任务仍未发现插件工具并在真实调用前首错停止。第 4 层等待 App 刷新/重启后的新任务验收，保持 partial。公开发布不授权其它活动 Codex 安装、替代旧工具或改写活动配置。**
+当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`；`0.1.1-beta.0` 是尚未发布的宿主启动修复候选。完整重启后的新任务仍未加载 0.1.0 插件工具；诊断发现其相对 runtime 入口缺少 `cwd`，CLI 显示 `cwd: -`，而官方本地 stdio 插件用 `cwd: "."` 解析到版本化缓存根目录。修复候选已补齐该声明，并让 artifact、release smoke、隔离插件与公共 npm 验收全部 fail closed 地验证 manifest 工作目录；本地 53 files / 891 passed / 1 skipped / 0 failed、类型检查、8/8 能力索引、release smoke、生产依赖审计和隔离官方插件生命周期已通过。第 4 层仍等待 beta 发布、官方升级和 App 刷新后的真实调用，保持 partial。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 
@@ -21,7 +21,7 @@
 | 1    | 确定性单测、类型检查、构建、release smoke | passed                                                                      | typecheck、测试、build、能力索引验证、release smoke 与隔离 `--check-report`                                                                                                                                                |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
 | 3    | 四个逻辑 LLM 的八项真实模型门禁           | passed：8 capabilities / 0 stale                                            | [能力资格索引](../smoke/evidence/capabilities.json)、[Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)                                                                                                                      |
-| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：安装、缓存与 CLI 来源消歧通过；等待 App 刷新后的新任务和真实调用     | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                            |
+| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：0.1.0 重启后仍失败；0.1.1-beta.0 修复候选等待发布、升级和刷新后复验 | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                            |
 
 ## 第 1 层：确定性单测与构建
 

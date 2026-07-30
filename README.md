@@ -21,7 +21,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 全量测试还暴露并闭合了一个既有 Kimi ACP 时序竞态：client 可能早于 child close 返回，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49 文件矩阵已包含该修复。Pi resolver 在生产隔离环境中找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`。
 
-注册表现在保持 8 passed / 0 pending，并由 [`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 与 `npm run verify:capabilities` 约束。当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。真实资格实验的 standing authorization 仍有效，但只有能力指纹失效、证据失效或新增能力时才需要针对性重跑；临时额度恢复本身不触发全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
+注册表现在保持 8 passed / 0 pending，并由 [`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 与 `npm run verify:capabilities` 约束。维护者本机已通过官方命令安装 0.1.0 插件并移除同名开发期直连；旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。真实资格实验的 standing authorization 仍有效，但只有能力指纹失效、证据失效或新增能力时才需要针对性重跑；临时额度恢复本身不触发全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
 2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
@@ -56,7 +56,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。44 files / 584 passed、46 files / 759 passed 与 48 files / 837 passed 都只描述各自历史候选；当前 stable fresh 全量为 53 files / 890 passed / 1 skipped / 0 failed。第 2 层隔离官方插件生命周期与既有 `--check-report` 均已通过；公共 npm 验收脚本还会在每个待晋级版本上重新执行临时 home 的官方生命周期。这些证据都不代表活动 Codex App 已安装或可用。
 
-维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents@0.1.0`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。版本化缓存和 MCP 契约已经通过；后续又用官方命令移除同名开发期直连，CLI 已解析到插件相对入口，旧 `codex_cc_tools` 保持 enabled。但当前桌面 App 进程创建的新任务仍未发现插件工具，已在任何真实模型调用前首错停止；因此需要刷新或重启 App 后再从新任务验收，真实 App 宿主门禁保持 partial，不能称为已替代旧工具。公开 npm 包不会自动安装到用户的活动 Codex；任何真实安装、升级或回滚仍须逐次授权，且不得用手工编辑配置代替官方机制。最新批次的 blocked 终态作为历史事实保留，不再覆盖八项独立能力资格。
+维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents@0.1.0`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。后续又用官方命令移除同名开发期直连，旧 `codex_cc_tools` 保持 enabled。完整重启后的第二个新任务仍未发现插件工具，且 0.1.0 的 `codex mcp get` 显示相对 runtime 入口没有工作目录；官方本地 stdio 插件则用 `cwd: "."` 把相对入口绑定到插件缓存根目录。`0.1.1-beta.0` 修复候选已补齐该声明，并让隔离与 npm 验收从 manifest 读取、强制验证和解析工作目录，不再由测试隐式补齐。真实 App 宿主门禁仍为 partial，须在 beta 发布、官方升级和 App 刷新后的新任务中闭环，不能称为已替代旧工具。
 
 完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](docs/release/checklist.md)。
 
@@ -104,4 +104,4 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前稳定版本为 `0.1.0`，已由 GitHub Actions OIDC 发布到 npm `latest`，并从公共 registry 通过 CLI、doctor、stdio MCP 与隔离官方插件生命周期复验；`next` 保持为 `0.1.0-beta.1`。四模型八项能力已由固定能力索引验证为 8 passed / 0 pending；release smoke 会在打包前重新校验不可变 evidence、精确 case、注册表 anchor 与运行时指纹。最新 `four-llm-v1` 批次仍按历史事实保留为 6 completed / 5 passed、`blocked / case_failed`，但其中已通过的精确 case 可以支持对应能力，批次聚合状态不再覆盖能力状态。维护者本机的官方 0.1.0 插件安装、缓存协议和 CLI 来源消歧已经完成；当前 App 进程的新任务未加载插件工具，完整真实 Codex App 宿主门禁等待 App 刷新/重启后的新任务与真实调用，仍为 partial。公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。
+当前稳定版本为 `0.1.0`，已由 GitHub Actions OIDC 发布到 npm `latest` 并完成公共 registry 隔离复验；`next` 当前仍为 `0.1.0-beta.1`。`0.1.1-beta.0` 是尚未发布的宿主启动修复候选：补齐插件 `cwd: "."`，其本地确定性矩阵为 53 files / 891 passed / 1 skipped / 0 failed，类型检查、8/8 能力索引、release smoke、生产依赖审计和隔离官方插件生命周期均通过。完整真实 Codex App 宿主门禁等待 beta 自动发布、公共 npm 隔离验收、活动插件官方升级和 App 刷新后的真实调用，仍为 partial。公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。

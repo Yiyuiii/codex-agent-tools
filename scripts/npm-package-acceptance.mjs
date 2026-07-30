@@ -94,6 +94,14 @@ function samePath(left, right) {
   );
 }
 
+function isAbsoluteOnAnyPlatform(value) {
+  return (
+    path.isAbsolute(value) ||
+    path.win32.isAbsolute(value) ||
+    path.posix.isAbsolute(value)
+  );
+}
+
 function redactedFailure(value) {
   return String(value)
     .replaceAll(temporaryRoot, "<TEMP_ROOT>")
@@ -279,16 +287,25 @@ async function installedPluginServer(installedPluginRoot) {
   if (
     typeof server.command !== "string" ||
     server.command.trim() === "" ||
-    path.isAbsolute(server.command) ||
+    isAbsoluteOnAnyPlatform(server.command) ||
     !Array.isArray(server.args) ||
     !server.args.every(
       (argument) =>
-        typeof argument === "string" && !path.isAbsolute(argument),
+        typeof argument === "string" && !isAbsoluteOnAnyPlatform(argument),
     )
   ) {
     throw new Error("Installed plugin MCP launch contract is invalid");
   }
-  return { command: server.command, args: [...server.args] };
+  if (server.cwd !== ".") {
+    throw new Error(
+      "Installed plugin MCP cwd must resolve relative launch paths from the plugin root",
+    );
+  }
+  return {
+    command: server.command,
+    args: [...server.args],
+    cwd: path.resolve(installedPluginRoot, server.cwd),
+  };
 }
 
 async function runCodex(args, environment) {
@@ -369,7 +386,7 @@ async function officialPluginLifecycle(environment) {
       await listInstalledMcpTools(
         server.command,
         server.args,
-        installedPluginRoot,
+        server.cwd,
         environment,
       ));
     await cleanupOwnedMcpTransport(cachedClient, cachedTransport);
