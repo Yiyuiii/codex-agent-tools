@@ -31,10 +31,6 @@ export class KimiAdapter implements ExternalAgentAdapter {
       );
     }
     const executable = await this.#locateExecutable();
-    const timeoutMs = Math.min(
-      request.timeoutMs ?? request.profile.timeoutMs,
-      request.profile.timeoutMs,
-    );
     const childEnvironment = buildChildEnvironment(
       request.profile,
       request.parentEnvironment,
@@ -50,9 +46,11 @@ export class KimiAdapter implements ExternalAgentAdapter {
       prompt: request.prompt,
       model: request.profile.model,
       environment: childEnvironment,
-      timeoutMs,
       secretValues,
     };
+    if (request.timeoutMs !== undefined) {
+      clientRequest.timeoutMs = request.timeoutMs;
+    }
     if (request.signal !== undefined) clientRequest.signal = request.signal;
     if (request.sessionId !== undefined) {
       clientRequest.sessionId = request.sessionId;

@@ -76,23 +76,54 @@ describe("public input schemas", () => {
     ).toBe(false);
   });
 
-  it("accepts an optional delegate session id and enforces the global timeout range", () => {
+  it("accepts an optional delegate session id", () => {
     expect(
       externalDelegateInputSchema.safeParse({
         llm: "kimi-k3",
         prompt: "Continue",
         cwd: process.cwd(),
         sessionId: "session-1",
-        timeoutMs: 900_000,
       }).success,
     ).toBe(true);
-    expect(
-      externalDelegateInputSchema.safeParse({
+  });
+
+  it.each([
+    [
+      "review",
+      externalReviewInputSchema,
+      {
+        llm: "kimi-k3",
+        task: "review_diff",
+        prompt: "Review",
+        cwd: process.cwd(),
+      },
+    ],
+    [
+      "delegate",
+      externalDelegateInputSchema,
+      {
         llm: "kimi-k3",
         prompt: "Continue",
         cwd: process.cwd(),
-        timeoutMs: 999,
-      }).success,
-    ).toBe(false);
-  });
+      },
+    ],
+  ] as const)(
+    "accepts an optional per-call safe integer timeout for %s",
+    (_task, schema, input) => {
+      expect(schema.safeParse(input).success).toBe(true);
+
+      for (const timeoutMs of [900_001, Number.MAX_SAFE_INTEGER]) {
+        expect(schema.safeParse({ ...input, timeoutMs }).success).toBe(true);
+      }
+
+      for (const timeoutMs of [
+        999,
+        1_000.5,
+        Number.POSITIVE_INFINITY,
+        Number.MAX_SAFE_INTEGER + 1,
+      ]) {
+        expect(schema.safeParse({ ...input, timeoutMs }).success).toBe(false);
+      }
+    },
+  );
 });

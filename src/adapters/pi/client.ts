@@ -1,6 +1,7 @@
 import { execa } from "execa";
 
 import type { AdapterRunResult } from "../adapter.js";
+import { scheduleDeadline } from "../../runtime/deadline.js";
 import { redactText } from "../../runtime/redaction.js";
 import { terminateProcessTree } from "../../runtime/process-tree.js";
 import { LfJsonlDecoder } from "./jsonl.js";
@@ -24,7 +25,7 @@ export interface PiRpcRunRequest {
   thinkingLevel: PiThinkingLevel;
   task: "review" | "delegate";
   prompt: string;
-  timeoutMs: number;
+  timeoutMs?: number;
   heartbeatMs?: number;
   terminationGraceMs?: number;
   secretValues?: readonly string[];
@@ -420,7 +421,10 @@ export async function runPiRpc(
   const onCallerAbort = (): void => cancel("cancelled");
   request.signal?.addEventListener("abort", onCallerAbort, { once: true });
   if (request.signal?.aborted) cancel("cancelled");
-  const deadline = setTimeout(() => cancel("timed_out"), request.timeoutMs);
+  const deadline = scheduleDeadline(
+    request.timeoutMs,
+    () => cancel("timed_out"),
+  );
   const heartbeat = setInterval(
     () => emitProgress(`pi heartbeat ${Date.now() - startedAt}ms`),
     heartbeatMs,
@@ -460,7 +464,7 @@ export async function runPiRpc(
       appendDiagnostic(error instanceof Error ? error.message : String(error));
     }
   } finally {
-    clearTimeout(deadline);
+    deadline.cancel();
     clearInterval(heartbeat);
     if (killTimer !== undefined) clearTimeout(killTimer);
     request.signal?.removeEventListener("abort", onCallerAbort);

@@ -7,6 +7,7 @@ import * as acp from "@agentclientprotocol/sdk";
 
 import type { TaskKind } from "../../domain/types.js";
 import type { AdapterExecutionTelemetry } from "../adapter.js";
+import { scheduleDeadline } from "../../runtime/deadline.js";
 import { redactText } from "../../runtime/redaction.js";
 import { terminateProcessTree } from "../../runtime/process-tree.js";
 import {
@@ -51,7 +52,7 @@ export interface KimiAcpRunRequest {
   model: string;
   sessionId?: string;
   environment: NodeJS.ProcessEnv;
-  timeoutMs: number;
+  timeoutMs?: number;
   heartbeatMs?: number;
   terminationGraceMs?: number;
   secretValues?: readonly string[];
@@ -321,7 +322,10 @@ export async function runKimiAcp(
   if (request.signal?.aborted) {
     cancel("cancelled");
   }
-  const deadline = setTimeout(() => cancel("timed_out"), request.timeoutMs);
+  const deadline = scheduleDeadline(
+    request.timeoutMs,
+    () => cancel("timed_out"),
+  );
   const heartbeat = setInterval(() => {
     emitProgress(`kimi heartbeat ${Date.now() - startedAt}ms`);
   }, heartbeatMs);
@@ -460,7 +464,7 @@ export async function runKimiAcp(
       ),
     );
   } finally {
-    clearTimeout(deadline);
+    deadline.cancel();
     clearInterval(heartbeat);
     if (killTimer !== undefined) clearTimeout(killTimer);
     request.signal?.removeEventListener("abort", onCallerAbort);

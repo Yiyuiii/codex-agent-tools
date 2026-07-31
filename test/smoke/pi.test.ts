@@ -89,6 +89,50 @@ describe("Ark Pi real-smoke harness", () => {
   });
 
   it.each([
+    ["review", "an omitted", undefined],
+    ["delegate", "an omitted", undefined],
+    ["review", "an explicit", 1_800_000],
+    ["delegate", "an explicit", 1_800_000],
+  ] as const)(
+    "forwards %s service input with %s per-run timeout",
+    async (task, _timeoutKind, timeoutMs) => {
+      const root = await tempRoot();
+      let capturedInput: unknown;
+      const service: PiSmokeService = {
+        review: async (input) => {
+          capturedInput = input;
+          throw new Error("captured review input");
+        },
+        delegate: async (input) => {
+          capturedInput = input;
+          throw new Error("captured delegate input");
+        },
+      };
+      const options = {
+        llm: "ark-agent-plan",
+        task,
+        tempRoot: root,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      };
+
+      await expect(
+        runPiSmoke(options, {
+          service,
+          runtimeEvidence: runtimeEvidence(),
+          readPiVersion: async () => "0.80.10",
+          listPiRpcProcessIds: async () => [100],
+        }),
+      ).rejects.toBeInstanceOf(SmokeInfrastructureError);
+
+      if (timeoutMs === undefined) {
+        expect(capturedInput).not.toHaveProperty("timeoutMs");
+      } else {
+        expect(capturedInput).toHaveProperty("timeoutMs", timeoutMs);
+      }
+    },
+  );
+
+  it.each([
     {
       label: "standalone Ark",
       llm: "ark-agent-plan",

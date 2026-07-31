@@ -116,12 +116,11 @@ export class PiAdapter implements ExternalAgentAdapter {
       thinkingLevel: "medium",
       task: request.task,
       prompt: request.prompt,
-      timeoutMs: Math.min(
-        request.timeoutMs ?? request.profile.timeoutMs,
-        request.profile.timeoutMs,
-      ),
       secretValues,
     };
+    if (request.timeoutMs !== undefined) {
+      clientRequest.timeoutMs = request.timeoutMs;
+    }
     if (request.signal !== undefined) clientRequest.signal = request.signal;
     if (request.onProgress !== undefined) {
       clientRequest.onProgress = request.onProgress;

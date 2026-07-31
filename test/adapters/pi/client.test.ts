@@ -66,7 +66,6 @@ function baseRequest(
     thinkingLevel: "medium" as const,
     task,
     prompt: "Do the task",
-    timeoutMs: 5_000,
     terminationGraceMs: 25,
     secretValues: ["fake-secret"],
   };

@@ -613,8 +613,6 @@ export async function runPiSmoke(
       executionTelemetryReportCount += 1;
       executionTelemetry = telemetry;
     };
-    const timeoutMs = options.timeoutMs ?? profile.timeoutMs;
-
     if (options.task === "review") {
       const result = await inSmokeInfrastructureStage(
         "task_execution",
@@ -627,7 +625,9 @@ export async function runPiSmoke(
                 "Read average.js and average.test.js. Identify the concrete correctness defect that makes the test fail. Cite the relevant expression. Do not modify files and do not execute commands.",
               cwd,
               includeGitDiff: true,
-              timeoutMs,
+              ...(options.timeoutMs === undefined
+                ? {}
+                : { timeoutMs: options.timeoutMs }),
             },
             context,
           ),
@@ -699,7 +699,9 @@ export async function runPiSmoke(
             llm: options.llm,
             prompt,
             cwd,
-            timeoutMs,
+            ...(options.timeoutMs === undefined
+              ? {}
+              : { timeoutMs: options.timeoutMs }),
           },
           context,
         );

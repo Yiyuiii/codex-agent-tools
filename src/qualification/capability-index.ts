@@ -78,7 +78,6 @@ export interface CapabilityFingerprintProfile {
   readonly network: "direct";
   readonly credentialEnv: readonly string[];
   readonly credentialTargetEnv?: string;
-  readonly timeoutMs: number;
   readonly maxConcurrency: number;
   readonly concurrencyKey?: string;
 }
@@ -980,7 +979,6 @@ function normalizedFingerprintProfile(
     network: profile.network,
     credentialEnv: [...profile.credentialEnv],
     credentialTargetEnv: profile.credentialTargetEnv ?? null,
-    timeoutMs: profile.timeoutMs,
     maxConcurrency: profile.maxConcurrency,
     concurrencyKey: profile.concurrencyKey ?? null,
   };
@@ -1027,7 +1025,6 @@ function fingerprintProfile(profile: LlmProfile): CapabilityFingerprintProfile {
     ...(profile.credentialTargetEnv === undefined
       ? {}
       : { credentialTargetEnv: profile.credentialTargetEnv }),
-    timeoutMs: profile.timeoutMs,
     maxConcurrency: profile.maxConcurrency,
     ...(profile.concurrencyKey === undefined
       ? {}

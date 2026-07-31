@@ -5,7 +5,7 @@ import type { KimiAcpRunRequest } from "../../../src/adapters/kimi/client.js";
 import { resolveLlm } from "../../../src/llms/registry.js";
 
 describe("KimiAdapter", () => {
-  it("maps a logical profile to the fixed Kimi executable, model, route, and timeout", async () => {
+  it("maps a logical profile and preserves an explicit per-call timeout", async () => {
     const runClient = vi.fn(async (_request: KimiAcpRunRequest) => ({
       status: "completed" as const,
       text: "done",
@@ -33,7 +33,7 @@ describe("KimiAdapter", () => {
       task: "review",
       cwd: process.cwd(),
       prompt: "Review this repository",
-      timeoutMs: profile.timeoutMs + 1,
+      timeoutMs: 1_800_000,
       parentEnvironment: {
         PATH: "C:\\Windows",
         HTTPS_PROXY: "http://parent:9999",
@@ -56,7 +56,7 @@ describe("KimiAdapter", () => {
       args: ["acp"],
       task: "review",
       model: "kimi-code/k3",
-      timeoutMs: 600_000,
+      timeoutMs: 1_800_000,
       environment: { PATH: "C:\\Windows" },
     });
     expect(clientRequest.environment.HTTPS_PROXY).toBeUndefined();
@@ -94,5 +94,6 @@ describe("KimiAdapter", () => {
     });
     expect(result.sessionId).toBe("existing-session");
     expect(runClient.mock.calls[0]![0].sessionId).toBe("existing-session");
+    expect(runClient.mock.calls[0]![0]).not.toHaveProperty("timeoutMs");
   });
 });

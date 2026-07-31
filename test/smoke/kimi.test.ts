@@ -81,6 +81,49 @@ describe("Kimi real-smoke harness", () => {
     ).toThrow(/Kimi ACP profile/u);
   });
 
+  it.each([
+    ["review", "an omitted", undefined],
+    ["delegate", "an omitted", undefined],
+    ["review", "an explicit", 1_800_000],
+    ["delegate", "an explicit", 1_800_000],
+  ] as const)(
+    "forwards %s service input with %s per-run timeout",
+    async (task, _timeoutKind, timeoutMs) => {
+      const root = await tempRoot();
+      let capturedInput: unknown;
+      const service: KimiSmokeService = {
+        review: async (input) => {
+          capturedInput = input;
+          throw new Error("captured review input");
+        },
+        delegate: async (input) => {
+          capturedInput = input;
+          throw new Error("captured delegate input");
+        },
+      };
+      const options = {
+        llm: "kimi-k3",
+        task,
+        tempRoot: root,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      };
+
+      await expect(
+        runKimiSmoke(options, {
+          service,
+          readKimiVersion: async () => "0.27.0",
+          listKimiProcessIds: async () => [100],
+        }),
+      ).rejects.toBeInstanceOf(SmokeInfrastructureError);
+
+      if (timeoutMs === undefined) {
+        expect(capturedInput).not.toHaveProperty("timeoutMs");
+      } else {
+        expect(capturedInput).toHaveProperty("timeoutMs", timeoutMs);
+      }
+    },
+  );
+
   it("rejects a qualification identity for a different active case", async () => {
     await expect(
       runKimiSmoke({

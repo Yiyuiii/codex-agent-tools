@@ -20,7 +20,12 @@ const commonShape = {
   llm: z.string().trim().min(1),
   prompt: z.string().trim().min(1).max(200_000),
   cwd: cwdSchema,
-  timeoutMs: z.number().int().min(1_000).max(900_000).optional(),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(1_000)
+    .max(Number.MAX_SAFE_INTEGER)
+    .optional(),
 } as const;
 
 export const externalReviewInputSchema = z

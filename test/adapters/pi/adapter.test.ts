@@ -17,7 +17,6 @@ function profile(): LlmProfile {
     network: "direct",
     credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
     credentialTargetEnv: "CODEX_AGENT_ARK_AGENT_KEY",
-    timeoutMs: 900_000,
     maxConcurrency: 1,
     capabilities: { review: true, delegate: true },
     qualityGates: {
@@ -82,7 +81,7 @@ describe("PiAdapter", () => {
       task: "delegate",
       cwd: process.cwd(),
       prompt: "Implement",
-      timeoutMs: 900_000,
+      timeoutMs: 1_800_000,
       parentEnvironment: {
         PATH: "C:\\Windows",
         HTTPS_PROXY: "http://parent:9999",
@@ -117,7 +116,7 @@ describe("PiAdapter", () => {
       model: "ark-code-latest",
       thinkingLevel: "medium",
       task: "delegate",
-      timeoutMs: 900_000,
+      timeoutMs: 1_800_000,
       environment: {
         PATH: "C:\\Windows",
         CODEX_AGENT_ARK_AGENT_KEY: "ark-secret",
@@ -128,6 +127,48 @@ describe("PiAdapter", () => {
     expect(request.environment.HTTPS_PROXY).toBeUndefined();
     expect(request.environment.ANTHROPIC_API_KEY).toBeUndefined();
     expect(request.environment.OPENAI_API_KEY_DOUBAO).toBeUndefined();
+  });
+
+  it("does not add a timeout when the caller omits it", async () => {
+    const runClient = vi.fn(async (_request: PiRpcRunRequest) => ({
+      status: "completed" as const,
+      text: "done",
+      actualModel: "ark-code-latest",
+      elapsedMs: 10,
+      events: [],
+      diagnostics: [],
+      executionTelemetry: {
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "pi-rpc-observable" as const,
+      },
+    }));
+    const adapter = new PiAdapter({
+      locateExecutable: async () => "pi.cmd",
+      buildConfig: async () => ({
+        agentDir: "C:\\cache\\pi",
+        settingsPath: "C:\\cache\\pi\\settings.json",
+        modelsPath: "C:\\cache\\pi\\models.json",
+        environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
+        contentSha256: "a".repeat(64),
+      }),
+      runClient,
+    });
+
+    await adapter.run({
+      profile: profile(),
+      task: "review",
+      cwd: process.cwd(),
+      prompt: "Review",
+      parentEnvironment: {
+        PATH: "C:\\Windows",
+        OPENAI_API_KEY_DOUBAO: "ark-secret",
+      },
+    });
+
+    expect(runClient.mock.calls[0]![0]).not.toHaveProperty("timeoutMs");
   });
 
   it.each([

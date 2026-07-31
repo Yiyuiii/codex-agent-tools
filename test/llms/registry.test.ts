@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { LlmProfile } from "../../src/domain/types.js";
 import {
@@ -168,6 +168,10 @@ describe("logical LLM registry", () => {
       model: "kimi-code/k3",
       network: "direct",
     });
+    expect(resolveLlm("kimi-k3")).not.toHaveProperty("timeoutMs");
+    expectTypeOf<
+      "timeoutMs" extends keyof LlmProfile ? false : true
+    >().toEqualTypeOf<true>();
     expect(supportedLlmIds()).toEqual([
       "ark-agent-deepseek-v4-flash",
       "ark-agent-plan",
@@ -193,7 +197,6 @@ describe("logical LLM registry", () => {
       ],
       credentialTargetEnv: "CODEX_AGENT_ARK_CODING_KEY",
       concurrencyKey: "ark-coding-plan",
-      timeoutMs: 900_000,
       maxConcurrency: 1,
       capabilities: { review: true, delegate: true },
       qualityGates: {
@@ -240,7 +243,6 @@ describe("logical LLM registry", () => {
         credentialEnv: ["OPENAI_API_KEY_DOUBAO"],
         credentialTargetEnv: "CODEX_AGENT_ARK_AGENT_KEY",
         concurrencyKey: "ark-agent-plan",
-        timeoutMs: 900_000,
         maxConcurrency: 1,
         capabilities: { review: true, delegate: true },
         qualityGates: {

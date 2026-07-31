@@ -223,7 +223,6 @@ describe("capability qualification runtime fingerprint", () => {
           "API_KEY_DOUBAO_CODING",
         ],
         credentialTargetEnv: "CODEX_AGENT_ARK_CODING_KEY",
-        timeoutMs: 900_000,
         maxConcurrency: 1,
         concurrencyKey: "ark-coding-plan",
       },
@@ -394,7 +393,6 @@ function codingProfile() {
       "API_KEY_DOUBAO_CODING",
     ],
     credentialTargetEnv: "CODEX_AGENT_ARK_CODING_KEY",
-    timeoutMs: 900_000,
     maxConcurrency: 1,
     concurrencyKey: "ark-coding-plan",
   };

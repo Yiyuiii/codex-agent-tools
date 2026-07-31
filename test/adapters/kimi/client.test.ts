@@ -31,7 +31,6 @@ function baseRequest(overrides: Record<string, unknown> = {}) {
     prompt: "Review fixture.txt",
     model: "kimi-code/k3",
     environment: { ...process.env },
-    timeoutMs: 5_000,
     heartbeatMs: 1_000,
     terminationGraceMs: 100,
     secretValues: [],

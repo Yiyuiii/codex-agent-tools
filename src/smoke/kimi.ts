@@ -453,8 +453,6 @@ export async function runKimiSmoke(
         commandObservations = observations;
       };
     }
-    const timeoutMs = options.timeoutMs ?? profile.timeoutMs;
-
     if (options.task === "review") {
       const result = await inSmokeInfrastructureStage(
         "task_execution",
@@ -467,7 +465,9 @@ export async function runKimiSmoke(
                 "Read average.js and average.test.js. Identify the concrete correctness defect that makes the test fail. Cite the relevant expression. Do not modify files and do not execute commands.",
               cwd,
               includeGitDiff: true,
-              timeoutMs,
+              ...(options.timeoutMs === undefined
+                ? {}
+                : { timeoutMs: options.timeoutMs }),
             },
             context,
           ),
@@ -531,7 +531,9 @@ export async function runKimiSmoke(
                   "Do not modify any other file. Report the file creation and the command result.",
                 ].join("\n\n"),
               cwd,
-              timeoutMs,
+              ...(options.timeoutMs === undefined
+                ? {}
+                : { timeoutMs: options.timeoutMs }),
             },
             context,
           );
