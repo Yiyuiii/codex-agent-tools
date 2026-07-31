@@ -36,6 +36,10 @@
   `npm run verify:capabilities` 退出 1 且只输出固定脱敏错误是权威预期状态。期间只允许精确
   排除该 live checked-in gate 来运行 capability 单元测试；不得把旧索引改成通过、把门禁
   永久 skip，或从发布验收中删除 verifier。
+- Task 4 已由 `a2f7d28` 实现在途 handler 与可取消 progress drain。规格复审命中的
+  Promise 微任务提前 drain 竞态及 review/delegate 测试缺口由 `f0c71f7` 修复，质量复审的
+  同步 progress notification 抛错覆盖由 `10322a5` 补齐；最终规格与质量复审均通过，父线程
+  聚焦验证为 16/16。
 
 ## Task 1：建立只服务显式 timeout 的分段 deadline 调度器
 
