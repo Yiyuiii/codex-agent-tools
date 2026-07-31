@@ -44,6 +44,14 @@
   顶层脱敏错误。规格复审复现的 listener cleanup 抛错导致 completion 错误 resolve/pending
   问题由 `7395a05` 修复；五项自有 listener 现在逐项 best-effort 清理，connect/close/drain/
   stdin 首错保持不变。最终规格与质量复审均通过，父线程聚焦验证为 28/28。
+- Task 6 已由 `f87104a` 建立真实 `StdioServerTransport → MCP tool → service → adapter →
+  client → fake executable` 的取消链，并由 `db2f947`、`c4004b5`、`599b1ba` 逐轮加固。
+  Kimi 的 root、carrier、grandchild 三层与 Pi 的 root、grandchild 两层都会在 stdin 断开前
+  捕获 `PID + startTime`，client 与 session 只有在完整 owned tree 归零后才返回。测试 teardown
+  只会终止断开前已记录且当前 startTime 精确匹配的进程；未知晚到 PID、格式损坏或不可读的
+  PID 证据一律不重新认领、不终止，并报告失败、保留现场。最终规格与三轮质量闭环均通过，
+  父线程 fresh 验证为 5 文件 63/63、类型检查通过、专用临时目录残留 0；没有真实模型调用、
+  生产执行预算变化、活动配置/插件修改或发布。
 
 ## Task 1：建立只服务显式 timeout 的分段 deadline 调度器
 
