@@ -953,7 +953,7 @@ git commit -m "test: prove stdio cancellation cleans owned trees"
 - 不存在 profile 600/900 秒上限叙述；
 - Pi 生产 native retry 未在本轮关闭；
 - handoff 不是 stable Stop gate 的唯一证据；
-- beta.2 必须先完成公开 npm 与真实宿主取消验收。
+- Task 9 取得 8/8 passed 并使 verifier green 后，Task 10 通过 GitHub Actions 先把 beta.2 发布到 npm next；Task 11 再做公开 npm/官方插件/完整 App 重启/真实 Stop；Task 11 只阻断 stable，Task 12 才发布 stable。
 
 - [ ] **Step 2：运行文档红灯**
 
@@ -976,7 +976,7 @@ npx vitest run test/smoke/script-entrypoints.test.ts test/plugin/artifact.test.t
 在完成真实资格前，明确写：
 
 - 当前源码使八项能力指纹 stale；
-- 旧 `capabilities.json` 保持不可变输入但当前 verifier 必须失败；
+- 当前源码变更已使八项能力指纹 stale；Task 7/8 与 Task 9 新证据形成前，`capabilities.json` 保持原样；Task 9 在新批次 8/8 passed 后更新同一索引；历史 batch manifest 与 case evidence 永久不可变；当前 verifier 必须失败；
 - 当前分支不可发布；
 - 待新 batch passed evidence 后才更新索引。
 

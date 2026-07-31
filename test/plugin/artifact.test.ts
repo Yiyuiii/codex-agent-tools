@@ -310,16 +310,26 @@ describe("Codex plugin artifact", () => {
     );
     const ark = readProjectText("docs/smoke/ark.md");
     const agentMemory = readProjectText("AGENTS.md");
+    const activePlan = readProjectText(
+      "docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md",
+    );
 
-    for (const source of [readme, checklist, runbook, ark, agentMemory]) {
+    for (const source of [
+      readme,
+      checklist,
+      runbook,
+      ark,
+      agentMemory,
+      activePlan,
+    ]) {
       expect(source).toMatch(
         /当前源码变更已使八项能力指纹 stale/u,
       );
       expect(source).toMatch(
-        /Task 7[\s\S]*Task 8[\s\S]*Task 9 新证据形成前[\s\S]*`?capabilities\.json`?[\s\S]*保持原样/u,
+        /Task 7(?:\/8|[\s\S]*Task 8)[\s\S]*Task 9 新证据形成前[\s\S]*`?capabilities\.json`?[\s\S]*保持原样/u,
       );
       expect(source).toMatch(
-        /Task 9[\s\S]*8\/8 passed[\s\S]*更新同一[\s\S]*`?capabilities\.json`?/u,
+        /Task 9[\s\S]*8\/8 passed[\s\S]*更新同一[\s\S]*(?:`?capabilities\.json`?|索引)/u,
       );
       expect(source).toMatch(
         /历史 batch manifest 与 case evidence\s*永久不可变/u,
@@ -341,11 +351,15 @@ describe("Codex plugin artifact", () => {
       readProjectText("docs/release/real-host-acceptance.md"),
       agentMemory,
     ];
+    const releaseOrderDocuments = [...releaseDocuments, activePlan];
 
-    for (const source of releaseDocuments) {
+    for (const source of releaseOrderDocuments) {
       expect(source).toMatch(
         /Task 9[\s\S]*8\/8[\s\S]*verifier green[\s\S]*Task 10[\s\S]*GitHub Actions[\s\S]*beta\.2[\s\S]*npm next[\s\S]*Task 11[\s\S]*公开 npm[\s\S]*官方插件[\s\S]*完整 App 重启[\s\S]*真实 Stop[\s\S]*Task 12[\s\S]*stable/u,
       );
+    }
+
+    for (const source of releaseDocuments) {
       expect(source).toMatch(
         /Task 9 未通过前不得发布 beta\.2；Task 11 未通过前不得发布 stable/u,
       );
@@ -353,6 +367,17 @@ describe("Codex plugin artifact", () => {
         /Task 11 未通过前不得发布 beta\.2/u,
       );
     }
+
+    const activePlanTask7 = markdownSection(
+      activePlan,
+      "## Task 7：同步有效文档、发布门禁与 stale 能力状态",
+    );
+    expect(activePlanTask7).toMatch(
+      /Task 9 取得 8\/8 passed 并使 verifier green 后，Task 10 通过 GitHub Actions 先把 beta\.2 发布到 npm next；Task 11 再做公开 npm\/官方插件\/完整 App 重启\/真实 Stop；Task 11 只阻断 stable，Task 12 才发布 stable/u,
+    );
+    expect(activePlanTask7).toMatch(
+      /当前源码变更已使八项能力指纹 stale；Task 7\/8 与 Task 9 新证据形成前，`capabilities\.json` 保持原样；Task 9 在新批次 8\/8 passed 后更新同一索引；历史 batch manifest 与 case evidence 永久不可变/u,
+    );
 
     const hostAcceptance = releaseDocuments[2] ?? "";
     expect(hostAcceptance).toMatch(
