@@ -6,7 +6,9 @@
 
 ## 当前状态
 
-standing authorization 下的最新真实 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c` 绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，已由一个 `functions.exec` cell 和一个四小时预算的前台 shell 从 ordinal 1 承载到可信首错终态。ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的模型、provider、direct route、凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` failed；ordinal 7–8 notRun。终态为 `blocked / case_failed`、6 completed / 5 passed 且 `promotionEligible=false`；manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，证据提交为 `6b4217d`。该批整体仍为 blocked；当前活动注册表则由能力索引验证为 8 passed / 0 pending。
+当前源码变更已使八项能力指纹 stale。`docs/smoke/evidence/capabilities.json` 作为不可变历史输入保留，不能原地改写；Task 9 新批次完成前，`npm run verify:capabilities` 必须以固定脱敏错误和退出码 1 fail closed。Task 9 只有在新批次 8/8 passed 后才能更新能力索引。registry 的旧 passed 文案不构成发布权威，发布权威仍是 `npm run verify:capabilities`。本手册以下历史终态和哈希保持原样。
+
+standing authorization 下的最新真实 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c` 绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，已由一个 `functions.exec` cell 和一个四小时预算的前台 shell 从 ordinal 1 承载到可信首错终态。ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的模型、provider、direct route、凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` failed；ordinal 7–8 notRun。终态为 `blocked / case_failed`、6 completed / 5 passed 且 `promotionEligible=false`；manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，证据提交为 `6b4217d`。该批整体仍为 blocked；活动 registry 文件仍保留上一实现的 8 passed / 0 pending，但当前 verifier 因新指纹拒绝发布。
 
 本轮没有发生 cell 丢失或 recovery，也没有 resume、retry、fallback、补跑、第二入口或第二批。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。ordinal 1 与 ordinal 6 的精确写入和精确状态命令均各一次 success，结果文件与文件范围都通过；这把上批的 Windows shell 与资格假阳性缺口真实闭合。`account_quota_exceeded` 作为当时 Agent Plan 可用性事实保留；它不再要求全量重跑，也不撤销其它能力资格。
 

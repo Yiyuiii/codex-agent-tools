@@ -8,20 +8,33 @@
 
 包版本：`0.1.1-beta.1`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`；`0.1.1-beta.1` 已由 GitHub Actions OIDC 发布到 `next`，Node 20/22/24 CI 和公共 npm 精确版本隔离验收通过。活动插件也已通过官方 remove/add 升级到 installed/enabled beta.1，CLI 显示正确缓存 cwd、四项脱敏环境变量，旧 `codex_cc_tools` 仍 enabled。第 4 层等待再次完整宿主重启后的 Pi review、隔离 delegate 和取消门禁；发布前 Kimi 外审还证明外层超时不会自动取消 MCP 服务端请求，因此取消传播与子进程不重生是明确的 stable 阻断项，状态保持 partial。**
+当前结论：**Task 1–6 已在源码和确定性测试中闭合原生执行预算、MCP 在途请求追踪、stdio 关闭协调与真实 fake Kimi/Pi owned 进程树清理。因为这些运行时输入已经变化，旧能力索引的八项指纹全部 stale；当前 `npm run verify:capabilities` 必须失败，所以当前分支不可发布。已发布的 `0.1.1-beta.1` 与活动插件保持原状，旧 `codex_cc_tools` 仍 enabled。Task 9 的新 8/8 资格、beta.2 公共发布与完整 App 重启后的普通 Stop/interrupt 真实宿主验收全部完成前，stable 继续阻断。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 
+## 当前 fail-closed 阻断
+
+当前源码变更已使八项能力指纹 stale。旧
+`docs/smoke/evidence/capabilities.json` 仍是不可变历史输入，不得为了让当前候选
+通过而改写；在 Task 9 产生新证据前，`npm run verify:capabilities` 必须打印固定的
+脱敏错误并以退出码 1 结束。Task 9 只有在新批次 8/8 passed 后才能更新能力索引。
+registry 中的旧 passed 文案不构成发布权威；唯一机器发布权威是
+`npm run verify:capabilities`。
+
+beta.1 handoff 只证明旧宿主断开会留下服务端任务，不是 stable Stop gate 的唯一证据。
+beta.2 必须依次通过公开 npm 精确版本验收、官方插件升级、完整 App 重启和真实宿主取消验收。
+完成上述门禁前，beta.2 与 stable 都不可发布。
+
 ## 状态总览
 
 | 层级 | 验收对象                                  | 当前状态                                                                    | 通过证据路径                                                                                                                                                                                                               |
 | ---- | ----------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | 确定性单测、类型检查、构建、release smoke | passed                                                                      | typecheck、测试、build、能力索引验证、release smoke 与隔离 `--check-report`                                                                                                                                                |
+| 1    | 确定性单测、类型检查、构建、release smoke | blocked：实现聚焦验证已通过，能力 verifier 按预期 fail closed               | Task 1–6 聚焦证据；Task 8 才形成完整确定性矩阵                                                                                                                                                                              |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
-| 3    | 四个逻辑 LLM 的八项真实模型门禁           | passed：8 capabilities / 0 stale                                            | [能力资格索引](../smoke/evidence/capabilities.json)、[Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)                                                                                                                      |
-| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta 已发布并升级；窗口重启未结束后台宿主，等待完整进程重启后真实调用 | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                         |
+| 3    | 四个逻辑 LLM 的八项真实模型门禁           | stale：0 current / 8 stale，等待 Task 9                                     | 不可变旧索引与历史 evidence 保留；新批次完成后更新索引                                                                                                                                                                     |
+| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta.1 已安装；等待 beta.2 公开包、完整重启与 Stop/interrupt       | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 [real-host-acceptance.md](real-host-acceptance.md)                                                                                |
 
 ## 第 1 层：确定性单测与构建
 
@@ -82,10 +95,10 @@ npm run acceptance:plugin:isolated
 
 | 逻辑 LLM                      | 固定路由                                             | review  | delegate |
 | ----------------------------- | ---------------------------------------------------- | ------- | -------- |
-| `kimi-k3`                     | Kimi ACP / `kimi-code/k3` / direct                   | passed  | passed   |
-| `ark-coding-plan`             | Pi / `ark-coding-plan` / `ark-code-latest` / direct  | passed  | passed   |
-| `ark-agent-plan`              | Pi / `ark-agent-plan` / `ark-code-latest` / direct   | passed  | passed   |
-| `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | passed  | passed   |
+| `kimi-k3`                     | Kimi ACP / `kimi-code/k3` / direct                   | stale   | stale    |
+| `ark-coding-plan`             | Pi / `ark-coding-plan` / `ark-code-latest` / direct  | stale   | stale    |
+| `ark-agent-plan`              | Pi / `ark-agent-plan` / `ark-code-latest` / direct   | stale   | stale    |
+| `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | stale   | stale    |
 
 ### 通过标准
 
@@ -98,7 +111,7 @@ npm run acceptance:plugin:isolated
 
 ### 当前证据
 
-移除 Gemini 后，当前活动产品面为四个逻辑 LLM、八项能力，注册表为 8 passed / 0 pending。唯一机器资格入口是 [`docs/smoke/evidence/capabilities.json`](../smoke/evidence/capabilities.json)：Coding Plan 与 Kimi 使用最新批次中的 passed case；Agent Plan 两项和 DeepSeek review 使用更早批次中的 passed case；DeepSeek delegate 使用设计中固定且受限的既有 standalone passed evidence。复用发生在精确能力与精确运行时指纹之间，不是把多个批次的聚合状态拼成一个虚构的 passed batch。
+移除 Gemini 后，当前活动产品面仍是四个逻辑 LLM、八项能力。注册表的 8 passed / 0 pending 与旧 [`docs/smoke/evidence/capabilities.json`](../smoke/evidence/capabilities.json) 记录上一实现的历史资格：Coding Plan 与 Kimi 引用最新批次中的 passed case；Agent Plan 两项和 DeepSeek review 引用更早 passed case；DeepSeek delegate 使用受限 legacy evidence。执行预算和 stdio 生命周期进入能力指纹后，这八项旧记录当前全部 stale；只有 Task 9 新 evidence 与新指纹通过 verifier 后才恢复为发布资格。
 
 ### 最新四模型 blocked 批次
 
@@ -148,7 +161,7 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 实现与审阅提交链为 `8261736`、`652b13d` / `5e209e1` / `16cdad5`、`293e745`、`969e546` / `0852691` / `d9eb28a`、`4bd2439`。逐任务规格/质量审阅与整体规格/安全审阅均 PASS；本轮两次 Kimi 外部复核均无结论：设计级跨多实现面审阅约 604.5 秒 `timed_out`，只返回读取进度；实现后两个内嵌摘录的单一不变量审阅约 181.8 秒 `timed_out`，review 正文为空。二者不计 PASS、不阻断，也未重试同形任务。该阶段验证为 48 files / 837 passed / 1 skipped / 0 failed；这个数字只属于当时的历史候选。
 
-当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。注册表为 8 passed / 0 pending；真实 App 安装仍未运行并需要逐动作许可。
+该历史阶段当时未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward；当时注册表为 8 passed / 0 pending，真实 App 安装尚未运行。此段只描述方案 B 阶段，不覆盖本文顶部的当前状态。
 
 ### 历史五模型证据
 

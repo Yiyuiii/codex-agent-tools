@@ -4,6 +4,8 @@
 
 `gemini-3.5-flash` 已从当前活动注册表、Pi 配置、Google 凭据继承、网络策略、doctor、standalone smoke 和资格执行入口完整退役，不再是当前 provider，也没有 pending 能力。当前四个活动逻辑 LLM 全部 direct；本页只保留 Gemini 曾经使用 Pi RPC / Google / 同名模型 / `proxy-10808` 的历史调用、失败和不可变 evidence 索引。
 
+Pi 仍承载当前三条 Ark 路线。现行公共调用省略 `timeoutMs` 时，Pi adapter 不设置模型执行 deadline，保留外部 agent 的原生执行预算。Pi 生产路径的原生 retry 策略未在本轮关闭；资格模式的 single-attempt 与零 retry/fallback 仍是单独的资格合同，不得反向改写生产默认。stdio 断开或调用方取消会等待完整 owned Pi RPC 进程树归零。
+
 2026-07-25 的历史复跑使用 Pi 0.80.10 和隔离配置 SHA-256 `61ffbd4c6ea41adc6a8313f957b732da2b98b8b28b082c52a95226b2a6fb2fe9`。当时凭据按 `GEMINI_API_KEY`、`GOOGLE_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY` 顺序只选第一个非空值；证据只记录命中的变量名，不记录凭据内容。上述变量和路由现在只存在于历史 codec、旧文档和泄漏拒绝检查中，不构成活动运行时支持。
 
 两次历史 evidence 的 `environmentIsolated` 与 `noNewPiRpcProcesses` 均为 true；每次 evidence 验收后的独立系统快照也确认 Kimi 与 Pi RPC 进程数均为 0。delegate 的失败保留为 `google_free_tier_quota`，没有重试或 fallback。该类别只用于解释历史 evidence，不再是活动 smoke 的失败原因。

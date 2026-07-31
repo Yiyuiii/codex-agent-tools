@@ -4,13 +4,15 @@
 
 当前 Ark 公开面共有三项固定 Pi/direct 路线：
 
-- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；最新批次的 delegate/review 均通过，能力索引两项均为 passed。
-- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；review/delegate 均有精确 passed evidence，能力索引两项均为 passed。
-- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；review 与受限 legacy delegate evidence 均已验证，能力索引两项均为 passed。
+- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；最新历史批次的 delegate/review 均通过，旧索引两项均记录为 passed。
+- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；review/delegate 均有精确 passed evidence，旧索引两项均记录为 passed。
+- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；review 与受限 legacy delegate evidence 均已验证，旧索引两项均记录为 passed。
+
+现行公共调用省略 `timeoutMs` 时，三条 Ark/Pi 路线都不设置模型执行 deadline；只有调用方显式传入的单次值会建立 deadline。Pi 生产路径的原生 retry 保持不变，资格模式仍单独执行 single-attempt、零 retry/fallback。本轮执行预算与 stdio 生命周期进入运行时指纹后，当前源码变更已使八项能力指纹 stale；旧 passed evidence 与索引保持不可变，但不能授权发布，Task 9 将生成新 8/8 evidence。
 
 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的 `ark-agent-plan` 配额池。2026-07-20 对旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 完成的四项 passed 证据现仅作为历史事实保留，不属于当前公开面，也不得用于晋级两个新 Agent Plan 路线。原始 evidence JSON 保持不变。
 
-Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力，注册表为 8 passed / 0 pending。资格单位现在是精确的逻辑 LLM × 任务；[`capabilities.json`](evidence/capabilities.json) 验证 evidence 哈希、case 身份、注册表 anchor 与运行时指纹。最新 `four-llm-v1` 批次仍以 `blocked / case_failed` 结束，但其 passed case 可用于对应能力，失败 case 与批次聚合状态都不能冒充其它能力。只有指纹变化、证据失效或新增能力才需定向重跑。
+Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力；registry 文件仍记录上一实现的 8 passed / 0 pending，但它不是当前候选的发布权威。资格单位是精确的逻辑 LLM × 任务；[`capabilities.json`](evidence/capabilities.json) 会被 verifier 用来比较 evidence 哈希、case 身份、registry anchor 与运行时指纹，本轮比较结果为 stale。最新历史 `four-llm-v1` 批次仍以 `blocked / case_failed` 结束，其 passed case 只能在新指纹重新验证后支持对应能力。
 
 2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据。后续真实批次由单个 `functions.exec` cell 正常承载到协调器终态，证明控制层承载路径有效，但不证明四小时存活。执行边界见[承载手册](../release/four-llm-qualification-execution-runbook.md)，演练事实见[承载演练报告](../release/qualification-carrier-rehearsal.md)。当前 pack dry-run 为 221 files / 17 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。该闭包不改变任何 Ark 路由、证据或资格状态，也不表示已经发布或安装。
 
@@ -44,9 +46,9 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 
 ## 当前证据矩阵
 
-机器可验证的当前来源、精确 SHA-256 与运行时指纹统一保存在 [`capabilities.json`](evidence/capabilities.json)。三条 Ark 路线的六项能力均为 passed；以下 2026-07-25 条目保留为历史基线，不再代表当前注册表状态。
+旧机器索引来源、精确 SHA-256 与上一运行时指纹统一保存在不可变 [`capabilities.json`](evidence/capabilities.json)。其中三条 Ark 路线的六项记录均为历史 passed，但当前因指纹变化全部 stale；以下 2026-07-25 条目同样只保留为历史基线，不代表当前候选资格。
 
-| 逻辑 LLM                      | review | delegate | 当前来源摘要 |
+| 逻辑 LLM                      | 旧 review | 旧 delegate | 历史来源摘要 |
 | ----------------------------- | ------ | -------- | ------------ |
 | `ark-coding-plan`             | passed | passed   | 最新 2026-07-28 batch passed cases |
 | `ark-agent-plan`              | passed | passed   | 最新 batch review + 更早 2026-07-28 batch delegate |

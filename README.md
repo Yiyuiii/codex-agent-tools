@@ -9,7 +9,7 @@
 - `ark-agent-plan`：隔离 Pi RPC / Ark Agent Plan / `ark-code-latest`，直连；
 - `ark-agent-deepseek-v4-flash`：隔离 Pi RPC / Ark Agent Plan / `deepseek-v4-flash`，直连。
 
-当前八项 review/delegate 能力均已通过机器可验证的能力资格索引。资格单位是一个精确的“逻辑 LLM × 任务”组合；每项记录固定运行时指纹，并引用不可变、已通过的真实 case evidence。相关运行时代码、模型绑定、路由、凭据来源或验收语义变化后，只有受影响能力会变为 stale 并需要重跑，不再因无关能力的临时额度或服务状态重复烧完整八项。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用只作为历史审计证据保留。
+八项 review/delegate 的旧索引仍引用不可变、已通过的真实 case evidence，但本轮执行预算和 stdio 生命周期源码变更已使八项运行时指纹全部 stale。当前 `npm run verify:capabilities` 必须以脱敏错误和退出码 1 fail closed，因此此分支不可发布。Task 9 只有在新资格批次形成 8/8 passed evidence 后才会更新能力索引；注册表中的旧 `passed` 文案只描述历史资格，不是当前候选的发布权威。资格单位仍是一个精确的“逻辑 LLM × 任务”组合，临时额度或服务状态不会要求无关能力重复运行。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用只作为历史审计证据保留。
 
 standing authorization 下的最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`。标准入口和 `functions.exec` cell 各只有一个；批次按首错停在 ordinal 6，形成 6 completed / 5 passed、`blocked / case_failed`、`promotionEligible=false`，ordinal 7–8 为 notRun。没有 resume、retry、fallback、补跑、第二入口或第二批。manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，20 个不可变证据文件由提交 `6b4217d` 保存。
 
@@ -21,11 +21,19 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 全量测试还暴露并闭合了一个既有 Kimi ACP 时序竞态：client 可能早于 child close 返回，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49 文件矩阵已包含该修复。Pi resolver 在生产隔离环境中找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`。
 
-注册表现在保持 8 passed / 0 pending，并由 [`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 与 `npm run verify:capabilities` 约束。维护者本机已通过官方命令安装 0.1.0 插件并移除同名开发期直连；旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。真实资格实验的 standing authorization 仍有效，但只有能力指纹失效、证据失效或新增能力时才需要针对性重跑；临时额度恢复本身不触发全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
+注册表仍保留 8 passed / 0 pending 的历史文案，旧 [`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 也保持不可变；当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。维护者本机已通过官方命令把活动插件升级到 `0.1.1-beta.1` 并移除同名开发期直连；旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。真实资格实验的 standing authorization 仍有效，Task 9 会针对本轮失效的八项能力生成新证据；临时额度恢复本身不触发额外全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
 2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
 项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端。
+
+## 执行预算与取消合同
+
+- `timeoutMs` 是调用方为单次请求显式设置的可选值；它不是外部 CLI 的全局配置，也不会持久化。
+- 省略时，Kimi 与 Pi 都不设置模型执行 deadline，让外部 CLI 使用自身原生执行预算；不存在 profile 级的 600 秒或 900 秒执行上限。
+- 显式 deadline 到期只结束该次请求，并返回超时语义；普通调用方取消保持 cancelled 语义。
+- stdio 的 end、close、error 与 SIGINT、SIGTERM 都会先取消所有在途请求，再关闭服务并等待 owned 子进程树清理，最后才结束共享 MCP session。
+- Pi 生产路径的原生 retry 策略保持不变；只在资格模式中沿用既有的 single-attempt、零 retry/fallback 合同。
 
 ## 公开契约
 
@@ -64,7 +72,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 - 当前 Kimi 只支持 K3；K2.7 记录仅作为历史证据保留，见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
 - Gemini 已退役，不再是当前 provider；旧 Google / `proxy-10808` 路由、额度失败和 blocked 批次只作为历史证据保留，见 [Pi / Gemini 退役历史](docs/smoke/pi-gemini.md)。
-- 三条 Ark 路线全部固定直连；Coding Plan 最新批次的 review/delegate 都通过，两个 Agent Plan profile 的 review/delegate 也各有已验证的通过证据。八项当前资格的唯一机器入口是 [能力资格索引](docs/smoke/evidence/capabilities.json)，叙述与历史见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
+- 三条 Ark 路线全部固定直连；Coding Plan 最新历史批次的 review/delegate 都通过，两个 Agent Plan profile 的 review/delegate 也各有历史 passed evidence。旧八项索引见 [能力资格索引](docs/smoke/evidence/capabilities.json)，当前候选必须等待 Task 9 更新后由 verifier 重新确认，叙述与历史见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
 
 终端用户不需要手工维护 Pi 模型配置；Pi 使用由本项目在应用缓存下生成的版本化隔离配置，不读取或修改用户日常 `~/.pi/agent`。
 
@@ -98,10 +106,10 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 - 子进程只继承最小环境白名单；凭据仅按逻辑 LLM 配置显式传入。
 - 四个活动逻辑 LLM 均使用 `direct`；子进程会清除从父进程继承的 HTTP(S)/ALL proxy。
 - 诊断、错误和模型输出在离开适配器前进行令牌与认证头脱敏。
-- 取消、硬超时和异常退出会触发进程树清理；并发按固定模型或共享 provider 配额池限制。
+- 调用方显式取消、单次显式 deadline 和宿主异常退出都会触发进程树清理；并发按固定模型或共享 provider 配额池限制。
 - 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的配额池。
 - 委派一旦开始不会自动重试，避免重复写入。
 
 ## 发布状态
 
-当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；npm `next` 已由 GitHub Actions OIDC 更新为 `0.1.1-beta.1`。本地单 worker 矩阵为 53 files / 891 passed / 1 skipped / 0 failed，Node 20/22/24 CI、类型检查、8/8 能力索引、release smoke、生产依赖审计、228 文件 dry-run 包、隔离官方插件生命周期和公共 npm 精确版本验收均已通过。维护者本机活动插件已通过官方 remove/add 升级到 beta.1，CLI 显示正确缓存 cwd 与四项脱敏环境变量，旧 `codex_cc_tools` 保持 enabled；完整重启后的修复版真实宿主 Pi/delegate/取消门禁仍待完成。一次 Kimi 外审还证明外层超时不会自动取消 MCP 服务端工作，因此取消传播与进程不重生必须在 stable 前闭合。公开发布不构成其它活动 Codex 的安装授权，也不能称为已替代旧工具。
+当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；npm `next` 仍是已发布的 `0.1.1-beta.1`。本轮已闭合原生执行预算、stdio 取消传播和 owned 进程树清理的确定性实现，但八项能力指纹因此 stale，当前分支不可发布。下一候选 `0.1.1-beta.2` 必须先通过 Task 9 的 8/8 新资格、GitHub Actions OIDC 发布、公开 npm 精确版本验收和官方插件升级；随后还必须完整退出并重开 App，在真实宿主中用普通 Stop/interrupt 完成取消与不重生验收。beta.1 handoff 只暴露了缺口，不是 stable Stop gate 的唯一证据。旧 `codex_cc_tools` 保持 enabled；未完成上述门禁前不得发布 beta.2 或 stable。

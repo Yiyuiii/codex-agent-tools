@@ -1,8 +1,14 @@
 # 真实 Codex App 宿主验收记录
 
-日期：2026-07-30
+最近更新：2026-07-31
 
-状态：**partial — beta 已发布并升级；窗口重启未结束后台宿主，等待完整进程重启后真实调用**
+状态：**partial — beta.1 已发布并升级；生命周期修复尚未发布，等待 beta.2 资格、公开包与真实 Stop/interrupt**
+
+## 当前 beta.2 阻断
+
+beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调，但这只是待发布候选的确定性证据。
+
+beta.2 必须先通过新的 8/8 能力资格和 GitHub Actions 发布，再完成公开 npm 精确版本验收、官方插件升级、完整 App 重启和真实宿主取消验收。真实门禁必须使用 App 的普通 Stop 或 dedicated interrupt，确认外层状态为 cancelled/interrupted、完成标记没有写入、SDK abort 到达、owned ACP/RPC 进程树归零且不重生。完成上述门禁前，beta.2 与 stable 都不可发布。
 
 ## 授权与边界
 
@@ -292,18 +298,21 @@ Codex 只清理这些由当前 App 宿主启动的插件 MCP 进程树，未终�
 
 完整第 4 层仍缺少以下证据：
 
-1. 完整重启宿主，并在新任务确认 beta.1 缓存与四项脱敏环境变量已经被新
+1. Task 9 形成新的 8/8 passed evidence，更新能力索引并使 verifier 恢复通过。
+2. beta.2 通过 GitHub Actions 发布到公开 npm、完成精确版本验收和官方插件升级。
+3. 完整重启宿主，并在新任务确认 beta.2 缓存与四项脱敏环境变量已经被新
    app-server 加载。
-2. 真实宿主调用：复用既有 Kimi 通过证据，重点完成至少一条 Pi 路线的代表性
+4. 真实宿主调用：复用既有 Kimi 通过证据，重点完成至少一条 Pi 路线的代表性
    review。
-3. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主验证取消长任务后的
-   Kimi/Pi 进程回收。
+5. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主用普通 Stop 或 dedicated
+   interrupt 验证取消长任务后的 Kimi/Pi 进程回收、不重生与服务端 handler drain。
 
 在这些缺口闭合前：
 
 - 官方插件可以称为“已安装、已启用，缓存协议验收通过”；
 - 开发期直连可以称为“已通过官方命令移除，CLI 已解析到插件相对入口”；
 - 不得称为“真实 App 宿主门禁全部通过”；
+- 不得发布 beta.2 或 stable；
 - 不得称为“已替代旧 `codex_cc_tools`”；
 - 不得删除旧工具、恢复开发期直连或手工修改活动配置。
 

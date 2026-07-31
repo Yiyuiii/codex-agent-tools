@@ -28,6 +28,23 @@ function readJson(relativePath: string): Record<string, unknown> {
   ) as Record<string, unknown>;
 }
 
+function readProjectText(relativePath: string): string {
+  return readFileSync(resolve(repositoryRoot, relativePath), "utf8");
+}
+
+function markdownSection(source: string, heading: string): string {
+  const headingStart = source.indexOf(`${heading}\n`);
+  if (headingStart < 0) {
+    throw new Error(`Missing Markdown section: ${heading}`);
+  }
+  const bodyStart = headingStart + heading.length + 1;
+  const nextHeading = source.indexOf("\n## ", bodyStart);
+  return source.slice(
+    bodyStart,
+    nextHeading < 0 ? source.length : nextHeading,
+  );
+}
+
 describe("Codex plugin artifact", () => {
   it("declares the single repository-local marketplace entry", () => {
     const marketplace = readJson(".agents/plugins/marketplace.json");
@@ -221,6 +238,123 @@ describe("Codex plugin artifact", () => {
     expect(releaseSmoke).toContain('"docs/smoke/pi-gemini.md"');
     expect(releaseSmoke).toContain('"docs/smoke/evidence"');
     expect(releaseSmoke).not.toContain("expected 5");
+  });
+
+  it("packages the approved lifecycle design and plan through the release gate", () => {
+    const packageManifest = readJson("package.json");
+    const packageFiles = packageManifest.files as string[];
+    const releaseSmoke = readProjectText("scripts/release-smoke.mjs");
+    const lifecycleSources = [
+      "docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md",
+      "docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md",
+    ];
+
+    for (const source of lifecycleSources) {
+      expect(packageFiles.filter((entry) => entry === source)).toEqual([
+        source,
+      ]);
+      expect(releaseSmoke).toContain(`"${source}"`);
+    }
+    expect(releaseSmoke).toMatch(
+      /const requiredLifecyclePackageSources = \[[\s\S]*?\];/u,
+    );
+    expect(releaseSmoke).toMatch(
+      /\.\.\.requiredLifecyclePackageSources,[\s\S]*?assertCapabilitySourcesPackaged/u,
+    );
+    expect(releaseSmoke).toMatch(
+      /await verifyCapabilityIndex\(\{[\s\S]*?repositoryRoot: root,[\s\S]*?\}\);[\s\S]*?await checkPackage/u,
+    );
+  });
+
+  it("documents optional native execution budgets and owned stdio shutdown", () => {
+    for (const relativePath of ["README.md", "docs/operations.md"]) {
+      const contract = markdownSection(
+        readProjectText(relativePath),
+        "## 执行预算与取消合同",
+      );
+
+      expect(contract).toMatch(
+        /`timeoutMs` 是调用方为单次请求显式设置的可选值/u,
+      );
+      expect(contract).toMatch(
+        /省略时，Kimi 与 Pi 都不设置模型执行 deadline/u,
+      );
+      expect(contract).toMatch(
+        /不存在 profile 级的 600 秒或 900 秒执行上限/u,
+      );
+      expect(contract).toMatch(
+        /stdio 的 end、close、error 与 SIGINT、SIGTERM/u,
+      );
+      expect(contract).toMatch(
+        /取消所有在途请求[\s\S]*等待 owned 子进程树清理/u,
+      );
+      expect(contract).toMatch(
+        /Pi 生产路径的原生 retry 策略保持不变/u,
+      );
+    }
+  });
+
+  it("keeps the stale capability gate and beta.2 host gate fail closed", () => {
+    const checklist = readProjectText("docs/release/checklist.md");
+    const hostAcceptance = readProjectText(
+      "docs/release/real-host-acceptance.md",
+    );
+    const runbook = readProjectText(
+      "docs/release/four-llm-qualification-execution-runbook.md",
+    );
+
+    for (const source of [checklist, runbook]) {
+      expect(source).toMatch(
+        /当前源码变更已使八项能力指纹 stale/u,
+      );
+      expect(source).toMatch(
+        /`docs\/smoke\/evidence\/capabilities\.json`[\s\S]*不可变/u,
+      );
+      expect(source).toMatch(
+        /`npm run verify:capabilities`[\s\S]*退出码 1/u,
+      );
+      expect(source).toMatch(
+        /Task 9[\s\S]*8\/8 passed[\s\S]*更新能力索引/u,
+      );
+      expect(source).toMatch(
+        /registry[\s\S]*旧 passed[\s\S]*不构成发布权威/u,
+      );
+    }
+
+    for (const source of [checklist, hostAcceptance]) {
+      expect(source).toMatch(
+        /beta\.1 handoff[\s\S]*不是 stable Stop gate 的唯一证据/u,
+      );
+      expect(source).toMatch(
+        /beta\.2[\s\S]*公开 npm[\s\S]*官方插件[\s\S]*完整 App 重启[\s\S]*真实宿主取消验收/u,
+      );
+      expect(source).toMatch(/完成上述门禁前[\s\S]*不可发布/u);
+    }
+  });
+
+  it("keeps current smoke guidance aligned with native budgets and Pi retry", () => {
+    const kimi = readProjectText("docs/smoke/kimi.md");
+    const pi = readProjectText("docs/smoke/pi-gemini.md");
+    const ark = readProjectText("docs/smoke/ark.md");
+
+    expect(kimi).toMatch(
+      /省略 `timeoutMs`[\s\S]*Kimi Code 原生执行预算/u,
+    );
+    expect(kimi).toMatch(
+      /宿主取消[\s\S]*完整 owned ACP 进程树/u,
+    );
+    expect(pi).toMatch(
+      /Pi 生产路径的原生 retry 策略未在本轮关闭/u,
+    );
+    expect(pi).toMatch(
+      /省略 `timeoutMs`[\s\S]*不设置模型执行 deadline/u,
+    );
+    expect(ark).toMatch(
+      /省略 `timeoutMs`[\s\S]*不设置模型执行 deadline/u,
+    );
+    expect(ark).toMatch(
+      /当前源码变更已使八项能力指纹 stale/u,
+    );
   });
 
   it("builds and runs the bundled MCP entry without repository dependencies", async () => {

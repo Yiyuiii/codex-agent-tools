@@ -86,6 +86,10 @@ const requiredReviewPackageSources = [
   "docs/superpowers/plans/2026-07-29-capability-scoped-qualification.md",
   "docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md",
 ];
+const requiredLifecyclePackageSources = [
+  "docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md",
+  "docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md",
+];
 const worktreeMarker = `${path.sep}.worktrees${path.sep}`;
 const worktreeMarkerIndex = root
   .toLocaleLowerCase("en-US")
@@ -308,6 +312,7 @@ async function checkPluginArtifact() {
     ![
       ...retainedHistoricalPackageSources,
       ...requiredReviewPackageSources,
+      ...requiredLifecyclePackageSources,
     ].every(
       (entry) => packageManifest.files.includes(entry),
     )
@@ -463,6 +468,7 @@ async function checkPackage(capabilitySources) {
     "docs/migration-from-codex-cc-tools.md",
     "docs/smoke/pi-gemini.md",
     ...requiredReviewPackageSources,
+    ...requiredLifecyclePackageSources,
     "dist/cli.js",
     "dist/mcp.js",
     ...exactPluginFiles,
