@@ -1,9 +1,62 @@
+import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { Readable, Writable } from "node:stream";
+import { fileURLToPath } from "node:url";
 
 import * as acp from "@agentclientprotocol/sdk";
 
 const sessions = new Map();
+const rootPidPath = process.env.FAKE_KIMI_ROOT_PID_FILE;
+const childPidPath = process.env.FAKE_KIMI_CHILD_PID_FILE;
+let grandchildCarrier;
+
+if (rootPidPath) {
+  writeFileSync(rootPidPath, String(process.pid), "utf8");
+}
+
+async function spawnGrandchildFixture() {
+  if (!childPidPath) return;
+  grandchildCarrier = spawn(
+    process.execPath,
+    [fileURLToPath(new URL("./spawn-grandchild.mjs", import.meta.url))],
+    {
+      stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
+    },
+  );
+  const grandchildPid = await new Promise((resolve, reject) => {
+    let buffer = "";
+    const cleanup = () => {
+      grandchildCarrier.stdout.off("data", onData);
+      grandchildCarrier.off("error", onError);
+      grandchildCarrier.off("exit", onExit);
+    };
+    const onData = (chunk) => {
+      buffer += chunk.toString("utf8");
+      const newline = buffer.indexOf("\n");
+      if (newline < 0) return;
+      cleanup();
+      resolve(Number.parseInt(buffer.slice(0, newline).trim(), 10));
+    };
+    const onError = (error) => {
+      cleanup();
+      reject(error);
+    };
+    const onExit = (code, signal) => {
+      cleanup();
+      reject(
+        new Error(
+          `spawn-grandchild fixture exited before reporting a PID: code=${String(code)} signal=${String(signal)}`,
+        ),
+      );
+    };
+    grandchildCarrier.stdout.on("data", onData);
+    grandchildCarrier.once("error", onError);
+    grandchildCarrier.once("exit", onExit);
+  });
+  writeFileSync(childPidPath, String(grandchildPid), "utf8");
+}
 
 function configOptions(currentModel) {
   return [
@@ -73,6 +126,7 @@ const agent = {
     if (!session) throw new Error("unknown session");
 
     if (process.env.FAKE_KIMI_SCENARIO === "hang") {
+      await spawnGrandchildFixture();
       await new Promise((resolve) => {
         session.cancel = resolve;
       });

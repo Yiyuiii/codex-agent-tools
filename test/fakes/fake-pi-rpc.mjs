@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 
 const scenario = process.env.FAKE_PI_SCENARIO ?? "normal";
 const logPath = process.env.FAKE_PI_LOG;
+const rootPidPath = process.env.FAKE_PI_ROOT_PID_FILE;
 const childPidPath = process.env.FAKE_PI_CHILD_PID_FILE;
 const argv = process.argv.slice(2);
 let buffer = Buffer.alloc(0);
@@ -13,6 +14,10 @@ const providerApis = {
   "ark-coding-plan": "anthropic-messages",
   "ark-agent-plan": "anthropic-messages",
 };
+
+if (rootPidPath) {
+  writeFileSync(rootPidPath, String(process.pid), "utf8");
+}
 
 function log(value) {
   if (logPath) appendFileSync(logPath, `${JSON.stringify(value)}\n`, "utf8");
@@ -87,6 +92,18 @@ function handle(command) {
       return;
     }
     if (scenario === "hold") {
+      if (rootPidPath) {
+        emit({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            model: selectedModel,
+            provider: selectedProvider,
+            content: [],
+            stopReason: "stop",
+          },
+        });
+      }
       spawnGrandchild();
       return;
     }
