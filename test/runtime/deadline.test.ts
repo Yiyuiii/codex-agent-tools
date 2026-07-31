@@ -5,7 +5,51 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   MAX_TIMER_DELAY_MS,
   scheduleDeadline,
+  scheduleDeadlineWithRuntime,
 } from "../../src/runtime/deadline.js";
+import type { DeadlineRuntime } from "../../src/runtime/deadline.js";
+
+interface ManualTimer {
+  readonly callback: () => void;
+  readonly handle: ReturnType<typeof setTimeout>;
+}
+
+function createManualRuntime() {
+  let nowMs = 0;
+  let nextHandle = 0;
+  const delays: number[] = [];
+  const pending: ManualTimer[] = [];
+  const runtime: DeadlineRuntime = {
+    now: () => nowMs,
+    setTimer: (callback, delayMs) => {
+      const handle = {
+        id: nextHandle++,
+      } as unknown as ReturnType<typeof setTimeout>;
+      delays.push(delayMs);
+      pending.push({ callback, handle });
+      return handle;
+    },
+    clearTimer: (handle) => {
+      const index = pending.findIndex((timer) => timer.handle === handle);
+      if (index >= 0) {
+        pending.splice(index, 1);
+      }
+    },
+  };
+
+  return {
+    delays,
+    runtime,
+    fireNextAt(nextNowMs: number): void {
+      nowMs = nextNowMs;
+      const timer = pending.shift();
+      if (timer === undefined) {
+        throw new Error("No pending deadline timer");
+      }
+      timer.callback();
+    },
+  };
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -39,6 +83,59 @@ describe("scheduleDeadline", () => {
     await vi.advanceTimersByTimeAsync(249);
     expect(onElapsed).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
+    expect(onElapsed).toHaveBeenCalledOnce();
+  });
+
+  it("arms exact MAX and remainder chunks", () => {
+    const manual = createManualRuntime();
+    const onElapsed = vi.fn();
+
+    scheduleDeadlineWithRuntime(
+      MAX_TIMER_DELAY_MS + 250,
+      onElapsed,
+      manual.runtime,
+    );
+
+    expect(manual.delays).toEqual([MAX_TIMER_DELAY_MS]);
+    manual.fireNextAt(MAX_TIMER_DELAY_MS);
+    expect(onElapsed).not.toHaveBeenCalled();
+    expect(manual.delays).toEqual([MAX_TIMER_DELAY_MS, 250]);
+    manual.fireNextAt(MAX_TIMER_DELAY_MS + 250);
+    expect(onElapsed).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Number.MAX_SAFE_INTEGER chunked without overflow or early elapsed callback", () => {
+    const manual = createManualRuntime();
+    const onElapsed = vi.fn();
+
+    scheduleDeadlineWithRuntime(
+      Number.MAX_SAFE_INTEGER,
+      onElapsed,
+      manual.runtime,
+    );
+
+    expect(manual.delays).toEqual([MAX_TIMER_DELAY_MS]);
+    manual.fireNextAt(MAX_TIMER_DELAY_MS);
+    expect(onElapsed).not.toHaveBeenCalled();
+    expect(manual.delays).toEqual([
+      MAX_TIMER_DELAY_MS,
+      MAX_TIMER_DELAY_MS,
+    ]);
+    manual.fireNextAt(Number.MAX_SAFE_INTEGER);
+    expect(onElapsed).toHaveBeenCalledOnce();
+  });
+
+  it("re-arms only the remaining duration after an early timer callback", () => {
+    const manual = createManualRuntime();
+    const onElapsed = vi.fn();
+
+    scheduleDeadlineWithRuntime(1_000, onElapsed, manual.runtime);
+
+    expect(manual.delays).toEqual([1_000]);
+    manual.fireNextAt(250);
+    expect(onElapsed).not.toHaveBeenCalled();
+    expect(manual.delays).toEqual([1_000, 750]);
+    manual.fireNextAt(1_000);
     expect(onElapsed).toHaveBeenCalledOnce();
   });
 

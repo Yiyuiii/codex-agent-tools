@@ -6,10 +6,14 @@ export interface CancellableDeadline {
   cancel(): void;
 }
 
-interface DeadlineRuntime {
-  now(): number;
-  setTimer(callback: () => void, delayMs: number): ReturnType<typeof setTimeout>;
-  clearTimer(timer: ReturnType<typeof setTimeout>): void;
+/** @internal */
+export interface DeadlineRuntime {
+  readonly now: () => number;
+  readonly setTimer: (
+    callback: () => void,
+    delayMs: number,
+  ) => ReturnType<typeof setTimeout>;
+  readonly clearTimer: (timer: ReturnType<typeof setTimeout>) => void;
 }
 
 const nodeDeadlineRuntime: DeadlineRuntime = {
@@ -25,7 +29,8 @@ export function scheduleDeadline(
   return scheduleDeadlineWithRuntime(timeoutMs, onElapsed, nodeDeadlineRuntime);
 }
 
-function scheduleDeadlineWithRuntime(
+/** @internal */
+export function scheduleDeadlineWithRuntime(
   timeoutMs: number | undefined,
   onElapsed: () => void,
   runtime: DeadlineRuntime,
