@@ -1,5 +1,9 @@
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import {
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { Readable, Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
@@ -8,12 +12,35 @@ import * as acp from "@agentclientprotocol/sdk";
 
 const sessions = new Map();
 const rootPidPath = process.env.FAKE_KIMI_ROOT_PID_FILE;
+const carrierPidPath = process.env.FAKE_KIMI_CARRIER_PID_FILE;
 const childPidPath = process.env.FAKE_KIMI_CHILD_PID_FILE;
 let grandchildCarrier;
+let pidFileSequence = 0;
 
-if (rootPidPath) {
-  writeFileSync(rootPidPath, String(process.pid), "utf8");
+function publishPid(filePath, pid) {
+  if (!filePath) return;
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
+    throw new Error(`Cannot publish invalid fixture PID: ${String(pid)}`);
+  }
+  const temporaryPath =
+    `${filePath}.tmp-${process.pid}-${++pidFileSequence}`;
+  try {
+    writeFileSync(temporaryPath, String(pid), {
+      encoding: "utf8",
+      flag: "wx",
+    });
+    renameSync(temporaryPath, filePath);
+  } catch (error) {
+    try {
+      unlinkSync(temporaryPath);
+    } catch {
+      // The temporary file may not have been created or may already be renamed.
+    }
+    throw error;
+  }
 }
+
+publishPid(rootPidPath, process.pid);
 
 async function spawnGrandchildFixture() {
   if (!childPidPath) return;
@@ -25,6 +52,7 @@ async function spawnGrandchildFixture() {
       windowsHide: true,
     },
   );
+  publishPid(carrierPidPath, grandchildCarrier.pid);
   const grandchildPid = await new Promise((resolve, reject) => {
     let buffer = "";
     const cleanup = () => {
@@ -37,7 +65,12 @@ async function spawnGrandchildFixture() {
       const newline = buffer.indexOf("\n");
       if (newline < 0) return;
       cleanup();
-      resolve(Number.parseInt(buffer.slice(0, newline).trim(), 10));
+      const reportedPid = buffer.slice(0, newline).trim();
+      if (!/^[1-9][0-9]*$/u.test(reportedPid)) {
+        reject(new Error(`Invalid spawn-grandchild PID: ${reportedPid}`));
+        return;
+      }
+      resolve(Number(reportedPid));
     };
     const onError = (error) => {
       cleanup();
@@ -55,7 +88,7 @@ async function spawnGrandchildFixture() {
     grandchildCarrier.once("error", onError);
     grandchildCarrier.once("exit", onExit);
   });
-  writeFileSync(childPidPath, String(grandchildPid), "utf8");
+  publishPid(childPidPath, grandchildPid);
 }
 
 function configOptions(currentModel) {

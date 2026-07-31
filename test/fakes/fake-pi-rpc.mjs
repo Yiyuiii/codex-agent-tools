@@ -1,4 +1,9 @@
-import { appendFileSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { spawn } from "node:child_process";
 
 const scenario = process.env.FAKE_PI_SCENARIO ?? "normal";
@@ -8,6 +13,7 @@ const childPidPath = process.env.FAKE_PI_CHILD_PID_FILE;
 const argv = process.argv.slice(2);
 let buffer = Buffer.alloc(0);
 let grandchild;
+let pidFileSequence = 0;
 let selectedModel = "ark-code-latest";
 let selectedProvider = "ark-agent-plan";
 const providerApis = {
@@ -15,9 +21,30 @@ const providerApis = {
   "ark-agent-plan": "anthropic-messages",
 };
 
-if (rootPidPath) {
-  writeFileSync(rootPidPath, String(process.pid), "utf8");
+function publishPid(filePath, pid) {
+  if (!filePath) return;
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
+    throw new Error(`Cannot publish invalid fixture PID: ${String(pid)}`);
+  }
+  const temporaryPath =
+    `${filePath}.tmp-${process.pid}-${++pidFileSequence}`;
+  try {
+    writeFileSync(temporaryPath, String(pid), {
+      encoding: "utf8",
+      flag: "wx",
+    });
+    renameSync(temporaryPath, filePath);
+  } catch (error) {
+    try {
+      unlinkSync(temporaryPath);
+    } catch {
+      // The temporary file may not have been created or may already be renamed.
+    }
+    throw error;
+  }
 }
+
+publishPid(rootPidPath, process.pid);
 
 function log(value) {
   if (logPath) appendFileSync(logPath, `${JSON.stringify(value)}\n`, "utf8");
@@ -36,7 +63,7 @@ function spawnGrandchild() {
     ["-e", "setInterval(() => {}, 1000)"],
     { stdio: "ignore", windowsHide: true },
   );
-  if (childPidPath) writeFileSync(childPidPath, String(grandchild.pid), "utf8");
+  publishPid(childPidPath, grandchild.pid);
 }
 
 function handle(command) {
