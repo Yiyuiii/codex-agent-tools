@@ -70,6 +70,9 @@ npm run acceptance:plugin:isolated
 
 只有版本已存在于公共 npm registry 后才运行：
 
+以下命令是历史的首次 `0.1.0` 安装验收模板；Task 11 验收 beta.2 时必须把
+`--version` 改成已由 Task 10 发布的精确 `0.1.1-beta.2`。
+
 ```powershell
 npm run acceptance:npm-package -- --version 0.1.0
 ```
@@ -88,20 +91,20 @@ real-smoke 进程为 0 且资格锁不存在。成功后生成对应版本的
 
 - `npm run verify:capabilities` 验证四个逻辑 LLM 的八项能力、不可变 evidence、精确 case、注册表 anchor 与当前运行时指纹；
 - 类型检查、测试、构建、release smoke 和隔离官方插件生命周期通过；
-- 权限包明确真实安装仍未执行，并给出预计影响、验证与官方回滚。
+- 权限包明确目标 `0.1.1-beta.2` 尚未安装或升级，并给出预计影响、验证与官方回滚。
 
 能力索引允许不同能力复用各自不可变的 passed case，但绝不允许用失败 case、模型别名、不同能力或指纹已变化的旧证据替代。最新 blocked 批次仍是不可改写的批次历史；它不再把其中 passed case 降为 pending。默认实验授权不能越过活动安装门禁。
 
 权限包必须列出：
 
 - 为什么只有真实官方安装才能验证 Codex App 宿主；
-- 当前尚未执行真实安装；
+- 目标 `0.1.1-beta.2` 尚未安装或升级；
 - 隔离取证支持的预计新增、修改和删除范围；
 - 官方安装后的验证步骤；
 - 官方 remove 回滚步骤；
 - 失败时不手工恢复或编辑活动 `config.toml`；
 - 旧 `codex_cc_tools` 保持原状，本轮不移除；
-- 本轮不执行 npm 或公共 marketplace 发布。
+- 禁止本地 `npm publish`；Task 10 只允许 GitHub Actions OIDC 发布 beta.2；本权限包不执行公共 marketplace 发布。
 
 权限包必须先交给用户审阅。过去关于采用官方插件机制的同意不能推定为本次 add/remove 的许可。
 
@@ -143,5 +146,5 @@ if ($LASTEXITCODE -ne 0) { throw "Codex marketplace remove 失败，停止回滚
 
 - 每次真实安装、升级或独立卸载都是新的外部状态变更，必须重新逐动作授权。
 - 永远不以手工编辑活动 `config.toml` 代替官方插件机制。
-- 本轮不移除旧 `codex_cc_tools`，不调用或修改 Claude Code，不执行 `npm publish`。
+- 本轮不移除旧 `codex_cc_tools`，不调用或修改 Claude Code；禁止本地 `npm publish`。Task 10 只允许 GitHub Actions OIDC 发布 beta.2。
 - 只有确定性检查、隔离生命周期、当前 8/8 能力资格、beta.2 公开 npm 与官方升级、完整 App 重启和真实 Stop/interrupt 宿主门禁全部通过后，才可说新插件具备替代旧工具的条件。

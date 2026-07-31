@@ -13,11 +13,11 @@
 ## 执行上下文与不可变边界
 
 - 实施分支：`codex/stdio-lifecycle-and-native-budget`
-- 隔离 worktree：`D:\Codes\codex-agent-tools\.worktrees\stdio-lifecycle-native-budget`
+- 隔离 worktree：`<isolated-worktree>`
 - 批准规格：`docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md`
 - 基线：53 个测试文件，891 passed / 1 skipped / 0 failed；单 worker 全量用时约 425 秒。
 - 不读取或修改活动 `~/.codex/config.toml`。
-- 不修改 `D:\Codes\codex-cc-tools`、本机 Claude Code、旧 `codex_cc_tools` 或用户 Kimi/Pi 全局配置。
+- 不修改相邻仓库 `codex-cc-tools`、本机 Claude Code、旧 `codex_cc_tools` 或用户 Kimi/Pi 全局配置。
 - 不给外部 CLI 增加全局或持久化的 step、turn、tool-call、context、token、duration 上限。
 - 不在本计划中关闭 Pi 生产默认 auto retry；资格模式继续显式 no-retry。
 - 不通过本地 `npm publish` 发布；beta 与 stable 都由现有 GitHub Actions Trusted Publishing 工作流根据 tag 自动发布。
@@ -854,7 +854,7 @@ git commit -m "feat: coordinate stdio session shutdown"
 ```json
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"stdio-test","version":"1.0.0"}}}
 {"jsonrpc":"2.0","method":"notifications/initialized","params":{}}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"external_review","arguments":{"llm":"kimi-k3","task":"review_plan","prompt":"hold","cwd":"D:\\Temp\\codex-agent-stdio-test-1234"}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"external_review","arguments":{"llm":"kimi-k3","task":"review_plan","prompt":"hold","cwd":"<isolated-test-cwd>"}}}
 ```
 
 第三条中的 `cwd` 只是合法 JSONL 形态示例；实际测试必须由 `mkdtemp` 得到路径并经
@@ -975,7 +975,6 @@ npx vitest run test/smoke/script-entrypoints.test.ts test/plugin/artifact.test.t
 
 在完成真实资格前，明确写：
 
-- 当前源码使八项能力指纹 stale；
 - 当前源码变更已使八项能力指纹 stale；Task 7/8 与 Task 9 新证据形成前，`capabilities.json` 保持原样；Task 9 在新批次 8/8 passed 后更新同一索引；历史 batch manifest 与 case evidence 永久不可变；当前 verifier 必须失败；
 - 当前分支不可发布；
 - 待新 batch passed evidence 后才更新索引。

@@ -12,6 +12,7 @@ import { build, type Options } from "tsup";
 import { describe, expect, it } from "vitest";
 
 import pluginBuildConfig from "../../tsup.plugin.config.js";
+import { assertNoSensitiveContent } from "../../src/release/assurance.js";
 
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -33,19 +34,66 @@ function readProjectText(relativePath: string): string {
 }
 
 function markdownSection(source: string, heading: string): string {
-  const headingStart = source.indexOf(`${heading}\n`);
+  const normalizedSource = source.replace(/\r\n?/gu, "\n");
+  const headingStart = normalizedSource.indexOf(`${heading}\n`);
   if (headingStart < 0) {
     throw new Error(`Missing Markdown section: ${heading}`);
   }
   const bodyStart = headingStart + heading.length + 1;
-  const nextHeading = source.indexOf("\n## ", bodyStart);
-  return source.slice(
+  const nextHeading = normalizedSource.indexOf("\n## ", bodyStart);
+  return normalizedSource.slice(
     bodyStart,
-    nextHeading < 0 ? source.length : nextHeading,
+    nextHeading < 0 ? normalizedSource.length : nextHeading,
   );
 }
 
+function sourceBlock(
+  source: string,
+  startMarker: string,
+  endMarker: string,
+): string {
+  const start = source.indexOf(startMarker);
+  if (start < 0) {
+    throw new Error(`Missing source block start: ${startMarker}`);
+  }
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  if (end < 0) {
+    throw new Error(`Missing source block end: ${endMarker}`);
+  }
+  return source.slice(start, end);
+}
+
+function assertLifecycleSourcesInRequiredFileLoop(
+  checkPackageBlock: string,
+): void {
+  const requiredFileLoop = sourceBlock(
+    checkPackageBlock,
+    "  for (const required of [",
+    "\n  const actualPluginFiles =",
+  );
+  if (!requiredFileLoop.includes("...requiredLifecyclePackageSources,")) {
+    throw new Error(
+      "Lifecycle package sources are missing from the required-file loop",
+    );
+  }
+}
+
 describe("Codex plugin artifact", () => {
+  it("extracts Markdown sections identically from CRLF input", () => {
+    const source = [
+      "# Document",
+      "",
+      "## Current",
+      "current line",
+      "",
+      "## Historical",
+      "historical line",
+      "",
+    ].join("\r\n");
+
+    expect(markdownSection(source, "## Current")).toBe("current line\n");
+  });
+
   it("declares the single repository-local marketplace entry", () => {
     const marketplace = readJson(".agents/plugins/marketplace.json");
 
@@ -248,22 +296,65 @@ describe("Codex plugin artifact", () => {
       "docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md",
       "docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md",
     ];
+    const lifecycleEntries = lifecycleSources.map((source) => ({
+      name: source,
+      content: readProjectText(source),
+    }));
 
     for (const source of lifecycleSources) {
       expect(packageFiles.filter((entry) => entry === source)).toEqual([
         source,
       ]);
-      expect(releaseSmoke).toContain(`"${source}"`);
     }
-    expect(releaseSmoke).toMatch(
-      /const requiredLifecyclePackageSources = \[[\s\S]*?\];/u,
+    assertNoSensitiveContent(lifecycleEntries, {
+      forbiddenPaths: [
+        repositoryRoot,
+        resolve(repositoryRoot, ".."),
+        resolve(repositoryRoot, "../.."),
+        "D:\\Codes",
+        "D:\\Temp",
+      ],
+      secrets: [],
+    });
+    for (const entry of lifecycleEntries) {
+      expect(entry.content).not.toMatch(/\b[A-Za-z]:[\\/]/u);
+    }
+
+    const lifecycleSourceList = sourceBlock(
+      releaseSmoke,
+      "const requiredLifecyclePackageSources = [",
+      "\n];",
     );
-    expect(releaseSmoke).toMatch(
-      /\.\.\.requiredLifecyclePackageSources,[\s\S]*?assertCapabilitySourcesPackaged/u,
+    for (const source of lifecycleSources) {
+      expect(lifecycleSourceList).toContain(`"${source}"`);
+    }
+
+    const checkPackageBlock = sourceBlock(
+      releaseSmoke,
+      "async function checkPackage(capabilitySources) {",
+      "\nawait Promise.all([access(cliPath)",
     );
-    expect(releaseSmoke).toMatch(
-      /await verifyCapabilityIndex\(\{[\s\S]*?repositoryRoot: root,[\s\S]*?\}\);[\s\S]*?await checkPackage/u,
+    expect(() =>
+      assertLifecycleSourcesInRequiredFileLoop(checkPackageBlock),
+    ).not.toThrow();
+    const withoutLifecycleSpread = checkPackageBlock.replace(
+      "    ...requiredLifecyclePackageSources,\n",
+      "",
     );
+    expect(withoutLifecycleSpread).not.toBe(checkPackageBlock);
+    expect(() =>
+      assertLifecycleSourcesInRequiredFileLoop(withoutLifecycleSpread),
+    ).toThrow(/missing from the required-file loop/u);
+
+    const capabilityVerificationIndex = releaseSmoke.indexOf(
+      "const capabilityVerification = await verifyCapabilityIndex({",
+    );
+    const packageCheckIndex = releaseSmoke.indexOf(
+      "await checkPackage({",
+      capabilityVerificationIndex,
+    );
+    expect(capabilityVerificationIndex).toBeGreaterThanOrEqual(0);
+    expect(packageCheckIndex).toBeGreaterThan(capabilityVerificationIndex);
   });
 
   it("documents optional native execution budgets and owned stdio shutdown", () => {
@@ -313,14 +404,24 @@ describe("Codex plugin artifact", () => {
     const activePlan = readProjectText(
       "docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md",
     );
+    const activePlanTask7 = markdownSection(
+      activePlan,
+      "## Task 7：同步有效文档、发布门禁与 stale 能力状态",
+    );
+    const checklistCurrent = markdownSection(
+      checklist,
+      "## 当前 fail-closed 阻断",
+    );
+    const runbookCurrent = markdownSection(runbook, "## 当前状态");
+    const arkCurrent = markdownSection(ark, "## 当前结论");
+    const agentCurrent = markdownSection(agentMemory, "## 当前事实状态");
 
     for (const source of [
-      readme,
-      checklist,
-      runbook,
-      ark,
-      agentMemory,
-      activePlan,
+      checklistCurrent,
+      runbookCurrent,
+      arkCurrent,
+      agentCurrent,
+      activePlanTask7,
     ]) {
       expect(source).toMatch(
         /当前源码变更已使八项能力指纹 stale/u,
@@ -336,7 +437,7 @@ describe("Codex plugin artifact", () => {
       );
     }
 
-    for (const source of [checklist, runbook]) {
+    for (const source of [checklistCurrent, runbookCurrent]) {
       expect(source).toMatch(
         /`npm run verify:capabilities`[\s\S]*退出码 1/u,
       );
@@ -345,21 +446,35 @@ describe("Codex plugin artifact", () => {
       );
     }
 
-    const releaseDocuments = [
+    const readmeReleaseStatus = markdownSection(
       readme,
-      checklist,
-      readProjectText("docs/release/real-host-acceptance.md"),
-      agentMemory,
+      "## 发布状态",
+    );
+    const hostAcceptance = readProjectText(
+      "docs/release/real-host-acceptance.md",
+    );
+    const hostCurrent = markdownSection(
+      hostAcceptance,
+      "## 当前 beta.2 阻断",
+    );
+    const releaseOrderSections = [
+      readmeReleaseStatus,
+      checklistCurrent,
+      hostCurrent,
+      activePlanTask7,
     ];
-    const releaseOrderDocuments = [...releaseDocuments, activePlan];
 
-    for (const source of releaseOrderDocuments) {
+    for (const source of releaseOrderSections) {
       expect(source).toMatch(
         /Task 9[\s\S]*8\/8[\s\S]*verifier green[\s\S]*Task 10[\s\S]*GitHub Actions[\s\S]*beta\.2[\s\S]*npm next[\s\S]*Task 11[\s\S]*公开 npm[\s\S]*官方插件[\s\S]*完整 App 重启[\s\S]*真实 Stop[\s\S]*Task 12[\s\S]*stable/u,
       );
     }
 
-    for (const source of releaseDocuments) {
+    for (const source of [
+      readmeReleaseStatus,
+      checklistCurrent,
+      hostCurrent,
+    ]) {
       expect(source).toMatch(
         /Task 9 未通过前不得发布 beta\.2；Task 11 未通过前不得发布 stable/u,
       );
@@ -368,10 +483,6 @@ describe("Codex plugin artifact", () => {
       );
     }
 
-    const activePlanTask7 = markdownSection(
-      activePlan,
-      "## Task 7：同步有效文档、发布门禁与 stale 能力状态",
-    );
     expect(activePlanTask7).toMatch(
       /Task 9 取得 8\/8 passed 并使 verifier green 后，Task 10 通过 GitHub Actions 先把 beta\.2 发布到 npm next；Task 11 再做公开 npm\/官方插件\/完整 App 重启\/真实 Stop；Task 11 只阻断 stable，Task 12 才发布 stable/u,
     );
@@ -379,8 +490,11 @@ describe("Codex plugin artifact", () => {
       /当前源码变更已使八项能力指纹 stale；Task 7\/8 与 Task 9 新证据形成前，`capabilities\.json` 保持原样；Task 9 在新批次 8\/8 passed 后更新同一索引；历史 batch manifest 与 case evidence 永久不可变/u,
     );
 
-    const hostAcceptance = releaseDocuments[2] ?? "";
-    expect(hostAcceptance).toMatch(
+    const hostNextNode = markdownSection(
+      hostAcceptance,
+      "## 下一人工节点",
+    );
+    expect(hostNextNode).toMatch(
       /下一人工节点[\s\S]*beta\.2 已发布到 npm next 并完成官方插件升级后[\s\S]*完整重启/u,
     );
 
@@ -388,18 +502,66 @@ describe("Codex plugin artifact", () => {
     expect(checklist).toMatch(
       /当前证据分支：`codex\/stdio-lifecycle-and-native-budget`/u,
     );
-    expect(readme).toMatch(
+    const readmePluginStatus = markdownSection(
+      readme,
+      "## 官方插件集成状态",
+    );
+    expect(readmePluginStatus).toMatch(
       /`0\.1\.1-beta\.1`[\s\S]*已发布到 npm `next`[\s\S]*已安装/u,
     );
-    expect(readme).not.toMatch(
+    expect(readmePluginStatus).not.toMatch(
       /`0\.1\.1-beta\.1` 候选[\s\S]*正在完成发布门禁/u,
     );
   });
 
+  it("documents the beta.2 install target and automated publish boundary", () => {
+    const operations = readProjectText("docs/operations.md");
+    const publicNpm = markdownSection(
+      operations,
+      "## 5. 验收公共 npm 精确版本",
+    );
+    const permissionPacket = markdownSection(
+      operations,
+      "## 6. 准备真实安装权限包",
+    );
+    const maintenanceBoundary = markdownSection(
+      operations,
+      "## 8. 长期维护边界",
+    );
+
+    expect(publicNpm).toMatch(
+      /历史的首次 `0\.1\.0` 安装验收模板/u,
+    );
+    expect(permissionPacket).toMatch(
+      /目标 `0\.1\.1-beta\.2` 尚未安装或升级/u,
+    );
+    expect(permissionPacket).toMatch(
+      /禁止本地 `npm publish`[\s\S]*Task 10[\s\S]*GitHub Actions OIDC[\s\S]*发布 beta\.2/u,
+    );
+    expect(permissionPacket).not.toMatch(
+      /本轮不执行 npm 或公共 marketplace 发布/u,
+    );
+    expect(maintenanceBoundary).toMatch(
+      /禁止本地 `npm publish`[\s\S]*Task 10[\s\S]*GitHub Actions OIDC[\s\S]*发布 beta\.2/u,
+    );
+    expect(maintenanceBoundary).not.toMatch(
+      /本轮[\s\S]*不执行 `npm publish`/u,
+    );
+  });
+
   it("keeps current smoke guidance aligned with native budgets and Pi retry", () => {
-    const kimi = readProjectText("docs/smoke/kimi.md");
-    const pi = readProjectText("docs/smoke/pi-gemini.md");
-    const ark = readProjectText("docs/smoke/ark.md");
+    const kimi = markdownSection(
+      readProjectText("docs/smoke/kimi.md"),
+      "## 当前结论",
+    );
+    const pi = markdownSection(
+      readProjectText("docs/smoke/pi-gemini.md"),
+      "## 退役结论",
+    );
+    const ark = markdownSection(
+      readProjectText("docs/smoke/ark.md"),
+      "## 当前结论",
+    );
 
     expect(kimi).toMatch(
       /省略 `timeoutMs`[\s\S]*Kimi Code 原生执行预算/u,
@@ -419,6 +581,8 @@ describe("Codex plugin artifact", () => {
     expect(ark).toMatch(
       /当前源码变更已使八项能力指纹 stale/u,
     );
+    expect(ark).toMatch(/当时的历史闭包为 221 files/u);
+    expect(ark).not.toMatch(/当前 pack dry-run 为 221 files/u);
   });
 
   it("builds and runs the bundled MCP entry without repository dependencies", async () => {

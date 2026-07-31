@@ -14,7 +14,7 @@
 
 Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力；registry 文件仍记录上一实现的 8 passed / 0 pending，但它不是当前候选的发布权威。资格单位是精确的逻辑 LLM × 任务；[`capabilities.json`](evidence/capabilities.json) 会被 verifier 用来比较 evidence 哈希、case 身份、registry anchor 与运行时指纹，本轮比较结果为 stale。最新历史 `four-llm-v1` 批次仍以 `blocked / case_failed` 结束，其 passed case 只能在新指纹重新验证后支持对应能力。
 
-2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据。后续真实批次由单个 `functions.exec` cell 正常承载到协调器终态，证明控制层承载路径有效，但不证明四小时存活。执行边界见[承载手册](../release/four-llm-qualification-execution-runbook.md)，演练事实见[承载演练报告](../release/qualification-carrier-rehearsal.md)。当前 pack dry-run 为 221 files / 17 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。该闭包不改变任何 Ark 路由、证据或资格状态，也不表示已经发布或安装。
+2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据。后续真实批次由单个 `functions.exec` cell 正常承载到协调器终态，证明控制层承载路径有效，但不证明四小时存活。执行边界见[承载手册](../release/four-llm-qualification-execution-runbook.md)，演练事实见[承载演练报告](../release/qualification-carrier-rehearsal.md)。当时的历史闭包为 221 files / 17 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。该历史闭包不改变任何 Ark 路由、证据或资格状态，也不表示已经发布或安装。
 
 最新审计记录：2026-07-28 在 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176` 上只调用一次标准入口，启动 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`。ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider `ark-agent-plan`、模型 `ark-code-latest`、direct route、Agent Plan 凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` failed；ordinal 7–8 notRun。ordinal 1 与 6 的规定写入、规定状态命令均各一次 success，文件范围只含预期文件，证明此前 Windows shell 与资格假阳性缺口已经真实闭合。
 
