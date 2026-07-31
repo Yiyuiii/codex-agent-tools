@@ -92,6 +92,34 @@ interface ObservedOwnedProcess {
   pid: number;
 }
 
+type CleanupPidFileReadResult =
+  | { kind: "missing" }
+  | { kind: "malformed" }
+  | { kind: "unreadable" }
+  | { kind: "pid"; pid: number };
+
+type CleanupPidDisposition =
+  | {
+      kind: "ignore";
+      mayTerminate: false;
+      reportFailure: false;
+      retainEvidence: false;
+    }
+  | {
+      kind: "recorded_identity";
+      mayTerminate: true;
+      pid: number;
+      reportFailure: false;
+      retainEvidence: false;
+    }
+  | {
+      failure: string;
+      kind: "malformed" | "unreadable" | "unknown_identity";
+      mayTerminate: false;
+      reportFailure: true;
+      retainEvidence: true;
+    };
+
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T | PromiseLike<T>) => void;
   const promise = new Promise<T>((resolvePromise) => {
@@ -148,11 +176,25 @@ async function readPid(filePath: string, timeoutMs = 5_000): Promise<number> {
 async function readPidIfAvailable(
   filePath: string,
   timeoutMs = 500,
-): Promise<number | undefined> {
-  try {
-    return await readPid(filePath, timeoutMs);
-  } catch {
-    return undefined;
+): Promise<CleanupPidFileReadResult> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      const content = await readFile(filePath, "utf8");
+      try {
+        return { kind: "pid", pid: parseFixturePid(content) };
+      } catch {
+        return { kind: "malformed" };
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        return { kind: "unreadable" };
+      }
+      if (Date.now() >= deadline) {
+        return { kind: "missing" };
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 25));
+    }
   }
 }
 
@@ -197,6 +239,48 @@ function mayTerminateRecordedProcess(
     expectedStartTime !== undefined &&
     identity.startTime === expectedStartTime
   );
+}
+
+function classifyCleanupPidEvidence(
+  readResult: CleanupPidFileReadResult,
+  hasRecordedIdentity: boolean,
+): CleanupPidDisposition {
+  if (readResult.kind === "missing") {
+    return {
+      kind: "ignore",
+      mayTerminate: false,
+      reportFailure: false,
+      retainEvidence: false,
+    };
+  }
+  if (readResult.kind === "malformed" || readResult.kind === "unreadable") {
+    return {
+      failure:
+        readResult.kind === "malformed"
+          ? "cleanup_pid_evidence_malformed"
+          : "cleanup_pid_evidence_unreadable",
+      kind: readResult.kind,
+      mayTerminate: false,
+      reportFailure: true,
+      retainEvidence: true,
+    };
+  }
+  if (!hasRecordedIdentity) {
+    return {
+      failure: "cleanup_pid_evidence_unknown_identity",
+      kind: "unknown_identity",
+      mayTerminate: false,
+      reportFailure: true,
+      retainEvidence: true,
+    };
+  }
+  return {
+    kind: "recorded_identity",
+    mayTerminate: true,
+    pid: readResult.pid,
+    reportFailure: false,
+    retainEvidence: false,
+  };
 }
 
 async function waitUntilDead(pid: number, timeoutMs = 10_000): Promise<void> {
@@ -478,20 +562,29 @@ afterEach(async () => {
     }),
   );
 
-  const latePids = await Promise.all(
+  const latePidReads = await Promise.all(
     ownedPidFiles
       .splice(0)
       .map((pidFile) => readPidIfAvailable(pidFile)),
   );
-  for (const pid of latePids) {
-    if (pid !== undefined) {
-      rememberPid(pid);
+  let retainEvidence = false;
+  for (const readResult of latePidReads) {
+    const disposition = classifyCleanupPidEvidence(
+      readResult,
+      readResult.kind === "pid" &&
+        ownedProcessStartTimes.has(readResult.pid),
+    );
+    if (disposition.reportFailure) {
+      cleanupFailures.push(disposition.failure);
+    }
+    if (disposition.retainEvidence) {
+      retainEvidence = true;
+    }
+    if (disposition.mayTerminate) {
+      rememberPid(disposition.pid);
     }
   }
   const uniquePids = [...new Set(ownedPids.splice(0))];
-  const unknownLatePids = uniquePids.filter(
-    (pid) => !ownedProcessStartTimes.has(pid),
-  );
   for (const pid of uniquePids) {
     const expectedStartTime = ownedProcessStartTimes.get(pid);
     if (expectedStartTime === undefined) continue;
@@ -543,14 +636,6 @@ afterEach(async () => {
     }
   }
 
-  let unknownOwnedProcessStillAlive = false;
-  for (const pid of unknownLatePids) {
-    if (!isAlive(pid)) continue;
-    unknownOwnedProcessStillAlive = true;
-    cleanupFailures.push(
-      `Refused to terminate unknown late PID ${pid} without a pre-disconnect identity`,
-    );
-  }
   let recordedOwnedProcessStillAlive = false;
   for (const [pid, expectedStartTime] of ownedProcessStartTimes) {
     if (!isAlive(pid)) continue;
@@ -571,8 +656,8 @@ afterEach(async () => {
   const directories = tempDirectories.splice(0);
   if (
     cleanupHandles.every((handle) => handle.settled) &&
-    !unknownOwnedProcessStillAlive &&
-    !recordedOwnedProcessStillAlive
+    !recordedOwnedProcessStillAlive &&
+    !retainEvidence
   ) {
     for (const directory of directories) {
       assertSafeTempDirectory(directory);
@@ -590,6 +675,31 @@ afterEach(async () => {
 });
 
 describe("MCP stdio owned-process cleanup", () => {
+  it("retains an unknown late PID without allowing termination", () => {
+    expect(
+      classifyCleanupPidEvidence({ kind: "pid", pid: 123_456 }, false),
+    ).toEqual({
+      failure: "cleanup_pid_evidence_unknown_identity",
+      kind: "unknown_identity",
+      mayTerminate: false,
+      reportFailure: true,
+      retainEvidence: true,
+    });
+  });
+
+  it("distinguishes malformed PID evidence from a missing file", async () => {
+    const directory = await makeTempDirectory();
+    const malformedPath = path.join(directory, "malformed.pid");
+    await writeFile(malformedPath, "123junk", "utf8");
+
+    await expect(readPidIfAvailable(malformedPath, 75)).resolves.toEqual({
+      kind: "malformed",
+    });
+    await expect(
+      readPidIfAvailable(path.join(directory, "missing.pid"), 75),
+    ).resolves.toEqual({ kind: "missing" });
+  });
+
   it("refuses to terminate a live PID without a pre-disconnect identity", () => {
     expect(
       mayTerminateRecordedProcess(987_654_321, {
