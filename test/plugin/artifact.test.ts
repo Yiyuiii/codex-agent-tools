@@ -52,15 +52,19 @@ function sourceBlock(
   startMarker: string,
   endMarker: string,
 ): string {
-  const start = source.indexOf(startMarker);
+  const normalizedSource = source.replace(/\r\n?/gu, "\n");
+  const start = normalizedSource.indexOf(startMarker);
   if (start < 0) {
     throw new Error(`Missing source block start: ${startMarker}`);
   }
-  const end = source.indexOf(endMarker, start + startMarker.length);
+  const end = normalizedSource.indexOf(
+    endMarker,
+    start + startMarker.length,
+  );
   if (end < 0) {
     throw new Error(`Missing source block end: ${endMarker}`);
   }
-  return source.slice(start, end);
+  return normalizedSource.slice(start, end);
 }
 
 function assertLifecycleSourcesInRequiredFileLoop(
@@ -92,6 +96,29 @@ describe("Codex plugin artifact", () => {
     ].join("\r\n");
 
     expect(markdownSection(source, "## Current")).toBe("current line\n");
+  });
+
+  it("keeps release source-block mutation checks stable with CRLF input", () => {
+    const releaseSmoke = readProjectText(
+      "scripts/release-smoke.mjs",
+    ).replace(/\r?\n/gu, "\r\n");
+    const checkPackageBlock = sourceBlock(
+      releaseSmoke,
+      "async function checkPackage(capabilitySources) {",
+      "\nawait Promise.all([access(cliPath)",
+    );
+
+    expect(() =>
+      assertLifecycleSourcesInRequiredFileLoop(checkPackageBlock),
+    ).not.toThrow();
+    const withoutLifecycleSpread = checkPackageBlock.replace(
+      "    ...requiredLifecyclePackageSources,\n",
+      "",
+    );
+    expect(withoutLifecycleSpread).not.toBe(checkPackageBlock);
+    expect(() =>
+      assertLifecycleSourcesInRequiredFileLoop(withoutLifecycleSpread),
+    ).toThrow(/missing from the required-file loop/u);
   });
 
   it("declares the single repository-local marketplace entry", () => {
