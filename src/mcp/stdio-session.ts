@@ -191,6 +191,13 @@ export function createMcpStdioSession(
     if (started) return completion;
     started = true;
     installListeners();
+    if (
+      dependencies.input.readableEnded ||
+      dependencies.input.destroyed ||
+      dependencies.input.closed
+    ) {
+      void requestClose();
+    }
 
     let connection: Promise<void>;
     try {

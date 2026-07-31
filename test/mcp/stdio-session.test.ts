@@ -83,13 +83,14 @@ class FakeSignalSource implements McpSignalSource {
 interface HarnessOptions {
   close?: () => Promise<void>;
   connect?: () => Promise<void>;
+  input?: PassThrough;
   inFlight?: InFlightTasks;
   reportError?: (message: string) => void;
   signalSource?: FakeSignalSource;
 }
 
 function createHarness(options: HarnessOptions = {}) {
-  const input = new PassThrough();
+  const input = options.input ?? new PassThrough();
   const output = new PassThrough();
   const signalSource = options.signalSource ?? new FakeSignalSource();
   const server = {
@@ -122,6 +123,91 @@ function createHarness(options: HarnessOptions = {}) {
 }
 
 describe("MCP stdio session", () => {
+  it("closes a session whose input ended before run without bypassing connect", async () => {
+    const events: string[] = [];
+    const connect = deferred<void>();
+    const input = new PassThrough({ autoDestroy: false });
+    const drain = vi.fn(async () => {
+      events.push("inFlight.drain");
+    });
+    const harness = createHarness({
+      connect: () => {
+        events.push("server.connect");
+        return connect.promise;
+      },
+      close: async () => {
+        events.push("server.close");
+      },
+      inFlight: { drain } as unknown as InFlightTasks,
+      input,
+    });
+    const ended = new Promise<void>((resolve) => input.once("end", resolve));
+    input.resume();
+    input.end();
+    await ended;
+
+    expect(input.readableEnded).toBe(true);
+    expect(input.destroyed).toBe(false);
+    const completion = harness.session.run();
+    await flushPromises();
+
+    expect(harness.connect).toHaveBeenCalledTimes(1);
+    expect(harness.close).not.toHaveBeenCalled();
+    connect.resolve();
+    const outcome = await Promise.race([
+      completion.then(() => "settled" as const),
+      new Promise<"pending">((resolve) =>
+        setImmediate(() => resolve("pending")),
+      ),
+    ]);
+
+    expect(outcome).toBe("settled");
+    expect(events).toEqual([
+      "server.connect",
+      "server.close",
+      "inFlight.drain",
+    ]);
+    expect(harness.close).toHaveBeenCalledTimes(1);
+    expect(drain).toHaveBeenCalledTimes(1);
+    expect(input.listenerCount("end")).toBe(0);
+    expect(input.listenerCount("close")).toBe(0);
+    expect(input.listenerCount("error")).toBe(0);
+    expect(harness.signalSource.listenerCount("SIGINT")).toBe(0);
+    expect(harness.signalSource.listenerCount("SIGTERM")).toBe(0);
+  });
+
+  it("closes a session whose input was destroyed before run", async () => {
+    const input = new PassThrough();
+    const drain = vi.fn(async () => {});
+    const harness = createHarness({
+      inFlight: { drain } as unknown as InFlightTasks,
+      input,
+    });
+    const closed = new Promise<void>((resolve) => input.once("close", resolve));
+    input.destroy();
+    await closed;
+
+    expect(input.destroyed).toBe(true);
+    expect(input.closed).toBe(true);
+    const completion = harness.session.run();
+    const outcome = await Promise.race([
+      completion.then(() => "settled" as const),
+      new Promise<"pending">((resolve) =>
+        setImmediate(() => resolve("pending")),
+      ),
+    ]);
+
+    expect(outcome).toBe("settled");
+    expect(harness.connect).toHaveBeenCalledTimes(1);
+    expect(harness.close).toHaveBeenCalledTimes(1);
+    expect(drain).toHaveBeenCalledTimes(1);
+    expect(input.listenerCount("end")).toBe(0);
+    expect(input.listenerCount("close")).toBe(0);
+    expect(input.listenerCount("error")).toBe(0);
+    expect(harness.signalSource.listenerCount("SIGINT")).toBe(0);
+    expect(harness.signalSource.listenerCount("SIGTERM")).toBe(0);
+  });
+
   it("closes the server, drains aborted handlers, then removes its listeners", async () => {
     const events: string[] = [];
     const handler = deferred<void>();
