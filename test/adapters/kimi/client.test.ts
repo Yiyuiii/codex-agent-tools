@@ -31,6 +31,7 @@ function baseRequest(overrides: Record<string, unknown> = {}) {
     prompt: "Review fixture.txt",
     model: "kimi-code/k3",
     environment: { ...process.env },
+    timeoutMs: 5_000,
     heartbeatMs: 1_000,
     terminationGraceMs: 100,
     secretValues: [],
@@ -155,17 +156,19 @@ describe("runKimiAcp", () => {
     expect(progress.filter((message) => message.includes("heartbeat")).length).toBeGreaterThanOrEqual(2);
   });
 
-  it("propagates caller cancellation and reports cancelled", async () => {
+  it("propagates caller cancellation without a timeout and reports cancelled", async () => {
     const controller = new AbortController();
-    const result = await runKimiAcp(
-      baseRequest({
-        environment: { ...process.env, FAKE_KIMI_SCENARIO: "hang" },
-        signal: controller.signal,
-        onProgress: (message: string) => {
-          if (message === "kimi prompt started") controller.abort();
-        },
-      }),
-    );
+    const {
+      timeoutMs: _omittedTimeoutMs,
+      ...requestWithoutTimeout
+    } = baseRequest({
+      environment: { ...process.env, FAKE_KIMI_SCENARIO: "hang" },
+      signal: controller.signal,
+      onProgress: (message: string) => {
+        if (message === "kimi prompt started") controller.abort();
+      },
+    });
+    const result = await runKimiAcp(requestWithoutTimeout);
     expect(result.status).toBe("cancelled");
   });
 

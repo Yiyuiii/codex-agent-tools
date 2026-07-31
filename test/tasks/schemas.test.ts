@@ -112,7 +112,11 @@ describe("public input schemas", () => {
     (_task, schema, input) => {
       expect(schema.safeParse(input).success).toBe(true);
 
-      for (const timeoutMs of [900_001, Number.MAX_SAFE_INTEGER]) {
+      for (const timeoutMs of [
+        1_000,
+        900_001,
+        Number.MAX_SAFE_INTEGER,
+      ]) {
         expect(schema.safeParse({ ...input, timeoutMs }).success).toBe(true);
       }
 

@@ -66,6 +66,7 @@ function baseRequest(
     thinkingLevel: "medium" as const,
     task,
     prompt: "Do the task",
+    timeoutMs: 5_000,
     terminationGraceMs: 25,
     secretValues: ["fake-secret"],
   };
@@ -268,19 +269,23 @@ describe("Pi RPC client", () => {
     expect(argv).toContain("read,bash,edit,write,grep,find,ls");
   });
 
-  it("sends abort and removes the fake RPC process tree on cancellation", async () => {
+  it("cancels without a timeout and removes the fake RPC process tree", async () => {
     const cwd = await tempDirectory();
     const logPath = path.join(cwd, "rpc-log.jsonl");
     const childPidPath = path.join(cwd, "child.pid");
     const controller = new AbortController();
+    const {
+      timeoutMs: _omittedTimeoutMs,
+      ...requestWithoutTimeout
+    } = baseRequest(cwd, {
+      PATH: process.env.PATH,
+      SYSTEMROOT: process.env.SYSTEMROOT,
+      FAKE_PI_LOG: logPath,
+      FAKE_PI_SCENARIO: "hold",
+      FAKE_PI_CHILD_PID_FILE: childPidPath,
+    });
     const result = await runPiRpc({
-      ...baseRequest(cwd, {
-        PATH: process.env.PATH,
-        SYSTEMROOT: process.env.SYSTEMROOT,
-        FAKE_PI_LOG: logPath,
-        FAKE_PI_SCENARIO: "hold",
-        FAKE_PI_CHILD_PID_FILE: childPidPath,
-      }),
+      ...requestWithoutTimeout,
       signal: controller.signal,
       onProgress: (message) => {
         if (message === "pi prompt started") setTimeout(() => controller.abort(), 25);
