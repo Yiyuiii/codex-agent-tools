@@ -90,11 +90,27 @@ export function createMcpStdioSession(
   const removeListeners = (): void => {
     if (!listenersInstalled) return;
     listenersInstalled = false;
-    dependencies.input.off("end", onInputEnd);
-    dependencies.input.off("close", onInputClose);
-    dependencies.input.off("error", onInputError);
-    dependencies.signalSource.off("SIGINT", onSigint);
-    dependencies.signalSource.off("SIGTERM", onSigterm);
+    let cleanupFailure: SessionFailure | undefined;
+    const attempt = (remove: () => void): void => {
+      try {
+        remove();
+      } catch (error) {
+        cleanupFailure ??= { error };
+      }
+    };
+
+    attempt(() => dependencies.input.off("end", onInputEnd));
+    attempt(() => dependencies.input.off("close", onInputClose));
+    attempt(() => dependencies.input.off("error", onInputError));
+    attempt(() => dependencies.signalSource.off("SIGINT", onSigint));
+    attempt(() => dependencies.signalSource.off("SIGTERM", onSigterm));
+
+    if (cleanupFailure !== undefined) {
+      recordFailure(
+        cleanupFailure.error,
+        "MCP session listener cleanup failed.",
+      );
+    }
   };
 
   const settleCompletion = (failure?: SessionFailure): void => {
@@ -137,7 +153,12 @@ export function createMcpStdioSession(
     shutdownPromise = performShutdown();
     void shutdownPromise.then(
       () => settleCompletion(),
-      () => settleCompletion(firstFailure),
+      (error: unknown) => {
+        if (firstFailure === undefined) {
+          recordFailure(error, "MCP session shutdown failed.");
+        }
+        settleCompletion(firstFailure);
+      },
     );
   };
 
@@ -154,8 +175,16 @@ export function createMcpStdioSession(
 
   const failConnect = (error: unknown): void => {
     recordFailure(error, "MCP server connection failed.");
-    removeListeners();
-    settleCompletion(firstFailure);
+    try {
+      removeListeners();
+    } catch (cleanupError) {
+      recordFailure(
+        cleanupError,
+        "MCP session listener cleanup failed.",
+      );
+    } finally {
+      settleCompletion(firstFailure);
+    }
   };
 
   const run = (): Promise<void> => {

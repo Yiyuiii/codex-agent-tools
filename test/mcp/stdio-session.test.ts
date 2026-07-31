@@ -34,10 +34,23 @@ async function flushPromises(): Promise<void> {
 class FakeSignalSource implements McpSignalSource {
   readonly #emitter = new EventEmitter();
   readonly #onLastSessionListenerRemoved: (() => void) | undefined;
+  readonly #offOptions:
+    | {
+        failure?: { error: Error; event: "SIGINT" | "SIGTERM" };
+        onOff?: (event: "SIGINT" | "SIGTERM") => void;
+      }
+    | undefined;
   #sessionOffCount = 0;
 
-  constructor(onLastSessionListenerRemoved?: () => void) {
+  constructor(
+    onLastSessionListenerRemoved?: () => void,
+    offOptions?: {
+      failure?: { error: Error; event: "SIGINT" | "SIGTERM" };
+      onOff?: (event: "SIGINT" | "SIGTERM") => void;
+    },
+  ) {
     this.#onLastSessionListenerRemoved = onLastSessionListenerRemoved;
+    this.#offOptions = offOptions;
   }
 
   on(event: "SIGINT" | "SIGTERM", listener: () => void): this {
@@ -47,9 +60,13 @@ class FakeSignalSource implements McpSignalSource {
 
   off(event: "SIGINT" | "SIGTERM", listener: () => void): this {
     this.#emitter.off(event, listener);
+    this.#offOptions?.onOff?.(event);
     this.#sessionOffCount += 1;
     if (this.#sessionOffCount === 2) {
       this.#onLastSessionListenerRemoved?.();
+    }
+    if (this.#offOptions?.failure?.event === event) {
+      throw this.#offOptions.failure.error;
     }
     return this;
   }
@@ -346,6 +363,141 @@ describe("MCP stdio session", () => {
     ]);
     expect(reports.join("\n")).not.toContain(closeSecret);
     expect(reports.join("\n")).not.toContain(drainSecret);
+  });
+
+  it("rejects a normal shutdown with a cleanup failure after attempting every listener removal", async () => {
+    const secret = "CLEANUP_SECRET_SENTINEL";
+    const cleanupFailure = new Error(secret);
+    const reports: string[] = [];
+    const offCalls: string[] = [];
+    const signalSource = new FakeSignalSource(undefined, {
+      failure: { error: cleanupFailure, event: "SIGINT" },
+      onOff: (event) => offCalls.push(event),
+    });
+    const harness = createHarness({
+      reportError: (message) => reports.push(message),
+      signalSource,
+    });
+    const originalInputOff = harness.input.off.bind(harness.input);
+    harness.input.off = ((event, listener) => {
+      offCalls.push(String(event));
+      return originalInputOff(event, listener);
+    }) as typeof harness.input.off;
+    const completion = harness.session.run();
+    await flushPromises();
+
+    harness.input.emit("end");
+
+    await expect(completion).rejects.toBe(cleanupFailure);
+    expect(offCalls).toEqual([
+      "end",
+      "close",
+      "error",
+      "SIGINT",
+      "SIGTERM",
+    ]);
+    expect(harness.input.listenerCount("end")).toBe(0);
+    expect(harness.input.listenerCount("close")).toBe(0);
+    expect(harness.input.listenerCount("error")).toBe(0);
+    expect(signalSource.listenerCount("SIGINT")).toBe(0);
+    expect(signalSource.listenerCount("SIGTERM")).toBe(0);
+    expect(reports).toEqual(["MCP session listener cleanup failed."]);
+    expect(reports.join("\n")).not.toContain(secret);
+  });
+
+  it("settles with an async connect failure even when listener cleanup also fails", async () => {
+    const connectSecret = "ASYNC_CONNECT_SECRET_SENTINEL";
+    const cleanupSecret = "ASYNC_CONNECT_CLEANUP_SECRET_SENTINEL";
+    const connectFailure = new Error(connectSecret);
+    const cleanupFailure = new Error(cleanupSecret);
+    const connect = deferred<void>();
+    const reports: string[] = [];
+    const offCalls: string[] = [];
+    const unhandled: unknown[] = [];
+    const signalSource = new FakeSignalSource(undefined, {
+      failure: { error: cleanupFailure, event: "SIGINT" },
+      onOff: (event) => offCalls.push(event),
+    });
+    const harness = createHarness({
+      connect: () => connect.promise,
+      reportError: (message) => reports.push(message),
+      signalSource,
+    });
+    const originalInputOff = harness.input.off.bind(harness.input);
+    harness.input.off = ((event, listener) => {
+      offCalls.push(String(event));
+      return originalInputOff(event, listener);
+    }) as typeof harness.input.off;
+    let outcome:
+      | { error: unknown; status: "rejected" }
+      | { status: "resolved" }
+      | undefined;
+    void harness.session.run().then(
+      () => {
+        outcome = { status: "resolved" };
+      },
+      (error: unknown) => {
+        outcome = { error, status: "rejected" };
+      },
+    );
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+
+    try {
+      connect.reject(connectFailure);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(outcome).toEqual({
+        error: connectFailure,
+        status: "rejected",
+      });
+      expect(unhandled).toEqual([]);
+      expect(offCalls).toEqual([
+        "end",
+        "close",
+        "error",
+        "SIGINT",
+        "SIGTERM",
+      ]);
+      expect(harness.input.listenerCount("end")).toBe(0);
+      expect(harness.input.listenerCount("close")).toBe(0);
+      expect(harness.input.listenerCount("error")).toBe(0);
+      expect(signalSource.listenerCount("SIGINT")).toBe(0);
+      expect(signalSource.listenerCount("SIGTERM")).toBe(0);
+      expect(reports).toEqual([
+        "MCP server connection failed.",
+        "MCP session listener cleanup failed.",
+      ]);
+      expect(reports.join("\n")).not.toContain(connectSecret);
+      expect(reports.join("\n")).not.toContain(cleanupSecret);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
+
+  it("settles with a synchronous connect throw after cleaning up listeners", async () => {
+    const secret = "SYNC_CONNECT_SECRET_SENTINEL";
+    const failure = new Error(secret);
+    const reports: string[] = [];
+    const harness = createHarness({
+      connect: () => {
+        throw failure;
+      },
+      reportError: (message) => reports.push(message),
+    });
+
+    const completion = harness.session.run();
+
+    await expect(completion).rejects.toBe(failure);
+    expect(harness.input.listenerCount("end")).toBe(0);
+    expect(harness.input.listenerCount("close")).toBe(0);
+    expect(harness.input.listenerCount("error")).toBe(0);
+    expect(harness.signalSource.listenerCount("SIGINT")).toBe(0);
+    expect(harness.signalSource.listenerCount("SIGTERM")).toBe(0);
+    expect(reports).toEqual(["MCP server connection failed."]);
+    expect(reports.join("\n")).not.toContain(secret);
   });
 
   it("uses the caller's in-flight tracker when creating the MCP server", async () => {
