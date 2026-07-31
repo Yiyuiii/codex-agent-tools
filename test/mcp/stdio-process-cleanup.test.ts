@@ -34,6 +34,7 @@ import { InFlightTasks } from "../../src/mcp/in-flight.js";
 import { createMcpServer } from "../../src/mcp/server.js";
 import { createMcpStdioSession } from "../../src/mcp/stdio-session.js";
 import type { ExternalTaskService } from "../../src/mcp/tools.js";
+import { inspectProcessIdentity } from "../../src/qualification/lock.js";
 import { terminateProcessTree } from "../../src/runtime/process-tree.js";
 import type { ExternalReviewResult } from "../../src/tasks/results.js";
 import {
@@ -51,6 +52,8 @@ const tempPrefix = "codex-agent-stdio-cleanup-test-";
 const tempDirectories: string[] = [];
 const ownedPids: number[] = [];
 const ownedPidFiles: string[] = [];
+const ownedProcessStartTimes = new Map<number, string>();
+const sessionCleanupHandles: SessionCleanupHandle[] = [];
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -68,6 +71,15 @@ interface ServiceObservation {
   result?: ExternalReviewResult;
   serviceResolvedOrder?: number;
   signal?: AbortSignal;
+}
+
+interface SessionCleanupHandle {
+  baselineSigintListeners: number;
+  baselineSigtermListeners: number;
+  input: PassThrough;
+  label: string;
+  output: PassThrough;
+  running: Promise<void>;
 }
 
 function deferred<T>(): Deferred<T> {
@@ -110,6 +122,44 @@ async function readPid(filePath: string, timeoutMs = 5_000): Promise<number> {
   throw new Error(
     `Fixture PID file was not ready: ${filePath}; ${String(lastError)}`,
   );
+}
+
+async function readPidIfAvailable(
+  filePath: string,
+  timeoutMs = 500,
+): Promise<number | undefined> {
+  try {
+    return await readPid(filePath, timeoutMs);
+  } catch {
+    return undefined;
+  }
+}
+
+async function captureOwnedProcessIdentity(pid: number): Promise<number> {
+  const identity = await inspectProcessIdentity(pid);
+  if (!identity.alive || identity.startTime === null) {
+    throw new Error(`Owned PID ${pid} was not alive when identity was captured`);
+  }
+  const previous = ownedProcessStartTimes.get(pid);
+  if (previous !== undefined && previous !== identity.startTime) {
+    throw new Error(
+      `Owned PID ${pid} changed identity from ${previous} to ${identity.startTime}`,
+    );
+  }
+  ownedProcessStartTimes.set(pid, identity.startTime);
+  return pid;
+}
+
+function observePromptProcessState(
+  rootPidPath: string,
+  childPidPath: string,
+): Promise<readonly [number, number]> {
+  const observation = Promise.all([
+    readPid(rootPidPath).then(captureOwnedProcessIdentity),
+    readPid(childPidPath).then(captureOwnedProcessIdentity),
+  ]);
+  void observation.catch(() => undefined);
+  return observation;
 }
 
 async function waitUntilDead(pid: number, timeoutMs = 10_000): Promise<void> {
@@ -283,9 +333,20 @@ async function runStdioCancellation(
     inFlight,
     signalSource: process,
   });
+  const baselineSigintListeners = process.listenerCount("SIGINT");
+  const baselineSigtermListeners = process.listenerCount("SIGTERM");
   let sessionResolvedOrder = 0;
   const running = session.run().then(() => {
     sessionResolvedOrder = nextOrder();
+  });
+  void running.catch(() => undefined);
+  sessionCleanupHandles.push({
+    baselineSigintListeners,
+    baselineSigtermListeners,
+    input,
+    label: llm,
+    output,
+    running,
   });
 
   const write = (record: JsonRpcRecord): void => {
@@ -335,7 +396,17 @@ async function runStdioCancellation(
         record.params?.message === promptStartedMessage,
       `${llm} prompt-start progress`,
     );
-    await withHarnessTimeout(promptStateReady, `${llm} fake prompt state`);
+    const [rootPid, childPid] = await withHarnessTimeout(
+      promptStateReady,
+      `${llm} fake prompt state`,
+    );
+    expect(isAlive(rootPid), `${llm} root must be alive before stdin end`).toBe(
+      true,
+    );
+    expect(
+      isAlive(childPid),
+      `${llm} grandchild must be alive before stdin end`,
+    ).toBe(true);
 
     input.end();
     await withHarnessTimeout(abortObserved.promise, `${llm} request abort`);
@@ -343,27 +414,77 @@ async function runStdioCancellation(
     return { sessionResolvedOrder };
   } finally {
     if (!input.writableEnded) input.end();
-    await withHarnessTimeout(running, `${llm} fallback session shutdown`).catch(
-      () => undefined,
-    );
-    output.destroy();
   }
 }
 
 afterEach(async () => {
-  for (const pidFile of ownedPidFiles.splice(0)) {
-    try {
-      rememberPid(Number.parseInt(await readFile(pidFile, "utf8"), 10));
-    } catch {
-      // A fixture that never started need not have a PID file.
+  const cleanupFailures: string[] = [];
+  const latePids = await Promise.all(
+    ownedPidFiles
+      .splice(0)
+      .map((pidFile) => readPidIfAvailable(pidFile)),
+  );
+  for (const pid of latePids) {
+    if (
+      pid !== undefined &&
+      !ownedProcessStartTimes.has(pid) &&
+      isAlive(pid)
+    ) {
+      try {
+        await captureOwnedProcessIdentity(pid);
+      } catch (error) {
+        cleanupFailures.push(String(error));
+      }
     }
   }
   for (const pid of [...new Set(ownedPids.splice(0))]) {
-    if (isAlive(pid)) {
+    const expectedStartTime = ownedProcessStartTimes.get(pid);
+    if (expectedStartTime === undefined) continue;
+    try {
+      const identity = await inspectProcessIdentity(pid);
+      if (!identity.alive) continue;
+      if (identity.startTime !== expectedStartTime) {
+        cleanupFailures.push(
+          `Refused to terminate reused PID ${pid}: expected ${expectedStartTime}, observed ${String(identity.startTime)}`,
+        );
+        continue;
+      }
       await terminateProcessTree(pid);
+      await waitUntilDead(pid);
+    } catch (error) {
+      cleanupFailures.push(String(error));
     }
-    await waitUntilDead(pid);
   }
+  ownedProcessStartTimes.clear();
+
+  for (const handle of sessionCleanupHandles.splice(0)) {
+    if (!handle.input.writableEnded) handle.input.end();
+    try {
+      await withHarnessTimeout(
+        handle.running,
+        `${handle.label} afterEach session shutdown`,
+      );
+    } catch (error) {
+      cleanupFailures.push(String(error));
+    } finally {
+      handle.output.destroy();
+    }
+    if (
+      process.listenerCount("SIGINT") !== handle.baselineSigintListeners
+    ) {
+      cleanupFailures.push(
+        `${handle.label} SIGINT listeners did not return to baseline`,
+      );
+    }
+    if (
+      process.listenerCount("SIGTERM") !== handle.baselineSigtermListeners
+    ) {
+      cleanupFailures.push(
+        `${handle.label} SIGTERM listeners did not return to baseline`,
+      );
+    }
+  }
+
   for (const directory of tempDirectories.splice(0)) {
     assertSafeTempDirectory(directory);
     await rm(directory, {
@@ -372,6 +493,9 @@ afterEach(async () => {
       maxRetries: 5,
       retryDelay: 50,
     });
+  }
+  if (cleanupFailures.length > 0) {
+    throw new Error(cleanupFailures.join("\n"));
   }
 });
 
@@ -387,7 +511,7 @@ describe("MCP stdio owned-process cleanup", () => {
 
       let order = 0;
       const nextOrder = (): number => ++order;
-      let clientInvocationCount = 0;
+      let adapterClientInvocationCount = 0;
       let clientResolvedOrder = 0;
       let clientResult: KimiAcpRunResult | undefined;
       let cleanupWasCompleteWhenClientResolved = false;
@@ -395,7 +519,7 @@ describe("MCP stdio owned-process cleanup", () => {
       const adapter = new KimiAdapter({
         locateExecutable: async () => process.execPath,
         runClient: async (request) => {
-          clientInvocationCount += 1;
+          adapterClientInvocationCount += 1;
           clientRequestHadTimeout = Object.hasOwn(request, "timeoutMs");
           clientResult = await runKimiAcp({
             ...request,
@@ -406,8 +530,6 @@ describe("MCP stdio owned-process cleanup", () => {
               FAKE_KIMI_ROOT_PID_FILE: rootPidPath,
               FAKE_KIMI_CHILD_PID_FILE: childPidPath,
             },
-            heartbeatMs: 1_000,
-            terminationGraceMs: 25,
           });
           const [rootPid, childPid] = await Promise.all([
             readPid(rootPidPath),
@@ -429,10 +551,10 @@ describe("MCP stdio owned-process cleanup", () => {
       });
       const observation: ServiceObservation = { abortCount: 0 };
       const abortObserved = deferred<void>();
-      const promptStateReady = Promise.all([
-        readPid(rootPidPath),
-        readPid(childPidPath),
-      ]);
+      const promptStateReady = observePromptProcessState(
+        rootPidPath,
+        childPidPath,
+      );
       const service = observeService(
         realService,
         observation,
@@ -461,7 +583,7 @@ describe("MCP stdio owned-process cleanup", () => {
       expect(clientResult?.executionTelemetry).toMatchObject({
         adapterClientInvocationCount: 1,
       });
-      expect(clientInvocationCount).toBe(1);
+      expect(adapterClientInvocationCount).toBe(1);
       expect(clientRequestHadTimeout).toBe(false);
       expect(cleanupWasCompleteWhenClientResolved).toBe(true);
       expect(clientResolvedOrder).toBeLessThan(
@@ -497,7 +619,7 @@ describe("MCP stdio owned-process cleanup", () => {
 
       let order = 0;
       const nextOrder = (): number => ++order;
-      let clientInvocationCount = 0;
+      let adapterClientInvocationCount = 0;
       let clientResolvedOrder = 0;
       let clientResult: AdapterRunResult | undefined;
       let cleanupWasCompleteWhenClientResolved = false;
@@ -507,7 +629,7 @@ describe("MCP stdio owned-process cleanup", () => {
         locateExecutable: async () => process.execPath,
         buildConfig: async () => testConfig,
         runClient: async (request) => {
-          clientInvocationCount += 1;
+          adapterClientInvocationCount += 1;
           clientRequestHadTimeout = Object.hasOwn(request, "timeoutMs");
           clientRequestHadRetryOverride =
             Object.hasOwn(request, "autoRetry") ||
@@ -522,8 +644,6 @@ describe("MCP stdio owned-process cleanup", () => {
               FAKE_PI_ROOT_PID_FILE: rootPidPath,
               FAKE_PI_CHILD_PID_FILE: childPidPath,
             },
-            heartbeatMs: 1_000,
-            terminationGraceMs: 25,
           });
           const [rootPid, childPid] = await Promise.all([
             readPid(rootPidPath),
@@ -548,10 +668,10 @@ describe("MCP stdio owned-process cleanup", () => {
       });
       const observation: ServiceObservation = { abortCount: 0 };
       const abortObserved = deferred<void>();
-      const promptStateReady = Promise.all([
-        readPid(rootPidPath),
-        readPid(childPidPath),
-      ]);
+      const promptStateReady = observePromptProcessState(
+        rootPidPath,
+        childPidPath,
+      );
       const service = observeService(
         realService,
         observation,
@@ -586,13 +706,15 @@ describe("MCP stdio owned-process cleanup", () => {
       expect(observation.abortCount).toBe(1);
       expect(observation.result?.status).toBe("cancelled");
       expect(clientResult?.status).toBe("cancelled");
-      expect(clientResult?.executionTelemetry).toMatchObject({
-        adapterClientInvocationCount: 1,
-      });
+      expect(clientResult?.executionTelemetry).toBeNull();
+      expect(clientResult?.diagnostics).toContain("pi_runtime_identity_unknown");
+      expect(
+        commands.filter((command) => command.type === "prompt"),
+      ).toHaveLength(1);
       expect(
         commands.filter((command) => command.type === "abort"),
       ).toHaveLength(1);
-      expect(clientInvocationCount).toBe(1);
+      expect(adapterClientInvocationCount).toBe(1);
       expect(clientRequestHadTimeout).toBe(false);
       expect(clientRequestHadRetryOverride).toBe(false);
       expect(commands.map((command) => command.type)).not.toContain(

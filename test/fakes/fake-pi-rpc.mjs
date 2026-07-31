@@ -92,18 +92,6 @@ function handle(command) {
       return;
     }
     if (scenario === "hold") {
-      if (rootPidPath) {
-        emit({
-          type: "message_end",
-          message: {
-            role: "assistant",
-            model: selectedModel,
-            provider: selectedProvider,
-            content: [],
-            stopReason: "stop",
-          },
-        });
-      }
       spawnGrandchild();
       return;
     }
