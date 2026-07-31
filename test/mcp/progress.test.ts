@@ -125,4 +125,19 @@ describe("createMcpProgressReporter", () => {
     await expect(progress.finish()).resolves.toBeUndefined();
     expect(controller.signal.aborted).toBe(false);
   });
+
+  it("absorbs a synchronous notification throw without aborting or rejecting finish", async () => {
+    const controller = new AbortController();
+    const progress = createMcpProgressReporter({
+      signal: controller.signal,
+      _meta: { progressToken: "token-1" },
+      sendNotification: () => {
+        throw new Error("transport failed synchronously");
+      },
+    });
+
+    expect(() => progress.report("best effort")).not.toThrow();
+    await expect(progress.finish()).resolves.toBeUndefined();
+    expect(controller.signal.aborted).toBe(false);
+  });
 });
