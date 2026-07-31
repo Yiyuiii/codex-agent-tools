@@ -61,6 +61,26 @@
   持久 tgz 0、打包文档 Windows 绝对路径 0、隐藏全局限制 0。旧能力索引仍按预期以
   code 1、空 stdout 与固定脱敏 stderr fail closed；Task 9 新 8/8 evidence 前不得转绿。
   本阶段没有真实模型、发布、网络后端、活动配置或插件变更。
+- Task 8 的确定性矩阵已先完成两项门禁修正。`4b1f8f3` 删除了通用单元测试里重复的
+  live current-index readiness 断言，但没有弱化独立 capability verifier 或 release smoke；
+  随后全量单 worker 结果为 58 files、951 passed / 1 skipped / 0 failed。`4102b6a`
+  把离线矩阵改为纯 local helper 单测和隔离插件 `--check-report`；此前因计划误分类而误跑
+  `acceptance:local` 触发的真实调用不计 Task 8 证据，临时清理后 Kimi ACP、Pi RPC、
+  real-smoke 目标进程均为 0，qualification lock absent。`5d78d0f` 又精确排除三个 Codex
+  CLI `arg0` shim，使隔离报告在三次只读复验及后续 check 中稳定通过；首次漂移的根因目前
+  只有高置信时序候选，未被证实。
+- Task 8 的 Ark `cc_review` 因 429 没有产生审阅意见；Kimi `external_review` 被当前已安装
+  beta.1/宿主调用链在 300 秒截断，也没有意见，并留下了该次精确 owned Kimi ACP。父线程
+  只按 PID、命令与精确 start time 清理该 ACP，未触碰 Kimi Desktop，目标计数随后回到 0。
+  这次运行只证明旧公开 beta.1 调用路径的行为，不计候选验收，也不能冒充候选修复已通过。
+- 两轮内部独立审阅命中的 P2 已由 `b03ad6c`、`123a7bd`、`a3fdf03` 以 TDD 闭合：
+  pre-ended、pre-destroyed、pre-errored 与 late-error stdin 均有合同覆盖；最终规格审阅 PASS、
+  质量审阅 Ready: Yes，父线程复验 4 files 37/37 与 typecheck，并有额外 34 次时序探针通过。
+  但质量审阅仍留下 Task 9 前必须闭合的 P1：Windows 生产 `terminateProcessTree` 只按 PID，
+  root 先退出时可能留下 orphan，PID 复用时可能误杀。该风险是审阅结论，不是已由真实事故
+  证实的根因；基于 Windows Job Object 的新设计已请求维护者明确批准，当前尚未获批或实现。
+  因此 Task 9 与 beta 发布仍 blocked。现行 capability index 与历史 evidence 未改，verifier
+  继续 stale fail closed；本阶段未发布、推送或更新配置/插件。
 
 ## Task 1：建立只服务显式 timeout 的分段 deadline 调度器
 
