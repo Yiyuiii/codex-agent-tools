@@ -2,9 +2,9 @@
 
 建立日期：2026-07-25
 
-最近复核：2026-07-30
+最近复核：2026-07-31
 
-目标发布分支：`next`；当前证据分支：`codex/beta-0.1.1-host-evidence`
+目标发布分支：`next`；当前证据分支：`codex/stdio-lifecycle-and-native-budget`
 
 包版本：`0.1.1-beta.1`
 
@@ -16,16 +16,19 @@
 
 ## 当前 fail-closed 阻断
 
-当前源码变更已使八项能力指纹 stale。旧
-`docs/smoke/evidence/capabilities.json` 仍是不可变历史输入，不得为了让当前候选
-通过而改写；在 Task 9 产生新证据前，`npm run verify:capabilities` 必须打印固定的
-脱敏错误并以退出码 1 结束。Task 9 只有在新批次 8/8 passed 后才能更新能力索引。
+当前源码变更已使八项能力指纹 stale。Task 7 和 Task 8 期间，以及 Task 9 新证据形成前，
+`capabilities.json` 保持原样，不得只为转绿而改写；在 Task 9 产生新证据前，
+`npm run verify:capabilities` 必须打印固定的脱敏错误并以退出码 1 结束。Task 9 在
+新批次 8/8 passed 后更新同一 `capabilities.json`。历史 batch manifest 与 case evidence
+永久不可变。
 registry 中的旧 passed 文案不构成发布权威；唯一机器发布权威是
 `npm run verify:capabilities`。
 
 beta.1 handoff 只证明旧宿主断开会留下服务端任务，不是 stable Stop gate 的唯一证据。
-beta.2 必须依次通过公开 npm 精确版本验收、官方插件升级、完整 App 重启和真实宿主取消验收。
-完成上述门禁前，beta.2 与 stable 都不可发布。
+
+晋级顺序只有一条：Task 9 取得 8/8 passed 并使 verifier green；Task 10 通过 GitHub Actions
+把 beta.2 发布到 npm next；Task 11 从公开 npm 做精确版本验收、完成官方插件升级、
+完整 App 重启与真实 Stop/interrupt 门禁；Task 12 才发布 stable。Task 9 未通过前不得发布 beta.2；Task 11 未通过前不得发布 stable。
 
 ## 状态总览
 
@@ -33,7 +36,7 @@ beta.2 必须依次通过公开 npm 精确版本验收、官方插件升级、�
 | ---- | ----------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1    | 确定性单测、类型检查、构建、release smoke | blocked：实现聚焦验证已通过，能力 verifier 按预期 fail closed               | Task 1–6 聚焦证据；Task 8 才形成完整确定性矩阵                                                                                                                                                                              |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
-| 3    | 四个逻辑 LLM 的八项真实模型门禁           | stale：0 current / 8 stale，等待 Task 9                                     | 不可变旧索引与历史 evidence 保留；新批次完成后更新索引                                                                                                                                                                     |
+| 3    | 四个逻辑 LLM 的八项真实模型门禁           | stale：0 current / 8 stale，等待 Task 9                                     | Task 7/8 保持现行索引原样；Task 9 用新证据更新；历史 manifest/case 永久不变                                                                                                                                                  |
 | 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta.1 已安装；等待 beta.2 公开包、完整重启与 Stop/interrupt       | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 [real-host-acceptance.md](real-host-acceptance.md)                                                                                |
 
 ## 第 1 层：确定性单测与构建

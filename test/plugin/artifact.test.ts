@@ -286,50 +286,89 @@ describe("Codex plugin artifact", () => {
         /stdio 的 end、close、error 与 SIGINT、SIGTERM/u,
       );
       expect(contract).toMatch(
-        /取消所有在途请求[\s\S]*等待 owned 子进程树清理/u,
+        /SDK abort handlers 取消在途请求[\s\S]*等待 owned 子进程树/u,
       );
       expect(contract).toMatch(
         /Pi 生产路径的原生 retry 策略保持不变/u,
       );
     }
+
+    const readmeContract = markdownSection(
+      readProjectText("README.md"),
+      "## 执行预算与取消合同",
+    );
+    expect(readmeContract).toMatch(
+      /幂等 session shutdown[\s\S]*`server\.close\(\)`[\s\S]*SDK abort handlers[\s\S]*owned 子进程树与 tracker drain[\s\S]*session 结束/u,
+    );
   });
 
-  it("keeps the stale capability gate and beta.2 host gate fail closed", () => {
+  it("keeps the stale capability index staged while evidence stays immutable", () => {
+    const readme = readProjectText("README.md");
     const checklist = readProjectText("docs/release/checklist.md");
-    const hostAcceptance = readProjectText(
-      "docs/release/real-host-acceptance.md",
-    );
     const runbook = readProjectText(
       "docs/release/four-llm-qualification-execution-runbook.md",
     );
+    const ark = readProjectText("docs/smoke/ark.md");
+    const agentMemory = readProjectText("AGENTS.md");
 
-    for (const source of [checklist, runbook]) {
+    for (const source of [readme, checklist, runbook, ark, agentMemory]) {
       expect(source).toMatch(
         /当前源码变更已使八项能力指纹 stale/u,
       );
       expect(source).toMatch(
-        /`docs\/smoke\/evidence\/capabilities\.json`[\s\S]*不可变/u,
+        /Task 7[\s\S]*Task 8[\s\S]*Task 9 新证据形成前[\s\S]*`?capabilities\.json`?[\s\S]*保持原样/u,
       );
+      expect(source).toMatch(
+        /Task 9[\s\S]*8\/8 passed[\s\S]*更新同一[\s\S]*`?capabilities\.json`?/u,
+      );
+      expect(source).toMatch(
+        /历史 batch manifest 与 case evidence\s*永久不可变/u,
+      );
+    }
+
+    for (const source of [checklist, runbook]) {
       expect(source).toMatch(
         /`npm run verify:capabilities`[\s\S]*退出码 1/u,
-      );
-      expect(source).toMatch(
-        /Task 9[\s\S]*8\/8 passed[\s\S]*更新能力索引/u,
       );
       expect(source).toMatch(
         /registry[\s\S]*旧 passed[\s\S]*不构成发布权威/u,
       );
     }
 
-    for (const source of [checklist, hostAcceptance]) {
+    const releaseDocuments = [
+      readme,
+      checklist,
+      readProjectText("docs/release/real-host-acceptance.md"),
+      agentMemory,
+    ];
+
+    for (const source of releaseDocuments) {
       expect(source).toMatch(
-        /beta\.1 handoff[\s\S]*不是 stable Stop gate 的唯一证据/u,
+        /Task 9[\s\S]*8\/8[\s\S]*verifier green[\s\S]*Task 10[\s\S]*GitHub Actions[\s\S]*beta\.2[\s\S]*npm next[\s\S]*Task 11[\s\S]*公开 npm[\s\S]*官方插件[\s\S]*完整 App 重启[\s\S]*真实 Stop[\s\S]*Task 12[\s\S]*stable/u,
       );
       expect(source).toMatch(
-        /beta\.2[\s\S]*公开 npm[\s\S]*官方插件[\s\S]*完整 App 重启[\s\S]*真实宿主取消验收/u,
+        /Task 9 未通过前不得发布 beta\.2；Task 11 未通过前不得发布 stable/u,
       );
-      expect(source).toMatch(/完成上述门禁前[\s\S]*不可发布/u);
+      expect(source).not.toMatch(
+        /Task 11 未通过前不得发布 beta\.2/u,
+      );
     }
+
+    const hostAcceptance = releaseDocuments[2] ?? "";
+    expect(hostAcceptance).toMatch(
+      /下一人工节点[\s\S]*beta\.2 已发布到 npm next 并完成官方插件升级后[\s\S]*完整重启/u,
+    );
+
+    expect(checklist).toMatch(/最近复核：2026-07-31/u);
+    expect(checklist).toMatch(
+      /当前证据分支：`codex\/stdio-lifecycle-and-native-budget`/u,
+    );
+    expect(readme).toMatch(
+      /`0\.1\.1-beta\.1`[\s\S]*已发布到 npm `next`[\s\S]*已安装/u,
+    );
+    expect(readme).not.toMatch(
+      /`0\.1\.1-beta\.1` 候选[\s\S]*正在完成发布门禁/u,
+    );
   });
 
   it("keeps current smoke guidance aligned with native budgets and Pi retry", () => {

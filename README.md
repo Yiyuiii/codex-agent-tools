@@ -9,7 +9,7 @@
 - `ark-agent-plan`：隔离 Pi RPC / Ark Agent Plan / `ark-code-latest`，直连；
 - `ark-agent-deepseek-v4-flash`：隔离 Pi RPC / Ark Agent Plan / `deepseek-v4-flash`，直连。
 
-八项 review/delegate 的旧索引仍引用不可变、已通过的真实 case evidence，但本轮执行预算和 stdio 生命周期源码变更已使八项运行时指纹全部 stale。当前 `npm run verify:capabilities` 必须以脱敏错误和退出码 1 fail closed，因此此分支不可发布。Task 9 只有在新资格批次形成 8/8 passed evidence 后才会更新能力索引；注册表中的旧 `passed` 文案只描述历史资格，不是当前候选的发布权威。资格单位仍是一个精确的“逻辑 LLM × 任务”组合，临时额度或服务状态不会要求无关能力重复运行。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用只作为历史审计证据保留。
+八项 review/delegate 的旧索引仍引用不可变、已通过的真实 case evidence，但当前源码变更已使八项能力指纹 stale。当前 `npm run verify:capabilities` 必须以脱敏错误和退出码 1 fail closed，因此此分支不可发布。Task 7 和 Task 8 期间，以及 Task 9 新证据形成前，`capabilities.json` 保持原样；Task 9 在新批次 8/8 passed 后更新同一 `capabilities.json`。历史 batch manifest 与 case evidence 永久不可变。注册表中的旧 `passed` 文案只描述历史资格，不是当前候选的发布权威。资格单位仍是一个精确的“逻辑 LLM × 任务”组合，临时额度或服务状态不会要求无关能力重复运行。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用只作为历史审计证据保留。
 
 standing authorization 下的最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`。标准入口和 `functions.exec` cell 各只有一个；批次按首错停在 ordinal 6，形成 6 completed / 5 passed、`blocked / case_failed`、`promotionEligible=false`，ordinal 7–8 为 notRun。没有 resume、retry、fallback、补跑、第二入口或第二批。manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，20 个不可变证据文件由提交 `6b4217d` 保存。
 
@@ -21,7 +21,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 全量测试还暴露并闭合了一个既有 Kimi ACP 时序竞态：client 可能早于 child close 返回，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49 文件矩阵已包含该修复。Pi resolver 在生产隔离环境中找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`。
 
-注册表仍保留 8 passed / 0 pending 的历史文案，旧 [`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 也保持不可变；当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。维护者本机已通过官方命令把活动插件升级到 `0.1.1-beta.1` 并移除同名开发期直连；旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。真实资格实验的 standing authorization 仍有效，Task 9 会针对本轮失效的八项能力生成新证据；临时额度恢复本身不触发额外全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
+注册表仍保留 8 passed / 0 pending 的历史文案，[`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 则是 Task 9 将按计划更新的现行索引；当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。维护者本机已通过官方命令把活动插件升级到 `0.1.1-beta.1` 并移除同名开发期直连；旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。真实资格实验的 standing authorization 仍有效，Task 9 会针对本轮失效的八项能力生成新证据；临时额度恢复本身不触发额外全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
 2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
@@ -32,7 +32,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 - `timeoutMs` 是调用方为单次请求显式设置的可选值；它不是外部 CLI 的全局配置，也不会持久化。
 - 省略时，Kimi 与 Pi 都不设置模型执行 deadline，让外部 CLI 使用自身原生执行预算；不存在 profile 级的 600 秒或 900 秒执行上限。
 - 显式 deadline 到期只结束该次请求，并返回超时语义；普通调用方取消保持 cancelled 语义。
-- stdio 的 end、close、error 与 SIGINT、SIGTERM 都会先取消所有在途请求，再关闭服务并等待 owned 子进程树清理，最后才结束共享 MCP session。
+- stdio 的 end、close、error 与 SIGINT、SIGTERM 都会触发幂等 session shutdown；shutdown 调用 `server.close()`，由 SDK abort handlers 取消在途请求，再等待 owned 子进程树与 tracker drain，最后才允许 session 结束。
 - Pi 生产路径的原生 retry 策略保持不变；只在资格模式中沿用既有的 single-attempt、零 retry/fallback 合同。
 
 ## 公开契约
@@ -64,7 +64,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。44 files / 584 passed、46 files / 759 passed 与 48 files / 837 passed 都只描述各自历史候选；当前 stable fresh 全量为 53 files / 890 passed / 1 skipped / 0 failed。第 2 层隔离官方插件生命周期与既有 `--check-report` 均已通过；公共 npm 验收脚本还会在每个待晋级版本上重新执行临时 home 的官方生命周期。这些证据都不代表活动 Codex App 已安装或可用。
 
-维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。后续又用官方命令移除同名开发期直连，旧 `codex_cc_tools` 保持 enabled。`0.1.1-beta.0` 补齐 `cwd: "."` 后由 GitHub Actions OIDC 发布到 npm `next` 并完成官方升级。维护者真正终止后台宿主并重开后，新任务已发现 `external_review` / `external_delegate` 与旧两项工具共存，真实 Kimi K3 review 通过；Ark Coding Plan review 在启动 Pi 前报告缺少凭据。根因是插件 manifest 没有声明 stdio MCP `env_vars`，宿主按隔离边界没有把父 App 中已存在的 Coding Plan 凭据转发给 MCP。`0.1.1-beta.1` 候选已增加精确四项变量名白名单且不保存任何值，正在完成发布门禁。真实 App 宿主门禁仍为 partial，不能称为已替代旧工具。
+维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。后续又用官方命令移除同名开发期直连，旧 `codex_cc_tools` 保持 enabled。`0.1.1-beta.0` 补齐 `cwd: "."` 后由 GitHub Actions OIDC 发布到 npm `next` 并完成官方升级。维护者真正终止后台宿主并重开后，新任务已发现 `external_review` / `external_delegate` 与旧两项工具共存，真实 Kimi K3 review 通过；Ark Coding Plan review 在启动 Pi 前报告缺少凭据。根因是插件 manifest 没有声明 stdio MCP `env_vars`，宿主按隔离边界没有把父 App 中已存在的 Coding Plan 凭据转发给 MCP。历史阶段的 `0.1.1-beta.1` 已发布到 npm `next` 并已安装到活动官方插件；该版本增加了精确四项变量名白名单且不保存任何值，其 handoff 取消门禁失败促成本轮修复。真实 App 宿主门禁仍为 partial，不能称为已替代旧工具。
 
 完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](docs/release/checklist.md)。
 
@@ -112,4 +112,8 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；npm `next` 仍是已发布的 `0.1.1-beta.1`。本轮已闭合原生执行预算、stdio 取消传播和 owned 进程树清理的确定性实现，但八项能力指纹因此 stale，当前分支不可发布。下一候选 `0.1.1-beta.2` 必须先通过 Task 9 的 8/8 新资格、GitHub Actions OIDC 发布、公开 npm 精确版本验收和官方插件升级；随后还必须完整退出并重开 App，在真实宿主中用普通 Stop/interrupt 完成取消与不重生验收。beta.1 handoff 只暴露了缺口，不是 stable Stop gate 的唯一证据。旧 `codex_cc_tools` 保持 enabled；未完成上述门禁前不得发布 beta.2 或 stable。
+当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；npm `next` 仍是已发布的 `0.1.1-beta.1`。本轮已闭合原生执行预算、stdio 取消传播和 owned 进程树清理的确定性实现，但八项能力指纹因此 stale，当前分支不可发布。
+
+晋级顺序只有一条：Task 9 取得 8/8 passed 并使 verifier green；Task 10 通过 GitHub Actions 把 beta.2 发布到 npm next；Task 11 从公开 npm 做精确版本验收、完成官方插件升级、完整 App 重启与真实 Stop/interrupt 门禁；Task 12 才发布 stable。Task 9 未通过前不得发布 beta.2；Task 11 未通过前不得发布 stable。
+
+beta.1 handoff 只暴露了缺口，不是 stable Stop gate 的唯一证据。旧 `codex_cc_tools` 保持 enabled。

@@ -8,7 +8,7 @@
 - `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；review/delegate 均有精确 passed evidence，旧索引两项均记录为 passed。
 - `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；review 与受限 legacy delegate evidence 均已验证，旧索引两项均记录为 passed。
 
-现行公共调用省略 `timeoutMs` 时，三条 Ark/Pi 路线都不设置模型执行 deadline；只有调用方显式传入的单次值会建立 deadline。Pi 生产路径的原生 retry 保持不变，资格模式仍单独执行 single-attempt、零 retry/fallback。本轮执行预算与 stdio 生命周期进入运行时指纹后，当前源码变更已使八项能力指纹 stale；旧 passed evidence 与索引保持不可变，但不能授权发布，Task 9 将生成新 8/8 evidence。
+现行公共调用省略 `timeoutMs` 时，三条 Ark/Pi 路线都不设置模型执行 deadline；只有调用方显式传入的单次值会建立 deadline。Pi 生产路径的原生 retry 保持不变，资格模式仍单独执行 single-attempt、零 retry/fallback。当前源码变更已使八项能力指纹 stale。Task 7 和 Task 8 期间，以及 Task 9 新证据形成前，`capabilities.json` 保持原样；Task 9 在新批次 8/8 passed 后更新同一 `capabilities.json`。历史 batch manifest 与 case evidence 永久不可变。
 
 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的 `ark-agent-plan` 配额池。2026-07-20 对旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 完成的四项 passed 证据现仅作为历史事实保留，不属于当前公开面，也不得用于晋级两个新 Agent Plan 路线。原始 evidence JSON 保持不变。
 
@@ -46,7 +46,7 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 
 ## 当前证据矩阵
 
-旧机器索引来源、精确 SHA-256 与上一运行时指纹统一保存在不可变 [`capabilities.json`](evidence/capabilities.json)。其中三条 Ark 路线的六项记录均为历史 passed，但当前因指纹变化全部 stale；以下 2026-07-25 条目同样只保留为历史基线，不代表当前候选资格。
+旧机器索引来源、精确 SHA-256 与上一运行时指纹当前仍保存在 [`capabilities.json`](evidence/capabilities.json)。其中三条 Ark 路线的六项记录均为历史 passed，但当前因指纹变化全部 stale；Task 9 将用新 passed evidence 更新该现行索引。以下 2026-07-25 条目只保留为历史基线，不代表当前候选资格。
 
 | 逻辑 LLM                      | 旧 review | 旧 delegate | 历史来源摘要 |
 | ----------------------------- | ------ | -------- | ------------ |

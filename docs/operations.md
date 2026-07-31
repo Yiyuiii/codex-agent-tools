@@ -22,7 +22,7 @@ ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、model�
 
 - `timeoutMs` 是调用方为单次请求显式设置的可选值；它不会写入 profile 或外部 CLI 配置。
 - 省略时，Kimi 与 Pi 都不设置模型执行 deadline，让后端保留原生执行预算；不存在 profile 级的 600 秒或 900 秒执行上限。
-- stdio 的 end、close、error 与 SIGINT、SIGTERM 都会取消所有在途请求，关闭 server 后等待 owned 子进程树清理，再移除本 session 自己注册的监听器。
+- stdio 的 end、close、error 与 SIGINT、SIGTERM 都会触发幂等 session shutdown；shutdown 调用 `server.close()`，由 SDK abort handlers 取消在途请求，再等待 owned 子进程树与 tracker drain，最后移除本 session 自己注册的监听器并结束 session。
 - 调用方普通取消保持 cancelled；只有显式 deadline 到期才报告 timed out，两个路径都必须完成进程树清理。
 - Pi 生产路径的原生 retry 策略保持不变；资格模式仍按独立协议使用 single-attempt 与零 retry/fallback。
 
