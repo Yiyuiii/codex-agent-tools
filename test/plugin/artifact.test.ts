@@ -420,6 +420,27 @@ describe("Codex plugin artifact", () => {
     );
   });
 
+  it("keeps the Task 8 verification matrix deterministic", () => {
+    const activePlan = readProjectText(
+      "docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md",
+    );
+    const activePlanTask8 = markdownSection(
+      activePlan,
+      "## Task 8：完整确定性验证与两轮独立审阅",
+    );
+
+    expect(activePlanTask8).toContain(
+      "npx vitest run test/acceptance/local.test.ts",
+    );
+    expect(activePlanTask8).not.toContain("npm run acceptance:local");
+    expect(activePlanTask8).toContain(
+      "npm run acceptance:plugin:isolated -- --check-report",
+    );
+    expect(activePlanTask8).not.toMatch(
+      /^npm run acceptance:plugin:isolated\s*$/mu,
+    );
+  });
+
   it("keeps the stale capability index staged while evidence stays immutable", () => {
     const readme = readProjectText("README.md");
     const checklist = readProjectText("docs/release/checklist.md");

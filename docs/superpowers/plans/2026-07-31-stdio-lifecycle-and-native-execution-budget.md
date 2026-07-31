@@ -1059,17 +1059,24 @@ npm test -- --maxWorkers=1
 ```powershell
 npm run typecheck
 npm run build
-npm run acceptance:local
-npm run acceptance:plugin:isolated
+npx vitest run test/acceptance/local.test.ts
+npm run acceptance:plugin:isolated -- --check-report
 npm run smoke:release
 git diff --check
 ```
 
 在能力 index 更新前：
 
-- `acceptance:local` / `smoke:release` 若包含 `verify:capabilities`，应精确因 stale 指纹失败；
-- 其它 deterministic 子检查必须通过；
+- `test/acceptance/local.test.ts` 只验证 local acceptance helper 的纯函数契约，不调用真实模型；
+- `acceptance:plugin:isolated -- --check-report` 只用隔离假后端核对既有报告，不更新仓库内报告；
+- `smoke:release` 应精确因 stale capability verifier 退出码 1；在此之前的 deterministic 子检查已独立通过，
+  且该失败路径不会运行联网 npm 名称检查；
 - 不允许跳过、mock 或弱化 capability verifier 来取得伪绿。
+
+**执行更正（2026-07-31）：** 早先版本的本计划把 `acceptance:local` 脚本误分类为离线检查，
+执行时意外触发了真实 Kimi/Pi 调用。该结果不计入 Task 8 验收；脚本已清理临时目录，随后审计确认 owned
+Kimi、Pi、real-smoke 进程计数均为 0，qualification lock 不存在。Task 8 后续严禁重跑该命令，
+只执行上方明确列出的纯单测与隔离假后端检查。
 
 - [ ] **Step 4：用 `cc_review` 审阅规格符合性**
 
