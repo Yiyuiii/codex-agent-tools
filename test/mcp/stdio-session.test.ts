@@ -208,6 +208,66 @@ describe("MCP stdio session", () => {
     expect(harness.signalSource.listenerCount("SIGTERM")).toBe(0);
   });
 
+  it("preserves an input error that happened before run while waiting for connect", async () => {
+    const secret = "PRE_RUN_STDIN_SECRET_SENTINEL";
+    const originalError = new Error(secret);
+    const reports: string[] = [];
+    const events: string[] = [];
+    const connect = deferred<void>();
+    const input = new PassThrough();
+    const externalError = vi.fn();
+    input.on("error", externalError);
+    const closed = new Promise<void>((resolve) => input.once("close", resolve));
+    input.destroy(originalError);
+    await closed;
+    const drain = vi.fn(async () => {
+      events.push("inFlight.drain");
+    });
+    const harness = createHarness({
+      connect: () => {
+        events.push("server.connect");
+        return connect.promise;
+      },
+      close: async () => {
+        events.push("server.close");
+      },
+      inFlight: { drain } as unknown as InFlightTasks,
+      input,
+      reportError: (message) => reports.push(message),
+    });
+
+    expect(input.errored).toBe(originalError);
+    expect(externalError).toHaveBeenCalledOnce();
+    expect(externalError).toHaveBeenCalledWith(originalError);
+
+    const completion = harness.session.run();
+    const repeatedRun = harness.session.run();
+    const explicitClose = harness.session.close();
+    await flushPromises();
+
+    expect(repeatedRun).toBe(completion);
+    expect(explicitClose).toBe(completion);
+    expect(harness.connect).toHaveBeenCalledTimes(1);
+    expect(harness.close).not.toHaveBeenCalled();
+    connect.resolve();
+
+    await expect(completion).rejects.toBe(originalError);
+    expect(events).toEqual([
+      "server.connect",
+      "server.close",
+      "inFlight.drain",
+    ]);
+    expect(harness.close).toHaveBeenCalledTimes(1);
+    expect(drain).toHaveBeenCalledTimes(1);
+    expect(reports).toEqual(["MCP stdio input failed; shutting down."]);
+    expect(reports.join("\n")).not.toContain(secret);
+    expect(input.listenerCount("end")).toBe(0);
+    expect(input.listenerCount("close")).toBe(0);
+    expect(input.listeners("error")).toEqual([externalError]);
+    expect(harness.signalSource.listenerCount("SIGINT")).toBe(0);
+    expect(harness.signalSource.listenerCount("SIGTERM")).toBe(0);
+  });
+
   it("closes the server, drains aborted handlers, then removes its listeners", async () => {
     const events: string[] = [];
     const handler = deferred<void>();

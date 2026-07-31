@@ -191,7 +191,13 @@ export function createMcpStdioSession(
     if (started) return completion;
     started = true;
     installListeners();
-    if (
+    const inputError = dependencies.input.errored;
+    if (inputError !== null && inputError !== undefined) {
+      void requestClose(
+        inputError,
+        "MCP stdio input failed; shutting down.",
+      );
+    } else if (
       dependencies.input.readableEnded ||
       dependencies.input.destroyed ||
       dependencies.input.closed
