@@ -12,6 +12,8 @@ import {
 } from "../llms/registry.js";
 import { ExternalAgentService } from "../tasks/service.js";
 import { SERVER_NAME, VERSION } from "../version.js";
+import { InFlightTasks } from "./in-flight.js";
+import { createMcpStdioSession } from "./stdio-session.js";
 import {
   registerExternalTools,
   type ExternalTaskService,
@@ -32,15 +34,28 @@ export function createDefaultExternalAgentService(): ExternalAgentService {
   return new ExternalAgentService({ registry: defaultRegistry, adapters });
 }
 
-export function createMcpServer(service: ExternalTaskService): McpServer {
+export function createMcpServer(
+  service: ExternalTaskService,
+  inFlight: InFlightTasks = new InFlightTasks(),
+): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: VERSION });
-  registerExternalTools(server, service);
+  registerExternalTools(server, service, inFlight);
   return server;
 }
 
 export async function serveMcp(
   service: ExternalTaskService = createDefaultExternalAgentService(),
 ): Promise<void> {
-  const server = createMcpServer(service);
-  await server.connect(new StdioServerTransport());
+  const inFlight = new InFlightTasks();
+  const server = createMcpServer(service, inFlight);
+  const transport = new StdioServerTransport(process.stdin, process.stdout);
+  const session = createMcpStdioSession({
+    server,
+    transport,
+    input: process.stdin,
+    output: process.stdout,
+    inFlight,
+    signalSource: process,
+  });
+  await session.run();
 }
