@@ -132,6 +132,7 @@
 - [当前：真实资格实验长期默认授权设计](docs/superpowers/specs/2026-07-28-standing-experiment-authorization-design.md)
 - [当前：能力级资格复用与变更影响失效设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)
 - [当前：stdio 生命周期与外部 CLI 原生执行预算设计](docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md)
+- [当前：stdio 生命周期与外部 CLI 原生执行预算实施计划](docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md)
 - [当前：能力级资格复用与 Ark Coding Plan 晋级实施计划](docs/superpowers/plans/2026-07-29-capability-scoped-qualification.md)
 - [当前：Beta → Stable 发布实施计划](docs/superpowers/plans/2026-07-29-beta-to-stable-release.md)
 - [当前：长期默认授权与自主资格收敛实施计划](docs/superpowers/plans/2026-07-28-standing-authorization-and-autonomous-qualification.md)
