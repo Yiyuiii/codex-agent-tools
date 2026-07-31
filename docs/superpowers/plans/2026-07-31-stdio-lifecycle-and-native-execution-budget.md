@@ -40,6 +40,10 @@
   Promise 微任务提前 drain 竞态及 review/delegate 测试缺口由 `f0c71f7` 修复，质量复审的
   同步 progress notification 抛错覆盖由 `10322a5` 补齐；最终规格与质量复审均通过，父线程
   聚焦验证为 16/16。
+- Task 5 已由 `90a2253` 实现幂等 stdio session shutdown、同一 tracker 的 server 接线与
+  顶层脱敏错误。规格复审复现的 listener cleanup 抛错导致 completion 错误 resolve/pending
+  问题由 `7395a05` 修复；五项自有 listener 现在逐项 best-effort 清理，connect/close/drain/
+  stdin 首错保持不变。最终规格与质量复审均通过，父线程聚焦验证为 28/28。
 
 ## Task 1：建立只服务显式 timeout 的分段 deadline 调度器
 
