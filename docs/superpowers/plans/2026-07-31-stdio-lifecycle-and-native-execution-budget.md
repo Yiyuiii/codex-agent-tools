@@ -15,8 +15,10 @@
 - 实施分支：`codex/stdio-lifecycle-and-native-budget`
 - 隔离 worktree：`<isolated-worktree>`
 - 批准规格：`docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md`
-- 方案 A 已获方向批准、待维护者书面确认的 Windows 补充规格：
+- 已获维护者书面确认的 Windows 补充规格：
   `docs/superpowers/specs/2026-07-31-windows-job-object-owned-process-design.md`
+- 当前 Windows 原生实施计划：
+  `docs/superpowers/plans/2026-07-31-windows-job-object-owned-process.md`
 - 基线：53 个测试文件，891 passed / 1 skipped / 0 failed；单 worker 全量用时约 425 秒。
 - 不读取或修改活动 `~/.codex/config.toml`。
 - 不修改相邻仓库 `codex-cc-tools`、本机 Claude Code、旧 `codex_cc_tools` 或用户 Kimi/Pi 全局配置。
@@ -85,8 +87,8 @@
   4.8 x64 helper、每 invocation 独立匿名 Job，以及 Windows 10+ 的
   `PROC_THREAD_ATTRIBUTE_JOB_LIST`，使 `CreateProcessW` 成功即已归 Job、失败即无 child，删除
   post-create ownership gap 与 PID 清理。两轮独立安全/质量审阅在多轮修订后均为 PASS；Ark
-  Coding Plan `cc_review` 仅返回周额度 429，没有审阅意见，不能计作 PASS。补充规格仍待维护者
-  对书面内容确认；原生实现尚未开始。因此 Task 9 与 beta 发布继续 blocked。现行 capability
+  Coding Plan `cc_review` 仅返回周额度 429，没有审阅意见，不能计作 PASS。维护者随后已确认
+  书面补充规格，逐任务 TDD 实施计划已建立；原生实现尚未开始。因此 Task 9 与 beta 发布继续 blocked。现行 capability
   index 与历史 evidence 未改，verifier 继续 stale fail closed；本阶段未发布、推送或更新
   配置/插件。
 

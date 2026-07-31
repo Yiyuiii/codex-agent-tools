@@ -1,9 +1,9 @@
 # Windows Job Object owned process 设计
 
-状态：维护者已于 2026-07-31 批准方案 A，并明确允许新增受控的 Windows
-原生辅助层；本文书面补充规格仍须在实现前由维护者确认。本文是
+状态：维护者已于 2026-07-31 批准方案 A、明确允许新增受控的 Windows 原生辅助层，
+并已确认本文书面补充规格。本文是
 `docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md`
-的 Windows 进程归属补充规格草案；维护者确认后，两份规格共同生效。本文只闭合
+的 Windows 进程归属补充规格；两份规格现已共同生效。本文只闭合
 Windows owned process 生命周期，不改变公开 MCP 工具、逻辑 LLM、provider、模型、
 凭据、提示词、资格协议或外部 CLI 的原生执行预算。
 
