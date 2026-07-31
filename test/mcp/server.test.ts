@@ -2,12 +2,21 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it, vi } from "vitest";
 
+import { InFlightTasks } from "../../src/mcp/in-flight.js";
 import { createMcpServer } from "../../src/mcp/server.js";
 import { registerExternalTools } from "../../src/mcp/tools.js";
 import type {
   ExternalDelegateResult,
   ExternalReviewResult,
 } from "../../src/tasks/results.js";
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
 
 function reviewResult(): ExternalReviewResult {
   return {
@@ -152,6 +161,181 @@ describe("codex_external_agents MCP server", () => {
     expect(JSON.parse(result.content[0]!.text)).not.toHaveProperty(
       "executionTelemetry",
     );
+  });
+
+  it("tracks the complete review handler through service execution and progress drain", async () => {
+    let callback:
+      | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    const serviceResult = deferred<ExternalReviewResult>();
+    const notification = deferred<void>();
+    const inFlight = new InFlightTasks();
+    const service = {
+      review: vi.fn(
+        (
+          _input: unknown,
+          context?: {
+            signal?: AbortSignal;
+            onProgress?: (message: string) => void;
+          },
+        ) => {
+          context?.onProgress?.("still running");
+          return serviceResult.promise;
+        },
+      ),
+      delegate: vi.fn(),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        if (name === "external_review") callback = handler;
+      },
+    };
+    registerExternalTools(fakeServer as never, service, inFlight);
+
+    let handlerSettled = false;
+    const handler = callback?.(
+      {
+        llm: "kimi-k3",
+        task: "review_plan",
+        prompt: "Review",
+        cwd: process.cwd(),
+      },
+      {
+        _meta: { progressToken: "progress-1" },
+        sendNotification: () => notification.promise,
+      },
+    );
+    void handler?.finally(() => {
+      handlerSettled = true;
+    });
+
+    expect(inFlight.size).toBe(1);
+    serviceResult.resolve(reviewResult());
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(handlerSettled).toBe(false);
+    expect(inFlight.size).toBe(1);
+
+    notification.resolve();
+    await handler;
+    expect(handlerSettled).toBe(true);
+    expect(inFlight.size).toBe(0);
+  });
+
+  it("keeps the business result when a progress notification rejects", async () => {
+    let callback:
+      | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    const controller = new AbortController();
+    const service = {
+      review: vi.fn(
+        async (
+          _input: unknown,
+          context?: {
+            signal?: AbortSignal;
+            onProgress?: (message: string) => void;
+          },
+        ) => {
+          context?.onProgress?.("best effort");
+          return reviewResult();
+        },
+      ),
+      delegate: vi.fn(),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        if (name === "external_review") callback = handler;
+      },
+    };
+    registerExternalTools(fakeServer as never, service);
+
+    const result = (await callback?.(
+      {
+        llm: "kimi-k3",
+        task: "review_plan",
+        prompt: "Review",
+        cwd: process.cwd(),
+      },
+      {
+        signal: controller.signal,
+        _meta: { progressToken: "progress-1" },
+        sendNotification: async () => {
+          throw new Error("transport failed");
+        },
+      },
+    )) as { structuredContent: ExternalReviewResult };
+
+    expect(result.structuredContent.review).toBe("No findings.");
+    expect(controller.signal.aborted).toBe(false);
+  });
+
+  it("tracks a synchronous service failure until progress drain finishes", async () => {
+    let callback:
+      | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    const notification = deferred<void>();
+    const failure = new Error("service failed synchronously");
+    const inFlight = new InFlightTasks();
+    const service = {
+      review: vi.fn(
+        (
+          _input: unknown,
+          context?: {
+            signal?: AbortSignal;
+            onProgress?: (message: string) => void;
+          },
+        ): Promise<ExternalReviewResult> => {
+          context?.onProgress?.("failure pending");
+          throw failure;
+        },
+      ),
+      delegate: vi.fn(),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        if (name === "external_review") callback = handler;
+      },
+    };
+    registerExternalTools(fakeServer as never, service, inFlight);
+
+    const handler = callback?.(
+      {
+        llm: "kimi-k3",
+        task: "review_plan",
+        prompt: "Review",
+        cwd: process.cwd(),
+      },
+      {
+        _meta: { progressToken: "progress-1" },
+        sendNotification: () => notification.promise,
+      },
+    );
+    const rejected = expect(handler).rejects.toBe(failure);
+
+    expect(inFlight.size).toBe(1);
+    notification.resolve();
+    await rejected;
+    expect(inFlight.size).toBe(0);
   });
 
   it("keeps delegate structured content free of Pi lifecycle fields", async () => {

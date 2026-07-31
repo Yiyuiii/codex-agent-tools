@@ -11,6 +11,7 @@ import {
   externalReviewInputSchema,
 } from "../tasks/schemas.js";
 import type { TaskExecutionContext } from "../tasks/service.js";
+import { InFlightTasks } from "./in-flight.js";
 import { createMcpProgressReporter } from "./progress.js";
 
 export interface ExternalTaskService {
@@ -31,7 +32,8 @@ function textContent(value: unknown): Array<{ type: "text"; text: string }> {
 export function registerExternalTools(
   server: McpServer,
   service: ExternalTaskService,
-): void {
+  inFlight: InFlightTasks = new InFlightTasks(),
+): InFlightTasks {
   server.registerTool(
     "external_review",
     {
@@ -47,23 +49,25 @@ export function registerExternalTools(
         openWorldHint: true,
       },
     },
-    async (input, extra) => {
-      const progress = createMcpProgressReporter(extra);
-      try {
-        const output = externalReviewResultSchema.parse(
-          await service.review(input, {
-            signal: extra.signal,
-            onProgress: progress.report,
-          }),
-        );
-        await progress.finish();
-        return {
-          content: textContent(output),
-          structuredContent: output,
-        };
-      } finally {
-        await progress.finish();
-      }
+    (input, extra) => {
+      const handler = (async () => {
+        const progress = createMcpProgressReporter(extra);
+        try {
+          const output = externalReviewResultSchema.parse(
+            await service.review(input, {
+              signal: extra.signal,
+              onProgress: progress.report,
+            }),
+          );
+          return {
+            content: textContent(output),
+            structuredContent: output,
+          };
+        } finally {
+          await progress.finish();
+        }
+      })();
+      return inFlight.track(handler);
     },
   );
 
@@ -82,23 +86,27 @@ export function registerExternalTools(
         openWorldHint: true,
       },
     },
-    async (input, extra) => {
-      const progress = createMcpProgressReporter(extra);
-      try {
-        const output = externalDelegateResultSchema.parse(
-          await service.delegate(input, {
-            signal: extra.signal,
-            onProgress: progress.report,
-          }),
-        );
-        await progress.finish();
-        return {
-          content: textContent(output),
-          structuredContent: output,
-        };
-      } finally {
-        await progress.finish();
-      }
+    (input, extra) => {
+      const handler = (async () => {
+        const progress = createMcpProgressReporter(extra);
+        try {
+          const output = externalDelegateResultSchema.parse(
+            await service.delegate(input, {
+              signal: extra.signal,
+              onProgress: progress.report,
+            }),
+          );
+          return {
+            content: textContent(output),
+            structuredContent: output,
+          };
+        } finally {
+          await progress.finish();
+        }
+      })();
+      return inFlight.track(handler);
     },
   );
+
+  return inFlight;
 }
