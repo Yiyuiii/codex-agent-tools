@@ -12,7 +12,7 @@
 
 - 新增：`config.toml`
 - 变化：无
-- 删除：`tmp/arg0/<ephemeral>/.lock`、`tmp/arg0/<ephemeral>/apply_patch.bat`、`tmp/arg0/<ephemeral>/applypatch.bat`
+- 删除：无
 
 ### plugin list before install
 

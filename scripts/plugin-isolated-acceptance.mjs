@@ -21,6 +21,7 @@ import {
 } from "../dist/plugin-state-snapshot.js";
 import { cleanupOwnedMcpTransport } from "../dist/plugin-mcp-cleanup.js";
 import {
+  canonicalizeIsolatedReportPaths,
   parseIsolatedReportArguments,
   synchronizeIsolatedReport,
 } from "../dist/plugin-isolated-report.js";
@@ -451,16 +452,7 @@ async function readFakePiInvocationCount() {
 }
 
 function renderPaths(paths) {
-  const stablePaths = [
-    ...new Set(
-      paths.map((entry) =>
-        entry.replace(
-          /^tmp\/arg0\/codex-arg0[^/]+\//u,
-          "tmp/arg0/<ephemeral>/",
-        ),
-      ),
-    ),
-  ].sort((left, right) => left.localeCompare(right));
+  const stablePaths = canonicalizeIsolatedReportPaths(paths);
   return stablePaths.length === 0
     ? "无"
     : stablePaths.map((entry) => `\`${entry}\``).join("、");

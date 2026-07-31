@@ -13,6 +13,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  canonicalizeIsolatedReportPaths,
   IsolatedReportError,
   parseIsolatedReportArguments,
   synchronizeIsolatedReport,
@@ -62,6 +63,54 @@ afterEach(async () => {
 });
 
 describe("isolated plugin report synchronization", () => {
+  it("makes ephemeral arg0 shim presence and random directory names irrelevant", () => {
+    const firstRun = [
+      "tmp/arg0/codex-arg0-a1/.lock",
+      "tmp/arg0/codex-arg0-a1/apply_patch.bat",
+      "tmp/arg0/codex-arg0-a1/applypatch.bat",
+    ];
+    const secondRun = [
+      "tmp/arg0/codex-arg0-b2/applypatch.bat",
+      "tmp/arg0/codex-arg0-b2/.lock",
+    ];
+
+    expect(canonicalizeIsolatedReportPaths(firstRun)).toEqual([]);
+    expect(canonicalizeIsolatedReportPaths(secondRun)).toEqual([]);
+    expect(canonicalizeIsolatedReportPaths([])).toEqual([]);
+  });
+
+  it("excludes only the three exact Codex CLI arg0 shim names", () => {
+    expect(
+      canonicalizeIsolatedReportPaths([
+        "tmp/arg0/codex-arg0-fixed/.lock",
+        "tmp/arg0/codex-arg0-fixed/apply_patch.bat",
+        "tmp/arg0/codex-arg0-fixed/applypatch.bat",
+      ]),
+    ).toEqual([]);
+  });
+
+  it("preserves neighboring files and stable config and plugin paths", () => {
+    expect(
+      canonicalizeIsolatedReportPaths([
+        "tmp/arg0/codex-arg0-random/subdir/apply_patch.bat",
+        "plugins/cache/example/plugin.json",
+        "config.toml",
+        "tmp/arg0/codex-arg0-random/.lock.backup",
+        "tmp/arg0/codex-other/apply_patch.bat",
+        "tmp/arg0/codex-arg0-other/keep.txt",
+        "plugins/cache/example/plugin.json",
+        "config.toml",
+      ]),
+    ).toEqual([
+      "config.toml",
+      "plugins/cache/example/plugin.json",
+      "tmp/arg0/<ephemeral>/.lock.backup",
+      "tmp/arg0/<ephemeral>/keep.txt",
+      "tmp/arg0/<ephemeral>/subdir/apply_patch.bat",
+      "tmp/arg0/codex-other/apply_patch.bat",
+    ]);
+  });
+
   it("wires the acceptance script to the helper after the complete lifecycle", async () => {
     const script = await readFile(
       path.resolve("scripts/plugin-isolated-acceptance.mjs"),
