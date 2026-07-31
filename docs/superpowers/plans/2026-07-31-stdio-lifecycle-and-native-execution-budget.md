@@ -24,6 +24,19 @@
 - 不改写历史 batch、manifest 或 evidence；新的源码指纹必须使旧能力索引 fail closed。
 - 每个行为改动先出现目标失败测试，再写最小实现。
 
+### 执行修正（2026-07-31）
+
+- Task 1 已由 `2224c9d` 与测试补强提交 `bd0db4d` 完成。
+- Task 2 与 Task 3 在实现时确认存在不可拆分的类型依赖：从 `LlmProfile` 删除
+  `timeoutMs` 会立即要求 adapter、client 与 smoke 同步改用可选单次值，否则中间提交无法通过
+  类型检查。因此两项按一个原子 TDD 批次由 `7ac2d7a` 完成，测试边界再由 `c221a6e`
+  加固；这不改变两项各自的规格范围。
+- Task 1 新增共享运行时源码后，已签入的八项 capability fingerprint 从该提交起就应
+  fail closed；Task 2/3 又进一步改变 profile 与 adapter 输入。Task 9 生成并晋级新证据前，
+  `npm run verify:capabilities` 退出 1 且只输出固定脱敏错误是权威预期状态。期间只允许精确
+  排除该 live checked-in gate 来运行 capability 单元测试；不得把旧索引改成通过、把门禁
+  永久 skip，或从发布验收中删除 verifier。
+
 ## Task 1：建立只服务显式 timeout 的分段 deadline 调度器
 
 **Files**
