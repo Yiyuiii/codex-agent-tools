@@ -165,9 +165,9 @@ export function createMcpStdioSession(
   function requestClose(error?: unknown, message?: string): Promise<void> {
     if (!closeRequested) {
       closeRequested = true;
-      if (message !== undefined) {
-        recordFailure(error, message);
-      }
+    }
+    if (message !== undefined && firstFailure === undefined) {
+      recordFailure(error, message);
     }
     startShutdown();
     return completion;

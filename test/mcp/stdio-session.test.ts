@@ -474,6 +474,51 @@ describe("MCP stdio session", () => {
     expect(reports.join("\n")).not.toContain(secret);
   });
 
+  it("retains a stdin error that arrives while a normal shutdown is pending", async () => {
+    const secret = "LATE_STDIN_SECRET_SENTINEL";
+    const failure = new Error(secret);
+    const laterFailure = new Error("LATER_STDIN_SECRET_SENTINEL");
+    const reports: string[] = [];
+    const close = deferred<void>();
+    const drain = vi.fn(async () => {});
+    const input = new PassThrough();
+    const harness = createHarness({
+      close: () => close.promise,
+      inFlight: { drain } as unknown as InFlightTasks,
+      input,
+      reportError: (message) => reports.push(message),
+    });
+    const completion = harness.session.run();
+    await flushPromises();
+
+    input.emit("end");
+    await flushPromises();
+    expect(harness.close).toHaveBeenCalledTimes(1);
+    expect(drain).not.toHaveBeenCalled();
+
+    const errorObserved = new Promise<void>((resolve) => {
+      input.once("error", () => resolve());
+    });
+    input.destroy(failure);
+    await errorObserved;
+    input.emit("error", laterFailure);
+    expect(harness.session.close()).toBe(completion);
+
+    close.resolve();
+    await expect(completion).rejects.toBe(failure);
+
+    expect(harness.close).toHaveBeenCalledTimes(1);
+    expect(drain).toHaveBeenCalledTimes(1);
+    expect(reports).toEqual(["MCP stdio input failed; shutting down."]);
+    expect(reports.join("\n")).not.toContain(secret);
+    expect(reports.join("\n")).not.toContain(laterFailure.message);
+    expect(input.listenerCount("end")).toBe(0);
+    expect(input.listenerCount("close")).toBe(0);
+    expect(input.listenerCount("error")).toBe(0);
+    expect(harness.signalSource.listenerCount("SIGINT")).toBe(0);
+    expect(harness.signalSource.listenerCount("SIGTERM")).toBe(0);
+  });
+
   it("drains and cleans up after close and drain both fail, then rejects with the first failure", async () => {
     const closeSecret = "CLOSE_SECRET_SENTINEL";
     const drainSecret = "DRAIN_SECRET_SENTINEL";
