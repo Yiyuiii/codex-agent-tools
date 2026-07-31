@@ -18,12 +18,13 @@ describe("InFlightTasks", () => {
     const tracked = inFlight.track(task.promise);
 
     expect(inFlight.size).toBe(1);
+    expect(tracked).toBe(task.promise);
     task.resolve("done");
     await expect(tracked).resolves.toBe("done");
     expect(inFlight.size).toBe(0);
   });
 
-  it("preserves rejection while removing the settled promise without an unhandled rejection", async () => {
+  it("absorbs rejection when the caller ignores the returned promise", async () => {
     const inFlight = new InFlightTasks();
     const failure = new Error("failed");
     const unhandled: unknown[] = [];
@@ -33,16 +34,37 @@ describe("InFlightTasks", () => {
     process.on("unhandledRejection", onUnhandled);
 
     try {
-      const tracked = inFlight.track(Promise.reject(failure));
+      void inFlight.track(Promise.reject(failure));
 
       expect(inFlight.size).toBe(1);
-      await expect(tracked).rejects.toBe(failure);
+      await new Promise<void>((resolve) => setImmediate(resolve));
       await new Promise<void>((resolve) => setImmediate(resolve));
       expect(inFlight.size).toBe(0);
       expect(unhandled).toEqual([]);
     } finally {
       process.off("unhandledRejection", onUnhandled);
     }
+  });
+
+  it("does not finish draining before the returned promise reaction runs", async () => {
+    const inFlight = new InFlightTasks();
+    const task = deferred<void>();
+    const tracked = inFlight.track(task.promise);
+    const order: string[] = [];
+
+    task.promise.then(() => {
+      void inFlight.drain().then(() => {
+        order.push("drain");
+      });
+    });
+    void tracked.then(() => {
+      order.push("tracked");
+    });
+
+    task.resolve();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(order).toEqual(["tracked", "drain"]);
   });
 
   it("drains tasks added after draining starts", async () => {

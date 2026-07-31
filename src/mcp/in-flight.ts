@@ -6,12 +6,13 @@ export class InFlightTasks {
   }
 
   track<T>(promise: Promise<T>): Promise<T> {
-    const tracked = promise.finally(() => {
-      this.#tasks.delete(tracked);
-    });
-    this.#tasks.add(tracked);
-    void tracked.catch(() => undefined);
-    return tracked;
+    this.#tasks.add(promise);
+    void promise
+      .finally(() => {
+        this.#tasks.delete(promise);
+      })
+      .catch(() => undefined);
+    return promise;
   }
 
   async drain(): Promise<void> {

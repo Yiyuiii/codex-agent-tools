@@ -338,6 +338,73 @@ describe("codex_external_agents MCP server", () => {
     expect(inFlight.size).toBe(0);
   });
 
+  it("tracks the complete delegate handler through service execution and progress drain", async () => {
+    let callback:
+      | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    const serviceResult = deferred<ExternalDelegateResult>();
+    const notification = deferred<void>();
+    const inFlight = new InFlightTasks();
+    const service = {
+      review: vi.fn(),
+      delegate: vi.fn(
+        (
+          _input: unknown,
+          context?: {
+            signal?: AbortSignal;
+            onProgress?: (message: string) => void;
+          },
+        ) => {
+          context?.onProgress?.("still delegating");
+          return serviceResult.promise;
+        },
+      ),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        if (name === "external_delegate") callback = handler;
+      },
+    };
+    registerExternalTools(fakeServer as never, service, inFlight);
+
+    let handlerSettled = false;
+    const handler = callback?.(
+      {
+        llm: "ark-agent-plan",
+        prompt: "Delegate",
+        cwd: process.cwd(),
+      },
+      {
+        _meta: { progressToken: "progress-1" },
+        sendNotification: () => notification.promise,
+      },
+    );
+    void handler?.finally(() => {
+      handlerSettled = true;
+    });
+
+    expect(inFlight.size).toBe(1);
+    serviceResult.resolve(delegateResult());
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(handlerSettled).toBe(false);
+    expect(inFlight.size).toBe(1);
+
+    notification.resolve();
+    const result = (await handler) as {
+      structuredContent: ExternalDelegateResult;
+    };
+    expect(result.structuredContent.summary).toBe("Delegated.");
+    expect(handlerSettled).toBe(true);
+    expect(inFlight.size).toBe(0);
+  });
+
   it("keeps delegate structured content free of Pi lifecycle fields", async () => {
     let callback:
       | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
