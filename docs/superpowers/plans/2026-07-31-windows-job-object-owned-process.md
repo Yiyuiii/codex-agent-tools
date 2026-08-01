@@ -1,5 +1,7 @@
 # Windows Job Object Owned Process Implementation Plan
 
+> **历史计划（2026-08-01）：** 本计划只用于解释已完成 Task 1 与失败的旧 Task 2，不再指导后续实现。维护者已取消三 Node 发布证明并要求同步删除冗余；现行任务从[当前宿主精简实施计划](2026-08-01-windows-current-host-owned-process.md) Task 2继续。禁止继续执行本文的 Node archive矩阵、fd3 write-half-close、`.cmd/.bat`、Windows三shard/composite attestation、双checkout package digest或固定2000轮竞态要求。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Every behavior-bearing task uses superpowers:test-driven-development; every task receives a fresh specification-compliance review followed by a fresh code-quality review before its task commit is accepted.
 
 **Goal:** 用一个可复现构建、可机器验真的 .NET Framework 4.8 x64 helper，把 Windows 上每次 Kimi/Pi invocation 在第一条用户代码执行前原子归入该 invocation 独有的匿名 Job Object，并让 Node、MCP stdio shutdown、能力资格和 GitHub Trusted Publishing 都以 Job 归零而非 PID 猜测作为完成依据。

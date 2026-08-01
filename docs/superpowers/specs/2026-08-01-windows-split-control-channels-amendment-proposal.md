@@ -1,8 +1,10 @@
-# Windows split control channels 补充规格草案
+# Windows split control channels 补充规格草案（历史、未采用）
 
 日期：2026-08-01
 
-状态：**提议中，尚未批准，不构成实施授权**
+状态：**已被替代，未获批准，禁止实施**
+
+> 2026-08-01维护者随后明确取消三个Node版本的发布证明，并要求一并删除其它冗余。重新审计发现，只要正常完成/取消使用显式frame且活着的Node在terminal前绝不half-close fd3，单一全双工fd3即可满足合同；本机Pi也可由当前Node直接运行包内`dist/cli.js`，无需`.cmd`执行。因此本文的fd3+fd4、三Node矩阵和相关证明链均未被采用。现行权威是[Windows当前宿主最小可靠owned process设计](2026-08-01-windows-current-host-minimal-design.md)。下文只保留为历史设计证据，不得作为实现要求或待批准事项。
 
 关联基线：
 
@@ -262,19 +264,6 @@ probe自报 `handlesDistinct=true`、`jobCreated=false`、`environmentRead=false
 - Task 9前capability index/evidence保持stale fail closed；Tasks 1–14无真实模型、活动配置/插件修改或发布；
 - 完成Task 14、Windows composite attestation和prequalification后，才恢复8/8、GitHub Actions OIDC beta、公共验收与stable。
 
-## 14. 维护者批准方式
+## 14. 历史结论
 
-推荐一次性批准本文完整方案，包括：
-
-1. fd3 command + fd4 event双通道；
-2. application-managed named pipe禁令的精确化；
-3. target `lpReserved2`/inheritance闭包；
-4. libuv 11项required environment显式闭包；
-5. Windows native route仅支持Node major 20/22/24；
-6. replacement Task 2三版真实硬门禁。
-
-建议回复：
-
-> 批准 split-control-channels 补充规格，按 fd3 command + fd4 event 继续。
-
-该回复只授权先把本文转为已批准规格、同步实施计划，并按现有subagent/TDD流程执行replacement Task 2及后续Tasks 3–14；不扩大真实模型、活动安装、发布或外部CLI限制授权。
+本文曾请求维护者批准fd3 command + fd4 event、三Node矩阵与相关继承/环境证明，但该批准未发生。后续维护者的新要求和重新审计已选择更小的单fd3/native-only当前宿主方案。任何后续实现都必须使用现行覆盖规格，不得继续执行本节历史提案。

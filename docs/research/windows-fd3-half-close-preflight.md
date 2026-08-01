@@ -4,6 +4,8 @@ Date: 2026-08-01
 
 Status: hard gate failed; implementation stopped before Task 3
 
+Current interpretation (2026-08-01): the negative result remains immutable evidence that Node must not use write-half-close as the normal terminal handshake. The maintainer later removed the three-Node release-proof requirement and asked to eliminate other redundancies. The active design therefore keeps one full-duplex fd3, sends explicit terminate frames, and requires a live Node to keep fd3 open until terminal/helper close. Helper-observed Node-to-helper EOF is a parent-loss/control-failure cleanup signal; Node-observed helper-to-Node EOF before terminal is a permanent failure; clean EOF after a verified terminal and helper-initiated close is normal success evidence. This does not reinterpret the failed probe as PASS and does not implement the previously proposed fd4 channel. See [the current-host minimal design](../superpowers/specs/2026-08-01-windows-current-host-minimal-design.md).
+
 Baseline: Task 1 commits `88cf22b` and `b575dd9`, with Task 2 plan correction `46ce2d2`
 
 ## Scope
@@ -60,15 +62,15 @@ These are reasons not to commit the failed probe as product code. They are not r
 
 After preserving the evidence, the parent thread verified the exact residual path, its fixed content allowlist, and absence of reparse points, removed that diagnostic GUID root, and confirmed that the build-root count returned to 0.
 
-## Replacement carrier options
+## Historical replacement carrier options (superseded)
 
-No replacement has been implemented. A read-only follow-up compared three written alternatives:
+At the time of the failure, no replacement had been implemented and a read-only follow-up compared three written alternatives. The labels and three-version preflight below record that historical judgment only. They are superseded by the current-host design, must not drive implementation, and do not create a pending fd4 approval gate:
 
-1. **Recommended: split inherited extra stdio channels.** Use fd 3 only for Node-to-helper commands and fd 4 only for helper-to-Node events and terminal. Closing fd 3 cannot make libuv close fd 4. This preserves the single managed helper, anonymous inherited handles, parent-loss cleanup, Job ownership, and absence of PID or named-object fallback, but it changes the approved single-fd topology and therefore needs maintainer approval.
+1. **Then-recommended, now superseded: split inherited extra stdio channels.** Use fd 3 only for Node-to-helper commands and fd 4 only for helper-to-Node events and terminal. Closing fd 3 cannot make libuv close fd 4. This would preserve the single managed helper, anonymous inherited handles, parent-loss cleanup, Job ownership, and absence of PID or named-object fallback, but it was not approved and is not the active topology.
 2. **Keep one fd but prohibit write-half-close.** Normal termination sends an explicit frame and keeps the pipe open until terminal. This is smaller, but it weakens the approved terminal-verification guarantee whenever the channel reaches EOF and therefore is not recommended.
 3. **Explicit named pipe or another Win32 carrier.** This introduces naming, DACL, connection authentication, race, packaging, and possibly ABI concerns. A single duplex named pipe also does not inherently solve half-close. This is the largest boundary change and is not recommended.
 
-For option 1, a replacement preflight must first prove on exact Node 20.20.2, 22.23.2, and 24.18.1 that `_get_osfhandle(3)` and `_get_osfhandle(4)` are distinct; fd 3 EOF triggers cleanup while fd 4 still delivers terminal; helper close and forced stop leave both pipes settled; and the probe creates no Job or target and reads no credentials. Any version failure remains a hard stop.
+The then-proposed option 1 would have required an exact three-version fd3/fd4 preflight. That requirement was never approved and has been deleted. The active replacement preflight uses the current `process.execPath`, keeps one full-duplex fd3 open until terminal/helper close, and treats terminal-before-close ordering—not half-close survival—as the gate.
 
 ## Invariants retained for any redesign
 

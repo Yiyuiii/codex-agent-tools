@@ -1,5 +1,7 @@
 # Windows Job Object owned process 设计
 
+> **现行覆盖说明（2026-08-01）：** 维护者已把目标收缩为“当前本机环境鲁棒可用”，不再要求三个 Node 版本的发布证明。[当前宿主最小可靠设计](2026-08-01-windows-current-host-minimal-design.md)覆盖本文的 Node 支持范围、正常控制通道关闭、`.cmd/.bat` 执行、CI/证明范围和测试规模；本文其余 Job 原子归属与安全边界继续有效。实现时必须先读覆盖规格，不能单独按本文执行。
+
 状态：维护者已于 2026-07-31 批准方案 A、明确允许新增受控的 Windows 原生辅助层，
 并已确认本文书面补充规格。本文是
 `docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md`
