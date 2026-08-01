@@ -34,7 +34,7 @@ ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、model�
 npm ci
 ```
 
-要求 Node.js 20+。真实 Kimi 调用还要求本机 Kimi Code 已安装并完成其原生 OAuth 登录；本项目不复制 OAuth 数据。
+要求 Node.js 24+；当前真实宿主为 v24.14.1，公开验证只覆盖这套维护者本机环境，不构成其它 Node 或 Windows 版本的兼容认证。真实 Kimi 调用还要求本机 Kimi Code 已安装并完成其原生 OAuth 登录；本项目不复制 OAuth 数据。
 
 ## 2. 构建候选产物
 

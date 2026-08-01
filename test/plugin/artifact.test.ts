@@ -258,13 +258,36 @@ describe("Codex plugin artifact", () => {
       'outExtension: () => ({ js: ".mjs" })',
     );
     expect(buildConfig).toContain('platform: "node"');
-    expect(buildConfig).toContain('target: "node20"');
+    expect(buildConfig).toContain('target: "node24"');
+    expect(buildConfig).not.toContain('target: "node20"');
     expect(buildConfig).toContain("bundle: true");
     expect(buildConfig).toContain("noExternal: [/.*/u]");
     expect(buildConfig).toContain("splitting: false");
     expect(buildConfig).toContain("dts: false");
     expect(buildConfig).toContain("sourcemap: false");
     expect(buildConfig).toContain("clean: true");
+  });
+
+  it("publishes one honest Node 24 runtime baseline", () => {
+    const packageManifest = readJson("package.json");
+    const packageLock = readJson("package-lock.json");
+    const packageLockPackages = packageLock.packages as Record<
+      string,
+      { engines?: unknown }
+    >;
+    const libraryBuild = readProjectText("tsup.config.ts");
+    const readme = readProjectText("README.md");
+    const operations = readProjectText("docs/operations.md");
+
+    expect(packageManifest.engines).toEqual({ node: ">=24" });
+    expect(packageLockPackages[""]?.engines).toEqual({ node: ">=24" });
+    expect(libraryBuild).toContain('target: "node24"');
+    expect(libraryBuild).not.toContain('target: "node20"');
+    for (const document of [readme, operations]) {
+      expect(document).toContain("要求 Node.js 24+");
+      expect(document).toContain("当前真实宿主为 v24.14.1");
+      expect(document).not.toContain("要求 Node.js 20+");
+    }
   });
 
   it("runs library then plugin builds and ignores only the runtime directory", () => {

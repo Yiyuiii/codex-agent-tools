@@ -33,7 +33,7 @@
 
 以上路径、版本和摘要只进入本机证据，不成为生产硬编码。未来 Node、Pi、Kimi、OS 或 CLR 变化时，维护者在下一次 beta/stable 前重跑同一当前宿主门禁；生产代码不得因未列入历史版本字符串而自动退回 direct spawn。
 
-`package.json#engines.node`可以继续保留本轮未改变的JavaScript/POSIX历史最低版本，但单Node CI不构成对该范围的主动兼容矩阵；公开文档必须如实说明。它也不得被解释为Windows原生路径已在所有满足版本上认证。Windows不增加20/22/24白名单，也不下载固定Node archive。
+`package.json#engines.node`与两个构建target统一收敛为Node 24最低运行时；这只删除未经当前宿主验证的Node 20/22公开承诺，不把单Node CI扩张成兼容矩阵。公开文档必须同时写明当前真实宿主是v24.14.1，Node 24最低版本声明不表示Windows原生路径已在其它Node或Windows版本上认证。Windows不下载固定Node archive，也不在production按精确版本字符串切换或fallback。
 
 ## 2. 保留的安全核心
 

@@ -8,7 +8,7 @@ export default defineConfig({
   format: ["esm"],
   outExtension: () => ({ js: ".mjs" }),
   platform: "node",
-  target: "node20",
+  target: "node24",
   bundle: true,
   noExternal: [/.*/u],
   banner: {
