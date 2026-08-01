@@ -32,6 +32,8 @@ Task 2只删除其中与新目标冲突的Node archive矩阵和`invocationKind`�
 
 ## 3. Task 2：当前宿主单fd3与native-only合同
 
+**状态（2026-08-01）：** 已由提交`7e03d26`完成。最终实现使用Node `overlapped` fd3和Win32 `OVERLAPPED ReadFile/WriteFile`；自主路径在`READY`后建立pending-read barrier，再写`EXIT`且不join。当前宿主连续10次preflight、聚焦25/25、类型检查和diff check均通过；两轮规格/质量复审最终PASS。
+
 ### 3.1 RED
 
 先新增/修改测试证明：
@@ -144,7 +146,7 @@ git diff --check
 - 用Task 1工具链生成唯一x64/net48 helper；保留一次本机source→artifact byte compare。
 - resolver拒绝escape、reparse、hash mismatch、非x64、CLR/probe失败和重复artifact。
 - 实现不暴露PID的`OwnedAgentProcess`：POSIX保留现有process-group，Windows只启动helper。
-- Windows wrapper spawn `stdio: [target stdin, target stdout, target stderr, control]`；正常路径不half-close fd3。
+- Windows wrapper spawn `stdio: ["pipe", "pipe", "pipe", "overlapped"]`；fd3复用Task 2已验证的Win32 OVERLAPPED全双工carrier，正常路径不half-close fd3。
 - 正式wrapper合同测试必须证明terminal前不调用`.end()`、`.destroy()`或主动close fd3；terminal前EOF/close/error永久失败，合法terminal后的helper clean close才能完成。
 - helper terminal + fd3 clean close + helper code 0 + stdio settle + Job-zero构成成功；任一异常永久失败。
 - Windows environment fixed allowlist增加必要系统key并case-fold去重，只保留选定credential；poison parent不得泄漏proxy或其它secret。

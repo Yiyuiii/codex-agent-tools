@@ -81,6 +81,8 @@ terminal缺失、重复、乱序、坏frame、helper非零退出或fd3在合法t
 
 单fd3的活性合同还要求：control reader绝不能成为terminal或helper退出的join前置。helper可以把同一fd3 OS endpoint复制为内部read/write handle（这不是第二个channel），但reader必须是后台/可取消且不拥有最终进程存活权；自然Job归零时，即使reader仍阻塞等待Node输入，terminal owner也必须能够写入并flush `EXIT`，随后由helper主动关闭自己的fd3 handles并自然退出。实现可以选择已在当前宿主实测的后台reader、cancellable async I/O或helper-owned handle cancellation，但不得等待Node先close、不得用无界join形成循环等待，也不得让reader在terminal seal后发布新的状态或第二个terminal。
 
+Task 2在当前宿主把上述选择收敛为一个可复用事实：Node为fd3使用`overlapped` extra stdio；helper从`_get_osfhandle(3)`取得endpoint并用Win32 `OVERLAPPED ReadFile/WriteFile`操作同一全双工handle。自主退出路径在`READY`后先提交1字节read，并以`ERROR_IO_PENDING`加零时`WAIT_TIMEOUT`证明读取仍pending；随后写入/flush `EXIT`且不等待该read。普通同步pipe加阻塞reader会阻断同一endpoint的terminal write，两个独立托管`FileStream`包装也不能形成可靠合同；后续production wrapper必须复用本轮已验证的overlapped carrier。
+
 ### 3.3 按观察方区分EOF、parent loss与崩溃
 
 - helper在fd3读到Node→helper EOF时锁存`session_shutdown`/control failure：pre-create阻止创建，`CREATING`只锁存并等待launcher发布，post-create由唯一cleanup owner清Job；
@@ -136,6 +138,8 @@ Node spawn helper时使用上述三类来源合成并验证后的环境；helper
 - partial/composite attestation、self-digest和远端 artifact fetcher。
 
 `native:preflight`只用调用它的`process.execPath`测试完整单fd3，并记录当前`process.version`/libuv用于证据。它必须分别证明：(a) CONFIG→READY→TERMINATE→EXIT→clean close；(b) CONFIG→READY后Node不再写且保持fd3开放，probe在reader仍可能阻塞时自主EXIT→close，Node能收到terminal且进程不死锁。`--probe-v1`只验证helper可加载、协议身份和当前CLR/架构，不启动target、不读取凭据；生产每次真实launch的READY/terminal合同本身负责fail closed，不再增加每个MCP进程的一次性carrier探针缓存。
+
+Task 2已在提交`7e03d26`实现该开发期preflight：当前Node v24.14.1/libuv 1.51.0连续10次稳定性运行通过；聚焦测试25/25通过。该数字是本机证据，不是生产版本白名单。显式`TERMINATE(cancelled)`必须在`EXIT`中回显`cancelled`，自主退出才使用`noneOrRootExit`。
 
 resolver在每次 Windows launch前验证规范路径、无逃逸/reparse、文件存在、实际 SHA与旁置 SHA一致、唯一 x64 PE和固定 probe合同。失败时不得 fallback。
 
