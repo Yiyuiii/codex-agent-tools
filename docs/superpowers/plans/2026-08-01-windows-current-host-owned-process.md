@@ -205,16 +205,22 @@ git diff --check
 
 - doctor、npm/plugin exact inclusion和public-package fixture尚不认识helper/SHA；
 - capability fingerprint尚未复用唯一canonical runtime-input manifest/digest；
-- workflow测试仍要求Node 20/22/24矩阵；
-- 当前宿主冻结、能力验证与tag workflow尚未复用同一runtime-input digest，且计划中仍存在重复的prequalification wrapper。
+- release workflow尚未实现beta当前宿主marker和stable公共beta/完整重启/真实Stop/owned-zero marker；
+- 当前宿主冻结、能力验证与tag workflow尚未复用同一runtime-input digest，且计划中仍存在重复的prequalification wrapper；
+- 活动测试仍真实创建`core.autocrlf=true/false`双checkout，插件文档门禁仍把历史Task 9–12和固定beta序号当现行路线；
+- `engines`、tsup target与公开文档仍声明Node 20兼容，npm文档清单仍把历史计划/审阅页当产品必需文件，旧`acceptance:local`仍可被误当现行真实模型门禁；
+- CI仍上传不被release消费的dist/plugin artifact，native sourceSets与npm文档清单仍有重复真值源。
 
 ### 8.2 GREEN
 
 1. Doctor/package：Windows strict doctor复用resolver并报告当前OS/Node/libuv/CLR/helper摘要，运行无target的`--probe-v1`但不重新构建/运行完整carrier preflight；production invocation不先跑probe。POSIX not-applicable。npm与plugin各包含唯一helper/SHA，隔离copy后可probe和跑fake MCP。
 2. Runtime inputs：建立唯一canonical manifest，精确列出native production source、TypeScript wrapper、protocol/build config和实际helper摘要，并由同一实现生成确定性digest。capability fingerprint把该digest作为运行输入；当前宿主冻结证据和tagged workflow复用同一manifest与算法，不再维护平行的`current-host runtime fingerprint`。不加入历史evidence、资格开关、计划/审阅稿或整个package-set raw-byte digest。
 3. Freeze/release smoke：不新增`smoke:prequalification`。Task 8逐项运行既有原子命令各一次，并单独记录八项能力唯一因runtime-input digest stale而fail closed；取得新8/8后只运行普通`smoke:release`。不得用candidate/core/prequalification多层wrapper重复build、pack或release core。
-4. Workflow：CI改为单一Node 24 Ubuntu job；artifact名称固定，不再有Windows三shard、partial/composite/selfDigest/fetcher。release继续Node24、branch/tag与npm Trusted Publishing/OIDC；beta tag新增版本化current-host prequalification/helper SHA/capability/canonical runtime-input digest marker，workflow在tagged tree以同一实现重算并精确比较；stable marker新增public-beta exact install、完整App restart、真实Stop、owned-zero、同helper SHA与同runtime-input digest，机器核对后才发布。
+4. Workflow：CI保持单一Node 24 Ubuntu job并删除不被release消费的dist/plugin artifact，不再有Windows三shard、partial/composite/selfDigest/fetcher；tag release job继续独立生成自己的package evidence。release继续Node24、branch/tag与npm Trusted Publishing/OIDC；beta tag新增版本化current-host prequalification/helper SHA/capability/canonical runtime-input digest marker，workflow在tagged tree以同一实现重算并精确比较；stable marker新增public-beta exact install、完整App restart、真实Stop、owned-zero、同helper SHA与同runtime-input digest，机器核对后才发布。
 5. 文档：公开说明“维护者当前Windows宿主已验证”，不声称Node/Windows广泛兼容。
+6. 单宿主冗余闭包：删除EOL双checkout与未消费的CI artifact；统一`engines >=24`、tsup `node24`和公开Node要求，并注明只实测当前v24.14.1而非跨版本认证；活动文档只使用阶段名，不再绑定历史Task 9–12或某个beta序号。历史发布/失败记录留在仓库但不重写。
+7. 单一真值源：native `build.config.json`是sourceSets唯一清单，PowerShell严格验证schema、相对`.cs`路径、安全compiler flags、边界与reparse后消费，不再复制整份数组；npm只打包用户文档、helper/SHA和能力索引实际引用的证据，release smoke从同一清单核对并继续执行秘密扫描与链接闭包。
+8. 旧入口退役：删除旧`acceptance:local`真实模型脚本/entry/专用测试；保留无模型公共包隔离验收和beta后的真实App代表性门禁。`prepublishOnly`只作误触本地publish的最后检查，不是发布授权，OIDC workflow仍是唯一发布路径。
 
 ### 8.3 子批次A：artifact / resolver / doctor / package
 
@@ -257,8 +263,11 @@ npm run native:preflight
 npm run native:verify
 npm run acceptance:plugin:isolated -- --check-report
 npm pack --dry-run --json
+npm run verify:capabilities
 git diff --check
 ```
+
+这里的`verify:capabilities`在新真实8/8之前必须精确以exit 1失败，且机器检查只能归因于八项runtime-input digest stale；Task 8不得把该预期失败改写为PASS，也不重复运行必然失败的完整`smoke:release`。
 
 本机证据必须记录：
 
