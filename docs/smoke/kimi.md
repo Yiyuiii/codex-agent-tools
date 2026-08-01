@@ -4,7 +4,7 @@
 
 当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。最新历史四模型批次中的 Kimi review/delegate 都通过，旧能力索引按精确 case 哈希与当时运行时指纹记录了两项 passed。
 
-现行调用省略 `timeoutMs` 时不会向 Kimi Code 设置 deadline，而是保留 Kimi Code 原生执行预算。宿主取消、stdio 断开或进程信号会传播 SDK abort，并等待完整 owned ACP 进程树归零；只有调用方显式设置的单次 `timeoutMs` 到期才报告 timed out。本轮运行时变更已使旧 Kimi 能力指纹 stale，须由 Task 9 的新证据重新资格化。
+现行调用省略 `timeoutMs` 时不会向 Kimi Code 设置 deadline，而是保留 Kimi Code 原生执行预算。宿主取消、stdio 断开或进程信号会传播 SDK abort，并等待完整 owned ACP 进程树归零；只有调用方显式设置的单次 `timeoutMs` 到期才报告 timed out。本轮运行时变更已使旧 Kimi 能力指纹 stale；冻结当前宿主离线候选后，只重跑 stale、缺失、新增或证据失效的能力，Kimi 两项由对应新证据重新资格化。
 
 最新历史 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c` 绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`。ordinal 3 Kimi review 与 ordinal 4 Kimi delegate 均固定使用 `kimi-code/k3` / direct，零 retry/fallback，并均 passed；这两项只支持旧实现资格，不能越过本轮 stale 指纹。
 
@@ -36,7 +36,7 @@ Kimi ACP client 现在保留协议允许晚到的 `kind/title/rawInput`，任务
 
 冻结前全量还暴露了 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3。该修复不修改公开任务/MCP 结果、模型/route/credential、资格计划、提示词或 retry/fallback。
 
-Kimi 命令观测加固的离线实现阶段本身没有调用真实模型，也没有修改任何既有 evidence JSON、`four-llm-v1` manifest/checkpoint schema 或公开任务/MCP 结果。后续历史批次已通过 Kimi review/delegate；Task 9 会用新能力索引同时验证新 evidence 与 Kimi 运行时指纹。
+Kimi 命令观测加固的离线实现阶段本身没有调用真实模型，也没有修改任何既有 evidence JSON、`four-llm-v1` manifest/checkpoint schema 或公开任务/MCP 结果。后续历史批次已通过 Kimi review/delegate；下一轮 stale 能力资格会用同一能力索引同时验证新 evidence 与 Kimi 运行时指纹。
 
 ## 方法与通过标准
 

@@ -1,16 +1,16 @@
 # 真实 Codex App 宿主验收记录
 
-最近更新：2026-07-31
+最近更新：2026-08-01
 
-状态：**partial — beta.1 已发布并升级；生命周期修复尚未发布，等待 beta.2 资格、公开包与真实 Stop/interrupt**
+状态：**partial — beta.1 已发布并升级；生命周期修复尚未发布，等待 stale 能力资格、下一个公开 beta 与真实 Stop/interrupt**
 
-## 当前 beta.2 阻断
+## 当前发布阻断
 
 beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调，但这只是待发布候选的确定性证据。
 
-晋级顺序只有一条：Task 9 取得 8/8 passed 并使 verifier green；Task 10 通过 GitHub Actions 把 beta.2 发布到 npm next；Task 11 从公开 npm 做精确版本验收、完成官方插件升级、完整 App 重启与真实 Stop/interrupt 门禁；Task 12 才发布 stable。Task 9 未通过前不得发布 beta.2；Task 11 未通过前不得发布 stable。
+晋级顺序只有一条：当前宿主离线实现与冻结完成后，只重跑 stale、缺失、新增或证据失效的能力并更新同一索引；verifier 恢复通过后，由 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`；再从公共 npm 安装精确版本、完成官方插件升级、完整 App 重启和真实 Stop/interrupt，确认 owned descendants zero；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`，且不预先指定下一个 beta 的版本号。
 
-Task 11 的真实门禁必须使用 App 的普通 Stop 或 dedicated interrupt，确认外层状态为 cancelled/interrupted、完成标记没有写入、SDK abort 到达、owned ACP/RPC 进程树归零且不重生。
+真实宿主门禁必须使用 App 的普通 Stop 或 dedicated interrupt，确认外层状态为 cancelled/interrupted、完成标记没有写入、SDK abort 到达、owned descendants zero 且不重生。
 
 ## 授权与边界
 
@@ -300,28 +300,29 @@ Codex 只清理这些由当前 App 宿主启动的插件 MCP 进程树，未终�
 
 完整第 4 层仍缺少以下证据：
 
-1. Task 9 形成新的 8/8 passed evidence，更新能力索引并使 verifier 恢复通过。
-2. Task 10 通过 GitHub Actions 把 beta.2 发布到 npm `next`。
-3. Task 11 从公开 npm 完成精确版本验收和官方插件升级。
-4. 完整重启宿主，并在新任务确认 beta.2 缓存与四项脱敏环境变量已经被新
+1. 当前宿主离线实现与冻结完成后，只重跑 stale、缺失、新增或证据失效的能力，更新同一能力索引并使 verifier 恢复通过。
+2. 通过 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`，不预先指定版本号。
+3. 从公共 npm 完成精确版本验收和官方插件升级。
+4. 完整重启宿主，并在新任务确认该精确 beta 缓存与四项脱敏环境变量已经被新
    app-server 加载。
 5. 真实宿主调用：复用既有 Kimi 通过证据，重点完成至少一条 Pi 路线的代表性
    review。
 6. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主用普通 Stop 或 dedicated
-   interrupt 验证取消长任务后的 Kimi/Pi 进程回收、不重生与服务端 handler drain。
+   interrupt 验证取消长任务后的 Kimi/Pi 进程回收、不重生、owned descendants zero 与服务端 handler drain。
+7. 上述门禁全部通过后，只通过 GitHub Actions OIDC 发布 stable。
 
 在这些缺口闭合前：
 
 - 官方插件可以称为“已安装、已启用，缓存协议验收通过”；
 - 开发期直连可以称为“已通过官方命令移除，CLI 已解析到插件相对入口”；
 - 不得称为“真实 App 宿主门禁全部通过”；
-- Task 9 未通过前不得发布 beta.2；Task 11 未通过前不得发布 stable；
+- verifier 恢复通过前不得发布 beta；真实宿主门禁通过前不得发布 stable；禁止本地 `npm publish`；
 - 不得称为“已替代旧 `codex_cc_tools`”；
 - 不得删除旧工具、恢复开发期直连或手工修改活动配置。
 
 ## 下一人工节点
 
-下一人工节点只会在 beta.2 已发布到 npm next 并完成官方插件升级后到达：维护者再做
+下一人工节点只会在下一个 beta 已由 GitHub Actions OIDC 发布到 npm `next` 并完成官方插件升级后到达：维护者再做
 一次完整重启，随后 Codex 在新任务验证 Pi review、隔离 delegate 与取消清理。
 
 若修复版升级并刷新后的新任务仍报告缺少 Ark 凭据，应单独审计 App 对 `env_vars`

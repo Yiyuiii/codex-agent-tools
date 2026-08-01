@@ -9,7 +9,7 @@
 - `ark-agent-plan`：隔离 Pi RPC / Ark Agent Plan / `ark-code-latest`，直连；
 - `ark-agent-deepseek-v4-flash`：隔离 Pi RPC / Ark Agent Plan / `deepseek-v4-flash`，直连。
 
-八项 review/delegate 的旧索引仍引用不可变、已通过的真实 case evidence，但当前源码变更已使八项能力指纹 stale。当前 `npm run verify:capabilities` 必须以脱敏错误和退出码 1 fail closed，因此此分支不可发布。Task 7 和 Task 8 期间，以及 Task 9 新证据形成前，`capabilities.json` 保持原样；Task 9 在新批次 8/8 passed 后更新同一 `capabilities.json`。历史 batch manifest 与 case evidence 永久不可变。注册表中的旧 `passed` 文案只描述历史资格，不是当前候选的发布权威。资格单位仍是一个精确的“逻辑 LLM × 任务”组合，临时额度或服务状态不会要求无关能力重复运行。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用只作为历史审计证据保留。
+八项 review/delegate 的旧索引仍引用不可变、已通过的真实 case evidence，但当前源码变更已使八项能力指纹 stale。当前 `npm run verify:capabilities` 必须以脱敏错误和退出码 1 fail closed，因此此分支不可发布。新证据形成前，`capabilities.json` 保持原样；当前宿主离线实现与冻结完成后，只重跑 stale、缺失、新增或证据失效的能力，并用通过的新证据更新同一 `capabilities.json`。历史 batch manifest 与 case evidence 永久不可变。注册表中的旧 `passed` 文案只描述历史资格，不是当前候选的发布权威。资格单位仍是一个精确的“逻辑 LLM × 任务”组合，临时额度或服务状态不会要求无关能力重复运行。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用只作为历史审计证据保留。
 
 standing authorization 下的最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`。标准入口和 `functions.exec` cell 各只有一个；批次按首错停在 ordinal 6，形成 6 completed / 5 passed、`blocked / case_failed`、`promotionEligible=false`，ordinal 7–8 为 notRun。没有 resume、retry、fallback、补跑、第二入口或第二批。manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，20 个不可变证据文件由提交 `6b4217d` 保存。
 
@@ -21,7 +21,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 全量测试还暴露并闭合了一个既有 Kimi ACP 时序竞态：client 可能早于 child close 返回，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49 文件矩阵已包含该修复。Pi resolver 在生产隔离环境中找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`。
 
-注册表仍保留 8 passed / 0 pending 的历史文案，[`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 则是 Task 9 将按计划更新的现行索引；当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。维护者本机已通过官方命令把活动插件升级到 `0.1.1-beta.1` 并移除同名开发期直连；旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。真实资格实验的 standing authorization 仍有效，Task 9 会针对本轮失效的八项能力生成新证据；临时额度恢复本身不触发额外全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
+注册表仍保留 8 passed / 0 pending 的历史文案，[`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 是当前候选的现行索引；当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。维护者本机已通过官方命令把活动插件升级到 `0.1.1-beta.1` 并移除同名开发期直连；旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。真实资格实验的 standing authorization 仍有效；当前宿主离线候选冻结后，只为 stale、缺失、新增或证据失效的能力生成新证据，临时额度恢复本身不触发额外全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
 2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
 
@@ -72,7 +72,7 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 - 当前 Kimi 只支持 K3；K2.7 记录仅作为历史证据保留，见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
 - Gemini 已退役，不再是当前 provider；旧 Google / `proxy-10808` 路由、额度失败和 blocked 批次只作为历史证据保留，见 [Pi / Gemini 退役历史](docs/smoke/pi-gemini.md)。
-- 三条 Ark 路线全部固定直连；Coding Plan 最新历史批次的 review/delegate 都通过，两个 Agent Plan profile 的 review/delegate 也各有历史 passed evidence。旧八项索引见 [能力资格索引](docs/smoke/evidence/capabilities.json)，当前候选必须等待 Task 9 更新后由 verifier 重新确认，叙述与历史见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
+- 三条 Ark 路线全部固定直连；Coding Plan 最新历史批次的 review/delegate 都通过，两个 Agent Plan profile 的 review/delegate 也各有历史 passed evidence。旧八项索引见 [能力资格索引](docs/smoke/evidence/capabilities.json)，当前候选必须等待 stale 能力证据更新后由 verifier 重新确认，叙述与历史见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
 
 终端用户不需要手工维护 Pi 模型配置；Pi 使用由本项目在应用缓存下生成的版本化隔离配置，不读取或修改用户日常 `~/.pi/agent`。
 
@@ -112,8 +112,8 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；npm `next` 仍是已发布的 `0.1.1-beta.1`。本轮已闭合原生执行预算、stdio 取消传播和 owned 进程树清理的确定性实现，但八项能力指纹因此 stale，当前分支不可发布。
+当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；npm `next` 仍是已发布的 `0.1.1-beta.1`。本轮正在闭合原生执行预算、stdio 取消传播和 owned 进程树清理的当前宿主离线实现与冻结，但八项能力指纹因此 stale，当前分支不可发布。
 
-晋级顺序只有一条：Task 9 取得 8/8 passed 并使 verifier green；Task 10 通过 GitHub Actions 把 beta.2 发布到 npm next；Task 11 从公开 npm 做精确版本验收、完成官方插件升级、完整 App 重启与真实 Stop/interrupt 门禁；Task 12 才发布 stable。Task 9 未通过前不得发布 beta.2；Task 11 未通过前不得发布 stable。
+晋级顺序只有一条：当前宿主离线实现与冻结完成后，只重跑 stale、缺失、新增或证据失效的能力并更新同一索引；verifier 恢复通过后，由 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`；再从公共 npm 安装精确版本、完成官方插件升级和完整 App 重启，并用真实 Stop/interrupt 证明 cancelled/interrupted、无完成标记、SDK abort 到达且 owned descendants zero；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`，也不预先指定下一个 beta 的版本号。
 
 beta.1 handoff 只暴露了缺口，不是 stable Stop gate 的唯一证据。旧 `codex_cc_tools` 保持 enabled。

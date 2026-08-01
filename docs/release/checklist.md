@@ -2,13 +2,13 @@
 
 建立日期：2026-07-25
 
-最近复核：2026-07-31
+最近复核：2026-08-01
 
 目标发布分支：`next`；当前证据分支：`codex/stdio-lifecycle-and-native-budget`
 
 包版本：`0.1.1-beta.1`
 
-当前结论：**Task 1–6 已在源码和确定性测试中闭合原生执行预算、MCP 在途请求追踪、stdio 关闭协调与真实 fake Kimi/Pi owned 进程树清理。因为这些运行时输入已经变化，旧能力索引的八项指纹全部 stale；当前 `npm run verify:capabilities` 必须失败，所以当前分支不可发布。已发布的 `0.1.1-beta.1` 与活动插件保持原状，旧 `codex_cc_tools` 仍 enabled。Task 9 的新 8/8 资格、beta.2 公共发布与完整 App 重启后的普通 Stop/interrupt 真实宿主验收全部完成前，stable 继续阻断。**
+当前结论：**当前宿主离线实现与冻结正在闭合原生执行预算、MCP 在途请求追踪、stdio 关闭协调与真实 fake Kimi/Pi owned 进程树清理。因为这些运行时输入已经变化，旧能力索引的八项指纹全部 stale；当前 `npm run verify:capabilities` 必须失败，所以当前分支不可发布。已发布的 `0.1.1-beta.1` 与活动插件保持原状，旧 `codex_cc_tools` 仍 enabled。只重跑 stale、缺失、新增或证据失效的能力、OIDC beta 发布、公共包精确安装以及完整 App 重启后的普通 Stop/interrupt 真实宿主验收全部完成前，stable 继续阻断。**
 
 最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
 
@@ -16,28 +16,26 @@
 
 ## 当前 fail-closed 阻断
 
-当前源码变更已使八项能力指纹 stale。Task 7 和 Task 8 期间，以及 Task 9 新证据形成前，
-`capabilities.json` 保持原样，不得只为转绿而改写；在 Task 9 产生新证据前，
-`npm run verify:capabilities` 必须打印固定的脱敏错误并以退出码 1 结束。Task 9 在
-新批次 8/8 passed 后更新同一 `capabilities.json`。历史 batch manifest 与 case evidence
+当前源码变更已使八项能力指纹 stale。新证据形成前，`capabilities.json` 保持原样，
+不得只为转绿而改写；当前宿主离线实现与冻结完成后，只重跑 stale、缺失、新增或证据失效的能力，
+并在这些能力通过后更新同一 `capabilities.json`。在新证据产生前，
+`npm run verify:capabilities` 必须打印固定的脱敏错误并以退出码 1 结束。历史 batch manifest 与 case evidence
 永久不可变。
 registry 中的旧 passed 文案不构成发布权威；唯一机器发布权威是
 `npm run verify:capabilities`。
 
 beta.1 handoff 只证明旧宿主断开会留下服务端任务，不是 stable Stop gate 的唯一证据。
 
-晋级顺序只有一条：Task 9 取得 8/8 passed 并使 verifier green；Task 10 通过 GitHub Actions
-把 beta.2 发布到 npm next；Task 11 从公开 npm 做精确版本验收、完成官方插件升级、
-完整 App 重启与真实 Stop/interrupt 门禁；Task 12 才发布 stable。Task 9 未通过前不得发布 beta.2；Task 11 未通过前不得发布 stable。
+晋级顺序只有一条：当前宿主离线实现与冻结完成后，只重跑 stale、缺失、新增或证据失效的能力并使 verifier green；GitHub Actions OIDC 把下一个 beta 发布到 npm `next`；从公共 npm 安装精确版本、完成官方插件升级、完整 App 重启与真实 Stop/interrupt 门禁，并证明 owned descendants zero；最后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`，且不预先指定下一个 beta 的版本号。
 
 ## 状态总览
 
 | 层级 | 验收对象                                  | 当前状态                                                                    | 通过证据路径                                                                                                                                                                                                               |
 | ---- | ----------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | 确定性单测、类型检查、构建、release smoke | blocked：实现聚焦验证已通过，能力 verifier 按预期 fail closed               | Task 1–6 聚焦证据；Task 8 才形成完整确定性矩阵                                                                                                                                                                              |
+| 1    | 确定性单测、类型检查、构建、release smoke | blocked：实现聚焦验证已通过，能力 verifier 按预期 fail closed               | 当前宿主离线实现与冻结完成后形成完整确定性矩阵                                                                                                                                                                               |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
-| 3    | 四个逻辑 LLM 的八项真实模型门禁           | stale：0 current / 8 stale，等待 Task 9                                     | Task 7/8 保持现行索引原样；Task 9 用新证据更新；历史 manifest/case 永久不变                                                                                                                                                  |
-| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta.1 已安装；等待 beta.2 公开包、完整重启与 Stop/interrupt       | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 [real-host-acceptance.md](real-host-acceptance.md)                                                                                |
+| 3    | 四个逻辑 LLM 的八项真实模型门禁           | stale：0 current / 8 stale                                                  | 只重跑 stale、缺失、新增或证据失效的能力并更新同一索引；历史 manifest/case 永久不变                                                                                                                                          |
+| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta.1 已安装；等待下一个公共 beta、完整重启与 Stop/interrupt      | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 [real-host-acceptance.md](real-host-acceptance.md)                                                                                |
 
 ## 第 1 层：确定性单测与构建
 
@@ -114,7 +112,7 @@ npm run acceptance:plugin:isolated
 
 ### 当前证据
 
-移除 Gemini 后，当前活动产品面仍是四个逻辑 LLM、八项能力。注册表的 8 passed / 0 pending 与旧 [`docs/smoke/evidence/capabilities.json`](../smoke/evidence/capabilities.json) 记录上一实现的历史资格：Coding Plan 与 Kimi 引用最新批次中的 passed case；Agent Plan 两项和 DeepSeek review 引用更早 passed case；DeepSeek delegate 使用受限 legacy evidence。执行预算和 stdio 生命周期进入能力指纹后，这八项旧记录当前全部 stale；只有 Task 9 新 evidence 与新指纹通过 verifier 后才恢复为发布资格。
+移除 Gemini 后，当前活动产品面仍是四个逻辑 LLM、八项能力。注册表的 8 passed / 0 pending 与旧 [`docs/smoke/evidence/capabilities.json`](../smoke/evidence/capabilities.json) 记录上一实现的历史资格：Coding Plan 与 Kimi 引用最新批次中的 passed case；Agent Plan 两项和 DeepSeek review 引用更早 passed case；DeepSeek delegate 使用受限 legacy evidence。执行预算和 stdio 生命周期进入能力指纹后，这八项旧记录当前全部 stale；只有相关 stale 能力的新 evidence 与新指纹通过 verifier 后才恢复为发布资格。
 
 ### 最新四模型 blocked 批次
 

@@ -443,65 +443,32 @@ describe("Codex plugin artifact", () => {
     );
   });
 
-  it("keeps the Task 8 verification matrix deterministic", () => {
-    const activePlan = readProjectText(
-      "docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md",
-    );
-    const activePlanTask8 = markdownSection(
-      activePlan,
-      "## Task 8：完整确定性验证与两轮独立审阅",
-    );
-
-    expect(activePlanTask8).toContain(
-      "npx vitest run test/acceptance/local.test.ts",
-    );
-    expect(activePlanTask8).not.toContain("npm run acceptance:local");
-    expect(activePlanTask8).toContain(
-      "npm run acceptance:plugin:isolated -- --check-report",
-    );
-    expect(activePlanTask8).not.toMatch(
-      /^npm run acceptance:plugin:isolated\s*$/mu,
-    );
-  });
-
-  it("keeps the stale capability index staged while evidence stays immutable", () => {
+  it("keeps capability refresh and release ordered by phase, not task numbers", () => {
     const readme = readProjectText("README.md");
     const checklist = readProjectText("docs/release/checklist.md");
     const runbook = readProjectText(
       "docs/release/four-llm-qualification-execution-runbook.md",
     );
     const ark = readProjectText("docs/smoke/ark.md");
-    const agentMemory = readProjectText("AGENTS.md");
-    const activePlan = readProjectText(
-      "docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md",
-    );
-    const activePlanTask7 = markdownSection(
-      activePlan,
-      "## Task 7：同步有效文档、发布门禁与 stale 能力状态",
-    );
     const checklistCurrent = markdownSection(
       checklist,
       "## 当前 fail-closed 阻断",
     );
     const runbookCurrent = markdownSection(runbook, "## 当前状态");
     const arkCurrent = markdownSection(ark, "## 当前结论");
-    const agentCurrent = markdownSection(agentMemory, "## 当前事实状态");
-
     for (const source of [
       checklistCurrent,
       runbookCurrent,
       arkCurrent,
-      agentCurrent,
-      activePlanTask7,
     ]) {
       expect(source).toMatch(
         /当前源码变更已使八项能力指纹 stale/u,
       );
       expect(source).toMatch(
-        /Task 7(?:\/8|[\s\S]*Task 8)[\s\S]*Task 9 新证据形成前[\s\S]*`?capabilities\.json`?[\s\S]*保持原样/u,
+        /新证据形成前[\s\S]*`?capabilities\.json`?[\s\S]*保持原样/u,
       );
       expect(source).toMatch(
-        /Task 9[\s\S]*8\/8 passed[\s\S]*更新同一[\s\S]*(?:`?capabilities\.json`?|索引)/u,
+        /只重跑 stale、缺失、新增或证据失效的能力[\s\S]*更新同一[\s\S]*(?:`?capabilities\.json`?|索引)/u,
       );
       expect(source).toMatch(
         /历史 batch manifest 与 case evidence\s*永久不可变/u,
@@ -526,50 +493,30 @@ describe("Codex plugin artifact", () => {
     );
     const hostCurrent = markdownSection(
       hostAcceptance,
-      "## 当前 beta.2 阻断",
+      "## 当前发布阻断",
     );
     const releaseOrderSections = [
       readmeReleaseStatus,
       checklistCurrent,
       hostCurrent,
-      activePlanTask7,
     ];
 
     for (const source of releaseOrderSections) {
       expect(source).toMatch(
-        /Task 9[\s\S]*8\/8[\s\S]*verifier green[\s\S]*Task 10[\s\S]*GitHub Actions[\s\S]*beta\.2[\s\S]*npm next[\s\S]*Task 11[\s\S]*公开 npm[\s\S]*官方插件[\s\S]*完整 App 重启[\s\S]*真实 Stop[\s\S]*Task 12[\s\S]*stable/u,
+        /当前宿主离线实现与冻结[\s\S]*只重跑 stale、缺失、新增或证据失效的能力[\s\S]*GitHub Actions OIDC[\s\S]*下一个 beta[\s\S]*npm `?next`?[\s\S]*公共 npm[\s\S]*精确版本[\s\S]*官方插件[\s\S]*完整 App 重启[\s\S]*真实 Stop\/interrupt[\s\S]*owned descendants zero[\s\S]*GitHub Actions OIDC[\s\S]*stable/u,
       );
+      expect(source).not.toMatch(/Task (?:9|10|11|12)|beta\.2/u);
     }
-
-    for (const source of [
-      readmeReleaseStatus,
-      checklistCurrent,
-      hostCurrent,
-    ]) {
-      expect(source).toMatch(
-        /Task 9 未通过前不得发布 beta\.2；Task 11 未通过前不得发布 stable/u,
-      );
-      expect(source).not.toMatch(
-        /Task 11 未通过前不得发布 beta\.2/u,
-      );
-    }
-
-    expect(activePlanTask7).toMatch(
-      /Task 9 取得 8\/8 passed 并使 verifier green 后，Task 10 通过 GitHub Actions 先把 beta\.2 发布到 npm next；Task 11 再做公开 npm\/官方插件\/完整 App 重启\/真实 Stop；Task 11 只阻断 stable，Task 12 才发布 stable/u,
-    );
-    expect(activePlanTask7).toMatch(
-      /当前源码变更已使八项能力指纹 stale；Task 7\/8 与 Task 9 新证据形成前，`capabilities\.json` 保持原样；Task 9 在新批次 8\/8 passed 后更新同一索引；历史 batch manifest 与 case evidence 永久不可变/u,
-    );
 
     const hostNextNode = markdownSection(
       hostAcceptance,
       "## 下一人工节点",
     );
     expect(hostNextNode).toMatch(
-      /下一人工节点[\s\S]*beta\.2 已发布到 npm next 并完成官方插件升级后[\s\S]*完整重启/u,
+      /下一人工节点[\s\S]*下一个 beta 已由 GitHub Actions OIDC 发布到 npm `next` 并完成官方插件升级后[\s\S]*完整重启/u,
     );
 
-    expect(checklist).toMatch(/最近复核：2026-07-31/u);
+    expect(checklist).toMatch(/最近复核：2026-08-01/u);
     expect(checklist).toMatch(
       /当前证据分支：`codex\/stdio-lifecycle-and-native-budget`/u,
     );
@@ -585,7 +532,29 @@ describe("Codex plugin artifact", () => {
     );
   });
 
-  it("documents the beta.2 install target and automated publish boundary", () => {
+  it("keeps the current-host freeze deterministic and model-free", () => {
+    const currentPlan = readProjectText(
+      "docs/superpowers/plans/2026-08-01-windows-current-host-owned-process.md",
+    );
+    const freeze = markdownSection(
+      currentPlan,
+      "## 9. Task 8：当前宿主冻结与独立终审",
+    );
+    const commandBlock = freeze.match(/```powershell\n([\s\S]*?)```/u)?.[1];
+
+    expect(commandBlock).toBeDefined();
+    expect(commandBlock).toContain("npx vitest run --maxWorkers=1");
+    expect(commandBlock).toContain("npm run native:preflight");
+    expect(commandBlock).toContain("npm run native:verify");
+    expect(commandBlock).toContain(
+      "npm run acceptance:plugin:isolated -- --check-report",
+    );
+    expect(commandBlock).toContain("npm run verify:capabilities");
+    expect(commandBlock).not.toContain("npm run acceptance:local");
+    expect(commandBlock).not.toContain("npm run smoke:release");
+  });
+
+  it("documents an exact public beta install without preselecting its version", () => {
     const operations = readProjectText("docs/operations.md");
     const publicNpm = markdownSection(
       operations,
@@ -603,17 +572,18 @@ describe("Codex plugin artifact", () => {
     expect(publicNpm).toMatch(
       /历史的首次 `0\.1\.0` 安装验收模板/u,
     );
-    expect(permissionPacket).toMatch(
-      /目标 `0\.1\.1-beta\.2` 尚未安装或升级/u,
+    expect(permissionPacket).toMatch(/下一个 beta 的精确版本[\s\S]*发布后/u);
+    expect(permissionPacket).not.toMatch(
+      /`\d+\.\d+\.\d+-beta\.\d+` 尚未安装或升级|Task \d+/u,
     );
     expect(permissionPacket).toMatch(
-      /禁止本地 `npm publish`[\s\S]*Task 10[\s\S]*GitHub Actions OIDC[\s\S]*发布 beta\.2/u,
+      /禁止本地 `npm publish`[\s\S]*GitHub Actions OIDC[\s\S]*发布下一个 beta/u,
     );
     expect(permissionPacket).not.toMatch(
       /本轮不执行 npm 或公共 marketplace 发布/u,
     );
     expect(maintenanceBoundary).toMatch(
-      /禁止本地 `npm publish`[\s\S]*Task 10[\s\S]*GitHub Actions OIDC[\s\S]*发布 beta\.2/u,
+      /禁止本地 `npm publish`[\s\S]*GitHub Actions OIDC[\s\S]*发布 beta 与 stable/u,
     );
     expect(maintenanceBoundary).not.toMatch(
       /本轮[\s\S]*不执行 `npm publish`/u,
