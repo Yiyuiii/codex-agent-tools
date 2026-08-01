@@ -185,6 +185,8 @@ npm run native:preflight
 
 预期：Windows x64 上 Node 20.20.2、22.23.2、24.18.1 全部通过，临时目录被删除。任一版本不能提供规格要求的 duplex/half-close/EOF 语义时，立即停止本计划并回到书面规格；不得开始 Task 3，不得自动改成命名 pipe。
 
+硬门禁结果（2026-08-01）：锁定矩阵首项 Node 20.20.2 已证明同一 `_get_osfhandle(3)` 的普通双向 CONFIG/ACK/READY/PING/PONG 成立，但 Node 对额外 stdio 调用 `.end()` 后，Windows libuv 在 50 ms EOF 路径关闭该 pipe 两端；临时 C# probe 的唯一 exit-0 路径要求 terminal write、flush 与 `_close(3)` 均未抛错或失败，因此只能据控制流推断这些操作成功，而 Node 仍只收到 EOF/close，无法收到 terminal。`npm run native:preflight` 因 `normal terminal ended with 0` 非零退出，按首错停规则未运行 22/24，Task 3 未开始，失败实现未提交。独立规格审查确认硬门禁成立；另发现失败路径临时清理、helper write-half-close 证明、current-version 测试入口和运行时无副作用证明仍不完整，故诊断 patch 不能作为成功实现保留。首轮 cleanup failure 遗留的精确 GUID root 已在路径、内容白名单与 reparse 校验后删除，build roots 回到 0。完整证据与替代载体比较见 [Windows fd3 write-half-close preflight](../../research/windows-fd3-half-close-preflight.md)。推荐的下一书面方案是 fd3 命令输入 + fd4 terminal 输出的两个独立 extra stdio 通道；它改变已批准的单 fd3 拓扑，必须先获维护者批准，不能自动实施。
+
 - [ ] **Step 3：复验并提交**
 
 ```powershell
