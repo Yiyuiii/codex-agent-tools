@@ -403,6 +403,27 @@ namespace CodexAgentTools.WindowsJobHelper.Tests
             TestAssert.Equal(ControlStage.HelperInternal, internalFailure.FailureStage);
             count++;
 
+            // Reading the root exit code happens after root completion and
+            // job-zero may already have moved the lifecycle to Terminated.
+            // A first helper-internal failure there must still seal ERROR and
+            // later cleanup failures cannot replace it.
+            var lateInternalFailure = stopped.ApplyFailure(
+                LifecycleActor.CleanupOwner,
+                ControlStage.HelperInternal);
+            TestAssert.Equal(LifecycleState.Terminated, lateInternalFailure.State);
+            TestAssert.Equal(ControlStage.HelperInternal, lateInternalFailure.FailureStage);
+            TestAssert.Equal(
+                lateInternalFailure,
+                lateInternalFailure.ApplyFailure(
+                    LifecycleActor.CleanupOwner,
+                    ControlStage.QueryJobFailed));
+            TestAssert.Equal(
+                TerminalKind.Error,
+                lateInternalFailure.Apply(
+                    LifecycleActor.TerminalWriter,
+                    LifecycleEvent.SealError).Terminal);
+            count++;
+
             // Ordinary post-resume cancellation is only a requested disposition.
             // A later transport failure before terminal seal upgrades it to ERROR.
             var cancelledThenProtocol = cancelledAfterReady.Apply(

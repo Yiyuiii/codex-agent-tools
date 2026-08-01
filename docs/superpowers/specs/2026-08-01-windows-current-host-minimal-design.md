@@ -22,14 +22,14 @@
 
 2026-08-01 的观测基线是：
 
-| 维度 | 当前值 | 合同含义 |
-| --- | --- | --- |
-| OS | Windows 10 Pro 10.0.19045 x64 | 当前真实验收宿主，不扩张为 Windows 全版本承诺 |
-| Node | v24.14.1，libuv 1.51.0 | 当前 preflight 与验收实际运行时，不写成精确版本白名单 |
-| npm | 11.11.0 | 发布/安装证据的观测值 |
-| CLR | .NET Framework 4.8，Release 528372 | helper 当前运行前提 |
-| Kimi | `%USERPROFILE%\.kimi-code\bin\kimi.exe` | 当前PATH解析到的Windows原生PE入口；精确绝对路径只留在脱敏本机证据 |
-| Pi | `@earendil-works/pi-coding-agent` 0.80.10，Node engine `>=22.19.0` | 由当前 `process.execPath` 直接启动包内 `dist/cli.js` |
+| 维度 | 当前值                                                             | 合同含义                                                          |
+| ---- | ------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| OS   | Windows 10 Pro 10.0.19045 x64                                      | 当前真实验收宿主，不扩张为 Windows 全版本承诺                     |
+| Node | v24.14.1，libuv 1.51.0                                             | 当前 preflight 与验收实际运行时，不写成精确版本白名单             |
+| npm  | 11.11.0                                                            | 发布/安装证据的观测值                                             |
+| CLR  | .NET Framework 4.8，Release 528372                                 | helper 当前运行前提                                               |
+| Kimi | `%USERPROFILE%\.kimi-code\bin\kimi.exe`                            | 当前PATH解析到的Windows原生PE入口；精确绝对路径只留在脱敏本机证据 |
+| Pi   | `@earendil-works/pi-coding-agent` 0.80.10，Node engine `>=22.19.0` | 由当前 `process.execPath` 直接启动包内 `dist/cli.js`              |
 
 以上路径、版本和摘要只进入本机证据，不成为生产硬编码。未来 Node、Pi、Kimi、OS 或 CLR 变化时，维护者在下一次 beta/stable 前重跑同一当前宿主门禁；生产代码不得因未列入历史版本字符串而自动退回 direct spawn。
 
@@ -90,7 +90,7 @@ Task 2在当前宿主把上述选择收敛为一个可复用事实：Node为fd3�
 - 若 Node 已死亡，不存在仍需接收 terminal 的活调用方；helper 应尽力清理并退出，不能为了写不可达 terminal 阻止关闭最后 Job handle；
 - 若Node仍活着却在合法terminal前观察到helper→Node EOF，该invocation永久失败；只有terminal已完整验证后由helper主动close造成的clean EOF/close才是成功证据；
 - helper 被杀时，最后 Job handle 关闭触发 `KILL_ON_JOB_CLOSE`；Node 因 terminal 缺失或 helper 非零/异常退出而失败；
-- 真内核测试直接牺牲production helper的Node parent：target/grandchild创建后、牺牲Node前，由test-only外层取得并核验handle-bound creation identity并保留`SYNCHRONIZE`handles；牺牲后只等待这些既有handles，不再查找/reopen PID。删除只证明carrier的三方observer、`OBSERVER_ARMED`、watchdog-success和parent-sacrifice probe。
+- helper kill与Node parent death真内核测试复用同一个最小外层：现有kernel runner以真实`JobSession`把牺牲用Node原子放入一个仅含`KILL_ON_JOB_CLOSE`的test-only outer Job，并从创建起到PASS判定后始终保持其唯一outer handle开放；production helper再创建inner Job。随机case-root中的root/grandchild各自以`CreateNew`、nonce内容和`FileShare.None`持有全生命周期双锁。Node尚处于suspended时同一个新outer Job必须严格只有1个成员；真实helper `READY`/armed且双锁明确sharing violation后，Node/helper/root/grandchild四个语义角色仍存活，因此动作前`ActiveProcesses`必须至少为4。当前宿主console host会加入同一Job，实测值为8；该数只进入本机观测，不固定成产品门禁，也不为它增加pre-CONFIG诊断握手。helper-kill只由Node通过spawn时保留的`ChildProcess`/libuv handle终止helper，并要求helper close与Node固定成功退出码；parent-death只由C#通过CreateProcess时已保留的Node process witness以固定test code终止Node。动作后必须同时观察Node witness signal、双锁释放并在outer handle仍开放时查询`ActiveProcesses=0`，从而证明既没有outer Job close救援伪造归零，也没有逃逸outer而仍持锁的root/grandchild。全程不报告、读取或reopen PID，不需要`OpenProcess`、creation-time身份通道、三方observer或额外compatible-nested-Job case；任一失败先永久锁存，`finally`关闭outer Job只作救援且不能恢复PASS。
 
 ## 4. Windows 只执行原生 PE
 
@@ -140,7 +140,7 @@ Node spawn helper时使用上述三类来源合成并验证后的环境；helper
 
 `native:preflight`只用调用它的`process.execPath`测试完整单fd3，并记录当前`process.version`/libuv用于证据。它必须分别证明：(a) CONFIG→READY→TERMINATE→EXIT→clean close；(b) CONFIG→READY后Node不再写且保持fd3开放，probe在reader仍可能阻塞时自主EXIT→close，Node能收到terminal且进程不死锁。`--probe-v1`只验证helper可加载、协议身份和当前CLR/架构，不启动target、不读取凭据，并且只由doctor、当前宿主冻结和公共包/插件安装验收调用。production resolver不为每次invocation另起probe进程；它完成静态身份校验后直接真实launch，由真实READY/terminal合同fail closed。
 
-Task 2已在提交`7e03d26`实现该开发期preflight：当前Node v24.14.1/libuv 1.51.0连续10次稳定性运行通过；聚焦测试25/25通过。该数字是本机证据，不是生产版本白名单。显式`TERMINATE(cancelled)`必须在`EXIT`中回显`cancelled`，自主退出才使用`noneOrRootExit`。
+Task 2已在提交`7e03d26`实现该开发期preflight：当前Node v24.14.1/libuv 1.51.0连续10次稳定性运行通过；聚焦测试25/25通过。该数字是本机证据，不是生产版本白名单。显式`TERMINATE(cancelled)`必须在`EXIT`中回显`cancelled`，自主退出才使用`noneOrRootExit`。该阶段的premature-close只证明没有target的carrier会fail closed；Task 4仍以一个READY后、target已启动的production `Program` EOF例覆盖真实`ControlChannel`到Job cleanup的接线，但不把half-close恢复为正常协议。
 
 resolver在每次 Windows launch前静态验证规范路径、无逃逸/reparse、文件存在、实际 SHA与旁置 SHA一致以及唯一 x64 PE。失败时不得 fallback；CLR/load/protocol错误由随后那次真实helper launch自身失败，不以每次调用前的独立probe重复证明。
 
@@ -162,14 +162,16 @@ resolver在每次 Windows launch前静态验证规范路径、无逃逸/reparse�
 
 - target第一条用户指令前已归 Job；
 - target只能访问复制的 0/1/2，fd3/Job/helper handle不可达，CRT reserved data为空；
-- 自然 root退出、root先退而grandchild存活、显式取消、显式 timeout、session shutdown、fd3 EOF、protocol error、helper kill、Node parent death；
+- 当前宿主真实覆盖按独立因果路径分层，不按`ControlReason`枚举机械重复。production `Program` carrier覆盖：(a)自然root退出且grandchild存活；(b)一个合法显式`TERMINATE`代表，当前使用`cancelled`；(c)READY后Node write-half-close/fd3 EOF这一独立OS transport失败；(d)READY后保持fd3开放并写入malformed frame的协议失败。EOF例只要求READY先发生、target已启动、helper非零结束、stdio收敛与owned Job最终归零；由于Windows extra stdio `.end()`可能关闭双向pipe，不要求Node收到`ERROR`或固定`end/error`顺序。malformed例要求真实`OVERLAPPED` reader/decoder产生`ERROR(protocolInvalid, protocolError)`、helper非零并在Job归零后关闭；
+- `timedOut`与`sessionShutdown`在helper侧和`cancelled`共享同一合法`TERMINATE`/Job cleanup路径，Task 4不再为三个reason各复制真实`Program` case；三种reason的编码、状态、首reason和terminal echo由协议/状态机/coordinator确定性参数测试覆盖。显式timeout的独立production producer在Task 5 wrapper集成测试，stdio session shutdown的独立production producer在Task 6真实stdio fake全链验证；
+- helper kill与Node parent death分别保留真实当前宿主回收证明；
 - Job create、set-limit、DuplicateHandle、attribute init、HANDLE_LIST update、JOB_LIST update、CreateProcess、Resume、TerminateJobObject、Query pre-zero、Query final-zero和terminal write各一个确定性fault；不恢复完整笛卡尔积；
 - 当前宿主compatible nested Job。删除人工制造的incompatible UI-limit outer Job组合；Tasks 2–8不修改活动插件，因此真实Codex App Stop只在beta官方插件阶段验证，届时若真实宿主不兼容则硬停；
 - 每例后已知 process/handle/temp root归零；测试 teardown只能收尾，先锁存的失败不能恢复为 PASS。
 
 ### 7.3 Kimi/Pi/stdio fake全链
 
-从真实 MCP stdio transport进入 service→adapter→client→fake executable，证明 READY前不发业务请求，取消先走 ACP/RPC原生信号再走 owned terminate，handler/session只在Job归零和stdio settle后完成。每个adapter只新增正常完成、一次取消或stdio shutdown，以及一个代表性descendant归零全链；Task 4已经覆盖的late-spawn、helper/parent crash、process rebirth与故障矩阵不在这里按Kimi/Pi重复。不得调用真实模型。
+从真实 MCP stdio transport进入 service→adapter→client→fake executable，证明 READY前不发业务请求，取消先走 ACP/RPC原生信号再走 owned terminate，handler/session只在Job归零和stdio settle后完成。每个adapter只新增正常完成、一次取消或stdio shutdown，以及一个代表性descendant归零全链；Task 4已经覆盖helper/parent crash、单次invocation的owned tree回收与故障矩阵，不在这里按Kimi/Pi重复。service/handler在shutdown或abort后晚启新helper或重生新invocation属于Task 6职责，只保留一个跨adapter共享的代表性late-spawn/no-rebirth全链。不得调用真实模型。
 
 Windows上的Kimi/Pi所有调用都必须经过`OwnedAgentProcess`，包括doctor、smoke与qualification preflight中的`--version`/只读诊断；不得因“不调用模型”而保留direct `execa`旁路。POSIX既有版本探针行为保持不变，本轮不为它增加新的owned-process抽象分支或认证测试。
 
@@ -201,24 +203,24 @@ Tasks 2–8完成前不调用真实模型、不修改活动配置/插件、不�
 
 ## 9. 删除项总表
 
-| 删除/降级事项 | 原因 | 替代证据 |
-| --- | --- | --- |
-| Node 20/22/24 archive与矩阵 | 与当前宿主目标无关且锁定24版本不等于本机版本 | 当前`process.execPath` preflight与本机验收记录 |
-| fd3+fd4 split | 正常路径不再half-close | 单fd3显式frame、terminal后helper close |
-| `.cmd/.bat`执行 | 本机Pi可直接由Node运行JS，Kimi是PE | Pi package/bin验证与native argv测试 |
-| 11项libuv精确相等/漂移协议 | 绑死特定libuv源码实现 | 固定系统allowlist、case-fold与poison-parent测试 |
-| 2000轮竞态、完整故障笛卡尔积 | 成本高且弱于确定性状态/事件覆盖 | 状态表+barrier+每公共失败分支代表 |
-| 人工不兼容outer Job | 不代表真实本机宿主 | 离线current-host compatible nested Job；beta后真实App Stop |
-| 三方parent-sacrifice carrier observer | 证明载体而非真实owned tree | production helper parent-death真内核测试 |
-| Windows CI三shard/composite attestation | 用户不要求跨版本/跨机器声明 | 单Node JS CI+当前宿主权威证据 |
-| 全package raw-byte/EOL双checkout证明 | 与运行鲁棒性关联弱 | helper实际hash、exact package inclusion与隔离安装 |
-| 多层candidate/core/prequalification wrapper | 重复同一release core | Task 8原子冻结清单+普通release smoke |
-| 专用`smoke:prequalification`命令 | 与Task 8原子命令及普通release smoke重复 | Task 8逐项运行一次并记录预期stale；8/8后只跑普通release smoke |
-| qualification/npm验收全机WMI/`ps` zero gate | 会把无关外部CLI误判为本项目泄漏，且弱于case-owned证据 | case-owned Job terminal/drain、lock owner identity与历史schema只读兼容 |
-| npm包内未消费的内部acceptance/smoke/release bundle、声明文件与仅内部release工具所需生产依赖 | 不属于CLI/MCP/plugin公共运行面 | 内部构建留在包外；npm只携带公开入口、helper/SHA与能力索引实际引用载荷 |
-| 单workflow内重复build/pack和无人消费的dist/runtime artifact | 重复相同候选且没有下游证明价值 | 一次显式build、一次pack检查并复用manifest；仅保留必要摘要证据 |
-| 锁定源码写法、当前beta/branch/date或计划命令块的文本测试 | 把临时实现和项目状态误当产品合同 | 纯函数/行为测试、跨产物版本一致性、真实隔离bundle与发布语义门禁 |
-| README与operations重复维护易变运维状态 | 形成两个会漂移的公开真值源 | operations维护完整流程；README只保留稳定摘要和链接，历史状态进入未打包证据 |
+| 删除/降级事项                                                                               | 原因                                                  | 替代证据                                                                   |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| Node 20/22/24 archive与矩阵                                                                 | 与当前宿主目标无关且锁定24版本不等于本机版本          | 当前`process.execPath` preflight与本机验收记录                             |
+| fd3+fd4 split                                                                               | 正常路径不再half-close                                | 单fd3显式frame、terminal后helper close                                     |
+| `.cmd/.bat`执行                                                                             | 本机Pi可直接由Node运行JS，Kimi是PE                    | Pi package/bin验证与native argv测试                                        |
+| 11项libuv精确相等/漂移协议                                                                  | 绑死特定libuv源码实现                                 | 固定系统allowlist、case-fold与poison-parent测试                            |
+| 2000轮竞态、完整故障笛卡尔积                                                                | 成本高且弱于确定性状态/事件覆盖                       | 状态表+barrier+每公共失败分支代表                                          |
+| 人工不兼容outer Job                                                                         | 不代表真实本机宿主                                    | 离线current-host compatible nested Job；beta后真实App Stop                 |
+| 三方parent-sacrifice carrier observer                                                       | 证明载体而非真实owned tree                            | production helper parent-death真内核测试                                   |
+| Windows CI三shard/composite attestation                                                     | 用户不要求跨版本/跨机器声明                           | 单Node JS CI+当前宿主权威证据                                              |
+| 全package raw-byte/EOL双checkout证明                                                        | 与运行鲁棒性关联弱                                    | helper实际hash、exact package inclusion与隔离安装                          |
+| 多层candidate/core/prequalification wrapper                                                 | 重复同一release core                                  | Task 8原子冻结清单+普通release smoke                                       |
+| 专用`smoke:prequalification`命令                                                            | 与Task 8原子命令及普通release smoke重复               | Task 8逐项运行一次并记录预期stale；8/8后只跑普通release smoke              |
+| qualification/npm验收全机WMI/`ps` zero gate                                                 | 会把无关外部CLI误判为本项目泄漏，且弱于case-owned证据 | case-owned Job terminal/drain、lock owner identity与历史schema只读兼容     |
+| npm包内未消费的内部acceptance/smoke/release bundle、声明文件与仅内部release工具所需生产依赖 | 不属于CLI/MCP/plugin公共运行面                        | 内部构建留在包外；npm只携带公开入口、helper/SHA与能力索引实际引用载荷      |
+| 单workflow内重复build/pack和无人消费的dist/runtime artifact                                 | 重复相同候选且没有下游证明价值                        | 一次显式build、一次pack检查并复用manifest；仅保留必要摘要证据              |
+| 锁定源码写法、当前beta/branch/date或计划命令块的文本测试                                    | 把临时实现和项目状态误当产品合同                      | 纯函数/行为测试、跨产物版本一致性、真实隔离bundle与发布语义门禁            |
+| README与operations重复维护易变运维状态                                                      | 形成两个会漂移的公开真值源                            | operations维护完整流程；README只保留稳定摘要和链接，历史状态进入未打包证据 |
 
 ## 10. 完成判定
 

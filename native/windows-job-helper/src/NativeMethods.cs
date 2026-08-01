@@ -198,7 +198,19 @@ namespace CodexAgentTools.WindowsJobHelper
             int informationClass,
             IntPtr information,
             uint informationLength,
-            IntPtr returnLength);
+            out uint returnLength);
+
+        [DllImport("kernel32.dll", EntryPoint = "TerminateJobObject", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool TerminateJobObjectNative(
+            IntPtr job,
+            uint exitCode);
+
+        [DllImport("kernel32.dll", EntryPoint = "GetExitCodeProcess", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetExitCodeProcessNative(
+            IntPtr process,
+            out uint exitCode);
 
         [DllImport("kernel32.dll", EntryPoint = "IsProcessInJob", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -363,10 +375,28 @@ namespace CodexAgentTools.WindowsJobHelper
             int informationClass,
             IntPtr information,
             uint length,
+            out uint returnLength,
             out int error)
         {
             bool result = QueryInformationJobObject(
-                job, informationClass, information, length, IntPtr.Zero);
+                job, informationClass, information, length, out returnLength);
+            error = result ? 0 : Marshal.GetLastWin32Error();
+            return result;
+        }
+
+        internal static bool TerminateJob(IntPtr job, uint exitCode, out int error)
+        {
+            bool result = TerminateJobObjectNative(job, exitCode);
+            error = result ? 0 : Marshal.GetLastWin32Error();
+            return result;
+        }
+
+        internal static bool GetProcessExitCode(
+            IntPtr process,
+            out uint exitCode,
+            out int error)
+        {
+            bool result = GetExitCodeProcessNative(process, out exitCode);
             error = result ? 0 : Marshal.GetLastWin32Error();
             return result;
         }
@@ -427,7 +457,10 @@ namespace CodexAgentTools.WindowsJobHelper
             int informationClass,
             IntPtr information,
             uint length,
+            out uint returnLength,
             out int error);
+        bool TerminateJobObject(IntPtr job, uint exitCode, out int error);
+        bool GetExitCodeProcess(IntPtr process, out uint exitCode, out int error);
         bool IsProcessInJob(
             IntPtr process,
             IntPtr job,
@@ -520,10 +553,21 @@ namespace CodexAgentTools.WindowsJobHelper
             int informationClass,
             IntPtr information,
             uint length,
+            out uint returnLength,
             out int error)
         {
             return NativeMethods.QueryJob(
-                job, informationClass, information, length, out error);
+                job, informationClass, information, length, out returnLength, out error);
+        }
+
+        public bool TerminateJobObject(IntPtr job, uint exitCode, out int error)
+        {
+            return NativeMethods.TerminateJob(job, exitCode, out error);
+        }
+
+        public bool GetExitCodeProcess(IntPtr process, out uint exitCode, out int error)
+        {
+            return NativeMethods.GetProcessExitCode(process, out exitCode, out error);
         }
 
         public bool IsProcessInJob(

@@ -195,7 +195,8 @@ function Remove-ExclusiveBuildRoot {
         )
         [void]$allowedFiles.Add($generatedPath)
         $validOutputNames = @(
-            "Fd3Preflight.exe", "ManagedTests.exe", "KernelTests.exe", "KernelFixture.exe"
+            "Fd3Preflight.exe", "ManagedTests.exe", "KernelTests.exe",
+            "KernelFixture.exe", "WindowsJobHelper.exe"
         )
         foreach ($actionOutputName in $ActionOutputNames) {
             if ($validOutputNames -cnotcontains $actionOutputName) {
@@ -356,7 +357,7 @@ elseif ($Action -eq "test-managed") {
     $outputNames = @("ManagedTests.exe")
 }
 elseif ($Action -eq "test-kernel") {
-    $outputNames = @("KernelFixture.exe", "KernelTests.exe")
+    $outputNames = @("KernelFixture.exe", "WindowsJobHelper.exe", "KernelTests.exe")
 }
 $outputNames = @([string[]]$outputNames)
 $outputName = if ($outputNames.Count -gt 0) { $outputNames[$outputNames.Count - 1] } else { "" }
@@ -502,7 +503,9 @@ elseif ($Action -eq "test-managed") {
         -not [string]::IsNullOrEmpty($Filter) -and
         $Filter -cne "Protocol" -and
         $Filter -cne "CommandLine" -and
-        $Filter -cne "LifecycleMachine"
+        $Filter -cne "ControlChannel" -and
+        $Filter -cne "LifecycleMachine" -and
+        $Filter -cne "SessionCoordinator"
     ) {
         throw "windows-native-helper: unsupported managed test filter"
     }
@@ -595,6 +598,30 @@ if ($Action -eq "test-kernel") {
         throw "windows-native-helper: native kernel fixture compilation failed"
     }
     [void](Assert-NoReparseExistingPath -Path $fixtureOutput)
+
+    $helperOutput = [System.IO.Path]::GetFullPath((Join-Path $generatedDirectory "WindowsJobHelper.exe"))
+    $helperCompilerArguments = [System.Collections.Generic.List[string]]::new()
+    foreach ($argument in $expectedCompilerArguments) {
+        $helperCompilerArguments.Add($argument)
+    }
+    $helperCompilerArguments.Add($pathMap)
+    $helperCompilerArguments.Add("/out:" + $helperOutput)
+    $helperCompilerArguments.Add("/main:CodexAgentTools.WindowsJobHelper.Program")
+    foreach ($referencePath in $resolvedReferences) {
+        $helperCompilerArguments.Add("/reference:" + $referencePath)
+    }
+    $helperCompilerArguments.Add($generatedPath)
+    foreach ($relativeProduction in $productionSources) {
+        $helperCompilerArguments.Add([string]$sourcePathsByRelative[$relativeProduction])
+    }
+    $helperCompilerOutput = & $compilerPath @helperCompilerArguments 2>&1
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $helperOutput -PathType Leaf)) {
+        if ($helperCompilerOutput) {
+            $helperCompilerOutput | Write-Output
+        }
+        throw "windows-native-helper: production helper compilation failed"
+    }
+    [void](Assert-NoReparseExistingPath -Path $helperOutput)
 }
 
 $compilerArguments = [System.Collections.Generic.List[string]]::new()
@@ -645,9 +672,37 @@ if ($Action -eq "test-managed") {
 }
 
 if ($Action -eq "test-kernel") {
-    & $nativeOutput $fixtureOutput
-    if ($LASTEXITCODE -ne 0) {
-        throw "windows-native-helper: kernel tests failed"
+    $expectedCarrierHarness = [System.IO.Path]::GetFullPath((Join-Path ([System.IO.Directory]::GetParent($nativeRoot).Parent.FullName) "scripts\windows-native-helper.mjs"))
+    if (
+        [string]::IsNullOrEmpty($InternalNodePath) -or
+        [string]::IsNullOrEmpty($InternalHarnessPath) -or
+        -not [System.IO.Path]::GetFullPath($InternalHarnessPath).Equals(
+            $expectedCarrierHarness,
+            [System.StringComparison]::OrdinalIgnoreCase)
+    ) {
+        throw "windows-native-helper: invalid production carrier harness"
+    }
+    $carrierNodePath = Assert-NoReparseExistingPath -Path $InternalNodePath
+    $carrierHarnessPath = Assert-NoReparseExistingPath -Path $InternalHarnessPath
+    $env:CODEX_WINDOWS_NATIVE_CRASH_INTERNAL = "1"
+    try {
+        & $nativeOutput $fixtureOutput $carrierNodePath $carrierHarnessPath $helperOutput
+        if ($LASTEXITCODE -ne 0) {
+            throw "windows-native-helper: kernel tests failed"
+        }
+    }
+    finally {
+        Remove-Item Env:CODEX_WINDOWS_NATIVE_CRASH_INTERNAL -ErrorAction SilentlyContinue
+    }
+    $env:CODEX_WINDOWS_NATIVE_CARRIER_INTERNAL = "1"
+    try {
+        & $carrierNodePath $carrierHarnessPath "__production-carrier-v1" $helperOutput $fixtureOutput
+        if ($LASTEXITCODE -ne 0) {
+            throw "windows-native-helper: production carrier failed"
+        }
+    }
+    finally {
+        Remove-Item Env:CODEX_WINDOWS_NATIVE_CARRIER_INTERNAL -ErrorAction SilentlyContinue
     }
     return
 }

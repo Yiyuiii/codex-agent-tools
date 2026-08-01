@@ -10,7 +10,9 @@ namespace CodexAgentTools.WindowsJobHelper.Tests
             {
                 { "Protocol", ProtocolTests.Run },
                 { "CommandLine", CommandLineTests.Run },
-                { "LifecycleMachine", LifecycleMachineTests.Run }
+                { "ControlChannel", ControlChannelTests.Run },
+                { "LifecycleMachine", LifecycleMachineTests.Run },
+                { "SessionCoordinator", SessionCoordinatorTests.Run }
             };
 
         private static int Main(string[] args)
@@ -41,7 +43,7 @@ namespace CodexAgentTools.WindowsJobHelper.Tests
                     suites++;
                 }
             }
-            catch
+            catch (Exception)
             {
                 Console.Error.WriteLine("windows-native-helper: managed tests failed");
                 return 1;

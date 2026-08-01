@@ -139,8 +139,13 @@ namespace CodexAgentTools.WindowsJobHelper.Tests
             var duplicateTerminate = new ControlProtocol.Decoder(ControlDirection.NodeToHelper);
             duplicateTerminate.Push(first, 0, first.Length);
             duplicateTerminate.Push(terminateBeforeConfig, 0, terminateBeforeConfig.Length);
-            TestAssert.Throws<ProtocolViolationException>(() =>
-                duplicateTerminate.Push(terminateBeforeConfig, 0, terminateBeforeConfig.Length));
+            IList<ControlFrame> repeatedTerminate =
+                duplicateTerminate.Push(
+                    terminateBeforeConfig,
+                    0,
+                    terminateBeforeConfig.Length);
+            TestAssert.Equal(1, repeatedTerminate.Count);
+            TestAssert.Equal(ControlReason.TimedOut, repeatedTerminate[0].Reason);
             count++;
 
             var helper = new ControlProtocol.Decoder(ControlDirection.HelperToNode);

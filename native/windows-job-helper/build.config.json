@@ -25,22 +25,27 @@
   "sourceSets": {
     "preflight": ["src/Fd3Preflight.cs"],
     "production": [
+      "src/ControlChannel.cs",
       "src/ControlProtocol.cs",
       "src/JobSession.cs",
       "src/LifecycleMachine.cs",
       "src/NativeMethods.cs",
       "src/Program.cs",
       "src/SafeNativeHandles.cs",
+      "src/SessionCoordinator.cs",
       "src/WindowsCommandLine.cs"
     ],
     "managedTests": [
       "tests/CommandLineTests.cs",
+      "tests/ControlChannelTests.cs",
       "tests/LifecycleMachineTests.cs",
       "tests/ProtocolTests.cs",
+      "tests/SessionCoordinatorTests.cs",
       "tests/TestAssert.cs",
       "tests/TestRunner.cs"
     ],
     "kernelTests": [
+      "tests/CrashRecoveryTests.cs",
       "tests/KernelTestRunner.cs",
       "tests/KernelTests.cs",
       "tests/TestAssert.cs"

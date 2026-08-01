@@ -308,6 +308,17 @@ namespace CodexAgentTools.WindowsJobHelper
                 return this;
             }
 
+            // Root completion and job-zero can both be observed before the
+            // final GetExitCodeProcess read. That read still belongs to the
+            // cleanup owner, so its first native failure must remain sealable
+            // as ERROR even though the drain lifecycle is already complete.
+            if (State == LifecycleState.Terminated &&
+                actor == LifecycleActor.CleanupOwner &&
+                stage == ControlStage.HelperInternal)
+            {
+                return Copy(failureStage: stage);
+            }
+
             if (State == LifecycleState.Configured &&
                 actor == LifecycleActor.Launcher &&
                 (stage == ControlStage.JobCreateFailed || stage == ControlStage.JobConfigFailed))

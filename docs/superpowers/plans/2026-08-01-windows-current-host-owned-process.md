@@ -111,9 +111,10 @@ Windows command line与生命周期纯状态机由`native:test:managed`中的C#�
 - `CREATE_SUSPENDED + HANDLE_LIST + JOB_LIST`同次原子创建；
 - marker在resume前不存在，target从第一条用户指令起已在Job；
 - target只能访问复制的0/1/2，`cbReserved2=0/lpReserved2=NULL`；
-- root先退而grandchild存活、取消、timeout、session shutdown、fd3 EOF、helper kill、Node parent death均最终Job归零；
+- production `Program` carrier用最小独立路径证明：natural root+grandchild、一个合法cancel代表、post-READY fd3 EOF、post-READY malformed frame；后两者分别证明真实transport failure与protocol failure接到真实Job drain。EOF允许terminal不可达但绝不能判成功；malformed必须得到唯一`ERROR`后clean close；
+- managed protocol/lifecycle/coordinator参数覆盖`cancelled`、`timedOut`、`sessionShutdown`全部reason；真内核只用一个合法stop代表验证同一Terminate/Query/zero路径，不复制同构reason case。helper kill与Node parent death仍分别证明崩溃回收；
 - 自然root/Job归零而Node保持fd3开放时，helper仍能terminal→close→exit，阻塞reader不造成死锁或重复terminal；
-- 当前宿主compatible nested Job可用；真实Codex App Stop留到beta官方插件阶段，不在禁止活动插件变更的Tasks 2–8伪测；
+- helper-kill与Node-parent-death两案共用一个test-only outer Job，并在outer handle仍开放时以case-owned双锁释放、Node witness signal和outer `ActiveProcesses=0`证明inner tree归零；这同时构成当前宿主compatible nested Job代表，不再新增第三案。真实Codex App Stop留到beta官方插件阶段，不在禁止活动插件变更的Tasks 2–8伪测；
 - Job create、set-limit、DuplicateHandle、attribute init、HANDLE_LIST update、JOB_LIST update、CreateProcess、Resume、TerminateJobObject、Query pre-zero、Query final-zero和terminal write各一个确定性fault并fail closed。
 
 ### 5.2 GREEN
@@ -122,7 +123,7 @@ Windows command line与生命周期纯状态机由`native:test:managed`中的C#�
 - Job只设置`KILL_ON_JOB_CLOSE`，无其它Job limit；helper是唯一Job owner。
 - fd3和Job在target创建前清除继承；target只收到duplicated stdio。
 - CREATING交错遵循Task 3状态机，不存在未归属running或suspended child。
-- parent-death使用test-only C#外层observer：Node test parent仍活着且fixture已创建root/grandchild后，fixture经专用测试通道报告PID/nonce和可复核creation identity；observer立即只为这两个已知identity打开并保留`SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION`handles，用`GetProcessTimes`等handle-bound identity核对报告后再牺牲Node。牺牲后禁止PID lookup/reopen，只wait既有handles；teardown救援不计PASS。生产不含该通道或PID逻辑。
+- 现有kernel runner直接充当外层，不新增observer可执行文件：它用真实`JobSession`把牺牲用Node原子放入只含`KILL_ON_JOB_CLOSE`的test-only outer Job，并把唯一outer handle保留到PASS之后。Node suspended后同一个新outer必须严格只有1个成员；随机case-root中的fixture root/grandchild各以`CreateNew`、nonce内容和`FileShare.None`持有全生命周期双锁；真实helper `READY`/armed且双锁明确sharing violation后，Node/helper/root/grandchild四个语义角色仍存活，故动作前`ActiveProcesses >= 4`，当前宿主实测8只记录为观测值，不固定为门禁也不保留pre-CONFIG诊断握手。释放后双锁必须成功独占打开并核验nonce。helper-kill只由Node用spawn时保留的`ChildProcess`/libuv handle执行，并核验kill成功、helper close和Node固定成功退出码；parent-death只用CreateProcess时已保留的Node process witness以固定test code执行。动作后同时要求Node witness signal、双锁释放以及仍开放outer Job的`ActiveProcesses=0`；不报告/读取/reopen PID，不增加`OpenProcess`、creation-time身份通道、三方observer或独立nested Job case。失败先锁存，`finally`关闭outer只作救援，永不计PASS。
 - C# helper的production source/API扫描拒绝target cleanup使用`AssignProcessToJobObject`、`TerminateProcess`、WMI、taskkill、breakaway、direct-spawn和production fault hook。Node仍可在调用已永久失败后，通过spawn时保留的`ChildProcess`/OS handle最后终止helper；不得PID reopen、不得直接终止target、不得把该兜底计入PASS。
 - 每个确定性barrier少量重复检查资源泄漏；不构造人工incompatible UI-limit outer Job。
 
@@ -157,6 +158,7 @@ git diff --check
 - 实现不暴露PID的`OwnedAgentProcess`：Windows只启动helper；POSIX保留现有process-group实现与既有回归，不扩展新的集成或认证工作。
 - Windows wrapper spawn `stdio: ["pipe", "pipe", "pipe", "overlapped"]`；fd3复用Task 2已验证的Win32 OVERLAPPED全双工carrier，正常路径不half-close fd3。
 - 正式wrapper合同测试必须证明terminal前不调用`.end()`、`.destroy()`或主动close fd3；terminal前EOF/close/error永久失败，合法terminal后的helper clean close才能完成。
+- Windows `OwnedAgentProcess`集成以显式调用级timer真实触发一次`TERMINATE(timedOut)`，验证reason echo、helper terminal/close、stdio settle与case-owned Job-zero；测试watchdog只作teardown，不充当production deadline。Task 4不重复这个producer路径。
 - helper terminal + fd3 clean close + helper code 0 + stdio settle + Job-zero构成成功；任一异常永久失败。
 - Windows environment fixed allowlist增加必要系统key并case-fold去重，只保留选定credential；poison parent不得泄漏proxy或其它secret。
 - 不增加production one-time carrier probe缓存；真实launch READY与terminal本身fail closed。
@@ -192,7 +194,8 @@ git diff --check
 - 省略`timeoutMs`不创建deadline；显式timeout只属于该次调用；finally等待owned close无总截止。
 - child environment用case-insensitive builder合成固定系统键、唯一credential和固定runtime-owned键；Pi本次隔离配置生成的`PI_CODING_AGENT_DIR`必须保留，父环境同名/变体、proxy与其它secret不得穿透，跨来源冲突fail closed。
 - stdio end/close/error与SIGINT/SIGTERM共享幂等shutdown，业务错误优先、cleanup错误作为secondary附加；即使业务原本成功，只要cleanup失败，整个调用仍必须失败。
-- 每个fake adapter只新增正常完成、一次取消或stdio shutdown，以及一个代表性descendant归零的真实stdio全链；late spawn、helper/parent崩溃、process rebirth与故障矩阵由Task 4真内核测试唯一负责，不按Kimi/Pi重复。不调用真实模型。
+- 从真实MCP stdio end/close（或固定代表事件）触发幂等session shutdown，验证wrapper只发送一次`TERMINATE(sessionShutdown)`、terminal echo、handler等待owned drain与stdio settle；不得用Task 4 `Program`直接写`reason=3`冒充stdio source路径。
+- 每个fake adapter只新增正常完成、一次取消或stdio shutdown，以及一个代表性descendant归零的真实stdio全链；helper/parent崩溃、单次invocation的owned tree回收与故障矩阵由Task 4真内核测试唯一负责，不按Kimi/Pi重复。Task 6另保留一个跨adapter共享的service/handler late-spawn/no-rebirth代表，证明shutdown或abort后不能晚启新helper或重生新invocation。不调用真实模型。
 - 每个qualification case把本次`OwnedAgentProcess`的合法terminal、Job `ActiveProcesses=0`与stdio/helper settle形成case-owned drain证据；协调器只能在验证该证据后发布case终态。preflight、case前后检查、公共npm验收和lock recovery删除全机WMI/`ps` zero前置，不因无关Kimi/Pi/旧插件进程失败。
 - lock recovery先验证qualification lock owner identity与不可变ledger状态；owner死亡后的target回收依赖已经证明的`KILL_ON_JOB_CLOSE`合同，不读取/reopen PID，也不以全机命令行匹配代替owned证明。删除现行runtime全机scanner及只验证它的测试，但保留历史记录codec。
 - 新current preflight使用新schema并不再生成`targetProcesses`；历史v1/v2 preflight、manifest与case evidence中的`targetProcesses`只按旧schema严格读取，绝不改写。verifier继续验证历史不可变性，新producer、coordinator与recovery不得重新消费旧全机计数作为当前证明。

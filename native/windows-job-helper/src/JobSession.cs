@@ -18,7 +18,30 @@ namespace CodexAgentTools.WindowsJobHelper
         }
     }
 
-    internal sealed class JobSession : IDisposable
+    internal sealed class TerminalSnapshot
+    {
+        internal TerminalKind Kind { get; private set; }
+        internal ControlStage Stage { get; private set; }
+        internal ControlReason Reason { get; private set; }
+        internal uint? Win32Code { get; private set; }
+        internal uint RootExitCode { get; private set; }
+
+        internal TerminalSnapshot(
+            TerminalKind kind,
+            ControlStage stage,
+            ControlReason reason,
+            uint? win32Code,
+            uint rootExitCode)
+        {
+            Kind = kind;
+            Stage = stage;
+            Reason = reason;
+            Win32Code = win32Code;
+            RootExitCode = rootExitCode;
+        }
+    }
+
+    internal sealed class JobSession : ISessionKernel, IDisposable
     {
         private readonly object gate = new object();
         private readonly IWin32Api api;
@@ -26,20 +49,21 @@ namespace CodexAgentTools.WindowsJobHelper
         private SafeProcessHandle process;
         private SafeThreadHandle thread;
         private LifecycleMachine lifecycle;
+        private uint? failureWin32Code;
+        private uint rootExitCode;
+        private bool rootExitCodeKnown;
+        private bool terminalReserved;
         private bool disposed;
 
-        private JobSession(
-            IWin32Api api,
-            SafeJobHandle job,
-            SafeProcessHandle process,
-            SafeThreadHandle thread,
-            LifecycleMachine lifecycle)
+        internal JobSession(IWin32Api api)
         {
+            if (api == null)
+            {
+                throw new ArgumentNullException("api");
+            }
+            NativeMethods.ValidateCurrentHostLayouts();
             this.api = api;
-            this.job = job;
-            this.process = process;
-            this.thread = thread;
-            this.lifecycle = lifecycle;
+            lifecycle = LifecycleMachine.Initial;
         }
 
         internal LifecycleMachine Lifecycle
@@ -59,150 +83,214 @@ namespace CodexAgentTools.WindowsJobHelper
             string currentDirectory,
             IEnumerable<string> arguments)
         {
-            if (api == null)
+            var session = new JobSession(api);
+            try
             {
-                throw new ArgumentNullException("api");
+                session.PrepareJob();
+                session.CreateSuspended(executable, currentDirectory, arguments);
+                return session;
             }
-            NativeMethods.ValidateCurrentHostLayouts();
+            catch
+            {
+                session.Dispose();
+                throw;
+            }
+        }
 
-            LifecycleMachine machine = LifecycleMachine.Initial;
-            SafeJobHandle job = null;
+        internal void PrepareJob()
+        {
+            lock (gate)
+            {
+                RequireNotDisposed();
+                if (lifecycle.State != LifecycleState.Configured)
+                {
+                    ThrowCurrentFailureOrViolation();
+                }
+
+                SafeJobHandle preparedJob = null;
+                SafeNativeBuffer limits = null;
+                try
+                {
+                    int error;
+                    IntPtr rawJob = api.CreateJobObject(out error);
+                    if (rawJob == IntPtr.Zero || rawJob == new IntPtr(-1))
+                    {
+                        lifecycle = lifecycle.ApplyFailure(
+                            LifecycleActor.Launcher,
+                            ControlStage.JobCreateFailed);
+                        RecordFirstWin32Code(ControlStage.JobCreateFailed, error);
+                        throw new JobSessionException(ControlStage.JobCreateFailed, error);
+                    }
+                    preparedJob = new SafeJobHandle(rawJob);
+
+                    var limitValue = new NativeMethods.JobExtendedLimitInformation();
+                    limitValue.BasicLimitInformation.LimitFlags =
+                        NativeMethods.JobObjectLimitKillOnJobClose;
+                    int limitBytes = Marshal.SizeOf(
+                        typeof(NativeMethods.JobExtendedLimitInformation));
+                    limits = AllocateZeroed(limitBytes);
+                    Marshal.StructureToPtr(limitValue, limits.DangerousGetHandle(), false);
+                    if (!api.SetInformationJobObject(
+                        preparedJob.DangerousGetHandle(),
+                        NativeMethods.JobObjectExtendedLimitInformation,
+                        limits.DangerousGetHandle(),
+                        checked((uint)limitBytes),
+                        out error))
+                    {
+                        lifecycle = lifecycle.ApplyFailure(
+                            LifecycleActor.Launcher,
+                            ControlStage.JobConfigFailed);
+                        RecordFirstWin32Code(ControlStage.JobConfigFailed, error);
+                        throw new JobSessionException(ControlStage.JobConfigFailed, error);
+                    }
+
+                    job = preparedJob;
+                    preparedJob = null;
+                    lifecycle = lifecycle.Apply(
+                        LifecycleActor.Launcher,
+                        LifecycleEvent.JobPrepared);
+                }
+                finally
+                {
+                    if (limits != null)
+                    {
+                        limits.Dispose();
+                    }
+                    if (preparedJob != null)
+                    {
+                        preparedJob.Dispose();
+                    }
+                }
+            }
+        }
+
+        internal void CreateSuspended(
+            string executable,
+            string currentDirectory,
+            IEnumerable<string> arguments)
+        {
             SafeProcessHandle process = null;
             SafeThreadHandle thread = null;
             var inherited = new List<SafeInheritedHandle>();
-            SafeNativeBuffer limits = null;
             SafeNativeBuffer handleValues = null;
             SafeNativeBuffer jobValue = null;
             ProcThreadAttributeList attributes = null;
             bool transferred = false;
             try
             {
-                int error;
-                IntPtr rawJob = api.CreateJobObject(out error);
-                if (rawJob == IntPtr.Zero || rawJob == new IntPtr(-1))
-                {
-                    machine = machine.ApplyFailure(
-                        LifecycleActor.Launcher,
-                        ControlStage.JobCreateFailed);
-                    throw new JobSessionException(ControlStage.JobCreateFailed, error);
-                }
-                job = new SafeJobHandle(rawJob);
-
-                var limitValue = new NativeMethods.JobExtendedLimitInformation();
-                limitValue.BasicLimitInformation.LimitFlags =
-                    NativeMethods.JobObjectLimitKillOnJobClose;
-                int limitBytes = Marshal.SizeOf(typeof(NativeMethods.JobExtendedLimitInformation));
-                limits = AllocateZeroed(limitBytes);
-                Marshal.StructureToPtr(limitValue, limits.DangerousGetHandle(), false);
-                if (!api.SetInformationJobObject(
-                    job.DangerousGetHandle(),
-                    NativeMethods.JobObjectExtendedLimitInformation,
-                    limits.DangerousGetHandle(),
-                    checked((uint)limitBytes),
-                    out error))
-                {
-                    machine = machine.ApplyFailure(
-                        LifecycleActor.Launcher,
-                        ControlStage.JobConfigFailed);
-                    throw new JobSessionException(ControlStage.JobConfigFailed, error);
-                }
-                machine = machine.Apply(LifecycleActor.Launcher, LifecycleEvent.JobPrepared);
-
                 WindowsCommandLineSpec commandLine;
-                try
+                NativeMethods.StartupInfoEx startup;
+                int error = 0;
+                lock (gate)
                 {
-                    commandLine = WindowsCommandLine.Build(
-                        executable, currentDirectory, arguments);
-                }
-                catch (CommandLineContractException)
-                {
-                    machine = machine.ApplyFailure(
-                        LifecycleActor.Launcher,
-                        ControlStage.CommandLineInvalid);
-                    throw new JobSessionException(ControlStage.CommandLineInvalid, 0);
-                }
-
-                int[] standardHandles = {
-                    NativeMethods.StandardInputHandle,
-                    NativeMethods.StandardOutputHandle,
-                    NativeMethods.StandardErrorHandle
-                };
-                foreach (int standardHandle in standardHandles)
-                {
-                    IntPtr source = NativeMethods.StandardHandle(standardHandle);
-                    IntPtr duplicate = IntPtr.Zero;
-                    if (source == IntPtr.Zero || source == new IntPtr(-1) ||
-                        !api.DuplicateHandle(source, out duplicate, out error) ||
-                        duplicate == IntPtr.Zero || duplicate == new IntPtr(-1))
+                    RequireNotDisposed();
+                    if (lifecycle.State != LifecycleState.JobReady)
                     {
-                        if (duplicate != IntPtr.Zero && duplicate != new IntPtr(-1))
-                        {
-                            new SafeInheritedHandle(duplicate).Dispose();
-                        }
-                        machine = machine.ApplyFailure(
-                            LifecycleActor.Launcher,
-                            ControlStage.StdioDuplicateFailed);
-                        throw new JobSessionException(ControlStage.StdioDuplicateFailed, error);
+                        ThrowCurrentFailureOrViolation();
                     }
-                    inherited.Add(new SafeInheritedHandle(duplicate));
-                }
 
-                attributes = ProcThreadAttributeList.Create(api, 2, out error);
-                if (attributes == null)
-                {
-                    machine = machine.ApplyFailure(
-                        LifecycleActor.Launcher,
-                        ControlStage.AttributeListInitFailed);
-                    throw new JobSessionException(ControlStage.AttributeListInitFailed, error);
-                }
+                    try
+                    {
+                        commandLine = WindowsCommandLine.Build(
+                            executable, currentDirectory, arguments);
+                    }
+                    catch (CommandLineContractException)
+                    {
+                        lifecycle = lifecycle.ApplyFailure(
+                            LifecycleActor.Launcher,
+                            ControlStage.CommandLineInvalid);
+                        throw new JobSessionException(ControlStage.CommandLineInvalid, 0);
+                    }
 
-                handleValues = AllocateZeroed(checked(IntPtr.Size * inherited.Count));
-                for (int index = 0; index < inherited.Count; index++)
-                {
-                    Marshal.WriteIntPtr(
+                    int[] standardHandles = {
+                        NativeMethods.StandardInputHandle,
+                        NativeMethods.StandardOutputHandle,
+                        NativeMethods.StandardErrorHandle
+                    };
+                    foreach (int standardHandle in standardHandles)
+                    {
+                        IntPtr source = NativeMethods.StandardHandle(standardHandle);
+                        IntPtr duplicate = IntPtr.Zero;
+                        if (source == IntPtr.Zero || source == new IntPtr(-1) ||
+                            !api.DuplicateHandle(source, out duplicate, out error) ||
+                            duplicate == IntPtr.Zero || duplicate == new IntPtr(-1))
+                        {
+                            if (duplicate != IntPtr.Zero && duplicate != new IntPtr(-1))
+                            {
+                                new SafeInheritedHandle(duplicate).Dispose();
+                            }
+                            lifecycle = lifecycle.ApplyFailure(
+                                LifecycleActor.Launcher,
+                                ControlStage.StdioDuplicateFailed);
+                            throw new JobSessionException(
+                                ControlStage.StdioDuplicateFailed, error);
+                        }
+                        inherited.Add(new SafeInheritedHandle(duplicate));
+                    }
+
+                    attributes = ProcThreadAttributeList.Create(api, 2, out error);
+                    if (attributes == null)
+                    {
+                        lifecycle = lifecycle.ApplyFailure(
+                            LifecycleActor.Launcher,
+                            ControlStage.AttributeListInitFailed);
+                        throw new JobSessionException(
+                            ControlStage.AttributeListInitFailed, error);
+                    }
+
+                    handleValues = AllocateZeroed(checked(IntPtr.Size * inherited.Count));
+                    for (int index = 0; index < inherited.Count; index++)
+                    {
+                        Marshal.WriteIntPtr(
+                            handleValues.DangerousGetHandle(),
+                            checked(index * IntPtr.Size),
+                            inherited[index].DangerousGetHandle());
+                    }
+                    if (!api.UpdateProcThreadAttribute(
+                        attributes.DangerousGetHandle(),
+                        NativeMethods.ProcThreadAttributeHandleList,
                         handleValues.DangerousGetHandle(),
-                        checked(index * IntPtr.Size),
-                        inherited[index].DangerousGetHandle());
-                }
-                if (!api.UpdateProcThreadAttribute(
-                    attributes.DangerousGetHandle(),
-                    NativeMethods.ProcThreadAttributeHandleList,
-                    handleValues.DangerousGetHandle(),
-                    new IntPtr(checked(IntPtr.Size * inherited.Count)),
-                    out error))
-                {
-                    machine = machine.ApplyFailure(
+                        new IntPtr(checked(IntPtr.Size * inherited.Count)),
+                        out error))
+                    {
+                        lifecycle = lifecycle.ApplyFailure(
+                            LifecycleActor.Launcher,
+                            ControlStage.HandleListAttributeFailed);
+                        throw new JobSessionException(
+                            ControlStage.HandleListAttributeFailed, error);
+                    }
+
+                    jobValue = AllocateZeroed(IntPtr.Size);
+                    Marshal.WriteIntPtr(jobValue.DangerousGetHandle(), job.DangerousGetHandle());
+                    if (!api.UpdateProcThreadAttribute(
+                        attributes.DangerousGetHandle(),
+                        NativeMethods.ProcThreadAttributeJobList,
+                        jobValue.DangerousGetHandle(),
+                        new IntPtr(IntPtr.Size),
+                        out error))
+                    {
+                        lifecycle = lifecycle.ApplyFailure(
+                            LifecycleActor.Launcher,
+                            ControlStage.JobListAttributeFailed);
+                        throw new JobSessionException(
+                            ControlStage.JobListAttributeFailed, error);
+                    }
+
+                    startup = new NativeMethods.StartupInfoEx();
+                    startup.StartupInfo.cb = Marshal.SizeOf(
+                        typeof(NativeMethods.StartupInfoEx));
+                    startup.StartupInfo.dwFlags = NativeMethods.StartfUseStdHandles;
+                    startup.StartupInfo.cbReserved2 = 0;
+                    startup.StartupInfo.lpReserved2 = IntPtr.Zero;
+                    startup.StartupInfo.hStdInput = inherited[0].DangerousGetHandle();
+                    startup.StartupInfo.hStdOutput = inherited[1].DangerousGetHandle();
+                    startup.StartupInfo.hStdError = inherited[2].DangerousGetHandle();
+                    startup.AttributeList = attributes.DangerousGetHandle();
+
+                    lifecycle = lifecycle.Apply(
                         LifecycleActor.Launcher,
-                        ControlStage.HandleListAttributeFailed);
-                    throw new JobSessionException(ControlStage.HandleListAttributeFailed, error);
+                        LifecycleEvent.BeginCreate);
                 }
-
-                jobValue = AllocateZeroed(IntPtr.Size);
-                Marshal.WriteIntPtr(jobValue.DangerousGetHandle(), job.DangerousGetHandle());
-                if (!api.UpdateProcThreadAttribute(
-                    attributes.DangerousGetHandle(),
-                    NativeMethods.ProcThreadAttributeJobList,
-                    jobValue.DangerousGetHandle(),
-                    new IntPtr(IntPtr.Size),
-                    out error))
-                {
-                    machine = machine.ApplyFailure(
-                        LifecycleActor.Launcher,
-                        ControlStage.JobListAttributeFailed);
-                    throw new JobSessionException(ControlStage.JobListAttributeFailed, error);
-                }
-
-                var startup = new NativeMethods.StartupInfoEx();
-                startup.StartupInfo.cb = Marshal.SizeOf(typeof(NativeMethods.StartupInfoEx));
-                startup.StartupInfo.dwFlags = NativeMethods.StartfUseStdHandles;
-                startup.StartupInfo.cbReserved2 = 0;
-                startup.StartupInfo.lpReserved2 = IntPtr.Zero;
-                startup.StartupInfo.hStdInput = inherited[0].DangerousGetHandle();
-                startup.StartupInfo.hStdOutput = inherited[1].DangerousGetHandle();
-                startup.StartupInfo.hStdError = inherited[2].DangerousGetHandle();
-                startup.AttributeList = attributes.DangerousGetHandle();
-
-                machine = machine.Apply(LifecycleActor.Launcher, LifecycleEvent.BeginCreate);
                 var writableCommandLine = new StringBuilder(
                     commandLine.CommandLine,
                     checked(commandLine.CommandLine.Length + 1));
@@ -233,20 +321,32 @@ namespace CodexAgentTools.WindowsJobHelper
                     information.Thread == IntPtr.Zero)
                 {
                     CloseReturnedProcessInformation(information);
-                    machine = machine.Apply(
-                        LifecycleActor.Launcher,
-                        LifecycleEvent.CreateFailed);
-                    throw new JobSessionException(ControlStage.CreateFailed, error);
+                    lock (gate)
+                    {
+                        ControlStage beforeCreateFailure = lifecycle.FailureStage;
+                        lifecycle = lifecycle.Apply(
+                            LifecycleActor.Launcher,
+                            LifecycleEvent.CreateFailed);
+                        if (beforeCreateFailure == ControlStage.None)
+                        {
+                            RecordFirstWin32Code(ControlStage.CreateFailed, error);
+                        }
+                        throw new JobSessionException(lifecycle.FailureStage, error);
+                    }
                 }
 
                 process = new SafeProcessHandle(information.Process);
                 thread = new SafeThreadHandle(information.Thread);
-                machine = machine.Apply(
-                    LifecycleActor.Launcher,
-                    LifecycleEvent.CreateSucceeded);
-                var result = new JobSession(api, job, process, thread, machine);
-                transferred = true;
-                return result;
+                lock (gate)
+                {
+                    RequireNotDisposed();
+                    this.process = process;
+                    this.thread = thread;
+                    lifecycle = lifecycle.Apply(
+                        LifecycleActor.Launcher,
+                        LifecycleEvent.CreateSucceeded);
+                    transferred = true;
+                }
             }
             finally
             {
@@ -262,10 +362,6 @@ namespace CodexAgentTools.WindowsJobHelper
                 {
                     handleValues.Dispose();
                 }
-                if (limits != null)
-                {
-                    limits.Dispose();
-                }
                 foreach (SafeInheritedHandle handle in inherited)
                 {
                     handle.Dispose();
@@ -279,10 +375,6 @@ namespace CodexAgentTools.WindowsJobHelper
                     if (process != null)
                     {
                         process.Dispose();
-                    }
-                    if (job != null)
-                    {
-                        job.Dispose();
                     }
                 }
             }
@@ -314,6 +406,7 @@ namespace CodexAgentTools.WindowsJobHelper
                     lifecycle = lifecycle.ApplyFailure(
                         LifecycleActor.Launcher,
                         ControlStage.ResumeFailed);
+                    RecordFirstWin32Code(ControlStage.ResumeFailed, error);
                     throw new JobSessionException(ControlStage.ResumeFailed, error);
                 }
 
@@ -358,6 +451,19 @@ namespace CodexAgentTools.WindowsJobHelper
             {
                 RequireNotDisposed();
                 lifecycle = lifecycle.Apply(LifecycleActor.ControlReader, stopEvent);
+            }
+        }
+
+        internal void ReportControlFailure(bool protocolInvalid)
+        {
+            lock (gate)
+            {
+                RequireNotDisposed();
+                lifecycle = lifecycle.Apply(
+                    LifecycleActor.ControlReader,
+                    protocolInvalid
+                        ? LifecycleEvent.ProtocolError
+                        : LifecycleEvent.ControlEof);
             }
         }
 
@@ -406,6 +512,7 @@ namespace CodexAgentTools.WindowsJobHelper
                 lifecycle = lifecycle.ApplyFailure(
                     LifecycleActor.RootWaiter,
                     ControlStage.WaitFailed);
+                RecordFirstWin32Code(ControlStage.WaitFailed, error);
                 throw new JobSessionException(ControlStage.WaitFailed, error);
             }
         }
@@ -419,14 +526,20 @@ namespace CodexAgentTools.WindowsJobHelper
                 using (SafeNativeBuffer buffer = AllocateZeroed(size))
                 {
                     int error;
+                    uint returnLength;
                     if (!api.QueryInformationJobObject(
                         job.DangerousGetHandle(),
                         NativeMethods.JobObjectExtendedLimitInformation,
                         buffer.DangerousGetHandle(),
                         checked((uint)size),
+                        out returnLength,
                         out error))
                     {
                         throw new JobSessionException(ControlStage.QueryJobFailed, error);
+                    }
+                    if (returnLength != checked((uint)size))
+                    {
+                        throw new JobSessionException(ControlStage.QueryJobFailed, 0);
                     }
                     return ((NativeMethods.JobExtendedLimitInformation)Marshal.PtrToStructure(
                         buffer.DangerousGetHandle(),
@@ -464,8 +577,148 @@ namespace CodexAgentTools.WindowsJobHelper
             }
         }
 
+        internal bool HasRootProcess
+        {
+            get
+            {
+                lock (gate)
+                {
+                    return process != null;
+                }
+            }
+        }
+
+        internal void TerminateOwnedJob()
+        {
+            lock (gate)
+            {
+                RequireNotDisposed();
+                int error;
+                if (!api.TerminateJobObject(job.DangerousGetHandle(), 1, out error))
+                {
+                    ControlStage before = lifecycle.FailureStage;
+                    lifecycle = lifecycle.ApplyFailure(
+                        LifecycleActor.CleanupOwner,
+                        ControlStage.TerminateJobFailed);
+                    if (before == ControlStage.None)
+                    {
+                        RecordFirstWin32Code(ControlStage.TerminateJobFailed, error);
+                    }
+                    throw new JobSessionException(ControlStage.TerminateJobFailed, error);
+                }
+            }
+        }
+
+        internal uint QueryActiveProcesses()
+        {
+            lock (gate)
+            {
+                RequireNotDisposed();
+                int size = Marshal.SizeOf(typeof(NativeMethods.JobBasicAccountingInformation));
+                using (SafeNativeBuffer buffer = AllocateZeroed(size))
+                {
+                    int error;
+                    uint returnLength;
+                    bool queried = api.QueryInformationJobObject(
+                        job.DangerousGetHandle(),
+                        NativeMethods.JobObjectBasicAccountingInformation,
+                        buffer.DangerousGetHandle(),
+                        checked((uint)size),
+                        out returnLength,
+                        out error);
+                    if (!queried || returnLength != checked((uint)size))
+                    {
+                        ControlStage before = lifecycle.FailureStage;
+                        lifecycle = lifecycle.ApplyFailure(
+                            LifecycleActor.CleanupOwner,
+                            ControlStage.QueryJobFailed);
+                        if (before == ControlStage.None)
+                        {
+                            RecordFirstWin32Code(ControlStage.QueryJobFailed, error);
+                        }
+                        throw new JobSessionException(ControlStage.QueryJobFailed, error);
+                    }
+                    return ((NativeMethods.JobBasicAccountingInformation)
+                        Marshal.PtrToStructure(
+                            buffer.DangerousGetHandle(),
+                            typeof(NativeMethods.JobBasicAccountingInformation)))
+                        .ActiveProcesses;
+                }
+            }
+        }
+
+        internal void RecordJobZero()
+        {
+            lock (gate)
+            {
+                RequireNotDisposed();
+                lifecycle = lifecycle.Apply(
+                    LifecycleActor.CleanupOwner,
+                    LifecycleEvent.JobZero);
+            }
+        }
+
+        internal uint ReadRootExitCode()
+        {
+            lock (gate)
+            {
+                RequireNotDisposed();
+                if (rootExitCodeKnown)
+                {
+                    return rootExitCode;
+                }
+                int error;
+                uint value;
+                if (!api.GetExitCodeProcess(process.DangerousGetHandle(), out value, out error))
+                {
+                    ControlStage before = lifecycle.FailureStage;
+                    lifecycle = lifecycle.ApplyFailure(
+                        LifecycleActor.CleanupOwner,
+                        ControlStage.HelperInternal);
+                    if (before == ControlStage.None)
+                    {
+                        RecordFirstWin32Code(ControlStage.HelperInternal, error);
+                    }
+                    throw new JobSessionException(ControlStage.HelperInternal, error);
+                }
+                rootExitCode = value;
+                rootExitCodeKnown = true;
+                return value;
+            }
+        }
+
+        internal TerminalSnapshot TryReserveTerminal()
+        {
+            lock (gate)
+            {
+                RequireNotDisposed();
+                if (terminalReserved)
+                {
+                    return null;
+                }
+                TerminalKind kind = lifecycle.FailureStage == ControlStage.None
+                    ? TerminalKind.Exit
+                    : TerminalKind.Error;
+                lifecycle = lifecycle.Apply(
+                    LifecycleActor.TerminalWriter,
+                    kind == TerminalKind.Exit
+                        ? LifecycleEvent.SealExit
+                        : LifecycleEvent.SealError);
+                terminalReserved = true;
+                return new TerminalSnapshot(
+                    kind,
+                    lifecycle.FailureStage,
+                    lifecycle.StopReason,
+                    failureWin32Code,
+                    rootExitCodeKnown ? rootExitCode : 0);
+            }
+        }
+
         public void Dispose()
         {
+            SafeThreadHandle threadToClose;
+            SafeJobHandle jobToClose;
+            SafeProcessHandle processToClose;
             lock (gate)
             {
                 if (disposed)
@@ -473,28 +726,31 @@ namespace CodexAgentTools.WindowsJobHelper
                     return;
                 }
                 disposed = true;
-                if (thread != null)
-                {
-                    thread.Dispose();
-                    thread = null;
-                }
-                if (job != null)
-                {
-                    // The final Job handle is intentionally closed last. Its only
-                    // configured limit is KILL_ON_JOB_CLOSE.
-                    job.Dispose();
-                    job = null;
-                }
-                if (process != null)
-                {
-                    int ignoredError;
-                    api.WaitForSingleObject(
-                        process.DangerousGetHandle(),
-                        NativeMethods.Infinite,
-                        out ignoredError);
-                    process.Dispose();
-                    process = null;
-                }
+                threadToClose = thread;
+                jobToClose = job;
+                processToClose = process;
+                thread = null;
+                job = null;
+                process = null;
+            }
+            if (threadToClose != null)
+            {
+                threadToClose.Dispose();
+            }
+            if (jobToClose != null)
+            {
+                // KILL_ON_JOB_CLOSE is the final exception fallback when an
+                // explicit cleanup path could not prove Job-zero.
+                jobToClose.Dispose();
+            }
+            if (processToClose != null)
+            {
+                int ignoredError;
+                api.WaitForSingleObject(
+                    processToClose.DangerousGetHandle(),
+                    NativeMethods.Infinite,
+                    out ignoredError);
+                processToClose.Dispose();
             }
         }
 
@@ -503,6 +759,25 @@ namespace CodexAgentTools.WindowsJobHelper
             if (disposed)
             {
                 throw new ObjectDisposedException("JobSession");
+            }
+        }
+
+        private void ThrowCurrentFailureOrViolation()
+        {
+            if (lifecycle.FailureStage != ControlStage.None)
+            {
+                throw new JobSessionException(lifecycle.FailureStage, 0);
+            }
+            throw new LifecycleViolationException();
+        }
+
+        private void RecordFirstWin32Code(ControlStage stage, int error)
+        {
+            if (failureWin32Code == null &&
+                lifecycle.FailureStage == stage &&
+                error != 0)
+            {
+                failureWin32Code = checked((uint)error);
             }
         }
 
@@ -528,5 +803,34 @@ namespace CodexAgentTools.WindowsJobHelper
                 new SafeProcessHandle(information.Process).Dispose();
             }
         }
+
+        LifecycleMachine ISessionKernel.Lifecycle { get { return Lifecycle; } }
+        bool ISessionKernel.HasRootProcess { get { return HasRootProcess; } }
+        void ISessionKernel.PrepareJob() { PrepareJob(); }
+        void ISessionKernel.CreateSuspended(
+            string executable,
+            string currentDirectory,
+            IEnumerable<string> arguments)
+        {
+            CreateSuspended(executable, currentDirectory, arguments);
+        }
+        void ISessionKernel.ResumeAndPublishReady(Action readyWriter)
+        {
+            ResumeAndPublishReady(readyWriter);
+        }
+        void ISessionKernel.RequestStop(ControlReason reason) { RequestStop(reason); }
+        void ISessionKernel.ReportControlFailure(bool protocolInvalid)
+        {
+            ReportControlFailure(protocolInvalid);
+        }
+        bool ISessionKernel.WaitForRootExit(uint milliseconds)
+        {
+            return WaitForRootExit(milliseconds);
+        }
+        uint ISessionKernel.ReadRootExitCode() { return ReadRootExitCode(); }
+        void ISessionKernel.TerminateOwnedJob() { TerminateOwnedJob(); }
+        uint ISessionKernel.QueryActiveProcesses() { return QueryActiveProcesses(); }
+        void ISessionKernel.RecordJobZero() { RecordJobZero(); }
+        TerminalSnapshot ISessionKernel.TryReserveTerminal() { return TryReserveTerminal(); }
     }
 }

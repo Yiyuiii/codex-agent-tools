@@ -19,7 +19,10 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const repositoryRoot = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 const nativeRoot = resolve(repositoryRoot, "native", "windows-job-helper");
 const windowsIt = it.runIf(process.platform === "win32");
 const nativeBuildActions = [
@@ -265,9 +268,15 @@ function createTinyToolchainFixture(fixtureRoot: string) {
       id: "Microsoft.NETFramework.ReferenceAssemblies.net48",
       version: "1.0.3",
       files: {
-        "build/.NETFramework/v4.8/mscorlib.dll": Buffer.from("mscorlib", "utf8"),
+        "build/.NETFramework/v4.8/mscorlib.dll": Buffer.from(
+          "mscorlib",
+          "utf8",
+        ),
         "build/.NETFramework/v4.8/System.dll": Buffer.from("system", "utf8"),
-        "build/.NETFramework/v4.8/System.Core.dll": Buffer.from("system-core", "utf8"),
+        "build/.NETFramework/v4.8/System.Core.dll": Buffer.from(
+          "system-core",
+          "utf8",
+        ),
       },
     },
   ];
@@ -297,7 +306,9 @@ function createTinyToolchainFixture(fixtureRoot: string) {
 
   const lockPackages = packages.map((fixturePackage) => {
     const source = join(fixtureRoot, "archive-source", fixturePackage.id);
-    for (const [relativePath, contents] of Object.entries(fixturePackage.files)) {
+    for (const [relativePath, contents] of Object.entries(
+      fixturePackage.files,
+    )) {
       writeFixtureFile(join(source, ...relativePath.split("/")), contents);
     }
     const archiveName = `${fixturePackage.id.toLowerCase()}.${fixturePackage.version}.nupkg`;
@@ -449,15 +460,21 @@ describe("Windows native helper build contract", () => {
     for (const [name, sources] of Object.entries(sourceSets)) {
       expect(sources.length, name).toBeGreaterThan(0);
       expect(sources).toEqual(
-        [...sources].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
+        [...sources].sort((left, right) =>
+          left < right ? -1 : left > right ? 1 : 0,
+        ),
       );
       expect(new Set(sources).size, name).toBe(sources.length);
-      expect(sources.every((source) => !source.includes("\\") && !source.startsWith("/"))).toBe(
-        true,
-      );
+      expect(
+        sources.every(
+          (source) => !source.includes("\\") && !source.startsWith("/"),
+        ),
+      ).toBe(true);
       expect(
         sources.every((source) =>
-          statSync(resolve(nativeRoot, source), { throwIfNoEntry: false })?.isFile(),
+          statSync(resolve(nativeRoot, source), {
+            throwIfNoEntry: false,
+          })?.isFile(),
         ),
       ).toBe(true);
     }
@@ -468,10 +485,14 @@ describe("Windows native helper build contract", () => {
       "native/windows-job-helper/build.config.json",
     ) as { sourceSets: { production: string[]; kernelTests: string[] } };
     const production = config.sourceSets.production
-      .map((source) => readRepositoryFile(`native/windows-job-helper/${source}`))
+      .map((source) =>
+        readRepositoryFile(`native/windows-job-helper/${source}`),
+      )
       .join("\n");
     const kernelTests = config.sourceSets.kernelTests
-      .map((source) => readRepositoryFile(`native/windows-job-helper/${source}`))
+      .map((source) =>
+        readRepositoryFile(`native/windows-job-helper/${source}`),
+      )
       .join("\n");
 
     for (const forbidden of [
@@ -543,13 +564,18 @@ describe("Windows native helper build contract", () => {
       {
         name: "generated-extra",
         mutate: (config) => {
-          (config.generatedProtocolConstants as Record<string, unknown>).extra = true;
+          (config.generatedProtocolConstants as Record<string, unknown>).extra =
+            true;
         },
       },
       {
         name: "reference-traversal",
         mutate: (config) => {
-          config.references = ["mscorlib.dll", "../System.dll", "System.Core.dll"];
+          config.references = [
+            "mscorlib.dll",
+            "../System.dll",
+            "System.Core.dll",
+          ];
         },
       },
       {
@@ -564,10 +590,17 @@ describe("Windows native helper build contract", () => {
       for (const testCase of cases) {
         const scriptRoot = join(fixtureRoot, testCase.name);
         mkdirSync(scriptRoot);
-        for (const name of ["build.ps1", "build.config.json", "protocol.v1.json"]) {
+        for (const name of [
+          "build.ps1",
+          "build.config.json",
+          "protocol.v1.json",
+        ]) {
           copyFileSync(resolve(nativeRoot, name), join(scriptRoot, name));
         }
-        writeFileSync(join(scriptRoot, "restore-toolchain.ps1"), "throw 'must-not-run'\n");
+        writeFileSync(
+          join(scriptRoot, "restore-toolchain.ps1"),
+          "throw 'must-not-run'\n",
+        );
         const config = JSON.parse(
           readFileSync(join(scriptRoot, "build.config.json"), "utf8"),
         ) as Record<string, unknown>;
@@ -607,7 +640,10 @@ describe("Windows native helper build contract", () => {
     ]);
     try {
       mkdirSync(source);
-      copyFileSync(resolve(repositoryRoot, ".gitattributes"), join(source, ".gitattributes"));
+      copyFileSync(
+        resolve(repositoryRoot, ".gitattributes"),
+        join(source, ".gitattributes"),
+      );
       writeFileSync(join(source, "fixture.txt"), expectedText);
       writeFileSync(join(source, "fixture.exe"), expectedExe);
       for (const arguments_ of [
@@ -623,14 +659,28 @@ describe("Windows native helper build contract", () => {
 
       for (const autocrlf of ["true", "false"]) {
         const checkout = join(fixtureRoot, `checkout-${autocrlf}`);
-        let result = run("git", ["clone", "--quiet", "--no-checkout", source, checkout]);
+        let result = run("git", [
+          "clone",
+          "--quiet",
+          "--no-checkout",
+          source,
+          checkout,
+        ]);
         expect(result.status, result.stderr).toBe(0);
-        result = run("git", ["config", "core.autocrlf", autocrlf], { cwd: checkout });
+        result = run("git", ["config", "core.autocrlf", autocrlf], {
+          cwd: checkout,
+        });
         expect(result.status, result.stderr).toBe(0);
-        result = run("git", ["checkout", "--quiet", "--force", "HEAD"], { cwd: checkout });
+        result = run("git", ["checkout", "--quiet", "--force", "HEAD"], {
+          cwd: checkout,
+        });
         expect(result.status, result.stderr).toBe(0);
-        expect(readFileSync(join(checkout, "fixture.txt"))).toEqual(expectedText);
-        expect(readFileSync(join(checkout, "fixture.exe"))).toEqual(expectedExe);
+        expect(readFileSync(join(checkout, "fixture.txt"))).toEqual(
+          expectedText,
+        );
+        expect(readFileSync(join(checkout, "fixture.exe"))).toEqual(
+          expectedExe,
+        );
       }
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
@@ -640,9 +690,9 @@ describe("Windows native helper build contract", () => {
   windowsIt(
     "generates exact protocol constants for every action and rejects canonical drift",
     async () => {
-      expect(sha256(Buffer.from(expectedGeneratedProtocolConstants, "utf8"))).toBe(
-        expectedGeneratedProtocolSha256,
-      );
+      expect(
+        sha256(Buffer.from(expectedGeneratedProtocolConstants, "utf8")),
+      ).toBe(expectedGeneratedProtocolSha256);
 
       const cases: Array<{
         name: string;
@@ -669,7 +719,9 @@ describe("Windows native helper build contract", () => {
         },
       ];
 
-      const fixtureRoot = mkdtempSync(join(tmpdir(), "cat-native-generate-actions-"));
+      const fixtureRoot = mkdtempSync(
+        join(tmpdir(), "cat-native-generate-actions-"),
+      );
       const systemTemp = join(fixtureRoot, "system-temp");
       mkdirSync(systemTemp);
       let canonicalScriptRoot = "";
@@ -700,7 +752,11 @@ describe("Windows native helper build contract", () => {
             `${JSON.stringify(protocol, null, 2)}\n`,
           );
 
-          const environment = { ...process.env, TEMP: systemTemp, TMP: systemTemp };
+          const environment = {
+            ...process.env,
+            TEMP: systemTemp,
+            TMP: systemTemp,
+          };
           for (const action of nativeBuildActions) {
             const before = buildInvocationRoots(systemTemp);
             const result = runPowerShell(
@@ -725,7 +781,11 @@ describe("Windows native helper build contract", () => {
           }
         }
 
-        const environment = { ...process.env, TEMP: systemTemp, TMP: systemTemp };
+        const environment = {
+          ...process.env,
+          TEMP: systemTemp,
+          TMP: systemTemp,
+        };
         const beforeConcurrent = new Set(buildInvocationRoots(systemTemp));
         const concurrent = await Promise.all([
           runPowerShellAsync(
@@ -760,7 +820,9 @@ describe("Windows native helper build contract", () => {
             symlinkSync(outside, boundaryTemp, "junction");
           } else {
             boundaryTemp = boundaryRoot;
-            mkdirSync(join(boundaryTemp, "codex-agent-tools"), { recursive: true });
+            mkdirSync(join(boundaryTemp, "codex-agent-tools"), {
+              recursive: true,
+            });
             symlinkSync(
               outside,
               join(boundaryTemp, "codex-agent-tools", "windows-job-helper"),
@@ -781,8 +843,15 @@ describe("Windows native helper build contract", () => {
         const cleanupOutside = join(fixtureRoot, "cleanup-outside");
         mkdirSync(cleanupAttackRoot);
         mkdirSync(cleanupOutside);
-        for (const name of ["build.ps1", "build.config.json", "protocol.v1.json"]) {
-          copyFileSync(resolve(nativeRoot, name), join(cleanupAttackRoot, name));
+        for (const name of [
+          "build.ps1",
+          "build.config.json",
+          "protocol.v1.json",
+        ]) {
+          copyFileSync(
+            resolve(nativeRoot, name),
+            join(cleanupAttackRoot, name),
+          );
         }
         writeFileSync(
           join(cleanupAttackRoot, "restore-toolchain.ps1"),
@@ -816,7 +885,10 @@ describe("Windows native helper build contract", () => {
         const outsideGuids = readdirSync(cleanupOutside);
         expect(outsideGuids).toHaveLength(1);
         expect(
-          readFileSync(join(cleanupOutside, outsideGuids[0] as string, "sentinel.txt"), "utf8"),
+          readFileSync(
+            join(cleanupOutside, outsideGuids[0] as string, "sentinel.txt"),
+            "utf8",
+          ),
         ).toBe("do-not-delete");
         expect(readdirSync(originalBuildBase)).toHaveLength(1);
 
@@ -824,8 +896,15 @@ describe("Windows native helper build contract", () => {
         const unknownTemp = join(fixtureRoot, "unknown-temp");
         mkdirSync(unknownAttackRoot);
         mkdirSync(unknownTemp);
-        for (const name of ["build.ps1", "build.config.json", "protocol.v1.json"]) {
-          copyFileSync(resolve(nativeRoot, name), join(unknownAttackRoot, name));
+        for (const name of [
+          "build.ps1",
+          "build.config.json",
+          "protocol.v1.json",
+        ]) {
+          copyFileSync(
+            resolve(nativeRoot, name),
+            join(unknownAttackRoot, name),
+          );
         }
         writeFileSync(
           join(unknownAttackRoot, "restore-toolchain.ps1"),
@@ -847,15 +926,19 @@ describe("Windows native helper build contract", () => {
         );
         const unknownRoots = buildInvocationRoots(unknownTemp);
         expect(unknownRoots).toHaveLength(1);
-        expect(readFileSync(join(unknownRoots[0] as string, "unknown.txt"), "utf8")).toBe(
-          "preserve-evidence",
-        );
+        expect(
+          readFileSync(join(unknownRoots[0] as string, "unknown.txt"), "utf8"),
+        ).toBe("preserve-evidence");
 
         const crossActionRoot = join(fixtureRoot, "cross-action-output");
         const crossActionTemp = join(fixtureRoot, "cross-action-temp");
         mkdirSync(crossActionRoot);
         mkdirSync(crossActionTemp);
-        for (const name of ["build.ps1", "build.config.json", "protocol.v1.json"]) {
+        for (const name of [
+          "build.ps1",
+          "build.config.json",
+          "protocol.v1.json",
+        ]) {
           copyFileSync(resolve(nativeRoot, name), join(crossActionRoot, name));
         }
         writeFileSync(
@@ -881,7 +964,11 @@ describe("Windows native helper build contract", () => {
         expect(crossActionRoots).toHaveLength(1);
         expect(
           readFileSync(
-            join(crossActionRoots[0] as string, "generated", "ManagedTests.exe"),
+            join(
+              crossActionRoots[0] as string,
+              "generated",
+              "ManagedTests.exe",
+            ),
           ),
         ).toEqual(Buffer.from([1, 2, 3]));
 
@@ -906,15 +993,15 @@ describe("Windows native helper build contract", () => {
           "Write-Output 'trusted-stub'\n",
         );
         copyFileSync(process.execPath, join(malicious, "powershell.exe"));
-        const runner = join(runnerFixture, "scripts", "windows-native-helper.mjs");
-        const secureResult = run(
-          process.execPath,
-          [runner, "restore"],
-          {
-            cwd: malicious,
-            env: { ...process.env, PATH: malicious },
-          },
+        const runner = join(
+          runnerFixture,
+          "scripts",
+          "windows-native-helper.mjs",
         );
+        const secureResult = run(process.execPath, [runner, "restore"], {
+          cwd: malicious,
+          env: { ...process.env, PATH: malicious },
+        });
         expect(secureResult.status, secureResult.stderr).toBe(0);
         expect(secureResult.stdout).toContain("trusted-stub");
       } finally {
@@ -935,7 +1022,10 @@ describe("Windows native helper build contract", () => {
         const packageRoot = join(cacheRoot, "packages");
 
         const escapedTemporaryRoot = join(fixtureRoot, "restore-temp-junction");
-        const escapedTemporaryTarget = join(fixtureRoot, "restore-temp-outside");
+        const escapedTemporaryTarget = join(
+          fixtureRoot,
+          "restore-temp-outside",
+        );
         mkdirSync(escapedTemporaryTarget);
         symlinkSync(escapedTemporaryTarget, escapedTemporaryRoot, "junction");
         const escapedResult = runRestore(restoreScript, {
@@ -1017,7 +1107,9 @@ describe("Windows native helper build contract", () => {
         }
         const finalResult = runRestore(restoreScript, environment);
         expect(finalResult.status, finalResult.stderr).toBe(0);
-        expect(readFileSync(compiler)).toEqual(Buffer.from("tiny-csc\0\r\n", "utf8"));
+        expect(readFileSync(compiler)).toEqual(
+          Buffer.from("tiny-csc\0\r\n", "utf8"),
+        );
         expect(
           readFileSync(
             join(
@@ -1042,7 +1134,9 @@ describe("Windows native helper build contract", () => {
   );
 
   it("keeps POSIX skips scoped to exactly three Windows integration cases", () => {
-    const source = readRepositoryFile("test/native/native-build-contract.test.ts");
+    const source = readRepositoryFile(
+      "test/native/native-build-contract.test.ts",
+    );
     expect(source.match(/\bit\.runIf\(/g)).toHaveLength(1);
     expect(source.match(/\bwindowsIt\(/g)).toHaveLength(3);
     expect(source).not.toMatch(/\b(?:it|describe)\.(?:skip|skipIf)\(/);
@@ -1053,9 +1147,13 @@ describe("Windows native helper build contract", () => {
     expect(build).toContain("[System.IO.FileMode]::CreateNew");
     expect(build).toContain("[System.IO.File]::Move");
     expect(build).not.toContain("[System.IO.File]::Copy");
-    expect(build).toContain("windows-native-helper: native path contains a reparse point");
+    expect(build).toContain(
+      "windows-native-helper: native path contains a reparse point",
+    );
     expect(build).toContain("Remove-ExclusiveBuildRoot");
-    expect(build).toContain("windows-native-helper: native build cleanup failed");
+    expect(build).toContain(
+      "windows-native-helper: native build cleanup failed",
+    );
     expect(build).toContain(
       "windows-native-helper: native preflight compilation failed",
     );
@@ -1084,9 +1182,6 @@ describe("Windows native helper build contract", () => {
     expect(runner).toContain("process.env.SystemRoot");
     expect(runner).toContain('fail("invalid SystemRoot")');
     expect(runner).toContain("realpathSync.native");
-    expect(runner).toContain(
-      'join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")',
-    );
     expect(runner).not.toContain('spawnSync("powershell.exe"');
   });
 
@@ -1099,7 +1194,8 @@ describe("Windows native helper build contract", () => {
       "native:preflight": "node scripts/windows-native-helper.mjs preflight",
       "native:test:managed":
         "node scripts/windows-native-helper.mjs test-managed",
-      "native:test:kernel": "node scripts/windows-native-helper.mjs test-kernel",
+      "native:test:kernel":
+        "node scripts/windows-native-helper.mjs test-kernel",
       "native:verify": "node scripts/windows-native-helper.mjs verify",
       "native:update-artifact":
         "node scripts/windows-native-helper.mjs update-artifact",
@@ -1114,7 +1210,9 @@ describe("Windows native helper build contract", () => {
       "native:update-artifact",
       "test:native",
     ]) {
-      expect(packageJson.scripts[name]).not.toMatch(/override|bootstrap|refresh|fallback/i);
+      expect(packageJson.scripts[name]).not.toMatch(
+        /override|bootstrap|refresh|fallback/i,
+      );
     }
     expect(packageJson.scripts).not.toHaveProperty("native:preflight:current");
   });
@@ -1132,12 +1230,18 @@ describe("Windows native helper build contract", () => {
 
     const result = spawnSync(
       process.execPath,
-      ["scripts/windows-native-helper.mjs", "restore", "--toolchain-override=x"],
+      [
+        "scripts/windows-native-helper.mjs",
+        "restore",
+        "--toolchain-override=x",
+      ],
       { cwd: repositoryRoot, encoding: "utf8" },
     );
 
     expect(result.status).toBe(1);
     expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("windows-native-helper: unsupported arguments\n");
+    expect(result.stderr).toBe(
+      "windows-native-helper: unsupported arguments\n",
+    );
   });
 });

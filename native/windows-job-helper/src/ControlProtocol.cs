@@ -453,9 +453,8 @@ namespace CodexAgentTools.WindowsJobHelper
                         configSeen = true;
                         return;
                     }
-                    if (frame.Type == ControlMessageType.Terminate && configSeen && !sealedDirection)
+                    if (frame.Type == ControlMessageType.Terminate && configSeen)
                     {
-                        sealedDirection = true;
                         return;
                     }
                     throw new ProtocolViolationException();

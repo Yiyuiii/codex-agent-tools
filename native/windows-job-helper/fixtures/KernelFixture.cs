@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -98,8 +99,113 @@ namespace CodexAgentTools.WindowsJobHelper.Fixtures
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool SetEvent(IntPtr handle);
 
+        private static int BlockWithExclusiveWitness(string path, string contents)
+        {
+            using (var witness = new FileStream(
+                path,
+                FileMode.CreateNew,
+                FileAccess.ReadWrite,
+                FileShare.None))
+            {
+                byte[] encoded = new UTF8Encoding(false, true).GetBytes(contents);
+                witness.Write(encoded, 0, encoded.Length);
+                witness.Flush(true);
+                Thread.Sleep(Timeout.Infinite);
+            }
+            return 0;
+        }
+
         private static int Main(string[] args)
         {
+            if (args.Length == 4 && args[0] == "--crash-root-with-grandchild" &&
+                Path.IsPathRooted(args[1]) && Path.IsPathRooted(args[2]) &&
+                IsCanonicalNonce(args[3]))
+            {
+                var start = new ProcessStartInfo();
+                start.FileName = Environment.GetCommandLineArgs()[0];
+                start.Arguments = "--crash-block-with-lock \"" + args[2] + "\" " + args[3];
+                start.WorkingDirectory = Path.GetDirectoryName(args[1]);
+                start.UseShellExecute = false;
+                start.CreateNoWindow = true;
+                using (Process child = Process.Start(start))
+                {
+                    DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+                    while (!File.Exists(args[2]) && DateTime.UtcNow < deadline)
+                    {
+                        Thread.Sleep(10);
+                    }
+                    if (!File.Exists(args[2]))
+                    {
+                        return 68;
+                    }
+                    return BlockWithExclusiveWitness(args[1], args[3]);
+                }
+            }
+
+            if (args.Length == 3 && args[0] == "--crash-block-with-lock" &&
+                Path.IsPathRooted(args[1]) && IsCanonicalNonce(args[2]))
+            {
+                return BlockWithExclusiveWitness(args[1], args[2]);
+            }
+
+            if (args.Length == 3 && args[0] == "--root-block-with-grandchild" &&
+                Path.IsPathRooted(args[1]) && Path.IsPathRooted(args[2]))
+            {
+                var start = new ProcessStartInfo();
+                start.FileName = Environment.GetCommandLineArgs()[0];
+                start.Arguments = "--block-with-lock \"" + args[2] + "\"";
+                start.WorkingDirectory = Path.GetDirectoryName(args[1]);
+                start.UseShellExecute = false;
+                start.CreateNoWindow = true;
+                using (Process child = Process.Start(start))
+                {
+                    DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+                    while (!File.Exists(args[2]) && DateTime.UtcNow < deadline)
+                    {
+                        Thread.Sleep(10);
+                    }
+                    if (!File.Exists(args[2]))
+                    {
+                        return 68;
+                    }
+                    return BlockWithExclusiveWitness(args[1], "started\n");
+                }
+            }
+
+            if (args.Length == 2 && args[0] == "--block-with-lock" &&
+                Path.IsPathRooted(args[1]))
+            {
+                return BlockWithExclusiveWitness(args[1], "started\n");
+            }
+
+            if (args.Length == 3 && args[0] == "--root-with-grandchild" &&
+                Path.IsPathRooted(args[1]) && Path.IsPathRooted(args[2]))
+            {
+                var start = new ProcessStartInfo();
+                start.FileName = Environment.GetCommandLineArgs()[0];
+                start.Arguments = "--block \"" + args[2] + "\"";
+                start.WorkingDirectory = Path.GetDirectoryName(args[1]);
+                start.UseShellExecute = false;
+                start.CreateNoWindow = true;
+                using (Process child = Process.Start(start))
+                {
+                    DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+                    while (!File.Exists(args[2]) && DateTime.UtcNow < deadline)
+                    {
+                        Thread.Sleep(10);
+                    }
+                    if (!File.Exists(args[2]))
+                    {
+                        return 68;
+                    }
+                    File.WriteAllText(
+                        args[1],
+                        "root-exited\n",
+                        new UTF8Encoding(false, true));
+                    return 0;
+                }
+            }
+
             if (args.Length == 2 && args[0] == "--block" && Path.IsPathRooted(args[1]))
             {
                 File.WriteAllText(args[1], "started\n", new UTF8Encoding(false, true));
@@ -177,6 +283,14 @@ namespace CodexAgentTools.WindowsJobHelper.Fixtures
             SetEvent(new IntPtr(excludedHandleValue));
             File.WriteAllText(args[1], evidence, new UTF8Encoding(false, true));
             return membership && flags == 0x00002000 && stdioOnly && reservedEmpty ? 0 : 67;
+        }
+
+        private static bool IsCanonicalNonce(string value)
+        {
+            Guid parsed;
+            return value.Length == 32 &&
+                value == value.ToLowerInvariant() &&
+                Guid.TryParseExact(value, "N", out parsed);
         }
     }
 }
