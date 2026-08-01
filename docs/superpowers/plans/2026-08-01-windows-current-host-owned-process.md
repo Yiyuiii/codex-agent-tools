@@ -102,6 +102,8 @@ Windows command line与生命周期纯状态机由`native:test:managed`中的C#�
 
 ## 5. Task 4：Win32 Job、句柄隔离与真实kernel helper
 
+**状态（2026-08-01，第一原子批次）：** 提交`b590e21`已建立x64 Win32 ABI/SafeHandle、`CREATE_SUSPENDED + HANDLE_LIST + JOB_LIST`同次原子创建、精确owned Job成员查询、仅复制0/1/2、`KILL_ON_JOB_CLOSE`、resume/READY门控与严格build入口。stop-before-resume不会调用`ResumeThread`；resume返回0的故障会先真实运行阻塞fixture再伪报失败，返回2保持suspended，两者都用非继承process witness证明Job关闭后进程归零。首错保持不变，但后续Terminate/Query cleanup失败仍可在无法证明Job-zero时best-effort发送一次`ERROR`。最终kernel 13/13、managed 54/54、TypeScript聚焦14/14、当前宿主preflight 5/5、类型检查、diff check、临时根与仓库artifact归零均通过；fresh规格与质量复审PASS/Ready。完整fd3 production loop、自然root/grandchild、Terminate/Query/terminal故障、helper kill与Node parent death仍属于本Task第二原子批次。
+
 ### 5.1 RED
 
 先建立当前宿主真内核fixtures和fault hooks，证明以下合同尚未满足：
@@ -128,7 +130,9 @@ Windows command line与生命周期纯状态机由`native:test:managed`中的C#�
 
 ```powershell
 npm run native:test:kernel
-npx vitest run test/native/windows-job-helper-kernel.test.ts
+npm run native:test:managed
+npx vitest run test/native/native-build-contract.test.ts test/native/fd3-control-preflight.test.ts --maxWorkers=1
+npm run native:preflight
 npm run typecheck
 git diff --check
 ```
