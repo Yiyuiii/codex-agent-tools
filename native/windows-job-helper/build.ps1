@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("preflight", "test-managed", "test-kernel", "verify", "update-artifact", "test")]
+    [ValidateSet("preflight", "test-managed", "test-kernel", "verify", "update-artifact")]
     [string]$Action,
     [string]$Filter = "",
     [string]$InternalNodePath = "",
@@ -155,6 +155,336 @@ function New-VerifiedDirectoryChild {
         throw "windows-native-helper: native path contains a reparse point"
     }
     return $child
+}
+
+function Test-ExactBytes {
+    param(
+        [Parameter(Mandatory = $true)][byte[]]$Left,
+        [Parameter(Mandatory = $true)][byte[]]$Right
+    )
+
+    if ($Left.Length -ne $Right.Length) {
+        return $false
+    }
+    for ($index = 0; $index -lt $Left.Length; $index += 1) {
+        if ($Left[$index] -ne $Right[$index]) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Assert-X64ManagedPe {
+    param([Parameter(Mandatory = $true)][byte[]]$Bytes)
+
+    if (
+        $Bytes.Length -lt 64 -or
+        $Bytes[0] -ne 0x4d -or
+        $Bytes[1] -ne 0x5a
+    ) {
+        throw "windows-native-helper: canonical artifact verification failed"
+    }
+    $peOffset = [System.BitConverter]::ToUInt32($Bytes, 0x3c)
+    if ($peOffset -gt ($Bytes.Length - 24)) {
+        throw "windows-native-helper: canonical artifact verification failed"
+    }
+    $optionalHeader = [int]$peOffset + 24
+    if (
+        $Bytes[[int]$peOffset] -ne 0x50 -or
+        $Bytes[[int]$peOffset + 1] -ne 0x45 -or
+        $Bytes[[int]$peOffset + 2] -ne 0 -or
+        $Bytes[[int]$peOffset + 3] -ne 0 -or
+        [System.BitConverter]::ToUInt16($Bytes, [int]$peOffset + 4) -ne 0x8664 -or
+        [System.BitConverter]::ToUInt16($Bytes, $optionalHeader) -ne 0x020b
+    ) {
+        throw "windows-native-helper: canonical artifact verification failed"
+    }
+    $optionalHeaderBytes = [System.BitConverter]::ToUInt16($Bytes, [int]$peOffset + 20)
+    $clrDirectory = $optionalHeader + 112 + (14 * 8)
+    if (
+        $optionalHeaderBytes -lt (112 + (15 * 8)) -or
+        $clrDirectory -gt ($Bytes.Length - 8) -or
+        [System.BitConverter]::ToUInt32($Bytes, $optionalHeader + 108) -lt 15 -or
+        [System.BitConverter]::ToUInt32($Bytes, $clrDirectory) -eq 0 -or
+        [System.BitConverter]::ToUInt32($Bytes, $clrDirectory + 4) -eq 0
+    ) {
+        throw "windows-native-helper: canonical artifact verification failed"
+    }
+}
+
+function Get-CanonicalArtifactPaths {
+    param([Parameter(Mandatory = $true)][bool]$Create)
+
+    $repositoryRoot = [System.IO.Directory]::GetParent(
+        [System.IO.Directory]::GetParent($nativeRoot).FullName
+    ).FullName
+    [void](Assert-NoReparseExistingPath -Path $repositoryRoot)
+    $pluginsRoot = Join-Path $repositoryRoot "plugins"
+    $pluginRoot = Join-Path $pluginsRoot "codex-external-agents"
+    if (-not (Test-Path -LiteralPath $pluginRoot -PathType Container)) {
+        throw "windows-native-helper: canonical artifact verification failed"
+    }
+    [void](Assert-NoReparseExistingPath -Path $pluginRoot)
+
+    if ($Create) {
+        $nativeArtifactRoot = New-VerifiedDirectoryChild -Parent $pluginRoot -Name "native"
+        $artifactRoot = New-VerifiedDirectoryChild -Parent $nativeArtifactRoot -Name "win32-x64"
+    }
+    else {
+        $artifactRoot = Join-Path $pluginRoot "native\win32-x64"
+        if (-not (Test-Path -LiteralPath $artifactRoot -PathType Container)) {
+            throw "windows-native-helper: canonical artifact verification failed"
+        }
+        [void](Assert-NoReparseExistingPath -Path $artifactRoot)
+    }
+
+    return @{
+        Root = [System.IO.Path]::GetFullPath($artifactRoot)
+        Executable = [System.IO.Path]::GetFullPath((Join-Path $artifactRoot "codex-agent-job-helper.exe"))
+        Manifest = [System.IO.Path]::GetFullPath((Join-Path $artifactRoot "codex-agent-job-helper.exe.sha256"))
+    }
+}
+
+function Install-CanonicalArtifactPair {
+    param(
+        [Parameter(Mandatory = $true)][string]$ArtifactRoot,
+        [Parameter(Mandatory = $true)][string]$ExecutablePath,
+        [Parameter(Mandatory = $true)][string]$ManifestPath,
+        [Parameter(Mandatory = $true)][byte[]]$ExecutableBytes,
+        [Parameter(Mandatory = $true)][byte[]]$ManifestBytes,
+        [switch]$InjectSecondInstallFailureForTest
+    )
+
+    $hasExistingPair = $false
+    try {
+        $resolvedRoot = (Assert-NoReparseExistingPath -Path $ArtifactRoot).TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar
+        )
+        $expectedExecutable = [System.IO.Path]::GetFullPath((Join-Path $resolvedRoot "codex-agent-job-helper.exe"))
+        $expectedManifest = [System.IO.Path]::GetFullPath((Join-Path $resolvedRoot "codex-agent-job-helper.exe.sha256"))
+        if (
+            -not [System.IO.Path]::GetFullPath($ExecutablePath).Equals(
+                $expectedExecutable,
+                [System.StringComparison]::OrdinalIgnoreCase
+            ) -or
+            -not [System.IO.Path]::GetFullPath($ManifestPath).Equals(
+                $expectedManifest,
+                [System.StringComparison]::OrdinalIgnoreCase
+            )
+        ) {
+            throw "invalid canonical artifact paths"
+        }
+        $entries = @(Get-ChildItem -LiteralPath $resolvedRoot -Force | Sort-Object Name)
+        if ($entries.Count -eq 0) {
+            $hasExistingPair = $false
+        }
+        elseif (
+            $entries.Count -eq 2 -and
+            $entries[0].Name -ceq "codex-agent-job-helper.exe" -and
+            $entries[1].Name -ceq "codex-agent-job-helper.exe.sha256"
+        ) {
+            foreach ($existingPath in @($expectedExecutable, $expectedManifest)) {
+                [void](Assert-NoReparseExistingPath -Path $existingPath)
+                $existingItem = Get-Item -LiteralPath $existingPath -Force
+                if (
+                    $existingItem -isnot [System.IO.FileInfo] -or
+                    $existingItem.PSIsContainer -or
+                    ($existingItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+                ) {
+                    throw "invalid canonical artifact entry"
+                }
+            }
+            $hasExistingPair = $true
+        }
+        else {
+            throw "invalid canonical artifact directory state"
+        }
+    }
+    catch {
+        throw "windows-native-helper: canonical artifact verification failed"
+    }
+
+    $originalExecutableBytes = if ($hasExistingPair) {
+        [System.IO.File]::ReadAllBytes($ExecutablePath)
+    }
+    else {
+        $null
+    }
+    $originalManifestBytes = if ($hasExistingPair) {
+        [System.IO.File]::ReadAllBytes($ManifestPath)
+    }
+    else {
+        $null
+    }
+    $token = [System.Guid]::NewGuid().ToString("N")
+    $temporaryExecutable = Join-Path $ArtifactRoot (".codex-agent-job-helper." + $token + ".exe.tmp")
+    $temporaryManifest = Join-Path $ArtifactRoot (".codex-agent-job-helper." + $token + ".sha256.tmp")
+    $backupExecutable = Join-Path $ArtifactRoot (".codex-agent-job-helper." + $token + ".exe.backup")
+    $backupManifest = Join-Path $ArtifactRoot (".codex-agent-job-helper." + $token + ".sha256.backup")
+    $installVerified = $false
+    $rollbackVerified = $false
+    try {
+        foreach ($temporary in @(
+            @{ Path = $temporaryExecutable; Bytes = $ExecutableBytes },
+            @{ Path = $temporaryManifest; Bytes = $ManifestBytes }
+        )) {
+            $stream = [System.IO.FileStream]::new(
+                $temporary.Path,
+                [System.IO.FileMode]::CreateNew,
+                [System.IO.FileAccess]::Write,
+                [System.IO.FileShare]::None
+            )
+            try {
+                $stream.Write($temporary.Bytes, 0, $temporary.Bytes.Length)
+                $stream.Flush($true)
+            }
+            finally {
+                $stream.Dispose()
+            }
+            [void](Assert-NoReparseExistingPath -Path $temporary.Path)
+        }
+
+        if (Test-Path -LiteralPath $ExecutablePath) {
+            [System.IO.File]::Replace($temporaryExecutable, $ExecutablePath, $backupExecutable)
+        }
+        else {
+            [System.IO.File]::Move($temporaryExecutable, $ExecutablePath)
+        }
+        if ($InjectSecondInstallFailureForTest) {
+            throw "windows-native-helper: injected second artifact install failure"
+        }
+        if (Test-Path -LiteralPath $ManifestPath) {
+            [System.IO.File]::Replace($temporaryManifest, $ManifestPath, $backupManifest)
+        }
+        else {
+            [System.IO.File]::Move($temporaryManifest, $ManifestPath)
+        }
+
+        [void](Assert-NoReparseExistingPath -Path $ExecutablePath)
+        [void](Assert-NoReparseExistingPath -Path $ManifestPath)
+        $installedExecutableBytes = [System.IO.File]::ReadAllBytes($ExecutablePath)
+        $installedManifestBytes = [System.IO.File]::ReadAllBytes($ManifestPath)
+        if (
+            -not (Test-ExactBytes -Left $ExecutableBytes -Right $installedExecutableBytes) -or
+            -not (Test-ExactBytes -Left $ManifestBytes -Right $installedManifestBytes)
+        ) {
+            throw "windows-native-helper: canonical artifact verification failed"
+        }
+        $installVerified = $true
+    }
+    catch {
+        $installFailure = $_
+        try {
+            if ($hasExistingPair) {
+                $currentManifestMatches =
+                    (Test-Path -LiteralPath $ManifestPath -PathType Leaf) -and
+                    (Test-ExactBytes `
+                        -Left $originalManifestBytes `
+                        -Right ([System.IO.File]::ReadAllBytes($ManifestPath)))
+                if (-not $currentManifestMatches) {
+                    if (-not (Test-Path -LiteralPath $backupManifest -PathType Leaf)) {
+                        throw "manifest backup unavailable"
+                    }
+                    if (Test-Path -LiteralPath $temporaryManifest) {
+                        [System.IO.File]::Delete($temporaryManifest)
+                    }
+                    [System.IO.File]::Replace($backupManifest, $ManifestPath, $temporaryManifest)
+                }
+
+                $currentExecutableMatches =
+                    (Test-Path -LiteralPath $ExecutablePath -PathType Leaf) -and
+                    (Test-ExactBytes `
+                        -Left $originalExecutableBytes `
+                        -Right ([System.IO.File]::ReadAllBytes($ExecutablePath)))
+                if (-not $currentExecutableMatches) {
+                    if (-not (Test-Path -LiteralPath $backupExecutable -PathType Leaf)) {
+                        throw "executable backup unavailable"
+                    }
+                    if (Test-Path -LiteralPath $temporaryExecutable) {
+                        [System.IO.File]::Delete($temporaryExecutable)
+                    }
+                    [System.IO.File]::Replace($backupExecutable, $ExecutablePath, $temporaryExecutable)
+                }
+            }
+            else {
+                if (Test-Path -LiteralPath $ManifestPath) {
+                    [System.IO.File]::Delete($ManifestPath)
+                }
+                if (Test-Path -LiteralPath $ExecutablePath) {
+                    [System.IO.File]::Delete($ExecutablePath)
+                }
+            }
+
+            if ($hasExistingPair) {
+                if (
+                    -not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf) -or
+                    -not (Test-Path -LiteralPath $ManifestPath -PathType Leaf) -or
+                    -not (Test-ExactBytes `
+                        -Left $originalExecutableBytes `
+                        -Right ([System.IO.File]::ReadAllBytes($ExecutablePath))) -or
+                    -not (Test-ExactBytes `
+                        -Left $originalManifestBytes `
+                        -Right ([System.IO.File]::ReadAllBytes($ManifestPath)))
+                ) {
+                    throw "artifact rollback verification failed"
+                }
+            }
+            elseif (
+                (Test-Path -LiteralPath $ExecutablePath) -or
+                (Test-Path -LiteralPath $ManifestPath)
+            ) {
+                throw "artifact rollback verification failed"
+            }
+            $rollbackVerified = $true
+        }
+        catch {
+            throw "windows-native-helper: canonical artifact rollback failed"
+        }
+        throw $installFailure
+    }
+    finally {
+        if ($installVerified -or $rollbackVerified) {
+            foreach ($temporaryPath in @(
+                $temporaryExecutable,
+                $temporaryManifest,
+                $backupExecutable,
+                $backupManifest
+            )) {
+                if (Test-Path -LiteralPath $temporaryPath) {
+                    Remove-Item -LiteralPath $temporaryPath -Force
+                }
+            }
+        }
+    }
+}
+
+function Assert-CanonicalArtifact {
+    param(
+        [Parameter(Mandatory = $true)]$Paths,
+        [Parameter(Mandatory = $true)][byte[]]$ExpectedBytes
+    )
+
+    $entries = @(Get-ChildItem -LiteralPath $Paths.Root -Force | ForEach-Object { $_.Name } | Sort-Object)
+    if (($entries -join "`n") -cne "codex-agent-job-helper.exe`ncodex-agent-job-helper.exe.sha256") {
+        throw "windows-native-helper: canonical artifact verification failed"
+    }
+    [void](Assert-NoReparseExistingPath -Path $Paths.Executable)
+    [void](Assert-NoReparseExistingPath -Path $Paths.Manifest)
+    $actualBytes = [System.IO.File]::ReadAllBytes($Paths.Executable)
+    Assert-X64ManagedPe -Bytes $actualBytes
+    if (-not (Test-ExactBytes -Left $ExpectedBytes -Right $actualBytes)) {
+        throw "windows-native-helper: canonical artifact verification failed"
+    }
+    $digest = (Get-FileHash -LiteralPath $Paths.Executable -Algorithm SHA256).Hash.ToLowerInvariant()
+    $manifestBytes = [System.IO.File]::ReadAllBytes($Paths.Manifest)
+    $expectedManifest = [System.Text.UTF8Encoding]::new($false).GetBytes(
+        $digest + "  codex-agent-job-helper.exe`n"
+    )
+    if (-not (Test-ExactBytes -Left $expectedManifest -Right $manifestBytes)) {
+        throw "windows-native-helper: canonical artifact verification failed"
+    }
+    return $digest
 }
 
 function Remove-ExclusiveBuildRoot {
@@ -359,6 +689,9 @@ elseif ($Action -eq "test-managed") {
 elseif ($Action -eq "test-kernel") {
     $outputNames = @("KernelFixture.exe", "WindowsJobHelper.exe", "KernelTests.exe")
 }
+elseif ($Action -eq "verify" -or $Action -eq "update-artifact") {
+    $outputNames = @("WindowsJobHelper.exe")
+}
 $outputNames = @([string[]]$outputNames)
 $outputName = if ($outputNames.Count -gt 0) { $outputNames[$outputNames.Count - 1] } else { "" }
 $temporaryRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
@@ -517,8 +850,13 @@ elseif ($Action -eq "test-kernel") {
     }
     $selectedSources = @($productionSources) + @($kernelTestSources)
 }
+elseif ($Action -eq "verify" -or $Action -eq "update-artifact") {
+    if (-not [string]::IsNullOrEmpty($Filter)) {
+        throw "windows-native-helper: unsupported artifact filter"
+    }
+    $selectedSources = $productionSources
+}
 else {
-    # Later tasks populate kernel, artifact, and aggregate actions.
     throw "windows-native-helper: native sources are not available for this action"
 }
 
@@ -636,6 +974,9 @@ if ($Action -eq "test-managed") {
 elseif ($Action -eq "test-kernel") {
     $compilerArguments.Add("/main:CodexAgentTools.WindowsJobHelper.Tests.KernelTestRunner")
 }
+elseif ($Action -eq "verify" -or $Action -eq "update-artifact") {
+    $compilerArguments.Add("/main:CodexAgentTools.WindowsJobHelper.Program")
+}
 foreach ($referencePath in $resolvedReferences) {
     $compilerArguments.Add("/reference:" + $referencePath)
 }
@@ -658,6 +999,34 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $nativeOutput -PathType
     throw "windows-native-helper: native managed compilation failed"
 }
 [void](Assert-NoReparseExistingPath -Path $nativeOutput)
+
+if ($Action -eq "verify" -or $Action -eq "update-artifact") {
+    $builtBytes = [System.IO.File]::ReadAllBytes($nativeOutput)
+    Assert-X64ManagedPe -Bytes $builtBytes
+    $paths = Get-CanonicalArtifactPaths -Create ($Action -eq "update-artifact")
+
+    if ($Action -eq "update-artifact") {
+        $digest = (Get-FileHash -LiteralPath $nativeOutput -Algorithm SHA256).Hash.ToLowerInvariant()
+        $manifestBytes = [System.Text.UTF8Encoding]::new($false).GetBytes(
+            $digest + "  codex-agent-job-helper.exe`n"
+        )
+        Install-CanonicalArtifactPair `
+            -ArtifactRoot $paths.Root `
+            -ExecutablePath $paths.Executable `
+            -ManifestPath $paths.Manifest `
+            -ExecutableBytes $builtBytes `
+            -ManifestBytes $manifestBytes
+    }
+
+    $verifiedDigest = Assert-CanonicalArtifact -Paths $paths -ExpectedBytes $builtBytes
+    if ($Action -eq "update-artifact") {
+        Write-Output "windows-native-helper: updated canonical artifact sha256=$verifiedDigest"
+    }
+    else {
+        Write-Output "windows-native-helper: verified canonical artifact sha256=$verifiedDigest"
+    }
+    return
+}
 
 if ($Action -eq "test-managed") {
     $managedArguments = @()

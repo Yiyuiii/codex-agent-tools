@@ -146,19 +146,18 @@ git diff --check
 
 ### 6.1 RED
 
-- 单一独占临时根source→artifact compare、仓库唯一exe/SHA、resolver静态path/hash/PE测试先失败；doctor/冻结/安装验收的CLR/probe测试单独失败，production resolver不为每次invocation启动probe；
+- 单一独占临时根source→artifact compare、仓库唯一exe/SHA、resolver静态path/hash/PE测试先失败；Vitest只读artifact/resolver且不触发build或probe，唯一重编译入口是`native:verify`；
 - Windows wrapper仍不能以单fd3传递target stdio和terminal；
-- 既有POSIX回归先失败；本轮不新增POSIX owned-process设计、集成矩阵或认证；
 - environment poison与case-fold测试先失败。
 
 ### 6.2 GREEN
 
 - 用Task 1工具链在一个独占、已验证临时根生成唯一x64/net48 helper，并与仓库artifact做一次byte compare；不再为路径可复现性构造第二个build root。
 - production resolver每次launch拒绝escape、reparse、hash mismatch、非x64和重复artifact，然后直接启动真实helper；它不另起`--probe-v1`。CLR/load/protocol失败由真实launch fail closed，`--probe-v1`只留doctor、冻结与公共包/插件安装验收。
-- 实现不暴露PID的`OwnedAgentProcess`：Windows只启动helper；POSIX保留现有process-group实现与既有回归，不扩展新的集成或认证工作。
+- 定义不暴露PID的`OwnedAgentProcess` handle/type，但本Task的production实现只做Windows helper；POSIX既有direct spawn与process-group cleanup保持原样，不新建`posix-owned-agent-process`抽象、集成矩阵或认证。Task 6改动client时只跑既有POSIX回归确认没有漂移。
 - Windows wrapper spawn `stdio: ["pipe", "pipe", "pipe", "overlapped"]`；fd3复用Task 2已验证的Win32 OVERLAPPED全双工carrier，正常路径不half-close fd3。
 - 正式wrapper合同测试必须证明terminal前不调用`.end()`、`.destroy()`或主动close fd3；terminal前EOF/close/error永久失败，合法terminal后的helper clean close才能完成。
-- Windows `OwnedAgentProcess`集成以显式调用级timer真实触发一次`TERMINATE(timedOut)`，验证reason echo、helper terminal/close、stdio settle与case-owned Job-zero；测试watchdog只作teardown，不充当production deadline。Task 4不重复这个producer路径。
+- Windows `OwnedAgentProcess`真实集成只保留两个代表：自然退出证明wrapper成功路径；显式调用级timer真实触发一次`TERMINATE(timedOut)`，证明Task 5唯一新增的reason producer及reason echo、helper terminal/close、stdio settle与case-owned Job-zero。reason echo允许原生层在late ordinary termination竞态中返回`noneOrRootExit`并优先判定自然完成，其它非预期termination reason仍fail closed。测试watchdog只作teardown，不充当production deadline；不重复Task 4的cancel/EOF/malformed/crash/fault矩阵。
 - helper terminal + fd3 clean close + helper code 0 + stdio settle + Job-zero构成成功；任一异常永久失败。
 - Windows environment fixed allowlist增加必要系统key并case-fold去重，只保留选定credential；poison parent不得泄漏proxy或其它secret。
 - 不增加production one-time carrier probe缓存；真实launch READY与terminal本身fail closed。
@@ -167,7 +166,7 @@ git diff --check
 
 ```powershell
 npm run native:verify
-npx vitest run test/native/windows-job-helper-artifact.test.ts test/runtime/windows-job-helper.test.ts test/runtime/owned-agent-process.test.ts test/runtime/posix-owned-agent-process.test.ts test/runtime/windows-owned-agent-process.test.ts test/runtime/windows-owned-agent-process.integration.test.ts
+npx vitest run test/native/native-build-contract.test.ts test/native/windows-job-helper-artifact.test.ts test/runtime/windows-job-helper.test.ts test/runtime/windows-owned-agent-process.test.ts test/runtime/windows-owned-agent-process.integration.test.ts test/runtime/environment.test.ts --maxWorkers=1
 npm run typecheck
 git diff --check
 ```

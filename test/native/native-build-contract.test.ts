@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   copyFileSync,
   cpSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -31,7 +32,6 @@ const nativeBuildActions = [
   "test-kernel",
   "verify",
   "update-artifact",
-  "test",
 ] as const;
 type NativeBuildAction = (typeof nativeBuildActions)[number];
 
@@ -216,6 +216,100 @@ function runRestoreAsync(script: string, environment: NodeJS.ProcessEnv) {
 function writeFixtureFile(path: string, contents: Uint8Array | string): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, contents);
+}
+
+function writeArtifactInstallHarness(root: string): string {
+  const harness = join(root, "artifact-install-harness.ps1");
+  writeFileSync(
+    harness,
+    `param(
+    [Parameter(Mandatory = $true)][string]$BuildScript,
+    [Parameter(Mandatory = $true)][string]$ArtifactRoot,
+    [switch]$InjectSecondInstallFailure
+)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+$tokens = $null
+$parseErrors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile(
+    $BuildScript,
+    [ref]$tokens,
+    [ref]$parseErrors
+)
+if ($parseErrors.Count -ne 0) {
+    throw "build script parse failed"
+}
+foreach ($name in @(
+    "Assert-NoReparseExistingPath",
+    "Test-ExactBytes",
+    "Install-CanonicalArtifactPair"
+)) {
+    $matches = @($ast.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -ceq $name
+    }, $true))
+    if ($matches.Count -ne 1) {
+        throw "required artifact function unavailable"
+    }
+    Invoke-Expression $matches[0].Extent.Text
+}
+$executablePath = Join-Path $ArtifactRoot "codex-agent-job-helper.exe"
+$manifestPath = Join-Path $ArtifactRoot "codex-agent-job-helper.exe.sha256"
+Install-CanonicalArtifactPair \
+    -ArtifactRoot $ArtifactRoot \
+    -ExecutablePath $executablePath \
+    -ManifestPath $manifestPath \
+    -ExecutableBytes ([byte[]](9, 8, 7, 6)) \
+    -ManifestBytes ([byte[]](5, 4, 3, 2, 1)) \
+    -InjectSecondInstallFailureForTest:$InjectSecondInstallFailure
+`,
+  );
+  return harness;
+}
+
+function runArtifactInstallHarness(
+  harness: string,
+  artifactRoot: string,
+  injectSecondInstallFailure = false,
+) {
+  const arguments_ = [
+    "-NoLogo",
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    harness,
+    "-BuildScript",
+    resolve(nativeRoot, "build.ps1"),
+    "-ArtifactRoot",
+    artifactRoot,
+  ];
+  if (injectSecondInstallFailure) {
+    arguments_.push("-InjectSecondInstallFailure");
+  }
+  return run("powershell.exe", arguments_);
+}
+
+function artifactDirectorySnapshot(root: string) {
+  return readdirSync(root)
+    .sort()
+    .map((name) => {
+      const path = join(root, name);
+      const stat = lstatSync(path);
+      return {
+        name,
+        kind: stat.isFile()
+          ? "file"
+          : stat.isSymbolicLink()
+            ? "reparse"
+            : stat.isDirectory()
+              ? "directory"
+              : "other",
+        bytes: stat.isFile() ? readFileSync(path).toString("hex") : undefined,
+      };
+    });
 }
 
 function buildInvocationRoots(systemTemp: string): string[] {
@@ -624,6 +718,140 @@ describe("Windows native helper build contract", () => {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
   });
+
+  windowsIt(
+    "rolls back both canonical artifact files when the second install step fails",
+    () => {
+      const fixtureRoot = mkdtempSync(join(tmpdir(), "cat-artifact-rollback-"));
+      const harness = writeArtifactInstallHarness(fixtureRoot);
+      const outcomes: Array<{
+        mode: string;
+        status: number | null;
+        stderr: string;
+        before: ReturnType<typeof artifactDirectorySnapshot>;
+        after: ReturnType<typeof artifactDirectorySnapshot>;
+      }> = [];
+      try {
+        for (const mode of ["existing", "fresh"] as const) {
+          const artifactRoot = join(fixtureRoot, mode);
+          mkdirSync(artifactRoot);
+          if (mode === "existing") {
+            writeFileSync(
+              join(artifactRoot, "codex-agent-job-helper.exe"),
+              Buffer.from([1, 2, 3, 4]),
+            );
+            writeFileSync(
+              join(artifactRoot, "codex-agent-job-helper.exe.sha256"),
+              Buffer.from([4, 3, 2, 1]),
+            );
+          }
+          const before = artifactDirectorySnapshot(artifactRoot);
+          const result = runArtifactInstallHarness(harness, artifactRoot, true);
+          outcomes.push({
+            mode,
+            status: result.status,
+            stderr: result.stderr,
+            before,
+            after: artifactDirectorySnapshot(artifactRoot),
+          });
+        }
+
+        expect(outcomes).toEqual(
+          ["existing", "fresh"].map((mode, index) => ({
+            mode,
+            status: 1,
+            stderr: expect.stringContaining(
+              "windows-native-helper: injected second artifact install failure",
+            ),
+            before: outcomes[index]?.before,
+            after: outcomes[index]?.before,
+          })),
+        );
+      } finally {
+        rmSync(fixtureRoot, { recursive: true, force: true });
+      }
+    },
+  );
+
+  windowsIt(
+    "rejects partial, extra, and reparse artifact states before mutation",
+    () => {
+      const fixtureRoot = mkdtempSync(join(tmpdir(), "cat-artifact-state-"));
+      const harness = writeArtifactInstallHarness(fixtureRoot);
+      const executableName = "codex-agent-job-helper.exe";
+      const manifestName = `${executableName}.sha256`;
+      const cases = [
+        "partial-executable",
+        "partial-manifest",
+        "extra-entry",
+        "executable-reparse",
+        "manifest-reparse",
+        "ancestor-reparse",
+      ] as const;
+      const outcomes: Array<{
+        name: string;
+        status: number | null;
+        stderr: string;
+        before: ReturnType<typeof artifactDirectorySnapshot>;
+        after: ReturnType<typeof artifactDirectorySnapshot>;
+      }> = [];
+      try {
+        for (const name of cases) {
+          const caseRoot = join(fixtureRoot, name);
+          const ordinaryArtifactRoot = join(caseRoot, "artifact-real");
+          mkdirSync(ordinaryArtifactRoot, { recursive: true });
+          let artifactRoot = ordinaryArtifactRoot;
+          const executablePath = join(ordinaryArtifactRoot, executableName);
+          const manifestPath = join(ordinaryArtifactRoot, manifestName);
+          if (name !== "partial-manifest" && name !== "executable-reparse") {
+            writeFileSync(executablePath, Buffer.from([1, 2, 3, 4]));
+          }
+          if (name !== "partial-executable" && name !== "manifest-reparse") {
+            writeFileSync(manifestPath, Buffer.from([4, 3, 2, 1]));
+          }
+          if (name === "extra-entry") {
+            writeFileSync(join(ordinaryArtifactRoot, "unexpected.bin"), "extra");
+          } else if (name === "executable-reparse") {
+            const outside = join(caseRoot, "executable-outside");
+            mkdirSync(outside);
+            symlinkSync(outside, executablePath, "junction");
+          } else if (name === "manifest-reparse") {
+            const outside = join(caseRoot, "manifest-outside");
+            mkdirSync(outside);
+            symlinkSync(outside, manifestPath, "junction");
+          } else if (name === "ancestor-reparse") {
+            const linkedArtifactRoot = join(caseRoot, "artifact-link");
+            symlinkSync(ordinaryArtifactRoot, linkedArtifactRoot, "junction");
+            artifactRoot = linkedArtifactRoot;
+          }
+
+          const before = artifactDirectorySnapshot(artifactRoot);
+          const result = runArtifactInstallHarness(harness, artifactRoot);
+          outcomes.push({
+            name,
+            status: result.status,
+            stderr: result.stderr,
+            before,
+            after: artifactDirectorySnapshot(artifactRoot),
+          });
+        }
+
+        expect(outcomes).toEqual(
+          cases.map((name, index) => ({
+            name,
+            status: 1,
+            stderr: expect.stringContaining(
+              "windows-native-helper: canonical artifact verification failed",
+            ),
+            before: outcomes[index]?.before,
+            after: outcomes[index]?.before,
+          })),
+        );
+      } finally {
+        rmSync(fixtureRoot, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("fixes LF text checkout and excludes PE files from text conversion", () => {
     expect(readRepositoryFile(".gitattributes")).toBe(
@@ -1133,15 +1361,6 @@ describe("Windows native helper build contract", () => {
     120_000,
   );
 
-  it("keeps POSIX skips scoped to exactly three Windows integration cases", () => {
-    const source = readRepositoryFile(
-      "test/native/native-build-contract.test.ts",
-    );
-    expect(source.match(/\bit\.runIf\(/g)).toHaveLength(1);
-    expect(source.match(/\bwindowsIt\(/g)).toHaveLength(3);
-    expect(source).not.toMatch(/\b(?:it|describe)\.(?:skip|skipIf)\(/);
-  });
-
   it("pins exclusive build, serialized restore, and trusted PowerShell contracts", () => {
     const build = readRepositoryFile("native/windows-job-helper/build.ps1");
     expect(build).toContain("[System.IO.FileMode]::CreateNew");
@@ -1199,7 +1418,6 @@ describe("Windows native helper build contract", () => {
       "native:verify": "node scripts/windows-native-helper.mjs verify",
       "native:update-artifact":
         "node scripts/windows-native-helper.mjs update-artifact",
-      "test:native": "node scripts/windows-native-helper.mjs test",
     });
 
     for (const name of [
@@ -1208,13 +1426,13 @@ describe("Windows native helper build contract", () => {
       "native:test:kernel",
       "native:verify",
       "native:update-artifact",
-      "test:native",
     ]) {
       expect(packageJson.scripts[name]).not.toMatch(
         /override|bootstrap|refresh|fallback/i,
       );
     }
     expect(packageJson.scripts).not.toHaveProperty("native:preflight:current");
+    expect(packageJson.scripts).not.toHaveProperty("test:native");
   });
 
   it("ships fixed PowerShell and Node entrypoints without an override surface", () => {

@@ -26,7 +26,6 @@ const fixedCommands = new Set([
   "test-kernel",
   "verify",
   "update-artifact",
-  "test",
 ]);
 
 const INTERNAL_PREFLIGHT_COMMAND = "__preflight-harness-v1";
