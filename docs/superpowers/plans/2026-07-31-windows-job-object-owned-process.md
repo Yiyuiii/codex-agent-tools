@@ -159,7 +159,9 @@ git commit -m "feat: freeze Windows helper protocol and toolchain"
 - Create: `native/windows-job-helper/preflight/Fd3Probe.cs`
 - Create: `test/native/fd3-preflight.test.ts`
 - Modify: `native/windows-job-helper/build.config.json`
+- Modify: `native/windows-job-helper/build.ps1`
 - Modify: `scripts/windows-native-helper.mjs`
+- Modify: `test/native/native-build-contract.test.ts`
 - Modify: `package.json`
 
 - [ ] **Step 1：写出真实 fd3 RED 测试**
@@ -174,7 +176,7 @@ npx vitest run test/native/fd3-preflight.test.ts
 
 - [ ] **Step 2：实现最小 probe 并逐版本运行**
 
-`native:preflight` 下载并核对 Task 1 锁定的三个官方 Node zip到临时目录，逐一调用相同编译出的 probe；不得用未锁定的 `npx node`，不得只用当前系统 Node。
+`build.ps1` 必须复用 Task 1 锁定的 Roslyn、net48 references、compiler flags、pathmap、临时输出和独占清理合同编译唯一 `Fd3Probe.cs` source set；不能在 Node runner 中复制第二套编译逻辑。`native:preflight` 下载并核对 Task 1 锁定的三个官方 Node zip到临时目录，逐一调用相同编译出的 probe；不得用未锁定的 `npx node`，不得只用当前系统 Node。Task 1 的 build-config 合同测试同步固定该 source set，防止 probe 被任意额外源码污染。
 同时提供无参数的固定入口 `native:preflight:current`，只接受当前 `process.version` 精确等于三项锁定版本之一，用于 GitHub matrix 证明各 runner 当前 Node；它不接受任意版本/path 参数。
 
 ```powershell
@@ -190,7 +192,7 @@ npx vitest run test/native/native-build-contract.test.ts test/native/fd3-preflig
 npm run native:preflight
 npm run typecheck
 git diff --check
-git add native/windows-job-helper/preflight/Fd3Probe.cs native/windows-job-helper/build.config.json scripts/windows-native-helper.mjs test/native/fd3-preflight.test.ts package.json
+git add native/windows-job-helper/preflight/Fd3Probe.cs native/windows-job-helper/build.config.json native/windows-job-helper/build.ps1 scripts/windows-native-helper.mjs test/native/native-build-contract.test.ts test/native/fd3-preflight.test.ts package.json
 git commit -m "test: prove Windows fd3 control transport"
 ```
 
