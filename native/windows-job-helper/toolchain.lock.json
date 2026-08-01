@@ -17,31 +17,5 @@
       "sha256": "8a7e348538e7eb91351696911689f49e3d4f63f8bab517432bbe159b8b1104a2",
       "sha512": "5d62a0c9e35a74d71341a215bd007c06b74236b11aafa7e8fdd7b539d41167d1c5cb48dc05268cf08579abae196a6a6c4a70bc0254ec002686654ba8170e3544"
     }
-  ],
-  "nodeArchives": [
-    {
-      "version": "20.20.2",
-      "platform": "win32",
-      "arch": "x64",
-      "fileName": "node-v20.20.2-win-x64.zip",
-      "url": "https://nodejs.org/dist/v20.20.2/node-v20.20.2-win-x64.zip",
-      "sha256": "dc3700fdd57a63eedb8fd7e3c7baaa32e6a740a1b904167ff4204bc68ed8bf77"
-    },
-    {
-      "version": "22.23.2",
-      "platform": "win32",
-      "arch": "x64",
-      "fileName": "node-v22.23.2-win-x64.zip",
-      "url": "https://nodejs.org/dist/v22.23.2/node-v22.23.2-win-x64.zip",
-      "sha256": "1177b4137ba5adaa56354ae40f1080c7450e8ae09cecb47da459d1c52ac99f97"
-    },
-    {
-      "version": "24.18.1",
-      "platform": "win32",
-      "arch": "x64",
-      "fileName": "node-v24.18.1-win-x64.zip",
-      "url": "https://nodejs.org/dist/v24.18.1/node-v24.18.1-win-x64.zip",
-      "sha256": "ec56b84a7551893ab2324ebdfdc4ab974a63b4781162600b68a1293cc3e53765"
-    }
   ]
 }

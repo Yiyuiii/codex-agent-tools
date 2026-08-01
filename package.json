@@ -69,7 +69,6 @@
     "verify:qualification": "tsx scripts/verify-qualification.ts",
     "verify:capabilities": "tsx scripts/verify-capabilities.ts",
     "native:preflight": "node scripts/windows-native-helper.mjs preflight",
-    "native:preflight:current": "node scripts/windows-native-helper.mjs preflight-current",
     "native:test:managed": "node scripts/windows-native-helper.mjs test-managed",
     "native:test:kernel": "node scripts/windows-native-helper.mjs test-kernel",
     "native:verify": "node scripts/windows-native-helper.mjs verify",

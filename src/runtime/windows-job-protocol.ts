@@ -5,7 +5,6 @@ import protocolV1 from "../../native/windows-job-helper/protocol.v1.json" with {
   type: "json",
 };
 
-export type WindowsJobInvocationKind = "native" | "cmd";
 export type WindowsJobReason =
   | "noneOrRootExit"
   | "cancelled"
@@ -33,7 +32,6 @@ export type WindowsJobStage =
 export type WindowsJobFrame =
   | {
       readonly type: "launchConfig";
-      readonly kind: WindowsJobInvocationKind;
       readonly executable: string;
       readonly cwd: string;
       readonly argv: readonly string[];
@@ -182,7 +180,6 @@ function encodeLaunchConfig(
   const cwd = encodeStrictString(frame.cwd);
   const argumentsEncoded = frame.argv.map(encodeStrictString);
   const payloadLength =
-    1 +
     executable.length +
     cwd.length +
     4 +
@@ -193,11 +190,6 @@ function encodeLaunchConfig(
 
   const payload = Buffer.allocUnsafe(payloadLength);
   let offset = 0;
-  payload.writeUInt8(
-    valueForKey(protocolContract.invocationKind, frame.kind),
-    offset,
-  );
-  offset += 1;
   executable.copy(payload, offset);
   offset += executable.length;
   cwd.copy(payload, offset);
@@ -295,9 +287,6 @@ function encodeValidatedWindowsJobFrame(frame: unknown): Uint8Array {
     case "launchConfig":
       return encodeLaunchConfig({
         type,
-        kind: requiredString(
-          ownDataProperty(frame, "kind"),
-        ) as WindowsJobInvocationKind,
         executable: requiredString(ownDataProperty(frame, "executable")),
         cwd: requiredString(ownDataProperty(frame, "cwd")),
         argv: requiredStringArray(ownDataProperty(frame, "argv")),
@@ -447,11 +436,6 @@ class PayloadReader {
 
 function decodeLaunchConfig(payload: Buffer): WindowsJobFrame {
   const reader = new PayloadReader(payload);
-  const kind = keyForValue(
-    protocolContract.invocationKind,
-    ["native", "cmd"],
-    reader.readUInt8(),
-  );
   const executable = reader.readString();
   const cwd = reader.readString();
   assertAbsolutePath(executable, false);
@@ -465,7 +449,7 @@ function decodeLaunchConfig(payload: Buffer): WindowsJobFrame {
     argv.push(reader.readString());
   }
   reader.assertComplete();
-  return { type: "launchConfig", kind, executable, cwd, argv };
+  return { type: "launchConfig", executable, cwd, argv };
 }
 
 function decodePayload(type: number, payload: Buffer): WindowsJobFrame {

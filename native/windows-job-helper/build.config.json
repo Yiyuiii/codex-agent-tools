@@ -23,6 +23,7 @@
     "virtualRoot": "/_/native/windows-job-helper"
   },
   "sourceSets": {
+    "preflight": ["src/Fd3Preflight.cs"],
     "production": [],
     "managedTests": [],
     "kernelTests": [],
@@ -34,6 +35,6 @@
   },
   "generatedProtocolConstants": {
     "relativePath": "generated/ProtocolV1.g.cs",
-    "sha256": "83f6475ea08f51d713da8e27e2b85edba6d9714b467ac592906fc792ca17882d"
+    "sha256": "0611bac55aeb67c5aa0bad23bd23e4cd6503fd56495d0d5d9b13f6d61a357d04"
   }
 }

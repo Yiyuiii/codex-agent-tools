@@ -24,7 +24,6 @@ const nativeRoot = resolve(repositoryRoot, "native", "windows-job-helper");
 const windowsIt = it.runIf(process.platform === "win32");
 const nativeBuildActions = [
   "preflight",
-  "preflight-current",
   "test-managed",
   "test-kernel",
   "verify",
@@ -46,14 +45,12 @@ namespace CodexAgentTools.WindowsJobHelper
         internal const int MaxPayloadBytes = 1048576;
         internal const int MaxStringBytes = 65536;
         internal const int MaxArgCount = 1024;
-        internal const int MaxCmdUtf16UnitsIncludingNul = 8191;
+        internal const int MaxNativeCommandLineUtf16UnitsIncludingNul = 32767;
         internal const int MessageLaunchConfig = 1;
         internal const int MessageReady = 2;
         internal const int MessageTerminate = 3;
         internal const int MessageError = 4;
         internal const int MessageExit = 5;
-        internal const int InvocationNative = 1;
-        internal const int InvocationCmd = 2;
         internal const int ReasonNoneOrRootExit = 0;
         internal const int ReasonCancelled = 1;
         internal const int ReasonTimedOut = 2;
@@ -79,7 +76,7 @@ namespace CodexAgentTools.WindowsJobHelper
 }
 `;
 const expectedGeneratedProtocolSha256 =
-  "83f6475ea08f51d713da8e27e2b85edba6d9714b467ac592906fc792ca17882d";
+  "0611bac55aeb67c5aa0bad23bd23e4cd6503fd56495d0d5d9b13f6d61a357d04";
 
 function readRepositoryFile(path: string): string {
   return readFileSync(resolve(repositoryRoot, path), "utf8");
@@ -341,7 +338,7 @@ function createTinyToolchainFixture(fixtureRoot: string) {
 }
 
 describe("Windows native helper build contract", () => {
-  it("pins the exact official NuGet packages and Node archives", () => {
+  it("pins only the exact official NuGet packages", () => {
     expect(
       readRepositoryJson("native/windows-job-helper/toolchain.lock.json"),
     ).toEqual({
@@ -366,35 +363,6 @@ describe("Windows native helper build contract", () => {
             "8a7e348538e7eb91351696911689f49e3d4f63f8bab517432bbe159b8b1104a2",
           sha512:
             "5d62a0c9e35a74d71341a215bd007c06b74236b11aafa7e8fdd7b539d41167d1c5cb48dc05268cf08579abae196a6a6c4a70bc0254ec002686654ba8170e3544",
-        },
-      ],
-      nodeArchives: [
-        {
-          version: "20.20.2",
-          platform: "win32",
-          arch: "x64",
-          fileName: "node-v20.20.2-win-x64.zip",
-          url: "https://nodejs.org/dist/v20.20.2/node-v20.20.2-win-x64.zip",
-          sha256:
-            "dc3700fdd57a63eedb8fd7e3c7baaa32e6a740a1b904167ff4204bc68ed8bf77",
-        },
-        {
-          version: "22.23.2",
-          platform: "win32",
-          arch: "x64",
-          fileName: "node-v22.23.2-win-x64.zip",
-          url: "https://nodejs.org/dist/v22.23.2/node-v22.23.2-win-x64.zip",
-          sha256:
-            "1177b4137ba5adaa56354ae40f1080c7450e8ae09cecb47da459d1c52ac99f97",
-        },
-        {
-          version: "24.18.1",
-          platform: "win32",
-          arch: "x64",
-          fileName: "node-v24.18.1-win-x64.zip",
-          url: "https://nodejs.org/dist/v24.18.1/node-v24.18.1-win-x64.zip",
-          sha256:
-            "ec56b84a7551893ab2324ebdfdc4ab974a63b4781162600b68a1293cc3e53765",
         },
       ],
     });
@@ -432,6 +400,7 @@ describe("Windows native helper build contract", () => {
         virtualRoot: "/_/native/windows-job-helper",
       },
       sourceSets: {
+        preflight: ["src/Fd3Preflight.cs"],
         production: [],
         managedTests: [],
         kernelTests: [],
@@ -920,8 +889,6 @@ describe("Windows native helper build contract", () => {
 
     expect(packageJson.scripts).toMatchObject({
       "native:preflight": "node scripts/windows-native-helper.mjs preflight",
-      "native:preflight:current":
-        "node scripts/windows-native-helper.mjs preflight-current",
       "native:test:managed":
         "node scripts/windows-native-helper.mjs test-managed",
       "native:test:kernel": "node scripts/windows-native-helper.mjs test-kernel",
@@ -933,7 +900,6 @@ describe("Windows native helper build contract", () => {
 
     for (const name of [
       "native:preflight",
-      "native:preflight:current",
       "native:test:managed",
       "native:test:kernel",
       "native:verify",
@@ -942,6 +908,7 @@ describe("Windows native helper build contract", () => {
     ]) {
       expect(packageJson.scripts[name]).not.toMatch(/override|bootstrap|refresh|fallback/i);
     }
+    expect(packageJson.scripts).not.toHaveProperty("native:preflight:current");
   });
 
   it("ships fixed PowerShell and Node entrypoints without an override surface", () => {

@@ -1,8 +1,10 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("preflight", "preflight-current", "test-managed", "test-kernel", "verify", "update-artifact", "test")]
+    [ValidateSet("preflight", "test-managed", "test-kernel", "verify", "update-artifact", "test")]
     [string]$Action,
-    [string]$Filter = ""
+    [string]$Filter = "",
+    [string]$InternalNodePath = "",
+    [string]$InternalHarnessPath = ""
 )
 
 Set-StrictMode -Version Latest
@@ -140,6 +142,7 @@ function Remove-ExclusiveBuildRoot {
             [System.StringComparer]::OrdinalIgnoreCase
         )
         [void]$allowedFiles.Add($generatedPath)
+        [void]$allowedFiles.Add([System.IO.Path]::GetFullPath((Join-Path $generatedDirectory "Fd3Preflight.exe")))
         if ($TemporaryGenerated.Length -gt 0) {
             $resolvedTemporaryGenerated = [System.IO.Path]::GetFullPath($TemporaryGenerated)
             $temporaryParent = [System.IO.Directory]::GetParent($resolvedTemporaryGenerated)
@@ -211,17 +214,16 @@ function Get-GeneratedProtocolConstants {
     param([Parameter(Mandatory = $true)]$Contract)
 
     Assert-ExactKeys -Value $Contract -Expected @(
-        "schemaVersion", "mode", "frame", "limits", "messageType", "invocationKind", "reason", "stage"
+        "schemaVersion", "mode", "frame", "limits", "messageType", "reason", "stage"
     )
     Assert-ExactKeys -Value $Contract.mode -Expected @("control", "probe")
     Assert-ExactKeys -Value $Contract.frame -Expected @("magic", "version", "headerBytes", "maxPayloadBytes")
     Assert-ExactKeys -Value $Contract.limits -Expected @(
-        "maxStringBytes", "maxArgCount", "maxCmdUtf16UnitsIncludingNul"
+        "maxStringBytes", "maxArgCount", "maxNativeCommandLineUtf16UnitsIncludingNul"
     )
     Assert-ExactKeys -Value $Contract.messageType -Expected @(
         "launchConfig", "ready", "terminate", "error", "exit"
     )
-    Assert-ExactKeys -Value $Contract.invocationKind -Expected @("native", "cmd")
     Assert-ExactKeys -Value $Contract.reason -Expected @(
         "noneOrRootExit", "cancelled", "timedOut", "sessionShutdown", "protocolError"
     )
@@ -249,14 +251,12 @@ function Get-GeneratedProtocolConstants {
         "        internal const int MaxPayloadBytes = $(Assert-ProtocolInteger $Contract.frame.maxPayloadBytes);",
         "        internal const int MaxStringBytes = $(Assert-ProtocolInteger $Contract.limits.maxStringBytes);",
         "        internal const int MaxArgCount = $(Assert-ProtocolInteger $Contract.limits.maxArgCount);",
-        "        internal const int MaxCmdUtf16UnitsIncludingNul = $(Assert-ProtocolInteger $Contract.limits.maxCmdUtf16UnitsIncludingNul);",
+        "        internal const int MaxNativeCommandLineUtf16UnitsIncludingNul = $(Assert-ProtocolInteger $Contract.limits.maxNativeCommandLineUtf16UnitsIncludingNul);",
         "        internal const int MessageLaunchConfig = $(Assert-ProtocolInteger $Contract.messageType.launchConfig);",
         "        internal const int MessageReady = $(Assert-ProtocolInteger $Contract.messageType.ready);",
         "        internal const int MessageTerminate = $(Assert-ProtocolInteger $Contract.messageType.terminate);",
         "        internal const int MessageError = $(Assert-ProtocolInteger $Contract.messageType.error);",
         "        internal const int MessageExit = $(Assert-ProtocolInteger $Contract.messageType.exit);",
-        "        internal const int InvocationNative = $(Assert-ProtocolInteger $Contract.invocationKind.native);",
-        "        internal const int InvocationCmd = $(Assert-ProtocolInteger $Contract.invocationKind.cmd);",
         "        internal const int ReasonNoneOrRootExit = $(Assert-ProtocolInteger $Contract.reason.noneOrRootExit);",
         "        internal const int ReasonCancelled = $(Assert-ProtocolInteger $Contract.reason.cancelled);",
         "        internal const int ReasonTimedOut = $(Assert-ProtocolInteger $Contract.reason.timedOut);",
@@ -324,7 +324,7 @@ try {
 
 Assert-ExactKeys -Value $configuration.generatedProtocolConstants -Expected @("relativePath", "sha256")
 $expectedGeneratedRelativePath = "generated/ProtocolV1.g.cs"
-$expectedGeneratedSha256 = "83f6475ea08f51d713da8e27e2b85edba6d9714b467ac592906fc792ca17882d"
+$expectedGeneratedSha256 = "0611bac55aeb67c5aa0bad23bd23e4cd6503fd56495d0d5d9b13f6d61a357d04"
 if (
     $configuration.generatedProtocolConstants.relativePath -cne $expectedGeneratedRelativePath -or
     $configuration.generatedProtocolConstants.sha256 -cne $expectedGeneratedSha256
@@ -395,9 +395,78 @@ if ($pathMap -notlike "/pathmap:*=/_/native/windows-job-helper") {
 
 & (Join-Path $nativeRoot "restore-toolchain.ps1") | Out-Null
 
-# Task 1 freezes the deterministic inputs. Later tasks populate the fixed source
-# sets and add the corresponding managed/kernel build actions.
-throw "windows-native-helper: native sources are not available for this action"
+if ($Action -ne "preflight") {
+    # Later tasks populate the remaining fixed source sets.
+    throw "windows-native-helper: native sources are not available for this action"
+}
+
+Assert-ExactKeys -Value $configuration.sourceSets -Expected @(
+    "preflight", "production", "managedTests", "kernelTests", "fixtures"
+)
+$preflightSources = [string[]]$configuration.sourceSets.preflight
+if (($preflightSources -join "`n") -cne "src/Fd3Preflight.cs") {
+    throw "windows-native-helper: invalid native build contract"
+}
+$unresolvedSourcePath = Join-Path $nativeRoot $preflightSources[0]
+if (-not (Test-Path -LiteralPath $unresolvedSourcePath -PathType Leaf)) {
+    throw "windows-native-helper: native sources are not available for this action"
+}
+$sourcePath = Assert-NoReparseExistingPath -Path $unresolvedSourcePath
+$sourcePrefix = $resolvedNativeSource.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+) + [System.IO.Path]::DirectorySeparatorChar
+if (-not $sourcePath.StartsWith($sourcePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "windows-native-helper: native source escaped its root"
+}
+
+$toolchainPackageRoot = Join-Path $helperRoot "toolchain-v1\packages"
+$compilerPath = Assert-NoReparseExistingPath -Path (
+    Join-Path $toolchainPackageRoot "microsoft.net.compilers.toolset.4.14.0\tasks\net472\csc.exe"
+)
+$referenceRoot = Assert-NoReparseExistingPath -Path (
+    Join-Path $toolchainPackageRoot "microsoft.netframework.referenceassemblies.net48.1.0.3\build\.NETFramework\v4.8"
+)
+$preflightOutput = [System.IO.Path]::GetFullPath((Join-Path $generatedDirectory "Fd3Preflight.exe"))
+$compilerArguments = [System.Collections.Generic.List[string]]::new()
+foreach ($argument in $expectedCompilerArguments) {
+    $compilerArguments.Add($argument)
+}
+$compilerArguments.Add($pathMap)
+$compilerArguments.Add("/out:" + $preflightOutput)
+foreach ($reference in [string[]]$configuration.references) {
+    $referencePath = Assert-NoReparseExistingPath -Path (Join-Path $referenceRoot $reference)
+    $compilerArguments.Add("/reference:" + $referencePath)
+}
+$compilerArguments.Add($generatedPath)
+$compilerArguments.Add($sourcePath)
+
+$compilerOutput = & $compilerPath @compilerArguments 2>&1
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $preflightOutput -PathType Leaf)) {
+    throw "windows-native-helper: native preflight compilation failed"
+}
+[void](Assert-NoReparseExistingPath -Path $preflightOutput)
+
+$expectedHarness = [System.IO.Path]::GetFullPath((Join-Path ([System.IO.Directory]::GetParent($nativeRoot).Parent.FullName) "scripts\windows-native-helper.mjs"))
+if (
+    [string]::IsNullOrEmpty($InternalNodePath) -or
+    [string]::IsNullOrEmpty($InternalHarnessPath) -or
+    -not [System.IO.Path]::GetFullPath($InternalHarnessPath).Equals($expectedHarness, [System.StringComparison]::OrdinalIgnoreCase)
+) {
+    throw "windows-native-helper: invalid preflight harness"
+}
+$nodePath = Assert-NoReparseExistingPath -Path $InternalNodePath
+$harnessPath = Assert-NoReparseExistingPath -Path $InternalHarnessPath
+$env:CODEX_WINDOWS_NATIVE_PREFLIGHT_INTERNAL = "1"
+try {
+    & $nodePath $harnessPath "__preflight-harness-v1" $preflightOutput
+    if ($LASTEXITCODE -ne 0) {
+        throw "windows-native-helper: fd3 preflight failed"
+    }
+}
+finally {
+    Remove-Item Env:CODEX_WINDOWS_NATIVE_PREFLIGHT_INTERNAL -ErrorAction SilentlyContinue
+}
 }
 finally {
     Remove-ExclusiveBuildRoot `

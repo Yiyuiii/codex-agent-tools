@@ -10,7 +10,7 @@
   "limits": {
     "maxStringBytes": 65536,
     "maxArgCount": 1024,
-    "maxCmdUtf16UnitsIncludingNul": 8191
+    "maxNativeCommandLineUtf16UnitsIncludingNul": 32767
   },
   "messageType": {
     "launchConfig": 1,
@@ -19,7 +19,6 @@
     "error": 4,
     "exit": 5
   },
-  "invocationKind": { "native": 1, "cmd": 2 },
   "reason": {
     "noneOrRootExit": 0,
     "cancelled": 1,

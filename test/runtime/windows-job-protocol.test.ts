@@ -57,7 +57,7 @@ describe("Windows job protocol v1", () => {
       limits: {
         maxStringBytes: 65_536,
         maxArgCount: 1_024,
-        maxCmdUtf16UnitsIncludingNul: 8_191,
+        maxNativeCommandLineUtf16UnitsIncludingNul: 32_767,
       },
       messageType: {
         launchConfig: 1,
@@ -66,7 +66,6 @@ describe("Windows job protocol v1", () => {
         error: 4,
         exit: 5,
       },
-      invocationKind: { native: 1, cmd: 2 },
       reason: {
         noneOrRootExit: 0,
         cancelled: 1,
@@ -124,7 +123,6 @@ describe("Windows job protocol v1", () => {
     expect(() =>
       encodeWindowsJobFrame({
         type: "launchConfig",
-        kind: "native",
         executable: "C:\\x.exe",
         cwd: "C:\\w",
         argv: Array.from({ length: 17 }, () => "x".repeat(65_536)),
@@ -137,14 +135,12 @@ describe("Windows job protocol v1", () => {
       {
         frame: {
           type: "launchConfig" as const,
-          kind: "native" as const,
           executable: "C:\\x.exe",
           cwd: "C:\\w",
           argv: ["ok"],
         },
         encoded: bytes(`
-          43 41 4a 31  01 00  01 00  1f 00 00 00
-          01
+          43 41 4a 31  01 00  01 00  1e 00 00 00
           08 00 00 00  43 3a 5c 78 2e 65 78 65
           04 00 00 00  43 3a 5c 77
           01 00 00 00
@@ -371,7 +367,6 @@ describe("Windows job protocol v1", () => {
   it("rejects invalid UTF-8, NULs, path, count, string, and frame limits", () => {
     const valid = {
       type: "launchConfig" as const,
-      kind: "native" as const,
       executable: "C:\\x.exe",
       cwd: "C:\\w",
       argv: ["ok"],
@@ -400,7 +395,7 @@ describe("Windows job protocol v1", () => {
     ).toThrow(/protocol/i);
 
     const invalidUtf8Payload = Buffer.concat([
-      bytes("01 01 00 00 00 ff"),
+      bytes("01 00 00 00 ff"),
       bytes("04 00 00 00 43 3a 5c 77"),
       bytes("00 00 00 00"),
     ]);
@@ -409,14 +404,14 @@ describe("Windows job protocol v1", () => {
     );
 
     const nulPayload = Buffer.concat([
-      bytes("01 08 00 00 00 43 3a 5c 78 00 65 78 65"),
+      bytes("08 00 00 00 43 3a 5c 78 00 65 78 65"),
       bytes("04 00 00 00 43 3a 5c 77"),
       bytes("00 00 00 00"),
     ]);
     expect(() => decodeWindowsJobFrame(rawFrame(1, nulPayload))).toThrow(/protocol/i);
 
     const badArgcPayload = Buffer.concat([
-      bytes("01 08 00 00 00 43 3a 5c 78 2e 65 78 65"),
+      bytes("08 00 00 00 43 3a 5c 78 2e 65 78 65"),
       bytes("04 00 00 00 43 3a 5c 77"),
       bytes("02 00 00 00"),
       bytes("02 00 00 00 6f 6b"),
@@ -429,7 +424,6 @@ describe("Windows job protocol v1", () => {
     expect(() =>
       encodeWindowsJobFrame({
         type: "launchConfig",
-        kind: "native",
         executable: "\uFEFFC:\\x.exe",
         cwd: "C:\\w",
         argv: [],
@@ -437,7 +431,7 @@ describe("Windows job protocol v1", () => {
     ).toThrowError(protocolError);
 
     const bomExecutablePayload = Buffer.concat([
-      bytes("01 0b 00 00 00 ef bb bf 43 3a 5c 78 2e 65 78 65"),
+      bytes("0b 00 00 00 ef bb bf 43 3a 5c 78 2e 65 78 65"),
       bytes("04 00 00 00 43 3a 5c 77"),
       bytes("00 00 00 00"),
     ]);
@@ -463,13 +457,6 @@ describe("Windows job protocol v1", () => {
 
   it("rejects every forged frame discriminator and enum key before encoding", () => {
     expectProtocolError({ type: "forged" });
-    expectProtocolError({
-      type: "launchConfig",
-      kind: "forged",
-      executable: "C:\\x.exe",
-      cwd: "C:\\w",
-      argv: [],
-    });
     expectProtocolError({ type: "terminate", reason: "forged" });
     expectProtocolError({
       type: "error",
@@ -494,7 +481,6 @@ describe("Windows job protocol v1", () => {
   it("normalizes forged field types, accessors, and proxies to one protocol error", () => {
     const launch = {
       type: "launchConfig",
-      kind: "native",
       executable: "C:\\x.exe",
       cwd: "C:\\w",
       argv: [],
