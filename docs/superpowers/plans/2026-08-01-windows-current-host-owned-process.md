@@ -68,6 +68,8 @@ git diff --check
 
 ## 4. Task 3：严格协议、native argv与生命周期状态机
 
+**状态（2026-08-01）：** 已由提交`a6930d9`完成。严格C#/TypeScript协议边界、Windows native argv构造与纯生命周期状态机已经实现；`ResumeThread`未成功时允许无`READY`的`ERROR`，一旦resume成功则即时退出或失败也必须遵守`READY → EXIT/ERROR`屏障。最终原生托管测试3套/53例、跨层聚焦3文件/26例、当前宿主preflight 5例、类型检查、diff check与临时构建根归零均通过；fresh规格与质量复审最终均为PASS/Ready。
+
 ### 4.1 RED
 
 - strict frame/config/terminal状态测试先失败；
@@ -88,10 +90,13 @@ git diff --check
 
 ```powershell
 npm run native:test:managed
-npx vitest run test/runtime/windows-job-protocol.test.ts test/runtime/windows-native-command-line.test.ts test/runtime/windows-lifecycle-machine.test.ts
+npx vitest run test/native/native-build-contract.test.ts test/native/fd3-control-preflight.test.ts test/runtime/windows-job-protocol.test.ts
+npm run native:preflight
 npm run typecheck
 git diff --check
 ```
+
+Windows command line与生命周期纯状态机由`native:test:managed`中的C#测试覆盖；不再维护仅重复同一实现的独立TypeScript镜像测试文件。
 
 提交：`feat: implement native helper protocol and lifecycle`
 

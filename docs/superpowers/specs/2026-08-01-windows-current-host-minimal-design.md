@@ -74,7 +74,7 @@ Job Object 仍是生命周期承载，不是权限沙箱。通过系统 broker�
 3. helper 完成验证、创建 Job、原子创建 suspended target并按状态机决定 resume；
 4. helper 写入 `READY` 后，Node 才允许 client 发送 ACP/RPC 请求；
 5. 自然退出时，或 Node 写入一次 `TERMINATE(reason)` 后，helper 由唯一 cleanup owner 终止/等待 Job 归零；
-6. helper确认Job已经归零后，写入并flush唯一`EXIT`或pre-ready `ERROR`，然后关闭fd3、Job和自身handle并自然退出；
+6. helper确认Job已经归零后，写入并flush唯一`EXIT`或`ERROR`，然后关闭fd3、Job和自身handle并自然退出；若`ResumeThread`尚未成功，create/resume前失败允许无`READY`的`ERROR`，一旦resume成功则即时退出或失败也必须先完成`READY`发布，再走`READY → EXIT/ERROR`；
 7. Node 只有在完整验证终态、clean EOF/close、helper exit code 和 stdio settle 后才完成调用。
 
 terminal缺失、重复、乱序、坏frame、helper非零退出或fd3在合法terminal前结束都会永久失败。失败后Node可利用spawn时已持有的`ChildProcess`/OS process handle精确终止helper并收尾stream；这项最后兜底允许底层使用该既有handle对应的终止能力，但不得读取/reopen PID、不得直接终止target，也不得把补救清理计为正常drain或PASS。
