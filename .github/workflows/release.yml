@@ -201,7 +201,7 @@ jobs:
           validation_file="${{ needs.publish.outputs.validation_file }}"
           {
             echo "## Validation"
-            echo "- CI matrix: Node 20/22/24"
+            echo "- CI runtime: Node 24"
             echo "- release smoke: passed"
             echo "- npm package and dist-tag: verified"
             if [[ "$npm_tag" == "latest" ]]; then

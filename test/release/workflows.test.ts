@@ -13,12 +13,16 @@ function workflow(name: string): string {
 }
 
 describe("GitHub release workflows", () => {
-  it("runs the deterministic matrix on main and next across supported Node versions", () => {
+  it("runs one honest Node 24 CI job on main and next", () => {
     const content = workflow("ci.yml");
 
     expect(content).toContain("branches: [main, next]");
-    expect(content).toContain("node-version: [20, 22, 24]");
-    expect(content).toContain("fail-fast: false");
+    expect(content.match(/node-version:/gu)).toHaveLength(1);
+    expect(content).toContain("node-version: 24");
+    expect(content).not.toContain("matrix:");
+    expect(content).not.toContain("fail-fast:");
+    expect(content).not.toContain("${{ matrix.node-version }}");
+    expect(content).toContain("name: ci-node-24-package-evidence");
     expect(content).toContain("CODEX_CLI_VERSION: 0.146.0");
     expect(content).toContain(
       'npm install --global "@openai/codex@${CODEX_CLI_VERSION}"',
@@ -42,6 +46,8 @@ describe("GitHub release workflows", () => {
       'if [[ "$GITHUB_REF" != refs/tags/v* ]]; then',
     );
     expect(content).toContain("CODEX_CLI_VERSION: 0.146.0");
+    expect(content.match(/node-version:/gu)).toHaveLength(1);
+    expect(content).toContain("node-version: 24");
     expect(content).toContain(
       'npm install --global "@openai/codex@${CODEX_CLI_VERSION}"',
     );
@@ -72,6 +78,8 @@ describe("GitHub release workflows", () => {
       'npm publish --ignore-scripts --tag "${{ steps.channel.outputs.npm_tag }}" --access public --registry=https://registry.npmjs.org/',
     );
     expect(content).toContain("Waiting for npm registry propagation");
+    expect(content).toContain('echo "- CI runtime: Node 24"');
+    expect(content).not.toContain("CI matrix: Node 20/22/24");
     expect(content).toContain("Create or update GitHub Release");
   });
 });
