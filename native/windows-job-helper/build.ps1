@@ -13,25 +13,20 @@ $ErrorActionPreference = "Stop"
 $nativeRoot = [System.IO.Path]::GetFullPath($PSScriptRoot)
 $configuration = Get-Content -LiteralPath (Join-Path $nativeRoot "build.config.json") -Raw -Encoding UTF8 | ConvertFrom-Json
 $protocol = Get-Content -LiteralPath (Join-Path $nativeRoot "protocol.v1.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($configuration.schemaVersion -ne 1 -or $protocol.schemaVersion -ne 1) {
-    throw "windows-native-helper: invalid native build contract"
-}
-if ($configuration.output.root -cne "system-temp" -or -not $configuration.output.repositoryOutputsForbidden) {
-    throw "windows-native-helper: invalid native output policy"
-}
 
 function Assert-ExactKeys {
     param(
         [Parameter(Mandatory = $true)]$Value,
-        [Parameter(Mandatory = $true)][string[]]$Expected
+        [Parameter(Mandatory = $true)][string[]]$Expected,
+        [string]$FailureMessage = "windows-native-helper: invalid protocol contract"
     )
 
     if ($null -eq $Value) {
-        throw "windows-native-helper: invalid protocol contract"
+        throw $FailureMessage
     }
     $actual = @($Value.PSObject.Properties | ForEach-Object { $_.Name })
     if (($actual -join "`n") -cne ($Expected -join "`n")) {
-        throw "windows-native-helper: invalid protocol contract"
+        throw $FailureMessage
     }
 }
 
@@ -42,6 +37,62 @@ function Assert-ProtocolInteger {
         throw "windows-native-helper: invalid protocol contract"
     }
     return [int64]$Value
+}
+
+$invalidBuildContract = "windows-native-helper: invalid native build contract"
+Assert-ExactKeys -Value $configuration -Expected @(
+    "schemaVersion", "targetFramework", "configuration", "platform",
+    "compilerArguments", "references", "pathMap", "sourceSets", "output",
+    "generatedProtocolConstants"
+) -FailureMessage $invalidBuildContract
+Assert-ExactKeys -Value $configuration.pathMap -Expected @(
+    "sourceRoot", "virtualRoot"
+) -FailureMessage $invalidBuildContract
+Assert-ExactKeys -Value $configuration.output -Expected @(
+    "root", "repositoryOutputsForbidden"
+) -FailureMessage $invalidBuildContract
+Assert-ExactKeys -Value $configuration.generatedProtocolConstants -Expected @(
+    "relativePath", "sha256"
+) -FailureMessage $invalidBuildContract
+Assert-ExactKeys -Value $configuration.sourceSets -Expected @(
+    "preflight", "production", "managedTests", "kernelTests", "fixtures"
+) -FailureMessage $invalidBuildContract
+
+$expectedGeneratedRelativePath = "generated/ProtocolV1.g.cs"
+$expectedGeneratedSha256 = "0611bac55aeb67c5aa0bad23bd23e4cd6503fd56495d0d5d9b13f6d61a357d04"
+$expectedCompilerArguments = @(
+    "/noconfig", "/nostdlib+", "/target:exe", "/platform:x64", "/optimize+", "/debug-",
+    "/deterministic+", "/checked+", "/unsafe-", "/langversion:latest", "/utf8output", "/filealign:512"
+)
+$expectedReferences = @("mscorlib.dll", "System.dll", "System.Core.dll")
+if (
+    $configuration.schemaVersion -ne 1 -or
+    $configuration.targetFramework -cne "net48" -or
+    $configuration.configuration -cne "Release" -or
+    $configuration.platform -cne "x64" -or
+    $configuration.pathMap.sourceRoot -cne "native/windows-job-helper" -or
+    $configuration.pathMap.virtualRoot -cne "/_/native/windows-job-helper" -or
+    $configuration.output.root -cne "system-temp" -or
+    $configuration.output.repositoryOutputsForbidden -isnot [bool] -or
+    -not $configuration.output.repositoryOutputsForbidden -or
+    $configuration.generatedProtocolConstants.relativePath -cne $expectedGeneratedRelativePath -or
+    $configuration.generatedProtocolConstants.sha256 -cne $expectedGeneratedSha256 -or
+    ([string[]]$configuration.compilerArguments -join "`n") -cne ($expectedCompilerArguments -join "`n") -or
+    ([string[]]$configuration.references -join "`n") -cne ($expectedReferences -join "`n")
+) {
+    throw $invalidBuildContract
+}
+foreach ($reference in [string[]]$configuration.references) {
+    if (
+        [string]::IsNullOrEmpty($reference) -or
+        [System.IO.Path]::GetFileName($reference) -cne $reference -or
+        -not ($reference -cmatch '^[A-Za-z0-9][A-Za-z0-9.]*\.dll$')
+    ) {
+        throw $invalidBuildContract
+    }
+}
+if ($protocol.schemaVersion -ne 1) {
+    throw $invalidBuildContract
 }
 
 function Assert-NoReparseExistingPath {
@@ -110,7 +161,7 @@ function Remove-ExclusiveBuildRoot {
     param(
         [Parameter(Mandatory = $true)][string]$BuildRoot,
         [Parameter(Mandatory = $true)][string]$BuildBase,
-        [string]$ActionOutputName = "",
+        [string[]]$ActionOutputNames = @(),
         [string]$TemporaryGenerated = ""
     )
 
@@ -143,12 +194,15 @@ function Remove-ExclusiveBuildRoot {
             [System.StringComparer]::OrdinalIgnoreCase
         )
         [void]$allowedFiles.Add($generatedPath)
-        if ($ActionOutputName.Length -gt 0) {
-            if ($ActionOutputName -cne "Fd3Preflight.exe" -and $ActionOutputName -cne "ManagedTests.exe") {
+        $validOutputNames = @(
+            "Fd3Preflight.exe", "ManagedTests.exe", "KernelTests.exe", "KernelFixture.exe"
+        )
+        foreach ($actionOutputName in $ActionOutputNames) {
+            if ($validOutputNames -cnotcontains $actionOutputName) {
                 throw "unsafe action output name"
             }
             [void]$allowedFiles.Add(
-                [System.IO.Path]::GetFullPath((Join-Path $generatedDirectory $ActionOutputName))
+                [System.IO.Path]::GetFullPath((Join-Path $generatedDirectory $actionOutputName))
             )
         }
         if ($TemporaryGenerated.Length -gt 0) {
@@ -293,24 +347,19 @@ function Get-GeneratedProtocolConstants {
     return [System.Text.UTF8Encoding]::new($false).GetBytes(($lines -join "`n"))
 }
 
-$expectedCompilerArguments = @(
-    "/noconfig", "/nostdlib+", "/target:exe", "/platform:x64", "/optimize+", "/debug-",
-    "/deterministic+", "/checked+", "/unsafe-", "/langversion:latest", "/utf8output", "/filealign:512"
-)
-if (([string[]]$configuration.compilerArguments -join "`n") -cne ($expectedCompilerArguments -join "`n")) {
-    throw "windows-native-helper: invalid compiler arguments"
-}
-
 $resolvedNativeSource = [System.IO.Path]::GetFullPath($nativeRoot)
-$outputName = if ($Action -eq "preflight") {
-    "Fd3Preflight.exe"
+$outputNames = @()
+if ($Action -eq "preflight") {
+    $outputNames = @("Fd3Preflight.exe")
 }
 elseif ($Action -eq "test-managed") {
-    "ManagedTests.exe"
+    $outputNames = @("ManagedTests.exe")
 }
-else {
-    ""
+elseif ($Action -eq "test-kernel") {
+    $outputNames = @("KernelFixture.exe", "KernelTests.exe")
 }
+$outputNames = @([string[]]$outputNames)
+$outputName = if ($outputNames.Count -gt 0) { $outputNames[$outputNames.Count - 1] } else { "" }
 $temporaryRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 [void](Assert-NoReparseExistingPath -Path $temporaryRoot)
 $productRoot = New-VerifiedDirectoryChild -Parent $temporaryRoot -Name "codex-agent-tools"
@@ -338,16 +387,6 @@ if ($null -eq $buildRoot) {
 $temporaryGenerated = ""
 
 try {
-
-Assert-ExactKeys -Value $configuration.generatedProtocolConstants -Expected @("relativePath", "sha256")
-$expectedGeneratedRelativePath = "generated/ProtocolV1.g.cs"
-$expectedGeneratedSha256 = "0611bac55aeb67c5aa0bad23bd23e4cd6503fd56495d0d5d9b13f6d61a357d04"
-if (
-    $configuration.generatedProtocolConstants.relativePath -cne $expectedGeneratedRelativePath -or
-    $configuration.generatedProtocolConstants.sha256 -cne $expectedGeneratedSha256
-) {
-    throw "windows-native-helper: invalid native build contract"
-}
 
 try {
     $generatedBytes = Get-GeneratedProtocolConstants -Contract $protocol
@@ -410,40 +449,53 @@ if ($pathMap -notlike "/pathmap:*=/_/native/windows-job-helper") {
     throw "windows-native-helper: invalid native path map"
 }
 
-Assert-ExactKeys -Value $configuration.sourceSets -Expected @(
-    "preflight", "production", "managedTests", "kernelTests", "fixtures"
-)
-
 # Restore remains ahead of action/source availability checks so the exclusive
 # build-root cleanup contract is exercised on every accepted action.
 & (Join-Path $nativeRoot "restore-toolchain.ps1") | Out-Null
 
-$expectedPreflightSources = @("src/Fd3Preflight.cs")
-$expectedProductionSources = @(
-    "src/ControlProtocol.cs",
-    "src/LifecycleMachine.cs",
-    "src/WindowsCommandLine.cs"
-)
-$expectedManagedTestSources = @(
-    "tests/CommandLineTests.cs",
-    "tests/LifecycleMachineTests.cs",
-    "tests/ProtocolTests.cs",
-    "tests/TestAssert.cs",
-    "tests/TestRunner.cs"
-)
-if (
-    ([string[]]$configuration.sourceSets.preflight -join "`n") -cne ($expectedPreflightSources -join "`n") -or
-    ([string[]]$configuration.sourceSets.production -join "`n") -cne ($expectedProductionSources -join "`n") -or
-    ([string[]]$configuration.sourceSets.managedTests -join "`n") -cne ($expectedManagedTestSources -join "`n") -or
-    @([string[]]$configuration.sourceSets.kernelTests).Count -ne 0 -or
-    @([string[]]$configuration.sourceSets.fixtures).Count -ne 0
-) {
-    throw "windows-native-helper: invalid native build contract"
+function Get-ValidatedSourceSet {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Directory
+    )
+
+    $property = $configuration.sourceSets.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        throw "windows-native-helper: invalid native build contract"
+    }
+    $values = @([string[]]$property.Value)
+    if ($values.Count -eq 0) {
+        throw "windows-native-helper: invalid native build contract"
+    }
+    $seen = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal
+    )
+    foreach ($value in $values) {
+        if (
+            [string]::IsNullOrEmpty($value) -or
+            -not ($value -cmatch ('^' + [regex]::Escape($Directory) + '/[A-Za-z0-9][A-Za-z0-9.-]*\.cs$')) -or
+            -not $seen.Add($value)
+        ) {
+            throw "windows-native-helper: invalid native build contract"
+        }
+    }
+    for ($index = 1; $index -lt $values.Count; $index += 1) {
+        if ([string]::CompareOrdinal($values[$index - 1], $values[$index]) -ge 0) {
+            throw "windows-native-helper: invalid native build contract"
+        }
+    }
+    return [string[]]$values
 }
+
+$preflightSources = Get-ValidatedSourceSet -Name "preflight" -Directory "src"
+$productionSources = Get-ValidatedSourceSet -Name "production" -Directory "src"
+$managedTestSources = Get-ValidatedSourceSet -Name "managedTests" -Directory "tests"
+$kernelTestSources = Get-ValidatedSourceSet -Name "kernelTests" -Directory "tests"
+$fixtureSources = Get-ValidatedSourceSet -Name "fixtures" -Directory "fixtures"
 
 $selectedSources = @()
 if ($Action -eq "preflight") {
-    $selectedSources = $expectedPreflightSources
+    $selectedSources = $preflightSources
 }
 elseif ($Action -eq "test-managed") {
     if (
@@ -454,7 +506,13 @@ elseif ($Action -eq "test-managed") {
     ) {
         throw "windows-native-helper: unsupported managed test filter"
     }
-    $selectedSources = @($expectedProductionSources) + @($expectedManagedTestSources)
+    $selectedSources = @($productionSources) + @($managedTestSources)
+}
+elseif ($Action -eq "test-kernel") {
+    if (-not [string]::IsNullOrEmpty($Filter)) {
+        throw "windows-native-helper: unsupported kernel test filter"
+    }
+    $selectedSources = @($productionSources) + @($kernelTestSources)
 }
 else {
     # Later tasks populate kernel, artifact, and aggregate actions.
@@ -465,8 +523,12 @@ $sourcePrefix = $resolvedNativeSource.TrimEnd(
     [System.IO.Path]::DirectorySeparatorChar,
     [System.IO.Path]::AltDirectorySeparatorChar
 ) + [System.IO.Path]::DirectorySeparatorChar
-$sourcePaths = [System.Collections.Generic.List[string]]::new()
-foreach ($relativeSource in $selectedSources) {
+$sourcesToResolve = @($selectedSources)
+if ($Action -eq "test-kernel") {
+    $sourcesToResolve += @($fixtureSources)
+}
+$sourcePathsByRelative = @{}
+foreach ($relativeSource in $sourcesToResolve) {
     $unresolvedSourcePath = Join-Path $nativeRoot $relativeSource
     if (-not (Test-Path -LiteralPath $unresolvedSourcePath -PathType Leaf)) {
         throw "windows-native-helper: native sources are not available for this action"
@@ -475,7 +537,11 @@ foreach ($relativeSource in $selectedSources) {
     if (-not $sourcePath.StartsWith($sourcePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "windows-native-helper: native source escaped its root"
     }
-    $sourcePaths.Add($sourcePath)
+    $sourcePathsByRelative.Add($relativeSource, $sourcePath)
+}
+$sourcePaths = [System.Collections.Generic.List[string]]::new()
+foreach ($relativeSource in $selectedSources) {
+    $sourcePaths.Add([string]$sourcePathsByRelative[$relativeSource])
 }
 
 $toolchainPackageRoot = Join-Path $helperRoot "toolchain-v1\packages"
@@ -485,7 +551,52 @@ $compilerPath = Assert-NoReparseExistingPath -Path (
 $referenceRoot = Assert-NoReparseExistingPath -Path (
     Join-Path $toolchainPackageRoot "microsoft.netframework.referenceassemblies.net48.1.0.3\build\.NETFramework\v4.8"
 )
+$referencePrefix = $referenceRoot.TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+) + [System.IO.Path]::DirectorySeparatorChar
+$resolvedReferences = [System.Collections.Generic.List[string]]::new()
+foreach ($reference in [string[]]$configuration.references) {
+    $referencePath = [System.IO.Path]::GetFullPath((Join-Path $referenceRoot $reference))
+    if (
+        -not $referencePath.StartsWith(
+            $referencePrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        ) -or
+        [System.IO.Path]::GetFileName($referencePath) -cne $reference
+    ) {
+        throw $invalidBuildContract
+    }
+    $resolvedReferences.Add((Assert-NoReparseExistingPath -Path $referencePath))
+}
 $nativeOutput = [System.IO.Path]::GetFullPath((Join-Path $generatedDirectory $outputName))
+
+if ($Action -eq "test-kernel") {
+    $fixtureOutput = [System.IO.Path]::GetFullPath((Join-Path $generatedDirectory "KernelFixture.exe"))
+    $fixtureCompilerArguments = [System.Collections.Generic.List[string]]::new()
+    foreach ($argument in $expectedCompilerArguments) {
+        $fixtureCompilerArguments.Add($argument)
+    }
+    $fixtureCompilerArguments.Add($pathMap)
+    $fixtureCompilerArguments.Add("/out:" + $fixtureOutput)
+    $fixtureCompilerArguments.Add("/main:CodexAgentTools.WindowsJobHelper.Fixtures.KernelFixture")
+    foreach ($referencePath in $resolvedReferences) {
+        $fixtureCompilerArguments.Add("/reference:" + $referencePath)
+    }
+    $fixtureCompilerArguments.Add($generatedPath)
+    foreach ($relativeFixture in $fixtureSources) {
+        $fixtureCompilerArguments.Add([string]$sourcePathsByRelative[$relativeFixture])
+    }
+    $fixtureCompilerOutput = & $compilerPath @fixtureCompilerArguments 2>&1
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $fixtureOutput -PathType Leaf)) {
+        if ($fixtureCompilerOutput) {
+            $fixtureCompilerOutput | Write-Output
+        }
+        throw "windows-native-helper: native kernel fixture compilation failed"
+    }
+    [void](Assert-NoReparseExistingPath -Path $fixtureOutput)
+}
+
 $compilerArguments = [System.Collections.Generic.List[string]]::new()
 foreach ($argument in $expectedCompilerArguments) {
     $compilerArguments.Add($argument)
@@ -495,8 +606,10 @@ $compilerArguments.Add("/out:" + $nativeOutput)
 if ($Action -eq "test-managed") {
     $compilerArguments.Add("/main:CodexAgentTools.WindowsJobHelper.Tests.TestRunner")
 }
-foreach ($reference in [string[]]$configuration.references) {
-    $referencePath = Assert-NoReparseExistingPath -Path (Join-Path $referenceRoot $reference)
+elseif ($Action -eq "test-kernel") {
+    $compilerArguments.Add("/main:CodexAgentTools.WindowsJobHelper.Tests.KernelTestRunner")
+}
+foreach ($referencePath in $resolvedReferences) {
     $compilerArguments.Add("/reference:" + $referencePath)
 }
 $compilerArguments.Add($generatedPath)
@@ -512,6 +625,9 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $nativeOutput -PathType
     if ($Action -eq "preflight") {
         throw "windows-native-helper: native preflight compilation failed"
     }
+    if ($Action -eq "test-kernel") {
+        throw "windows-native-helper: native kernel compilation failed"
+    }
     throw "windows-native-helper: native managed compilation failed"
 }
 [void](Assert-NoReparseExistingPath -Path $nativeOutput)
@@ -524,6 +640,14 @@ if ($Action -eq "test-managed") {
     & $nativeOutput @managedArguments
     if ($LASTEXITCODE -ne 0) {
         throw "windows-native-helper: managed tests failed"
+    }
+    return
+}
+
+if ($Action -eq "test-kernel") {
+    & $nativeOutput $fixtureOutput
+    if ($LASTEXITCODE -ne 0) {
+        throw "windows-native-helper: kernel tests failed"
     }
     return
 }
@@ -553,6 +677,6 @@ finally {
     Remove-ExclusiveBuildRoot `
         -BuildRoot $buildRoot `
         -BuildBase $buildBase `
-        -ActionOutputName $outputName `
+        -ActionOutputNames $outputNames `
         -TemporaryGenerated $temporaryGenerated
 }

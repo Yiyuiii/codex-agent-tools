@@ -372,10 +372,20 @@ describe("Windows native helper build contract", () => {
     const config = readRepositoryJson(
       "native/windows-job-helper/build.config.json",
     ) as {
+      schemaVersion: number;
+      targetFramework: string;
+      configuration: string;
+      platform: string;
+      compilerArguments: string[];
+      references: string[];
+      pathMap: { sourceRoot: string; virtualRoot: string };
       sourceSets: Record<string, string[]>;
+      output: { root: string; repositoryOutputsForbidden: boolean };
+      generatedProtocolConstants: { relativePath: string; sha256: string };
     };
 
-    expect(config).toEqual({
+    const { sourceSets, ...fixedBuildContract } = config;
+    expect(fixedBuildContract).toEqual({
       schemaVersion: 1,
       targetFramework: "net48",
       configuration: "Release",
@@ -399,23 +409,6 @@ describe("Windows native helper build contract", () => {
         sourceRoot: "native/windows-job-helper",
         virtualRoot: "/_/native/windows-job-helper",
       },
-      sourceSets: {
-        preflight: ["src/Fd3Preflight.cs"],
-        production: [
-          "src/ControlProtocol.cs",
-          "src/LifecycleMachine.cs",
-          "src/WindowsCommandLine.cs",
-        ],
-        managedTests: [
-          "tests/CommandLineTests.cs",
-          "tests/LifecycleMachineTests.cs",
-          "tests/ProtocolTests.cs",
-          "tests/TestAssert.cs",
-          "tests/TestRunner.cs",
-        ],
-        kernelTests: [],
-        fixtures: [],
-      },
       output: {
         root: "system-temp",
         repositoryOutputsForbidden: true,
@@ -426,11 +419,176 @@ describe("Windows native helper build contract", () => {
       },
     });
 
-    for (const sources of Object.values(config.sourceSets)) {
-      expect(sources).toEqual([...sources].sort((left, right) => left.localeCompare(right)));
+    expect(Object.keys(sourceSets)).toEqual([
+      "preflight",
+      "production",
+      "managedTests",
+      "kernelTests",
+      "fixtures",
+    ]);
+    expect(sourceSets.preflight).toEqual(["src/Fd3Preflight.cs"]);
+    expect(sourceSets.production).toEqual(
+      expect.arrayContaining([
+        "src/ControlProtocol.cs",
+        "src/JobSession.cs",
+        "src/LifecycleMachine.cs",
+        "src/NativeMethods.cs",
+        "src/Program.cs",
+        "src/SafeNativeHandles.cs",
+        "src/WindowsCommandLine.cs",
+      ]),
+    );
+    expect(sourceSets.kernelTests).toEqual(
+      expect.arrayContaining([
+        "tests/KernelTestRunner.cs",
+        "tests/KernelTests.cs",
+      ]),
+    );
+    expect(sourceSets.fixtures).toEqual(["fixtures/KernelFixture.cs"]);
+
+    for (const [name, sources] of Object.entries(sourceSets)) {
+      expect(sources.length, name).toBeGreaterThan(0);
+      expect(sources).toEqual(
+        [...sources].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
+      );
+      expect(new Set(sources).size, name).toBe(sources.length);
       expect(sources.every((source) => !source.includes("\\") && !source.startsWith("/"))).toBe(
         true,
       );
+      expect(
+        sources.every((source) =>
+          statSync(resolve(nativeRoot, source), { throwIfNoEntry: false })?.isFile(),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("keeps production Job ownership atomic and test fault injection out of production", () => {
+    const config = readRepositoryJson(
+      "native/windows-job-helper/build.config.json",
+    ) as { sourceSets: { production: string[]; kernelTests: string[] } };
+    const production = config.sourceSets.production
+      .map((source) => readRepositoryFile(`native/windows-job-helper/${source}`))
+      .join("\n");
+    const kernelTests = config.sourceSets.kernelTests
+      .map((source) => readRepositoryFile(`native/windows-job-helper/${source}`))
+      .join("\n");
+
+    for (const forbidden of [
+      "AssignProcessToJobObject",
+      "TerminateProcess",
+      "GetProcessById",
+      "System.Management",
+      "taskkill",
+      "CREATE_BREAKAWAY_FROM_JOB",
+      "FaultStep",
+      "CODEX_WINDOWS_NATIVE_FAULT",
+      "--fault",
+    ]) {
+      expect(production).not.toContain(forbidden);
+    }
+    expect(kernelTests).toContain("FaultStep");
+    expect(production).toContain("CreateSuspended");
+    expect(production).toContain("ExtendedStartupInfoPresent");
+    expect(production).toContain("CreateNoWindow");
+    expect(production).toContain("ProcThreadAttributeHandleList");
+    expect(production).toContain("ProcThreadAttributeJobList");
+    expect(production).toContain("JobObjectLimitKillOnJobClose");
+  });
+
+  windowsIt("rejects build-config drift at the PowerShell build entry", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "cat-native-build-config-"));
+    const systemTemp = join(fixtureRoot, "system-temp");
+    mkdirSync(systemTemp);
+    const cases: Array<{
+      name: string;
+      mutate: (config: Record<string, unknown>) => void;
+    }> = [
+      {
+        name: "top-level-extra",
+        mutate: (config) => {
+          config.extra = true;
+        },
+      },
+      {
+        name: "target-framework",
+        mutate: (config) => {
+          config.targetFramework = "net472";
+        },
+      },
+      {
+        name: "configuration",
+        mutate: (config) => {
+          config.configuration = "Debug";
+        },
+      },
+      {
+        name: "platform",
+        mutate: (config) => {
+          config.platform = "AnyCPU";
+        },
+      },
+      {
+        name: "path-map-extra",
+        mutate: (config) => {
+          (config.pathMap as Record<string, unknown>).extra = "escape";
+        },
+      },
+      {
+        name: "output-drift",
+        mutate: (config) => {
+          (config.output as Record<string, unknown>).root = "repository";
+        },
+      },
+      {
+        name: "generated-extra",
+        mutate: (config) => {
+          (config.generatedProtocolConstants as Record<string, unknown>).extra = true;
+        },
+      },
+      {
+        name: "reference-traversal",
+        mutate: (config) => {
+          config.references = ["mscorlib.dll", "../System.dll", "System.Core.dll"];
+        },
+      },
+      {
+        name: "source-set-extra",
+        mutate: (config) => {
+          (config.sourceSets as Record<string, unknown>).extra = [];
+        },
+      },
+    ];
+
+    try {
+      for (const testCase of cases) {
+        const scriptRoot = join(fixtureRoot, testCase.name);
+        mkdirSync(scriptRoot);
+        for (const name of ["build.ps1", "build.config.json", "protocol.v1.json"]) {
+          copyFileSync(resolve(nativeRoot, name), join(scriptRoot, name));
+        }
+        writeFileSync(join(scriptRoot, "restore-toolchain.ps1"), "throw 'must-not-run'\n");
+        const config = JSON.parse(
+          readFileSync(join(scriptRoot, "build.config.json"), "utf8"),
+        ) as Record<string, unknown>;
+        testCase.mutate(config);
+        writeFileSync(
+          join(scriptRoot, "build.config.json"),
+          `${JSON.stringify(config, null, 2)}\n`,
+        );
+
+        const result = runPowerShell(join(scriptRoot, "build.ps1"), "verify", {
+          ...process.env,
+          TEMP: systemTemp,
+          TMP: systemTemp,
+        });
+        expect(result.status, `${testCase.name}: ${result.stderr}`).toBe(1);
+        expect(result.stderr).toContain("invalid native build contract");
+        expect(result.stdout).toBe("");
+        expect(buildInvocationRoots(systemTemp)).toEqual([]);
+      }
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
     }
   });
 
@@ -883,10 +1041,10 @@ describe("Windows native helper build contract", () => {
     120_000,
   );
 
-  it("keeps POSIX skips scoped to exactly two Windows integration cases", () => {
+  it("keeps POSIX skips scoped to exactly three Windows integration cases", () => {
     const source = readRepositoryFile("test/native/native-build-contract.test.ts");
     expect(source.match(/\bit\.runIf\(/g)).toHaveLength(1);
-    expect(source.match(/\bwindowsIt\(/g)).toHaveLength(2);
+    expect(source.match(/\bwindowsIt\(/g)).toHaveLength(3);
     expect(source).not.toMatch(/\b(?:it|describe)\.(?:skip|skipIf)\(/);
   });
 

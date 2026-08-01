@@ -26,7 +26,11 @@
     "preflight": ["src/Fd3Preflight.cs"],
     "production": [
       "src/ControlProtocol.cs",
+      "src/JobSession.cs",
       "src/LifecycleMachine.cs",
+      "src/NativeMethods.cs",
+      "src/Program.cs",
+      "src/SafeNativeHandles.cs",
       "src/WindowsCommandLine.cs"
     ],
     "managedTests": [
@@ -36,8 +40,12 @@
       "tests/TestAssert.cs",
       "tests/TestRunner.cs"
     ],
-    "kernelTests": [],
-    "fixtures": []
+    "kernelTests": [
+      "tests/KernelTestRunner.cs",
+      "tests/KernelTests.cs",
+      "tests/TestAssert.cs"
+    ],
+    "fixtures": ["fixtures/KernelFixture.cs"]
   },
   "output": {
     "root": "system-temp",

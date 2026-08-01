@@ -466,10 +466,77 @@ namespace CodexAgentTools.WindowsJobHelper.Tests
                     ControlStage.CancelledBeforeReady));
             TestAssert.Throws<LifecycleViolationException>(() =>
                 running.ApplyFailure(LifecycleActor.Launcher, ControlStage.ProtocolInvalid));
+            // Terminal writes are a distinct authority. A READY write failure
+            // is linearized by the launcher before READY is published. It must
+            // transfer cleanup ownership without pretending the reader saw EOF.
+            var readyWriteFailed = running.ApplyFailure(
+                LifecycleActor.Launcher,
+                ControlStage.ControlChannelFailed);
+            AssertFailure(
+                readyWriteFailed,
+                LifecycleState.Terminating,
+                CleanupOwner.Launcher,
+                ControlStage.ControlChannelFailed);
+            TestAssert.True(!readyWriteFailed.ReadyWasPublished);
             TestAssert.Throws<LifecycleViolationException>(() =>
                 running.ApplyFailure(
-                    LifecycleActor.Launcher,
+                    LifecycleActor.ControlReader,
                     ControlStage.ControlChannelFailed));
+
+            var terminateBeforeReadyWrite = running.Apply(
+                LifecycleActor.ControlReader,
+                LifecycleEvent.TerminateCancelled);
+            var racedReadyWriteFailed = terminateBeforeReadyWrite.ApplyFailure(
+                LifecycleActor.Launcher,
+                ControlStage.ControlChannelFailed);
+            TestAssert.Equal(LifecycleState.Terminating, racedReadyWriteFailed.State);
+            TestAssert.Equal(CleanupOwner.ControlReader, racedReadyWriteFailed.Owner);
+            TestAssert.Equal(ControlReason.Cancelled, racedReadyWriteFailed.StopReason);
+            TestAssert.Equal(ControlStage.ControlChannelFailed, racedReadyWriteFailed.FailureStage);
+            count++;
+
+            // If cleanup cannot prove Job zero, the helper must still be able to
+            // make one best-effort ERROR write and then close its final Job
+            // handle. Sealing remains illegal for ordinary in-progress cleanup.
+            var cleanupRequested = readyRunning.Apply(
+                LifecycleActor.ControlReader,
+                LifecycleEvent.TerminateCancelled);
+            var terminateJobFailed = cleanupRequested.ApplyFailure(
+                LifecycleActor.CleanupOwner,
+                ControlStage.TerminateJobFailed);
+            TestAssert.True(!terminateJobFailed.JobWasZero);
+            TestAssert.True(terminateJobFailed.MaySealErrorBeforeJobZero);
+            TestAssert.Equal(
+                TerminalKind.Error,
+                terminateJobFailed
+                    .Apply(LifecycleActor.TerminalWriter, LifecycleEvent.SealError)
+                    .Terminal);
+
+            var queryJobFailed = cleanupRequested.ApplyFailure(
+                LifecycleActor.CleanupOwner,
+                ControlStage.QueryJobFailed);
+            TestAssert.True(!queryJobFailed.JobWasZero);
+            TestAssert.True(queryJobFailed.MaySealErrorBeforeJobZero);
+            TestAssert.Equal(
+                TerminalKind.Error,
+                queryJobFailed
+                    .Apply(LifecycleActor.TerminalWriter, LifecycleEvent.SealError)
+                    .Terminal);
+            TestAssert.Throws<LifecycleViolationException>(() =>
+                cleanupRequested.Apply(
+                    LifecycleActor.TerminalWriter,
+                    LifecycleEvent.SealError));
+
+            var resumeThenCleanupFailed = createdAssigned
+                .ApplyFailure(LifecycleActor.Launcher, ControlStage.ResumeFailed)
+                .ApplyFailure(LifecycleActor.CleanupOwner, ControlStage.QueryJobFailed);
+            TestAssert.Equal(ControlStage.ResumeFailed, resumeThenCleanupFailed.FailureStage);
+            TestAssert.True(resumeThenCleanupFailed.MaySealErrorBeforeJobZero);
+            TestAssert.Equal(
+                TerminalKind.Error,
+                resumeThenCleanupFailed
+                    .Apply(LifecycleActor.TerminalWriter, LifecycleEvent.SealError)
+                    .Terminal);
             count++;
 
             return count;

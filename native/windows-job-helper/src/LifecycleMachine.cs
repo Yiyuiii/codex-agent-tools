@@ -77,6 +77,7 @@ namespace CodexAgentTools.WindowsJobHelper
             false,
             false,
             false,
+            false,
             false);
 
         internal LifecycleState State { get; private set; }
@@ -88,6 +89,7 @@ namespace CodexAgentTools.WindowsJobHelper
         internal bool ReadyWasPublished { get; private set; }
         internal bool RootWasCompleted { get; private set; }
         internal bool JobWasZero { get; private set; }
+        internal bool MaySealErrorBeforeJobZero { get; private set; }
 
         private LifecycleMachine(
             LifecycleState state,
@@ -98,7 +100,8 @@ namespace CodexAgentTools.WindowsJobHelper
             bool wasResumed,
             bool readyWasPublished,
             bool rootWasCompleted,
-            bool jobWasZero)
+            bool jobWasZero,
+            bool maySealErrorBeforeJobZero)
         {
             State = state;
             Owner = owner;
@@ -109,6 +112,7 @@ namespace CodexAgentTools.WindowsJobHelper
             ReadyWasPublished = readyWasPublished;
             RootWasCompleted = rootWasCompleted;
             JobWasZero = jobWasZero;
+            MaySealErrorBeforeJobZero = maySealErrorBeforeJobZero;
         }
 
         internal LifecycleMachine Apply(LifecycleActor actor, LifecycleEvent lifecycleEvent)
@@ -223,6 +227,13 @@ namespace CodexAgentTools.WindowsJobHelper
                     }
                     break;
                 case LifecycleState.Terminating:
+                    if (lifecycleEvent == LifecycleEvent.SealError &&
+                        MaySealErrorBeforeJobZero &&
+                        FailureStage != ControlStage.None &&
+                        (!WasResumed || ReadyWasPublished))
+                    {
+                        return Copy(state: LifecycleState.Terminal, terminal: TerminalKind.Error);
+                    }
                     if (lifecycleEvent == LifecycleEvent.ReadyPublished && WasResumed && !ReadyWasPublished)
                     {
                         return Copy(readyWasPublished: true);
@@ -286,6 +297,14 @@ namespace CodexAgentTools.WindowsJobHelper
             RequireFailureActor(actor, stage);
             if (FailureStage != ControlStage.None)
             {
+                if (State == LifecycleState.Terminating &&
+                    actor == LifecycleActor.CleanupOwner &&
+                    IsUnrecoverableCleanupFailure(stage))
+                {
+                    return MaySealErrorBeforeJobZero
+                        ? this
+                        : Copy(maySealErrorBeforeJobZero: true);
+                }
                 return this;
             }
 
@@ -325,8 +344,22 @@ namespace CodexAgentTools.WindowsJobHelper
                     owner: CleanupOwner.RootWaiter,
                     failureStage: stage);
             }
+            if (State == LifecycleState.Running &&
+                actor == LifecycleActor.Launcher &&
+                stage == ControlStage.ControlChannelFailed)
+            {
+                return Copy(
+                    state: LifecycleState.Terminating,
+                    owner: CleanupOwner.Launcher,
+                    failureStage: stage);
+            }
             if (State == LifecycleState.Terminating)
             {
+                if (actor == LifecycleActor.Launcher &&
+                    stage == ControlStage.ControlChannelFailed)
+                {
+                    return Copy(failureStage: stage);
+                }
                 if (actor == LifecycleActor.RootWaiter && stage == ControlStage.WaitFailed)
                 {
                     return Copy(
@@ -340,7 +373,8 @@ namespace CodexAgentTools.WindowsJobHelper
                 {
                     return Copy(
                         state: JobWasZero ? LifecycleState.Terminated : LifecycleState.Terminating,
-                        failureStage: stage);
+                        failureStage: stage,
+                        maySealErrorBeforeJobZero: IsUnrecoverableCleanupFailure(stage));
                 }
             }
 
@@ -444,6 +478,7 @@ namespace CodexAgentTools.WindowsJobHelper
                 stage == ControlStage.ResumeFailed ||
                 stage == ControlStage.TerminateJobFailed ||
                 stage == ControlStage.QueryJobFailed ||
+                stage == ControlStage.ControlChannelFailed ||
                 stage == ControlStage.HelperInternal ||
                 stage == ControlStage.WaitFailed;
         }
@@ -454,6 +489,10 @@ namespace CodexAgentTools.WindowsJobHelper
             if (stage == ControlStage.WaitFailed)
             {
                 valid = actor == LifecycleActor.RootWaiter;
+            }
+            else if (stage == ControlStage.ControlChannelFailed)
+            {
+                valid = actor == LifecycleActor.Launcher;
             }
             else if (stage == ControlStage.TerminateJobFailed ||
                 stage == ControlStage.QueryJobFailed ||
@@ -469,6 +508,12 @@ namespace CodexAgentTools.WindowsJobHelper
             {
                 throw new LifecycleViolationException();
             }
+        }
+
+        private static bool IsUnrecoverableCleanupFailure(ControlStage stage)
+        {
+            return stage == ControlStage.TerminateJobFailed ||
+                stage == ControlStage.QueryJobFailed;
         }
 
         private bool IsBeforeReadyCreation()
@@ -537,7 +582,8 @@ namespace CodexAgentTools.WindowsJobHelper
             bool? wasResumed = null,
             bool? readyWasPublished = null,
             bool? rootWasCompleted = null,
-            bool? jobWasZero = null)
+            bool? jobWasZero = null,
+            bool? maySealErrorBeforeJobZero = null)
         {
             return new LifecycleMachine(
                 state ?? State,
@@ -548,7 +594,8 @@ namespace CodexAgentTools.WindowsJobHelper
                 wasResumed ?? WasResumed,
                 readyWasPublished ?? ReadyWasPublished,
                 rootWasCompleted ?? RootWasCompleted,
-                jobWasZero ?? JobWasZero);
+                jobWasZero ?? JobWasZero,
+                maySealErrorBeforeJobZero ?? MaySealErrorBeforeJobZero);
         }
     }
 }
