@@ -144,6 +144,8 @@ git diff --check
 
 ## 6. Task 5：artifact、resolver与OwnedAgentProcess
 
+**状态（2026-08-01，已完成）：** 提交`7ab9b0b`建立唯一x64/net48 helper artifact与严格SHA清单、单次重编译`native:verify`、只接受dist/plugin布局且逐级拒绝reparse/hash/PE漂移的resolver，以及不暴露PID和默认执行预算的Windows `OwnedAgentProcess`。wrapper以单fd3传CONFIG/TERMINATE并严格等待READY、合法terminal、clean control close、helper exit和三路stdio settle；terminal后故障由保留的ChildProcess handle精确救援，termination reason接受精确回显或已先发生的自然完成竞态。artifact更新在任何写入前拒绝partial/extra/reparse状态，第二步失败会逐字节恢复旧pair或首次安装空状态。Windows child env按大小写无关唯一键和固定identity白名单fail closed，POSIX则完整保留旧的exact-first/case-insensitive-fallback及覆盖语义。最终`native:verify`固定SHA `c9bc5cddf77e6385c6a9971b7bf4d4cf5bd697f498fa80c2f1c9ec7c706d8dfa`；审计修复前全库65文件1021 passed / 1 skipped，最终影响范围52/52及后续env 18/18、类型与diff检查通过；两位fresh终审修复后均PASS。没有真实模型、活动配置/插件、发布、三Node矩阵、新POSIX抽象或外部CLI默认/全局限制。
+
 ### 6.1 RED
 
 - 单一独占临时根source→artifact compare、仓库唯一exe/SHA、resolver静态path/hash/PE测试先失败；Vitest只读artifact/resolver且不触发build或probe，唯一重编译入口是`native:verify`；
