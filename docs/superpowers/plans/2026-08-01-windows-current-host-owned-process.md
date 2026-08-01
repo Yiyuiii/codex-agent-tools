@@ -179,7 +179,8 @@ git diff --check
 - Kimi/Pi Windows路径仍依赖direct spawn、PID terminator或`pi.cmd`执行的合同测试先失败；
 - Pi locator尚不能从当前安装解析/验证package name/version/bin/realpath/engine并返回结构化`PiInvocation`；
 - adapter、doctor、`src/smoke/pi.ts`版本读取、qualification preflight和隔离/公共验收消费者仍把Pi locator当作字符串，尚未统一拼接`argvPrefix`；
-- stdio真实fake链尚不能证明handler/session只在owned tree归零后settle。
+- stdio真实fake链尚不能证明handler/session只在owned tree归零后settle；
+- qualification preflight/coordinator/lock recovery与公共npm验收仍通过`src/runtime/agent-processes.ts`调用WMI/`ps`，把全机Kimi/Pi/real-smoke为零当作本case成功或恢复条件；无关外部CLI/旧插件会被误判为泄漏，现行current preflight仍生成该全机计数字段。
 
 ### 7.2 GREEN
 
@@ -192,6 +193,10 @@ git diff --check
 - child environment用case-insensitive builder合成固定系统键、唯一credential和固定runtime-owned键；Pi本次隔离配置生成的`PI_CODING_AGENT_DIR`必须保留，父环境同名/变体、proxy与其它secret不得穿透，跨来源冲突fail closed。
 - stdio end/close/error与SIGINT/SIGTERM共享幂等shutdown，业务错误优先、cleanup错误作为secondary附加；即使业务原本成功，只要cleanup失败，整个调用仍必须失败。
 - 每个fake adapter只新增正常完成、一次取消或stdio shutdown，以及一个代表性descendant归零的真实stdio全链；late spawn、helper/parent崩溃、process rebirth与故障矩阵由Task 4真内核测试唯一负责，不按Kimi/Pi重复。不调用真实模型。
+- 每个qualification case把本次`OwnedAgentProcess`的合法terminal、Job `ActiveProcesses=0`与stdio/helper settle形成case-owned drain证据；协调器只能在验证该证据后发布case终态。preflight、case前后检查、公共npm验收和lock recovery删除全机WMI/`ps` zero前置，不因无关Kimi/Pi/旧插件进程失败。
+- lock recovery先验证qualification lock owner identity与不可变ledger状态；owner死亡后的target回收依赖已经证明的`KILL_ON_JOB_CLOSE`合同，不读取/reopen PID，也不以全机命令行匹配代替owned证明。删除现行runtime全机scanner及只验证它的测试，但保留历史记录codec。
+- 新current preflight使用新schema并不再生成`targetProcesses`；历史v1/v2 preflight、manifest与case evidence中的`targetProcesses`只按旧schema严格读取，绝不改写。verifier继续验证历史不可变性，新producer、coordinator与recovery不得重新消费旧全机计数作为当前证明。
+- 现有provider `KeyedLimiter`与`maxConcurrency`合同保留；它只调度本MCP进程内共享provider池，不设置或持久化外部CLI的step、turn、tool、context、token或执行时长上限。
 
 ### 7.3 验证与提交
 
@@ -213,7 +218,10 @@ git diff --check
 - 当前宿主冻结、能力验证与tag workflow尚未复用同一runtime-input digest，且计划中仍存在重复的prequalification wrapper；
 - 活动测试仍真实创建`core.autocrlf=true/false`双checkout，插件文档门禁仍把历史Task 9–12和固定beta序号当现行路线；
 - `engines`、tsup target与公开文档仍声明Node 20兼容，npm文档清单仍把历史计划/审阅页当产品必需文件，旧`acceptance:local`仍可被误当现行真实模型门禁；
-- CI仍上传不被release消费的dist/plugin artifact，native sourceSets与npm文档清单仍有重复真值源。
+- CI仍上传不被release消费的dist/plugin artifact，native sourceSets与npm文档清单仍有重复真值源；
+- npm仍把整个`dist`作为公开运行面：未消费的`qualification` entry、仓库内部acceptance/smoke/release入口、无公共类型入口的声明/映射和仅release assurance使用的`commonmark`生产依赖尚未收敛；
+- CI/release在同一job内通过`pretest`与`smoke:release`重复build，release smoke已检查pack后workflow又重复pack并上传无人消费的完整dist/runtime；
+- 多项测试仍扫描脚本/tsup/计划Markdown的精确源码文本或锁定当前beta、branch、date与Windows条件测试数量；README与operations仍重复维护易变的活动安装、历史批次和执行合同。
 
 ### 8.2 GREEN
 
@@ -225,6 +233,11 @@ git diff --check
 6. 单宿主冗余闭包：删除EOL双checkout与未消费的CI artifact；统一`engines >=24`、tsup `node24`和公开Node要求，并注明只实测当前v24.14.1而非跨版本认证；活动文档只使用阶段名，不再绑定历史Task 9–12或某个beta序号。历史发布/失败记录留在仓库但不重写。
 7. 单一真值源：native `build.config.json`是sourceSets唯一清单，PowerShell严格验证schema、相对`.cs`路径、安全compiler flags、边界与reparse后消费，不再复制整份数组；npm只打包用户文档、helper/SHA和能力索引实际引用的证据，release smoke从同一清单核对并继续执行秘密扫描与链接闭包。
 8. 旧入口退役：删除旧`acceptance:local`真实模型脚本/entry/专用测试；保留无模型公共包隔离验收和beta后的真实App代表性门禁。`prepublishOnly`只作误触本地publish的最后检查，不是发布授权，OIDC workflow仍是唯一发布路径。
+9. npm运行面：把CLI、MCP、plugin runtime与能力索引实际引用载荷定义为公开包边界；仓库内部acceptance/smoke/release构建输出留在包外，不再因`files: ["dist"]`整体发布。删除没有消费者的`qualification` build entry；无公共TypeScript API的声明文件不进入包。`commonmark`等仅release assurance使用的依赖降为开发依赖。不得误删CLI/MCP共享chunk、helper/SHA、能力索引引用evidence或其它由真实pack闭包证明必需的文件。
+10. Workflow单次执行：每个CI/release job只显式build一次，随后直接运行Vitest与已构建的release smoke；release smoke第一次`npm pack --dry-run --json`的已检查结果同时写成可上传manifest，不再第二次pack。CI不上传dist/runtime；release若保留调试artifact，只保留pack manifest或必要摘要，不把无人消费的完整dist/runtime当发布证明。
+11. 行为测试替代文本耦合：把npm launch-path等validator提取为纯函数并测试输入输出；保留真实隔离bundle执行、package exact inclusion、链接闭包、秘密/绝对路径扫描和workflow发布语义。删除对tsup实现字段、release-smoke源代码列表、计划命令块、`windowsIt`数量、当前beta/branch/date及精确Codex CLI版本的重复文本断言；版本测试改为比较package、CLI、MCP、plugin与workflow共享pin的一致性，Codex CLI仍固定到一个仓库真值源而非浮动最新版。
+12. 文档真值源：`docs/operations.md`唯一维护完整安装、验收、回滚和发布流程；README只保留稳定产品合同、当前支持声明与链接。活动插件版本、历史批次ID/SHA/测试计数和一次性分支日期进入未打包的freeze/release evidence，不在两个公开文档重复维护。历史evidence/manifest保持不可变。
+13. 明确保留：Job原子归属、唯一owner、句柄/环境/凭据隔离、parent/helper crash、managed与kernel分层测试、source→artifact/SHA/PE/resolver、canonical runtime-input digest、资格与能力双verifier、pack秘密/链接检查、beta/stable marker、公共beta精确安装、完整App重启/真实Stop、OIDC发布、`prepublishOnly`、固定Codex CLI来源、最小POSIX release回归及provider `KeyedLimiter`均不因删冗余而弱化。
 
 ### 8.3 子批次A：artifact / resolver / doctor / package
 
@@ -278,7 +291,8 @@ git diff --check
 - 当前OS/Node/libuv/npm/CLR/Pi/Kimi身份，只作观测值；
 - helper实际SHA、单一独占临时根的source→artifact一致性与canonical runtime-input manifest/digest；
 - carrier与Task 4 kernel/parent/helper crash结果，以及Task 6最小fake Kimi/Pi/stdio接线结果；
-- 全部已知owned process/handle/temp root归零；
+- 全部已知owned process/handle/temp root由各自case-owned Job drain归零，资格、恢复与公共npm验收没有调用WMI/`ps`全机zero gate；
+- 新current preflight不再生成`targetProcesses`，历史v1/v2记录仍可严格只读验证且没有任何历史manifest/evidence被改写；
 - 八项能力唯一因runtime fingerprint stale；
 - 真实模型、活动配置/插件、发布和外部CLI全局限制均为0。
 

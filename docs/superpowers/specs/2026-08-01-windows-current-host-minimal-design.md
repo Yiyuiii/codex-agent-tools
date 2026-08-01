@@ -48,7 +48,8 @@
 7. helper 或 Node 崩溃时，helper观察到的Node→helper EOF或最后Job handle关闭最终清除整个owned tree；Node只有在合法terminal之后因helper主动关闭fd3而观察到的EOF才能参与成功判定；
 8. C# helper对target cleanup禁止PID reopen、WMI、`taskkill`、全机扫描、`AssignProcessToJobObject`事后归属、`TerminateProcess`和breakaway；任何前置失败禁止direct-spawn或自动fallback；
 9. helper、协议、hash、路径、架构、CLR、环境或 transport 前置条件失败时 fail closed；cleanup 成功不能把业务/协议失败改写为成功；
-10. POSIX process-group 路径与公开 MCP 语义不因本设计改变；本轮只保留既有回归，不新增 POSIX owned-process 设计、集成矩阵或兼容认证。
+10. qualification、lock recovery、smoke与公共包验收只能用本次case的Job terminal/drain、既有handle与lock owner identity证明本项目owned资源归零；不得以WMI、`ps`或命令行模式扫描要求全机Kimi/Pi/smoke为零，也不得因无关外部CLI或旧插件仍在运行而阻断本项目；
+11. POSIX process-group 路径、现有provider `KeyedLimiter`并发合同与公开 MCP 语义不因本设计改变；本轮只保留既有回归，不新增 POSIX owned-process 设计、集成矩阵或兼容认证。进程内provider并发池不是外部CLI的step、turn、tool、context、token或执行时长上限，不在“删除全局执行预算”名义下静默移除。
 
 Job Object 仍是生命周期承载，不是权限沙箱。通过系统 broker、服务或其它 Job 外机制显式创建的进程不属于可证明的 owned tree；若真实验收发现逃逸，停止发布并保存脱敏证据，不用模糊清理伪造通过。
 
@@ -176,6 +177,8 @@ Windows上的Kimi/Pi所有调用都必须经过`OwnedAgentProcess`，包括docto
 
 Windows strict doctor只复用resolver并报告当前OS/Node/libuv/CLR/helper实际摘要，随后运行无target、无凭据的`--probe-v1`；非Windows报告not-applicable。完整单fd3 carrier preflight只由开发/冻结命令运行并写入发布证据，不在普通doctor中重新构建或执行，也不通过持久缓存替代。doctor是本机可用性诊断，不是跨版本认证。
 
+现行资格preflight/coordinator/lock recovery与公共npm验收中的全机WMI/`ps` zero gate属于待删除的旧实现。每个新case必须由`OwnedAgentProcess`给出与该case绑定的Job terminal/drain证据，协调器在发布case终态前验证owned Job已经归零；恢复只依赖已验证的qualification lock owner identity、不可变ledger状态与`KILL_ON_JOB_CLOSE`合同，不通过PID reopen或全机命令行匹配猜测旧target。新current preflight记录不得继续生成`targetProcesses`全机计数；历史v1/v2 preflight、manifest与case evidence中的该字段仍按原schema严格只读验证，绝不改写、删除或迁移历史文件。
+
 建立唯一canonical runtime-input manifest，精确枚举影响Windows运行语义的native production source、TypeScript wrapper、canonical protocol、构建配置和helper实际摘要，并由同一实现生成一个确定性digest。能力指纹把该digest作为运行输入，当前宿主冻结证据与tag workflow复用同一manifest和算法；不得另建平行的`current-host runtime fingerprint`实现。helper SHA仍作为manifest内可读的artifact身份，不成为第二套运行输入摘要。历史计划、审阅稿和跨系统package-set digest不进入manifest。native变化会使八项能力stale，普通`verify:capabilities`与`smoke:release`继续fail closed，直到后续真实8/8形成新证据。
 
 GitHub CI改为单一Node 24 Ubuntu job，只证明TypeScript、package、插件与OIDC发布链，不宣称Windows native兼容。Windows权威证据来自维护者当前宿主的preflight、真内核、fake全链、隔离package/plugin和最终真实Stop。
@@ -211,6 +214,11 @@ Tasks 2–8完成前不调用真实模型、不修改活动配置/插件、不�
 | 全package raw-byte/EOL双checkout证明 | 与运行鲁棒性关联弱 | helper实际hash、exact package inclusion与隔离安装 |
 | 多层candidate/core/prequalification wrapper | 重复同一release core | Task 8原子冻结清单+普通release smoke |
 | 专用`smoke:prequalification`命令 | 与Task 8原子命令及普通release smoke重复 | Task 8逐项运行一次并记录预期stale；8/8后只跑普通release smoke |
+| qualification/npm验收全机WMI/`ps` zero gate | 会把无关外部CLI误判为本项目泄漏，且弱于case-owned证据 | case-owned Job terminal/drain、lock owner identity与历史schema只读兼容 |
+| npm包内未消费的内部acceptance/smoke/release bundle、声明文件与仅内部release工具所需生产依赖 | 不属于CLI/MCP/plugin公共运行面 | 内部构建留在包外；npm只携带公开入口、helper/SHA与能力索引实际引用载荷 |
+| 单workflow内重复build/pack和无人消费的dist/runtime artifact | 重复相同候选且没有下游证明价值 | 一次显式build、一次pack检查并复用manifest；仅保留必要摘要证据 |
+| 锁定源码写法、当前beta/branch/date或计划命令块的文本测试 | 把临时实现和项目状态误当产品合同 | 纯函数/行为测试、跨产物版本一致性、真实隔离bundle与发布语义门禁 |
+| README与operations重复维护易变运维状态 | 形成两个会漂移的公开真值源 | operations维护完整流程；README只保留稳定摘要和链接，历史状态进入未打包证据 |
 
 ## 10. 完成判定
 
@@ -219,7 +227,7 @@ Tasks 2–8完成前不调用真实模型、不修改活动配置/插件、不�
 1. 当前宿主单fd3 preflight通过，旧half-close路径不进入生产；
 2. Windows helper满足原子Job归属、唯一owner、句柄/环境隔离和无预算限制；
 3. Kimi直接PE、Pi直接Node+已验证cli.js，不存在production cmd/direct-spawn/PID fallback；
-4. 当前宿主真内核、parent/helper crash、fake Kimi/Pi/stdio与current-host compatible nested Job测试通过且无残留；真实App Stop只在beta后门禁执行；
+4. 当前宿主真内核、parent/helper crash、fake Kimi/Pi/stdio与current-host compatible nested Job测试通过，每个case均以自身Job drain证明无残留；现行资格与验收不再执行全机进程zero gate；真实App Stop只在beta后门禁执行；
 5. helper artifact、SHA、resolver、doctor、package、canonical runtime-input manifest、能力指纹与单Node workflow闭合；
 6. 全量离线/隔离验证通过，工作树clean并由独立规格、质量审阅收敛；
 7. 能力索引仍因预期stale而fail closed，真实模型、活动插件和公开发布尚未发生。
