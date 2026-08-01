@@ -48,7 +48,7 @@
 7. helper 或 Node 崩溃时，helper观察到的Node→helper EOF或最后Job handle关闭最终清除整个owned tree；Node只有在合法terminal之后因helper主动关闭fd3而观察到的EOF才能参与成功判定；
 8. C# helper对target cleanup禁止PID reopen、WMI、`taskkill`、全机扫描、`AssignProcessToJobObject`事后归属、`TerminateProcess`和breakaway；任何前置失败禁止direct-spawn或自动fallback；
 9. helper、协议、hash、路径、架构、CLR、环境或 transport 前置条件失败时 fail closed；cleanup 成功不能把业务/协议失败改写为成功；
-10. POSIX process-group 路径与公开 MCP 语义不因本设计改变。
+10. POSIX process-group 路径与公开 MCP 语义不因本设计改变；本轮只保留既有回归，不新增 POSIX owned-process 设计、集成矩阵或兼容认证。
 
 Job Object 仍是生命周期承载，不是权限沙箱。通过系统 broker、服务或其它 Job 外机制显式创建的进程不属于可证明的 owned tree；若真实验收发现逃逸，停止发布并保存脱敏证据，不用模糊清理伪造通过。
 
@@ -126,7 +126,7 @@ Node spawn helper时使用上述三类来源合成并验证后的环境；helper
 - 固定 Roslyn 4.14.0 与 net48 reference assemblies 1.0.3 的 URL/摘要和完整 restore 验证；
 - x64/net48、固定 flags、独占临时根、reparse/路径边界和非递归白名单清理；
 - canonical protocol JSON、TypeScript codec 与临时生成 C# constants；
-- source→artifact 的本机 deterministic 双根 byte compare；
+- 在一个独占、已验证临时根完成一次本机 source→artifact byte compare；
 - 仓库和包内唯一 helper PE、旁置 SHA-256、canonical resolver 与只读 `--probe-v1`。
 
 删除：
@@ -137,11 +137,11 @@ Node spawn helper时使用上述三类来源合成并验证后的环境；helper
 - `core.autocrlf=true/false` 双 checkout EOL门禁；
 - partial/composite attestation、self-digest和远端 artifact fetcher。
 
-`native:preflight`只用调用它的`process.execPath`测试完整单fd3，并记录当前`process.version`/libuv用于证据。它必须分别证明：(a) CONFIG→READY→TERMINATE→EXIT→clean close；(b) CONFIG→READY后Node不再写且保持fd3开放，probe在reader仍可能阻塞时自主EXIT→close，Node能收到terminal且进程不死锁。`--probe-v1`只验证helper可加载、协议身份和当前CLR/架构，不启动target、不读取凭据；生产每次真实launch的READY/terminal合同本身负责fail closed，不再增加每个MCP进程的一次性carrier探针缓存。
+`native:preflight`只用调用它的`process.execPath`测试完整单fd3，并记录当前`process.version`/libuv用于证据。它必须分别证明：(a) CONFIG→READY→TERMINATE→EXIT→clean close；(b) CONFIG→READY后Node不再写且保持fd3开放，probe在reader仍可能阻塞时自主EXIT→close，Node能收到terminal且进程不死锁。`--probe-v1`只验证helper可加载、协议身份和当前CLR/架构，不启动target、不读取凭据，并且只由doctor、当前宿主冻结和公共包/插件安装验收调用。production resolver不为每次invocation另起probe进程；它完成静态身份校验后直接真实launch，由真实READY/terminal合同fail closed。
 
 Task 2已在提交`7e03d26`实现该开发期preflight：当前Node v24.14.1/libuv 1.51.0连续10次稳定性运行通过；聚焦测试25/25通过。该数字是本机证据，不是生产版本白名单。显式`TERMINATE(cancelled)`必须在`EXIT`中回显`cancelled`，自主退出才使用`noneOrRootExit`。
 
-resolver在每次 Windows launch前验证规范路径、无逃逸/reparse、文件存在、实际 SHA与旁置 SHA一致、唯一 x64 PE和固定 probe合同。失败时不得 fallback。
+resolver在每次 Windows launch前静态验证规范路径、无逃逸/reparse、文件存在、实际 SHA与旁置 SHA一致以及唯一 x64 PE。失败时不得 fallback；CLR/load/protocol错误由随后那次真实helper launch自身失败，不以每次调用前的独立probe重复证明。
 
 ## 7. 最小充分测试
 
@@ -150,10 +150,10 @@ resolver在每次 Windows launch前验证规范路径、无逃逸/reparse、文�
 - strict frame/payload/UTF-8/长度/保留位/顺序；
 - native argv round-trip 与拒绝边界；
 - Pi 包解析、engine与realpath；
-- 生命周期全部状态×事件确定性表，显式包含create success/failure、terminate/EOF/protocol error、root-complete、job-zero与terminal-seal；
+- 生命周期全部可达状态转移，外加关键非法事件，显式包含create success/failure、CREATING期间的terminate/EOF/protocol error、root-complete、job-zero、重复terminate与terminal-seal后事件；
 - 首错、幂等 terminate、唯一 terminal/cleanup owner。
 
-不再用固定 2000 轮随机竞态或敌对 JavaScript对象内部测试替代状态覆盖。少量重复只用于发现真实 handle/process泄漏，不作为形式化证明。
+不再用固定 2000 轮随机竞态、不可达状态×事件笛卡尔积或敌对 JavaScript对象内部测试替代可达状态覆盖。少量重复只用于发现真实 handle/process泄漏，不作为形式化证明。
 
 ### 7.2 当前宿主真内核
 
@@ -168,22 +168,22 @@ resolver在每次 Windows launch前验证规范路径、无逃逸/reparse、文�
 
 ### 7.3 Kimi/Pi/stdio fake全链
 
-从真实 MCP stdio transport进入 service→adapter→client→fake executable，证明 READY前不发业务请求，取消先走 ACP/RPC原生信号再走 owned terminate，handler/session只在Job归零和stdio settle后完成。不得调用真实模型。
+从真实 MCP stdio transport进入 service→adapter→client→fake executable，证明 READY前不发业务请求，取消先走 ACP/RPC原生信号再走 owned terminate，handler/session只在Job归零和stdio settle后完成。每个adapter只新增正常完成、一次取消或stdio shutdown，以及一个代表性descendant归零全链；Task 4已经覆盖的late-spawn、helper/parent crash、process rebirth与故障矩阵不在这里按Kimi/Pi重复。不得调用真实模型。
 
-Windows上的Kimi/Pi所有调用都必须经过`OwnedAgentProcess`，包括doctor、smoke与qualification preflight中的`--version`/只读诊断；不得因“不调用模型”而保留direct `execa`旁路。POSIX既有版本探针行为保持不变。
+Windows上的Kimi/Pi所有调用都必须经过`OwnedAgentProcess`，包括doctor、smoke与qualification preflight中的`--version`/只读诊断；不得因“不调用模型”而保留direct `execa`旁路。POSIX既有版本探针行为保持不变，本轮不为它增加新的owned-process抽象分支或认证测试。
 
 ## 8. Doctor、资格与发布边界
 
 Windows strict doctor只复用resolver并报告当前OS/Node/libuv/CLR/helper实际摘要，随后运行无target、无凭据的`--probe-v1`；非Windows报告not-applicable。完整单fd3 carrier preflight只由开发/冻结命令运行并写入发布证据，不在普通doctor中重新构建或执行，也不通过持久缓存替代。doctor是本机可用性诊断，不是跨版本认证。
 
-能力指纹必须覆盖影响运行语义的native source、canonical protocol、构建配置和helper实际摘要；不需要覆盖历史计划、审阅稿或跨系统package-set digest。native变化会使八项能力stale，普通`verify:capabilities`与`smoke:release`继续fail closed，直到后续真实8/8形成新证据。
+建立唯一canonical runtime-input manifest，精确枚举影响Windows运行语义的native production source、TypeScript wrapper、canonical protocol、构建配置和helper实际摘要，并由同一实现生成一个确定性digest。能力指纹把该digest作为运行输入，当前宿主冻结证据与tag workflow复用同一manifest和算法；不得另建平行的`current-host runtime fingerprint`实现。helper SHA仍作为manifest内可读的artifact身份，不成为第二套运行输入摘要。历史计划、审阅稿和跨系统package-set digest不进入manifest。native变化会使八项能力stale，普通`verify:capabilities`与`smoke:release`继续fail closed，直到后续真实8/8形成新证据。
 
 GitHub CI改为单一Node 24 Ubuntu job，只证明TypeScript、package、插件与OIDC发布链，不宣称Windows native兼容。Windows权威证据来自维护者当前宿主的preflight、真内核、fake全链、隔离package/plugin和最终真实Stop。
 
 删除远端composite不等于允许任意tag立即发布。release workflow保留轻量、版本化、本地证据绑定：
 
-- beta tag必须存在同版本`.release-validation/v<version>.md`，精确声明`Current-Host-Prequalification: pass`、`Capability-Index: pass`、runtime frozen commit、helper实际SHA和`Current-Host-Runtime-Fingerprint: <sha256>`；该fingerprint由一个确定性实现覆盖Windows native production source、TypeScript wrapper、canonical protocol、build config和helper实际digest，workflow在tagged tree重算并精确比较，同时核对tag/package版本与仓库helper/SHA；
-- stable marker除既有release门禁外，必须精确声明`Public-Beta-Exact-Install: pass`、`Codex-App-Full-Restart: pass`、`Real-App-Stop: pass`、`Owned-Descendants-Zero: pass`、同一helper SHA和同一current-host runtime fingerprint，并用`RC:`绑定已公开beta；
+- beta tag必须存在同版本`.release-validation/v<version>.md`，精确声明`Current-Host-Prequalification: pass`、`Capability-Index: pass`、runtime frozen commit、helper实际SHA和canonical runtime-input digest；workflow在tagged tree用同一manifest实现重算并精确比较，同时核对tag/package版本与仓库helper/SHA；
+- stable marker除既有release门禁外，必须精确声明`Public-Beta-Exact-Install: pass`、`Codex-App-Full-Restart: pass`、`Real-App-Stop: pass`、`Owned-Descendants-Zero: pass`、同一helper SHA和同一canonical runtime-input digest，并用`RC:`绑定已公开beta；
 - marker是可审计发布授权记录，不恢复Windows三shard、remote fetcher、selfDigest或跨OS package digest。
 
 Tasks 2–8完成前不调用真实模型、不修改活动配置/插件、不发布。clean freeze后，沿既有授权执行：
@@ -209,7 +209,8 @@ Tasks 2–8完成前不调用真实模型、不修改活动配置/插件、不�
 | 三方parent-sacrifice carrier observer | 证明载体而非真实owned tree | production helper parent-death真内核测试 |
 | Windows CI三shard/composite attestation | 用户不要求跨版本/跨机器声明 | 单Node JS CI+当前宿主权威证据 |
 | 全package raw-byte/EOL双checkout证明 | 与运行鲁棒性关联弱 | helper实际hash、exact package inclusion与隔离安装 |
-| 多层candidate/core/prequalification wrapper | 重复同一release core | 一个本机prequalification入口+普通release smoke |
+| 多层candidate/core/prequalification wrapper | 重复同一release core | Task 8原子冻结清单+普通release smoke |
+| 专用`smoke:prequalification`命令 | 与Task 8原子命令及普通release smoke重复 | Task 8逐项运行一次并记录预期stale；8/8后只跑普通release smoke |
 
 ## 10. 完成判定
 
@@ -219,7 +220,7 @@ Tasks 2–8完成前不调用真实模型、不修改活动配置/插件、不�
 2. Windows helper满足原子Job归属、唯一owner、句柄/环境隔离和无预算限制；
 3. Kimi直接PE、Pi直接Node+已验证cli.js，不存在production cmd/direct-spawn/PID fallback；
 4. 当前宿主真内核、parent/helper crash、fake Kimi/Pi/stdio与current-host compatible nested Job测试通过且无残留；真实App Stop只在beta后门禁执行；
-5. helper artifact、SHA、resolver、doctor、package、能力指纹与单Node workflow闭合；
+5. helper artifact、SHA、resolver、doctor、package、canonical runtime-input manifest、能力指纹与单Node workflow闭合；
 6. 全量离线/隔离验证通过，工作树clean并由独立规格、质量审阅收敛；
 7. 能力索引仍因预期stale而fail closed，真实模型、活动插件和公开发布尚未发生。
 
