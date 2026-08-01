@@ -110,6 +110,7 @@ function Remove-ExclusiveBuildRoot {
     param(
         [Parameter(Mandatory = $true)][string]$BuildRoot,
         [Parameter(Mandatory = $true)][string]$BuildBase,
+        [string]$ActionOutputName = "",
         [string]$TemporaryGenerated = ""
     )
 
@@ -142,7 +143,14 @@ function Remove-ExclusiveBuildRoot {
             [System.StringComparer]::OrdinalIgnoreCase
         )
         [void]$allowedFiles.Add($generatedPath)
-        [void]$allowedFiles.Add([System.IO.Path]::GetFullPath((Join-Path $generatedDirectory "Fd3Preflight.exe")))
+        if ($ActionOutputName.Length -gt 0) {
+            if ($ActionOutputName -cne "Fd3Preflight.exe" -and $ActionOutputName -cne "ManagedTests.exe") {
+                throw "unsafe action output name"
+            }
+            [void]$allowedFiles.Add(
+                [System.IO.Path]::GetFullPath((Join-Path $generatedDirectory $ActionOutputName))
+            )
+        }
         if ($TemporaryGenerated.Length -gt 0) {
             $resolvedTemporaryGenerated = [System.IO.Path]::GetFullPath($TemporaryGenerated)
             $temporaryParent = [System.IO.Directory]::GetParent($resolvedTemporaryGenerated)
@@ -294,6 +302,15 @@ if (([string[]]$configuration.compilerArguments -join "`n") -cne ($expectedCompi
 }
 
 $resolvedNativeSource = [System.IO.Path]::GetFullPath($nativeRoot)
+$outputName = if ($Action -eq "preflight") {
+    "Fd3Preflight.exe"
+}
+elseif ($Action -eq "test-managed") {
+    "ManagedTests.exe"
+}
+else {
+    ""
+}
 $temporaryRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 [void](Assert-NoReparseExistingPath -Path $temporaryRoot)
 $productRoot = New-VerifiedDirectoryChild -Parent $temporaryRoot -Name "codex-agent-tools"
@@ -393,31 +410,72 @@ if ($pathMap -notlike "/pathmap:*=/_/native/windows-job-helper") {
     throw "windows-native-helper: invalid native path map"
 }
 
-& (Join-Path $nativeRoot "restore-toolchain.ps1") | Out-Null
-
-if ($Action -ne "preflight") {
-    # Later tasks populate the remaining fixed source sets.
-    throw "windows-native-helper: native sources are not available for this action"
-}
-
 Assert-ExactKeys -Value $configuration.sourceSets -Expected @(
     "preflight", "production", "managedTests", "kernelTests", "fixtures"
 )
-$preflightSources = [string[]]$configuration.sourceSets.preflight
-if (($preflightSources -join "`n") -cne "src/Fd3Preflight.cs") {
+
+# Restore remains ahead of action/source availability checks so the exclusive
+# build-root cleanup contract is exercised on every accepted action.
+& (Join-Path $nativeRoot "restore-toolchain.ps1") | Out-Null
+
+$expectedPreflightSources = @("src/Fd3Preflight.cs")
+$expectedProductionSources = @(
+    "src/ControlProtocol.cs",
+    "src/LifecycleMachine.cs",
+    "src/WindowsCommandLine.cs"
+)
+$expectedManagedTestSources = @(
+    "tests/CommandLineTests.cs",
+    "tests/LifecycleMachineTests.cs",
+    "tests/ProtocolTests.cs",
+    "tests/TestAssert.cs",
+    "tests/TestRunner.cs"
+)
+if (
+    ([string[]]$configuration.sourceSets.preflight -join "`n") -cne ($expectedPreflightSources -join "`n") -or
+    ([string[]]$configuration.sourceSets.production -join "`n") -cne ($expectedProductionSources -join "`n") -or
+    ([string[]]$configuration.sourceSets.managedTests -join "`n") -cne ($expectedManagedTestSources -join "`n") -or
+    @([string[]]$configuration.sourceSets.kernelTests).Count -ne 0 -or
+    @([string[]]$configuration.sourceSets.fixtures).Count -ne 0
+) {
     throw "windows-native-helper: invalid native build contract"
 }
-$unresolvedSourcePath = Join-Path $nativeRoot $preflightSources[0]
-if (-not (Test-Path -LiteralPath $unresolvedSourcePath -PathType Leaf)) {
+
+$selectedSources = @()
+if ($Action -eq "preflight") {
+    $selectedSources = $expectedPreflightSources
+}
+elseif ($Action -eq "test-managed") {
+    if (
+        -not [string]::IsNullOrEmpty($Filter) -and
+        $Filter -cne "Protocol" -and
+        $Filter -cne "CommandLine" -and
+        $Filter -cne "LifecycleMachine"
+    ) {
+        throw "windows-native-helper: unsupported managed test filter"
+    }
+    $selectedSources = @($expectedProductionSources) + @($expectedManagedTestSources)
+}
+else {
+    # Later tasks populate kernel, artifact, and aggregate actions.
     throw "windows-native-helper: native sources are not available for this action"
 }
-$sourcePath = Assert-NoReparseExistingPath -Path $unresolvedSourcePath
+
 $sourcePrefix = $resolvedNativeSource.TrimEnd(
     [System.IO.Path]::DirectorySeparatorChar,
     [System.IO.Path]::AltDirectorySeparatorChar
 ) + [System.IO.Path]::DirectorySeparatorChar
-if (-not $sourcePath.StartsWith($sourcePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "windows-native-helper: native source escaped its root"
+$sourcePaths = [System.Collections.Generic.List[string]]::new()
+foreach ($relativeSource in $selectedSources) {
+    $unresolvedSourcePath = Join-Path $nativeRoot $relativeSource
+    if (-not (Test-Path -LiteralPath $unresolvedSourcePath -PathType Leaf)) {
+        throw "windows-native-helper: native sources are not available for this action"
+    }
+    $sourcePath = Assert-NoReparseExistingPath -Path $unresolvedSourcePath
+    if (-not $sourcePath.StartsWith($sourcePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "windows-native-helper: native source escaped its root"
+    }
+    $sourcePaths.Add($sourcePath)
 }
 
 $toolchainPackageRoot = Join-Path $helperRoot "toolchain-v1\packages"
@@ -427,25 +485,48 @@ $compilerPath = Assert-NoReparseExistingPath -Path (
 $referenceRoot = Assert-NoReparseExistingPath -Path (
     Join-Path $toolchainPackageRoot "microsoft.netframework.referenceassemblies.net48.1.0.3\build\.NETFramework\v4.8"
 )
-$preflightOutput = [System.IO.Path]::GetFullPath((Join-Path $generatedDirectory "Fd3Preflight.exe"))
+$nativeOutput = [System.IO.Path]::GetFullPath((Join-Path $generatedDirectory $outputName))
 $compilerArguments = [System.Collections.Generic.List[string]]::new()
 foreach ($argument in $expectedCompilerArguments) {
     $compilerArguments.Add($argument)
 }
 $compilerArguments.Add($pathMap)
-$compilerArguments.Add("/out:" + $preflightOutput)
+$compilerArguments.Add("/out:" + $nativeOutput)
+if ($Action -eq "test-managed") {
+    $compilerArguments.Add("/main:CodexAgentTools.WindowsJobHelper.Tests.TestRunner")
+}
 foreach ($reference in [string[]]$configuration.references) {
     $referencePath = Assert-NoReparseExistingPath -Path (Join-Path $referenceRoot $reference)
     $compilerArguments.Add("/reference:" + $referencePath)
 }
 $compilerArguments.Add($generatedPath)
-$compilerArguments.Add($sourcePath)
+foreach ($sourcePath in $sourcePaths) {
+    $compilerArguments.Add($sourcePath)
+}
 
 $compilerOutput = & $compilerPath @compilerArguments 2>&1
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $preflightOutput -PathType Leaf)) {
-    throw "windows-native-helper: native preflight compilation failed"
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $nativeOutput -PathType Leaf)) {
+    if ($compilerOutput) {
+        $compilerOutput | Write-Output
+    }
+    if ($Action -eq "preflight") {
+        throw "windows-native-helper: native preflight compilation failed"
+    }
+    throw "windows-native-helper: native managed compilation failed"
 }
-[void](Assert-NoReparseExistingPath -Path $preflightOutput)
+[void](Assert-NoReparseExistingPath -Path $nativeOutput)
+
+if ($Action -eq "test-managed") {
+    $managedArguments = @()
+    if (-not [string]::IsNullOrEmpty($Filter)) {
+        $managedArguments = @("--filter", $Filter)
+    }
+    & $nativeOutput @managedArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "windows-native-helper: managed tests failed"
+    }
+    return
+}
 
 $expectedHarness = [System.IO.Path]::GetFullPath((Join-Path ([System.IO.Directory]::GetParent($nativeRoot).Parent.FullName) "scripts\windows-native-helper.mjs"))
 if (
@@ -459,7 +540,7 @@ $nodePath = Assert-NoReparseExistingPath -Path $InternalNodePath
 $harnessPath = Assert-NoReparseExistingPath -Path $InternalHarnessPath
 $env:CODEX_WINDOWS_NATIVE_PREFLIGHT_INTERNAL = "1"
 try {
-    & $nodePath $harnessPath "__preflight-harness-v1" $preflightOutput
+    & $nodePath $harnessPath "__preflight-harness-v1" $nativeOutput
     if ($LASTEXITCODE -ne 0) {
         throw "windows-native-helper: fd3 preflight failed"
     }
@@ -472,5 +553,6 @@ finally {
     Remove-ExclusiveBuildRoot `
         -BuildRoot $buildRoot `
         -BuildBase $buildBase `
+        -ActionOutputName $outputName `
         -TemporaryGenerated $temporaryGenerated
 }

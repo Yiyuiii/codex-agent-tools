@@ -419,6 +419,53 @@ describe("Windows job protocol v1", () => {
     expect(() => decodeWindowsJobFrame(rawFrame(1, badArgcPayload))).toThrow(/protocol/i);
   });
 
+  it("uses the shared fully-qualified Windows path boundary vectors", () => {
+    const acceptedPaths = [
+      "C:\\root\\target.exe",
+      "c:/root/target.exe",
+      "\\\\server\\share\\target.exe",
+      "//server/share/target.exe",
+    ] as const;
+    const rejectedPaths = [
+      "target.exe",
+      "Å:\\target.exe",
+      "\\root\\target.exe",
+      "/root/target.exe",
+      "\\\\server",
+      "\\\\server\\",
+      "\\\\server\\\\target.exe",
+      "///server/share/target.exe",
+    ] as const;
+
+    for (const acceptedPath of acceptedPaths) {
+      const frame = {
+        type: "launchConfig" as const,
+        executable: acceptedPath,
+        cwd: acceptedPath,
+        argv: ["\uFEFFargument"],
+      };
+      expect(decodeWindowsJobFrame(encodeWindowsJobFrame(frame))).toEqual(frame);
+    }
+    for (const rejectedPath of rejectedPaths) {
+      expect(() =>
+        encodeWindowsJobFrame({
+          type: "launchConfig",
+          executable: rejectedPath,
+          cwd: "C:\\work",
+          argv: [],
+        }),
+      ).toThrowError("Windows job protocol violation.");
+      expect(() =>
+        encodeWindowsJobFrame({
+          type: "launchConfig",
+          executable: "C:\\target.exe",
+          cwd: rejectedPath,
+          argv: [],
+        }),
+      ).toThrowError("Windows job protocol violation.");
+    }
+  });
+
   it("rejects a UTF-8 BOM before an executable path in both directions", () => {
     const protocolError = "Windows job protocol violation.";
     expect(() =>

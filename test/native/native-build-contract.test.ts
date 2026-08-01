@@ -401,8 +401,18 @@ describe("Windows native helper build contract", () => {
       },
       sourceSets: {
         preflight: ["src/Fd3Preflight.cs"],
-        production: [],
-        managedTests: [],
+        production: [
+          "src/ControlProtocol.cs",
+          "src/LifecycleMachine.cs",
+          "src/WindowsCommandLine.cs",
+        ],
+        managedTests: [
+          "tests/CommandLineTests.cs",
+          "tests/LifecycleMachineTests.cs",
+          "tests/ProtocolTests.cs",
+          "tests/TestAssert.cs",
+          "tests/TestRunner.cs",
+        ],
         kernelTests: [],
         fixtures: [],
       },
@@ -683,6 +693,40 @@ describe("Windows native helper build contract", () => {
           "preserve-evidence",
         );
 
+        const crossActionRoot = join(fixtureRoot, "cross-action-output");
+        const crossActionTemp = join(fixtureRoot, "cross-action-temp");
+        mkdirSync(crossActionRoot);
+        mkdirSync(crossActionTemp);
+        for (const name of ["build.ps1", "build.config.json", "protocol.v1.json"]) {
+          copyFileSync(resolve(nativeRoot, name), join(crossActionRoot, name));
+        }
+        writeFileSync(
+          join(crossActionRoot, "restore-toolchain.ps1"),
+          [
+            "$base = Join-Path $env:TEMP 'codex-agent-tools\\windows-job-helper\\build-v1'",
+            "$root = @(Get-ChildItem -LiteralPath $base -Directory)[0].FullName",
+            "$generated = Join-Path $root 'generated'",
+            "[System.IO.File]::WriteAllBytes((Join-Path $generated 'ManagedTests.exe'), [byte[]](1, 2, 3))",
+            "",
+          ].join("\n"),
+        );
+        const crossActionResult = runPowerShell(
+          join(crossActionRoot, "build.ps1"),
+          "preflight",
+          { ...process.env, TEMP: crossActionTemp, TMP: crossActionTemp },
+        );
+        expect(crossActionResult.status).toBe(1);
+        expect(crossActionResult.stderr).toContain(
+          "windows-native-helper: native build cleanup failed",
+        );
+        const crossActionRoots = buildInvocationRoots(crossActionTemp);
+        expect(crossActionRoots).toHaveLength(1);
+        expect(
+          readFileSync(
+            join(crossActionRoots[0] as string, "generated", "ManagedTests.exe"),
+          ),
+        ).toEqual(Buffer.from([1, 2, 3]));
+
         const runnerFixture = join(fixtureRoot, "runner-fixture");
         const malicious = join(fixtureRoot, "malicious-path");
         mkdirSync(join(runnerFixture, "scripts"), { recursive: true });
@@ -854,6 +898,12 @@ describe("Windows native helper build contract", () => {
     expect(build).toContain("windows-native-helper: native path contains a reparse point");
     expect(build).toContain("Remove-ExclusiveBuildRoot");
     expect(build).toContain("windows-native-helper: native build cleanup failed");
+    expect(build).toContain(
+      "windows-native-helper: native preflight compilation failed",
+    );
+    expect(build).toContain(
+      "windows-native-helper: native managed compilation failed",
+    );
     expect(build).toContain(
       'Write-Output "windows-native-helper: generated protocol constants verified"',
     );

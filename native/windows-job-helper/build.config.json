@@ -24,8 +24,18 @@
   },
   "sourceSets": {
     "preflight": ["src/Fd3Preflight.cs"],
-    "production": [],
-    "managedTests": [],
+    "production": [
+      "src/ControlProtocol.cs",
+      "src/LifecycleMachine.cs",
+      "src/WindowsCommandLine.cs"
+    ],
+    "managedTests": [
+      "tests/CommandLineTests.cs",
+      "tests/LifecycleMachineTests.cs",
+      "tests/ProtocolTests.cs",
+      "tests/TestAssert.cs",
+      "tests/TestRunner.cs"
+    ],
     "kernelTests": [],
     "fixtures": []
   },

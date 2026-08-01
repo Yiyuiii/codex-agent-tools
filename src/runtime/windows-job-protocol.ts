@@ -1,4 +1,3 @@
-import { win32 } from "node:path";
 import { TextDecoder } from "node:util";
 
 import protocolV1 from "../../native/windows-job-helper/protocol.v1.json" with {
@@ -120,8 +119,47 @@ function assertUInt32(value: number): void {
   }
 }
 
+function isWindowsSeparator(value: string): boolean {
+  return value === "\\" || value === "/";
+}
+
+function isFullyQualifiedWindowsPath(value: string): boolean {
+  if (
+    value.length >= 3 &&
+    /^[A-Za-z]$/.test(value[0] as string) &&
+    value[1] === ":" &&
+    isWindowsSeparator(value[2] as string)
+  ) {
+    return true;
+  }
+  if (
+    value.length < 5 ||
+    !isWindowsSeparator(value[0] as string) ||
+    !isWindowsSeparator(value[1] as string) ||
+    isWindowsSeparator(value[2] as string)
+  ) {
+    return false;
+  }
+
+  let serverEnd = 2;
+  while (
+    serverEnd < value.length &&
+    !isWindowsSeparator(value[serverEnd] as string)
+  ) {
+    serverEnd += 1;
+  }
+  if (serverEnd === 2 || serverEnd >= value.length - 1) {
+    return false;
+  }
+  const shareStart = serverEnd + 1;
+  return !isWindowsSeparator(value[shareStart] as string);
+}
+
 function assertAbsolutePath(value: string, allowEmpty: boolean): void {
-  if ((!allowEmpty && value.length === 0) || !win32.isAbsolute(value)) {
+  if (
+    (!allowEmpty && value.length === 0) ||
+    !isFullyQualifiedWindowsPath(value)
+  ) {
     throw protocolError();
   }
 }

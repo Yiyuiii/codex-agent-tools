@@ -321,10 +321,10 @@ function parseFilter(commandName, argumentsList) {
     return "";
   }
   if (
-    (commandName === "test-managed" || commandName === "test-kernel") &&
+    commandName === "test-managed" &&
     argumentsList.length === 2 &&
     argumentsList[0] === "--filter" &&
-    /^[A-Za-z][A-Za-z0-9_.-]*$/.test(argumentsList[1])
+    new Set(["Protocol", "CommandLine", "LifecycleMachine"]).has(argumentsList[1])
   ) {
     return argumentsList[1];
   }
