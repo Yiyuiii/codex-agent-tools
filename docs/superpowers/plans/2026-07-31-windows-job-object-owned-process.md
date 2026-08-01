@@ -99,7 +99,7 @@ canonical JSON的枚举/限制段必须精确为以下内容，generator只允�
 - Modify: `package.json`
 - Modify: `.gitattributes`
 
-- [ ] **Step 1：先写工具链与协议 RED 测试**
+- [x] **Step 1：先写工具链与协议 RED 测试**
 
 测试必须断言：精确 NuGet package/version/official flat-container URL/长度/SHA-256/SHA-512；精确 Node archive URL 与以下官方 SHA-256；固定编译参数、x64、排序 source list、临时目录输出；协议 mode、枚举、payload、golden vectors、short read、合并帧、坏 magic/version/type/length/UTF-8/NUL/argc/string/frame 上限。
 
@@ -117,7 +117,7 @@ npx vitest run test/native/native-build-contract.test.ts test/runtime/windows-jo
 
 预期：因锁文件、脚本、协议模块和 fixture 不存在而失败。
 
-- [ ] **Step 2：锁定官方工具链并实现共享协议 codec**
+- [x] **Step 2：锁定官方工具链并实现共享协议 codec**
 
 规划阶段已从以下官方 NuGet flat-container HTTPS URL独立下载并冻结长度、SHA-256与SHA-512；正式 `restore-toolchain.ps1` 从第一次运行起只允许下载到经解析验证的系统临时目录并与这些精确值校验，绝不提供 bootstrap/refresh/update-lock模式，任何漂移 fail closed：
 
@@ -137,7 +137,7 @@ sha512 5d62a0c9e35a74d71341a215bd007c06b74236b11aafa7e8fdd7b539d41167d1c5cb48dc0
 
 最终固定 package scripts 为：`native:preflight`（三版全跑）、`native:preflight:current`（当前锁定版本）、`native:test:managed`、`native:test:kernel`、`native:verify`、`native:update-artifact`、`test:native`；全部只委托 `scripts/windows-native-helper.mjs` 的固定 subcommand，不接受工具链/helper/path override。
 
-- [ ] **Step 3：验证并提交**
+- [x] **Step 3：验证并提交**
 
 ```powershell
 npx vitest run test/native/native-build-contract.test.ts test/runtime/windows-job-protocol.test.ts
@@ -149,6 +149,8 @@ git commit -m "feat: freeze Windows helper protocol and toolchain"
 ```
 
 预期：全部通过，下载/解包/编译缓存只在系统临时目录，仓库没有生成物。
+
+完成证据（2026-08-01）：提交 `88cf22b`；fresh 聚焦测试 23/23、正式工具链 restore、类型检查、完整构建与 diff whitespace 全部通过。规格复审 `PASS`，质量复审 `Ready: Yes`；改动精确命中 Task 1 的 11 个文件，临时 build root、测试 fixture 和仓库二进制缓存均为 0。质量闭环额外覆盖了协议深冻结与固定错误、BOM、跨 push 线性解码、完整展开树验真、并发 restore、独占 build root、ancestor junction、非递归清理和绝对 System32 PowerShell。
 
 ## Task 2：证明 Node 20/22/24 与 C# fd3 控制载体成立
 
