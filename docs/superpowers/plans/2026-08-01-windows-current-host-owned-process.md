@@ -102,7 +102,7 @@ Windows command line与生命周期纯状态机由`native:test:managed`中的C#�
 
 ## 5. Task 4：Win32 Job、句柄隔离与真实kernel helper
 
-**状态（2026-08-01，第一原子批次）：** 提交`b590e21`已建立x64 Win32 ABI/SafeHandle、`CREATE_SUSPENDED + HANDLE_LIST + JOB_LIST`同次原子创建、精确owned Job成员查询、仅复制0/1/2、`KILL_ON_JOB_CLOSE`、resume/READY门控与严格build入口。stop-before-resume不会调用`ResumeThread`；resume返回0的故障会先真实运行阻塞fixture再伪报失败，返回2保持suspended，两者都用非继承process witness证明Job关闭后进程归零。首错保持不变，但后续Terminate/Query cleanup失败仍可在无法证明Job-zero时best-effort发送一次`ERROR`。最终kernel 13/13、managed 54/54、TypeScript聚焦14/14、当前宿主preflight 5/5、类型检查、diff check、临时根与仓库artifact归零均通过；fresh规格与质量复审PASS/Ready。完整fd3 production loop、自然root/grandchild、Terminate/Query/terminal故障、helper kill与Node parent death仍属于本Task第二原子批次。
+**状态（2026-08-01，已完成）：** 第一批提交`b590e21`建立x64 Win32 ABI/SafeHandle、`CREATE_SUSPENDED + HANDLE_LIST + JOB_LIST`原子创建、仅复制0/1/2、`KILL_ON_JOB_CLOSE`、resume/READY门控与严格build入口；完成提交`6d8c585`增加单fd3 OVERLAPPED control loop、唯一cleanup/terminal、自然root+grandchild drain、完整故障代表和helper/Node parent两条真实崩溃回收。production carrier只保留natural、cancel、post-READY EOF与malformed四条独立因果路径；`timedOut`和`sessionShutdown`的真实producer分别留给Task 5/6，service/handler late-spawn/no-rebirth也由Task 6一个跨adapter共享代表负责。最终当前宿主preflight 5/5、managed 5套76例（测试替身竞态修复后额外连续5轮全绿）、kernel 2套24例（含crash 2例）、production carrier 4例、TypeScript聚焦14/14、全库61文件988 passed / 1 skipped、类型检查、格式/diff检查、临时根与仓库artifact归零均通过；fresh规格与质量复审最终PASS/Ready。未调用真实模型，未读写活动配置，未变更插件或发布，也未增加外部CLI默认/全局限制。
 
 ### 5.1 RED
 
