@@ -1,1 +1,2 @@
-docs/smoke/evidence/** text eol=lf
+* text=auto eol=lf
+*.exe binary

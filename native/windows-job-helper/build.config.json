@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "targetFramework": "net48",
+  "configuration": "Release",
+  "platform": "x64",
+  "compilerArguments": [
+    "/noconfig",
+    "/nostdlib+",
+    "/target:exe",
+    "/platform:x64",
+    "/optimize+",
+    "/debug-",
+    "/deterministic+",
+    "/checked+",
+    "/unsafe-",
+    "/langversion:latest",
+    "/utf8output",
+    "/filealign:512"
+  ],
+  "references": ["mscorlib.dll", "System.dll", "System.Core.dll"],
+  "pathMap": {
+    "sourceRoot": "native/windows-job-helper",
+    "virtualRoot": "/_/native/windows-job-helper"
+  },
+  "sourceSets": {
+    "production": [],
+    "managedTests": [],
+    "kernelTests": [],
+    "fixtures": []
+  },
+  "output": {
+    "root": "system-temp",
+    "repositoryOutputsForbidden": true
+  },
+  "generatedProtocolConstants": {
+    "relativePath": "generated/ProtocolV1.g.cs",
+    "sha256": "83f6475ea08f51d713da8e27e2b85edba6d9714b467ac592906fc792ca17882d"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "mode": { "control": "--control-v1", "probe": "--probe-v1" },
+  "frame": {
+    "magic": "CAJ1",
+    "version": 1,
+    "headerBytes": 12,
+    "maxPayloadBytes": 1048576
+  },
+  "limits": {
+    "maxStringBytes": 65536,
+    "maxArgCount": 1024,
+    "maxCmdUtf16UnitsIncludingNul": 8191
+  },
+  "messageType": {
+    "launchConfig": 1,
+    "ready": 2,
+    "terminate": 3,
+    "error": 4,
+    "exit": 5
+  },
+  "invocationKind": { "native": 1, "cmd": 2 },
+  "reason": {
+    "noneOrRootExit": 0,
+    "cancelled": 1,
+    "timedOut": 2,
+    "sessionShutdown": 3,
+    "protocolError": 4
+  },
+  "stage": {
+    "protocolInvalid": 1,
+    "cancelledBeforeReady": 2,
+    "jobCreateFailed": 3,
+    "jobConfigFailed": 4,
+    "stdioDuplicateFailed": 5,
+    "attributeListInitFailed": 6,
+    "handleListAttributeFailed": 7,
+    "jobListAttributeFailed": 8,
+    "commandLineInvalid": 9,
+    "createFailed": 10,
+    "resumeFailed": 11,
+    "terminateJobFailed": 12,
+    "queryJobFailed": 13,
+    "controlChannelFailed": 14,
+    "helperInternal": 15,
+    "waitFailed": 16
+  }
+}
