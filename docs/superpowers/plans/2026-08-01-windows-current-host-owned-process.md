@@ -191,13 +191,15 @@ git diff --check
 
 **第五子批状态（2026-08-02，smoke owned evidence已完成）：** 提交`3daff2b`把当前Kimi/Pi smoke producer统一升级为evidence schema v4，删除直接目标`--version`探针、`tasklist`/WMI/`pgrep`全机快照、PID计数与`process_residual`结论。四种runtime/task组合只接受精确完整的业务检查集合，并要求一次adapter调用、零retry/auto-retry、无fallback及本次调用`ownedProcessDrained:true`；业务失败仍可独立记录排空事实。历史v2/v3只读类型保留，current资格consumer尚未升级前必须继续fail closed。最终5个聚焦文件141/141、类型与diff通过，fresh只读复审PASS。下一子批按artifact protocol v3/evidence v4迁移preflight、checkpoint、manifest、verifier、capability index与coordinator，再删除全机scanner。
 
+**第六子批状态（2026-08-02，资格协议与scanner接线已完成）：** 提交`754a796`建立current preflight/checkpoint/manifest schema v3与evidence v4，历史schema v1/evidence v2及schema v2/evidence v3继续严格验证；共享current evidence contract在ledger写checkpoint前、immutable verifier和capability index三处统一校验四种runtime/task精确checks、owned drain、结果文件与命令诊断，runner不能用伪`passed:true`生成promotionEligible terminal。preflight只记录Node/Codex版本，Windows静态Pi检查与adapter同为`process.execPath + 单一绝对CLI`，不启动目标；coordinator/gate删除全部全机扫描，lock recovery只用owner PID+start identity并可按磁盘协议把历史未终结schema2批次关闭为interrupted。review producer同时删去冗余`commandCount:0`，真实四LLM×两任务八种生产形状直接通过共享contract。终审三轮修复伪passed、历史恢复、scanner类型残留及review形状漂移后PASS；主线程最终12文件416 passed / 1 POSIX-only skipped、类型/diff通过。公共npm acceptance的最后两次全机扫描与runtime scanner文件本身仍待下一子批删除。
+
 ### 7.1 RED
 
 - Kimi/Pi Windows路径仍依赖direct spawn、PID terminator或`pi.cmd`执行的合同测试先失败；
 - Pi locator尚不能从当前安装解析/验证package name/version/bin/realpath/engine并返回结构化`PiInvocation`；
-- qualification preflight和公共验收消费者仍有旧target探针或全机扫描；smoke中的直接target探针已经删除；
+- 公共npm验收仍有全机扫描；smoke、preflight、coordinator、gate与lock recovery中的target探针/扫描已经删除；
 - stdio真实fake链尚不能证明handler/session只在owned tree归零后settle；
-- qualification preflight/coordinator/lock recovery与公共npm验收仍通过`src/runtime/agent-processes.ts`调用WMI/`ps`，把全机Kimi/Pi/real-smoke为零当作本case成功或恢复条件；无关外部CLI/旧插件会被误判为泄漏，现行current preflight仍生成该全机计数字段。
+- 公共npm验收仍通过`src/runtime/agent-processes.ts`调用WMI/`ps`并要求全机Kimi/Pi/real-smoke为零；资格producer、coordinator和lock recovery已不再消费该字段，下一子批必须删除公共验收调用与scanner实现/专用测试。
 
 ### 7.2 GREEN
 
