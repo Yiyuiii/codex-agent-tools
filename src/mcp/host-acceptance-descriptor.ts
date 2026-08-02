@@ -9,16 +9,21 @@ import protocol from "../../host-acceptance/protocol/observer-protocol.v1.json" 
 import { parseStrictJsonBytes } from "../runtime/strict-json.js";
 
 const DESCRIPTOR_ERROR = "Host acceptance descriptor is invalid.";
-const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
-const SHA1_PATTERN = /^[a-f0-9]{40}$/u;
-const COMMIT_PATTERN = /^[a-f0-9]{40}$/u;
-const VERSION_PATTERN =
-  /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*$/u;
-const OBSERVER_PATH =
-  "host-acceptance/win32-x64/codex-host-acceptance-observer.exe";
-const BUILD_MANIFEST_PATH = "host-acceptance/observer-build-inputs.v1.json";
-const PROTOCOL_PATH =
-  "host-acceptance/protocol/observer-protocol.v1.json";
+const SHA256_PATTERN = new RegExp(protocol.descriptor.sha256Pattern, "u");
+const SHA1_PATTERN = new RegExp(protocol.descriptor.sha1Pattern, "u");
+const COMMIT_PATTERN = new RegExp(protocol.descriptor.commitPattern, "u");
+const VERSION_PATTERN = new RegExp(
+  protocol.descriptor.publicBetaVersionPattern,
+  "u",
+);
+const NPM_INTEGRITY_PATTERN = new RegExp(
+  protocol.descriptor.npmIntegrityPattern,
+  "u",
+);
+const LLM_PATTERN = new RegExp(protocol.descriptor.llmPattern, "u");
+const OBSERVER_PATH = protocol.descriptor.fixedPaths.observerArtifact;
+const BUILD_MANIFEST_PATH = protocol.descriptor.fixedPaths.buildManifest;
+const PROTOCOL_PATH = protocol.descriptor.fixedPaths.protocol;
 
 export const HOST_ACCEPTANCE_DESCRIPTOR_RELATIVE_PATH =
   protocol.descriptor.relativePath;
@@ -224,7 +229,7 @@ export function parseHostAcceptanceDescriptorBytes(
     const tag = exactString(beta.tag, `v${version}`);
     const markerPath = exactString(
       beta.markerPath,
-      `.release-validation/v${version}.json`,
+      `${protocol.descriptor.fixedPaths.markerPrefix}${version}${protocol.descriptor.fixedPaths.markerSuffix}`,
     );
     const observer = record(beta.observerArtifact);
     exactKeys(observer, protocol.descriptor.observerArtifactKeys);
@@ -239,14 +244,14 @@ export function parseHostAcceptanceDescriptorBytes(
     exactKeys(npm, protocol.descriptor.npmKeys);
     const integrity = matchingString(
       npm.integrity,
-      /^sha512-[A-Za-z0-9+/]{86}==$/u,
+      NPM_INTEGRITY_PATTERN,
       256,
     );
 
     const request = record(root.request);
     exactKeys(request, protocol.descriptor.requestKeys);
     if (request.task !== "delegate") invalidDescriptor();
-    const llm = matchingString(request.llm, /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u, 128);
+    const llm = matchingString(request.llm, LLM_PATTERN, 128);
     const promptSha256 = digest(request.promptSha256);
     const cwdSha256 = digest(request.cwdSha256);
     const timeoutMs =
@@ -254,7 +259,7 @@ export function parseHostAcceptanceDescriptorBytes(
         ? null
         : typeof request.timeoutMs === "number" &&
             Number.isSafeInteger(request.timeoutMs) &&
-            request.timeoutMs >= 1_000
+            request.timeoutMs >= protocol.descriptor.minimumTimeoutMs
           ? request.timeoutMs
           : invalidDescriptor();
     const sessionIdSha256 =

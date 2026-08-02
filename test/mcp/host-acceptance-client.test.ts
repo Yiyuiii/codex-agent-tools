@@ -18,6 +18,9 @@ import {
   type HostAcceptancePipeTransport,
 } from "../../src/mcp/host-acceptance-client.js";
 import type { HostAcceptanceLifecycleEvent } from "../../src/mcp/host-acceptance-events.js";
+import protocol from "../../host-acceptance/protocol/observer-protocol.v1.json" with {
+  type: "json",
+};
 
 const SHA256_A = "a".repeat(64);
 const SHA256_B = "b".repeat(64);
@@ -57,16 +60,15 @@ function descriptorValue(overrides: Record<string, unknown> = {}) {
       markerSha256: SHA256_A,
       pluginArtifactTreeDigestSha256: SHA256_B,
       observerArtifact: {
-        path:
-          "host-acceptance/win32-x64/codex-host-acceptance-observer.exe",
+        path: protocol.descriptor.fixedPaths.observerArtifact,
         sha256: SHA256_C,
         protocolVersion: 1,
         buildManifest: {
-          path: "host-acceptance/observer-build-inputs.v1.json",
+          path: protocol.descriptor.fixedPaths.buildManifest,
           sha256: SHA256_A,
         },
         protocol: {
-          path: "host-acceptance/protocol/observer-protocol.v1.json",
+          path: protocol.descriptor.fixedPaths.protocol,
           sha256: SHA256_B,
         },
         inputsDigestSha256: SHA256_C,
@@ -220,6 +222,42 @@ describe("host acceptance descriptor", () => {
         packageName: "codex-agent-tools",
         packageVersion: "0.1.1-beta.1",
       }),
+    ).toThrow(/descriptor is invalid/iu);
+  });
+
+  it("takes beta-version and timeout boundaries from the protocol contract", () => {
+    const stable = descriptorValue();
+    stable.publicBeta.version = "0.1.1";
+    stable.publicBeta.tag = "v0.1.1";
+    stable.publicBeta.markerPath = `${protocol.descriptor.fixedPaths.markerPrefix}0.1.1${protocol.descriptor.fixedPaths.markerSuffix}`;
+    expect(() =>
+      parseHostAcceptanceDescriptorBytes(Buffer.from(JSON.stringify(stable)), {
+        packageName: protocol.descriptor.packageName,
+        packageVersion: "0.1.1",
+      }),
+    ).toThrow(/descriptor is invalid/iu);
+
+    const belowMinimum = computeHostAcceptanceDelegateInputIdentity({
+      ...ACCEPTANCE_INPUT,
+      timeoutMs: protocol.descriptor.minimumTimeoutMs - 1,
+    });
+    const invalidTimeout = descriptorValue();
+    invalidTimeout.request = {
+      task: "delegate",
+      ...belowMinimum,
+      completionMarkerId: MARKER_ID,
+      completionMarkerIdentitySha256:
+        computeHostAcceptanceCompletionMarkerIdentitySha256({
+          nonce: NONCE_A,
+          completionMarkerId: MARKER_ID,
+          inputIdentitySha256: belowMinimum.inputIdentitySha256,
+        }),
+    };
+    expect(() =>
+      parseHostAcceptanceDescriptorBytes(
+        Buffer.from(JSON.stringify(invalidTimeout)),
+        { packageName: "codex-agent-tools", packageVersion: "0.1.1-beta.1" },
+      ),
     ).toThrow(/descriptor is invalid/iu);
   });
 

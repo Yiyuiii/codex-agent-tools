@@ -4,9 +4,28 @@
   "descriptor": {
     "relativePath": "codex-agent-tools/host-acceptance/session.v1.json",
     "maximumBytes": 16384,
+    "packageName": "codex-agent-tools",
     "noncePattern": "^[A-Za-z0-9_-]{43,128}$",
     "pipeNamePattern": "^codex-agent-tools-host-acceptance-[a-f0-9]{32,64}$",
     "completionMarkerIdPattern": "^[a-z0-9][a-z0-9_-]{15,63}$",
+    "publicBetaVersionPattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*$",
+    "sha256Pattern": "^[a-f0-9]{64}$",
+    "sha1Pattern": "^[a-f0-9]{40}$",
+    "commitPattern": "^[a-f0-9]{40}$",
+    "npmIntegrityPattern": "^sha512-[A-Za-z0-9+/]{86}==$",
+    "llmPattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+    "minimumTimeoutMs": 1000,
+    "fixedPaths": {
+      "observerArtifact": "host-acceptance/win32-x64/codex-host-acceptance-observer.exe",
+      "buildManifest": "host-acceptance/observer-build-inputs.v1.json",
+      "protocol": "host-acceptance/protocol/observer-protocol.v1.json",
+      "markerPrefix": ".release-validation/v",
+      "markerSuffix": ".json",
+      "windowsJobHelper": "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+      "capabilityIndex": "docs/smoke/evidence/capabilities.json",
+      "currentHostFreezePrefix": ".release-validation/evidence/current-host-",
+      "currentHostFreezeSuffix": ".json"
+    },
     "topLevelKeys": [
       "schemaVersion",
       "protocolVersion",
@@ -121,6 +140,7 @@
         "requestIdType",
         "requestCorrelationSha256"
       ]
-    }
+    },
+    "mcpKeys": ["pid", "packageName", "version"]
   }
 }
