@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable, Writable } from "node:stream";
@@ -8,6 +8,12 @@ import * as acp from "@agentclientprotocol/sdk";
 import type { TaskKind } from "../../domain/types.js";
 import type { AdapterExecutionTelemetry } from "../adapter.js";
 import { scheduleDeadline } from "../../runtime/deadline.js";
+import {
+  spawnOwnedAgentProcess,
+  type OwnedAgentProcess,
+  type OwnedTerminationReason,
+  type SpawnOwnedAgentProcessRequest,
+} from "../../runtime/owned-agent-process.js";
 import { redactText } from "../../runtime/redaction.js";
 import { terminateProcessTree } from "../../runtime/process-tree.js";
 import {
@@ -57,7 +63,19 @@ export interface KimiAcpRunRequest {
   terminationGraceMs?: number;
   secretValues?: readonly string[];
   signal?: AbortSignal;
+  shutdownSignal?: AbortSignal;
   onProgress?: (message: string) => void;
+}
+
+export interface KimiAcpClientDependencies {
+  readonly platform?: NodeJS.Platform;
+  readonly spawnOwnedAgentProcess?: (
+    request: SpawnOwnedAgentProcessRequest,
+  ) => Promise<OwnedAgentProcess>;
+  readonly notifySessionCancel?: (
+    context: acp.ClientContext,
+    sessionId: string,
+  ) => Promise<void>;
 }
 
 export interface KimiAcpRunResult {
@@ -77,7 +95,7 @@ interface ModelSelection {
   value: string;
 }
 
-const KIMI_CHILD_CLOSE_TIMEOUT_MS = 1_000;
+const POSIX_CHILD_CLOSE_TIMEOUT_MS = 1_000;
 
 async function waitForChildClose(
   childClosed: Promise<void>,
@@ -86,7 +104,7 @@ async function waitForChildClose(
   const closed = await Promise.race([
     childClosed.then(() => true),
     new Promise<boolean>((resolve) => {
-      timer = setTimeout(() => resolve(false), KIMI_CHILD_CLOSE_TIMEOUT_MS);
+      timer = setTimeout(() => resolve(false), POSIX_CHILD_CLOSE_TIMEOUT_MS);
     }),
   ]);
   if (timer !== undefined) {
@@ -247,8 +265,20 @@ function collectUpdate(
   }
 }
 
+function isExpectedCancellationClose(
+  error: unknown,
+  cancellationReason: OwnedTerminationReason | undefined,
+): boolean {
+  return (
+    cancellationReason !== undefined &&
+    error instanceof Error &&
+    error.message === "ACP connection closed"
+  );
+}
+
 export async function runKimiAcp(
   request: KimiAcpRunRequest,
+  dependencies: KimiAcpClientDependencies = {},
 ): Promise<KimiAcpRunResult> {
   const startedAt = Date.now();
   const events: KimiAcpEvent[] = [];
@@ -256,7 +286,7 @@ export async function runKimiAcp(
   const diagnostics: string[] = [];
   const secrets = request.secretValues ?? [];
   const heartbeatMs = request.heartbeatMs ?? 15_000;
-  const terminationGraceMs = request.terminationGraceMs ?? 1_000;
+  const platform = dependencies.platform ?? process.platform;
   let status: KimiRunStatus = "failed";
   let actualModel: string | undefined;
   let sessionId: string | undefined;
@@ -264,11 +294,35 @@ export async function runKimiAcp(
   let directSessionId: string | undefined;
   let stderr = "";
   let spawnError: Error | undefined;
-  let cancellationReason: "cancelled" | "timed_out" | undefined;
+  let cancellationReason: OwnedTerminationReason | undefined;
   let clientContext: acp.ClientContext | undefined;
+  let connection: acp.ClientConnection | undefined;
   const requestCancellation = new AbortController();
   let killTimer: NodeJS.Timeout | undefined;
   let promptSubmitted = false;
+  let directChild: ChildProcessWithoutNullStreams | undefined;
+  let directChildClosed: Promise<void> | undefined;
+  let owned: OwnedAgentProcess | undefined;
+  let ownedTermination: Promise<void> | undefined;
+  const preStartCancellation = Symbol("pre-start-cancellation");
+
+  const beginOwnedTermination = (
+    process: OwnedAgentProcess,
+    reason: OwnedTerminationReason,
+  ): Promise<void> => {
+    if (ownedTermination !== undefined) {
+      return ownedTermination;
+    }
+    let started: Promise<void>;
+    try {
+      started = process.terminate(reason);
+    } catch (error) {
+      started = Promise.reject(error);
+    }
+    ownedTermination = started;
+    void started.catch(() => undefined);
+    return started;
+  };
 
   const emitProgress = (message: string): void => {
     try {
@@ -278,48 +332,56 @@ export async function runKimiAcp(
     }
   };
 
-  const child = spawn(request.executable, [...request.args], {
-    cwd: request.cwd,
-    env: request.environment,
-    detached: process.platform !== "win32",
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true,
-  });
-  const childClosed = new Promise<void>((resolve) => {
-    child.once("close", () => resolve());
-  });
-  child.once("error", (error) => {
-    spawnError = error;
-  });
-  child.stderr.on("data", (chunk: Buffer) => {
-    stderr = `${stderr}${chunk.toString("utf8")}`.slice(-65_536);
-  });
-  emitProgress("kimi process started");
-
-  const cancel = (reason: "cancelled" | "timed_out"): void => {
+  const cancel = (reason: OwnedTerminationReason): void => {
     if (cancellationReason !== undefined) {
       return;
     }
     cancellationReason = reason;
     requestCancellation.abort();
-    emitProgress(`kimi ${reason}`);
-    if (clientContext !== undefined && sessionId !== undefined) {
-      void clientContext
-        .notify(acp.methods.agent.session.cancel, { sessionId })
-        .catch((error: unknown) => {
+    emitProgress(
+      `kimi ${reason === "session_shutdown" ? "session shutdown" : reason}`,
+    );
+
+    const nativeCancel = async (): Promise<void> => {
+      if (clientContext !== undefined && sessionId !== undefined) {
+        try {
+          await (
+            dependencies.notifySessionCancel ??
+            ((context: acp.ClientContext, id: string) =>
+              context.notify(acp.methods.agent.session.cancel, {
+                sessionId: id,
+              }))
+          )(clientContext, sessionId);
+        } catch (error) {
           diagnostics.push(`ACP session cancel failed: ${String(error)}`);
-        });
+        }
+      }
+    };
+
+    if (platform === "win32" && owned !== undefined) {
+      const nativeCancellation = nativeCancel();
+      void nativeCancellation.catch(() => undefined);
+      beginOwnedTermination(owned, reason);
+      return;
     }
-    if (child.pid !== undefined) {
+
+    void nativeCancel();
+    if (directChild?.pid !== undefined) {
       killTimer = setTimeout(() => {
-        void terminateProcessTree(child.pid!).catch(() => undefined);
-      }, terminationGraceMs);
+        void terminateProcessTree(directChild!.pid!).catch(() => undefined);
+      }, request.terminationGraceMs ?? 1_000);
     }
   };
 
   const onCallerAbort = (): void => cancel("cancelled");
+  const onSessionShutdown = (): void => cancel("session_shutdown");
+  request.shutdownSignal?.addEventListener("abort", onSessionShutdown, {
+    once: true,
+  });
   request.signal?.addEventListener("abort", onCallerAbort, { once: true });
-  if (request.signal?.aborted) {
+  if (request.shutdownSignal?.aborted) {
+    cancel("session_shutdown");
+  } else if (request.signal?.aborted) {
     cancel("cancelled");
   }
   const deadline = scheduleDeadline(
@@ -331,11 +393,71 @@ export async function runKimiAcp(
   }, heartbeatMs);
 
   try {
+    let childInput: NodeJS.WritableStream;
+    let childOutput: NodeJS.ReadableStream;
+    if (platform === "win32") {
+      if (cancellationReason !== undefined) {
+        throw preStartCancellation;
+      }
+      owned = await (
+        dependencies.spawnOwnedAgentProcess ?? spawnOwnedAgentProcess
+      )({
+        executable: request.executable,
+        args: request.args,
+        cwd: request.cwd,
+        environment: request.environment,
+      });
+      if (cancellationReason !== undefined) {
+        beginOwnedTermination(owned, cancellationReason);
+        throw preStartCancellation;
+      }
+      childInput = owned.stdin;
+      childOutput = owned.stdout;
+      owned.stderr.on("data", (chunk: Buffer | string) => {
+        stderr = `${stderr}${Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk}`.slice(
+          -65_536,
+        );
+      });
+    } else {
+      directChild = spawn(request.executable, [...request.args], {
+        cwd: request.cwd,
+        env: request.environment,
+        detached: true,
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+      });
+      directChildClosed = new Promise<void>((resolve) => {
+        directChild!.once("close", () => resolve());
+      });
+      directChild.once("error", (error) => {
+        spawnError = error;
+      });
+      directChild.stderr.on("data", (chunk: Buffer | string) => {
+        stderr = `${stderr}${Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk}`.slice(
+          -65_536,
+        );
+      });
+      childInput = directChild.stdin;
+      childOutput = directChild.stdout;
+    }
+
     const stream = acp.ndJsonStream(
-      Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
-      Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
+      Writable.toWeb(childInput as Writable) as unknown as WritableStream<Uint8Array>,
+      Readable.toWeb(childOutput as Readable) as unknown as ReadableStream<Uint8Array>,
     );
-    const promptResponse = await acp
+    emitProgress("kimi process started");
+    if (owned !== undefined) {
+      if (cancellationReason !== undefined) {
+        beginOwnedTermination(owned, cancellationReason);
+        throw preStartCancellation;
+      }
+      await owned.ready;
+    }
+    if (cancellationReason !== undefined) {
+      throw new Error("Kimi ACP invocation was cancelled before initialization");
+    }
+
+    const app = acp
       .client({ name: "codex_external_agents" })
       .onRequest(acp.methods.client.session.requestPermission, (ctx) => {
         const intent: {
@@ -367,127 +489,186 @@ export async function runKimiAcp(
         if (directSessionId === ctx.params.sessionId) {
           collectUpdate(ctx.params.update, events, textChunks);
         }
-      })
-      .connectWith(stream, async (ctx) => {
-        clientContext = ctx;
-        const initialization = await ctx.request(acp.methods.agent.initialize, {
-          protocolVersion: acp.PROTOCOL_VERSION,
-          clientCapabilities: {
-            fs: {
-              readTextFile: true,
-              writeTextFile: request.task === "delegate",
-            },
+      });
+    const executePrompt = async (
+      ctx: acp.ClientContext,
+    ): Promise<acp.PromptResponse> => {
+      clientContext = ctx;
+      const initialization = await ctx.request(acp.methods.agent.initialize, {
+        protocolVersion: acp.PROTOCOL_VERSION,
+        clientCapabilities: {
+          fs: {
+            readTextFile: true,
+            writeTextFile: request.task === "delegate",
           },
-        });
-
-        if (request.sessionId !== undefined) {
-          if (
-            initialization.agentCapabilities?.sessionCapabilities?.resume == null
-          ) {
-            throw new Error("Kimi ACP agent does not support session resume");
-          }
-          sessionId = request.sessionId;
-          directSessionId = sessionId;
-          const resumed = await ctx.request(acp.methods.agent.session.resume, {
-            sessionId,
-            cwd: request.cwd,
-            mcpServers: [],
-          });
-          const selection = findModelSelection(
-            resumed.configOptions,
-            request.model,
-          );
-          await ctx.request(acp.methods.agent.session.setConfigOption, {
-            sessionId,
-            configId: selection.configId,
-            value: selection.value,
-          });
-          actualModel = selection.value;
-          emitProgress("kimi prompt started");
-          if (cancellationReason !== undefined) {
-            await ctx.notify(acp.methods.agent.session.cancel, { sessionId });
-            return { stopReason: "cancelled" } as acp.PromptResponse;
-          }
-          promptSubmitted = true;
-          return ctx.request(
-            acp.methods.agent.session.prompt,
-            {
-              sessionId,
-              prompt: [{ type: "text", text: request.prompt }],
-            },
-            { cancellationSignal: requestCancellation.signal },
-          );
-        }
-
-        return ctx.buildSession(request.cwd).withSession(async (session) => {
-          sessionId = session.sessionId;
-          const selection = findModelSelection(
-            session.newSessionResponse.configOptions,
-            request.model,
-          );
-          await ctx.request(acp.methods.agent.session.setConfigOption, {
-            sessionId,
-            configId: selection.configId,
-            value: selection.value,
-          });
-          actualModel = selection.value;
-          emitProgress("kimi prompt started");
-          if (cancellationReason !== undefined) {
-            await ctx.notify(acp.methods.agent.session.cancel, { sessionId });
-            return { stopReason: "cancelled" } as acp.PromptResponse;
-          }
-
-          promptSubmitted = true;
-          void session
-            .prompt(request.prompt, {
-              cancellationSignal: requestCancellation.signal,
-            })
-            .catch(() => undefined);
-          for (;;) {
-            const message = await session.nextUpdate();
-            if (message.kind === "stop") {
-              return message.response;
-            }
-            collectUpdate(message.update, events, textChunks);
-          }
-        });
+        },
       });
 
+      if (request.sessionId !== undefined) {
+        if (
+          initialization.agentCapabilities?.sessionCapabilities?.resume == null
+        ) {
+          throw new Error("Kimi ACP agent does not support session resume");
+        }
+        sessionId = request.sessionId;
+        directSessionId = sessionId;
+        const resumed = await ctx.request(acp.methods.agent.session.resume, {
+          sessionId,
+          cwd: request.cwd,
+          mcpServers: [],
+        });
+        const selection = findModelSelection(
+          resumed.configOptions,
+          request.model,
+        );
+        await ctx.request(acp.methods.agent.session.setConfigOption, {
+          sessionId,
+          configId: selection.configId,
+          value: selection.value,
+        });
+        actualModel = selection.value;
+        emitProgress("kimi prompt started");
+        if (cancellationReason !== undefined) {
+          return { stopReason: "cancelled" } as acp.PromptResponse;
+        }
+        promptSubmitted = true;
+        return ctx.request(
+          acp.methods.agent.session.prompt,
+          {
+            sessionId,
+            prompt: [{ type: "text", text: request.prompt }],
+          },
+          { cancellationSignal: requestCancellation.signal },
+        );
+      }
+
+      return ctx.buildSession(request.cwd).withSession(async (session) => {
+        sessionId = session.sessionId;
+        const selection = findModelSelection(
+          session.newSessionResponse.configOptions,
+          request.model,
+        );
+        await ctx.request(acp.methods.agent.session.setConfigOption, {
+          sessionId,
+          configId: selection.configId,
+          value: selection.value,
+        });
+        actualModel = selection.value;
+        emitProgress("kimi prompt started");
+        if (cancellationReason !== undefined) {
+          return { stopReason: "cancelled" } as acp.PromptResponse;
+        }
+
+        promptSubmitted = true;
+        void session
+          .prompt(request.prompt, {
+            cancellationSignal: requestCancellation.signal,
+          })
+          .catch(() => undefined);
+        for (;;) {
+          const message = await session.nextUpdate();
+          if (message.kind === "stop") {
+            return message.response;
+          }
+          collectUpdate(message.update, events, textChunks);
+        }
+      });
+    };
+    let promptResponse: acp.PromptResponse;
+    if (platform === "win32") {
+      connection = app.connect(stream);
+      promptResponse = await executePrompt(connection.agent);
+    } else {
+      promptResponse = await app.connectWith(stream, executePrompt);
+    }
+
     stopReason = promptResponse.stopReason;
-    status = cancellationReason ?? "completed";
+    status =
+      cancellationReason === "timed_out"
+        ? "timed_out"
+        : cancellationReason === undefined
+          ? "completed"
+          : "cancelled";
   } catch (error) {
-    status = cancellationReason ?? "failed";
-    diagnostics.push(
-      redactText(
-        spawnError?.message ?? (error instanceof Error ? error.message : String(error)),
-        secrets,
-      ),
-    );
+    status =
+      cancellationReason === "timed_out"
+        ? "timed_out"
+        : cancellationReason === undefined
+          ? "failed"
+          : "cancelled";
+    const reportedError = spawnError ?? error;
+    if (
+      reportedError !== preStartCancellation &&
+      !isExpectedCancellationClose(reportedError, cancellationReason)
+    ) {
+      diagnostics.push(
+        redactText(
+          reportedError instanceof Error
+            ? reportedError.message
+            : String(reportedError),
+          secrets,
+        ),
+      );
+    }
   } finally {
     deadline.cancel();
     clearInterval(heartbeat);
     if (killTimer !== undefined) clearTimeout(killTimer);
+    request.shutdownSignal?.removeEventListener("abort", onSessionShutdown);
     request.signal?.removeEventListener("abort", onCallerAbort);
-    let shouldAwaitChildClose = child.pid === undefined;
-    if (child.pid !== undefined) {
+
+    if (owned !== undefined) {
       try {
-        await terminateProcessTree(child.pid);
-        shouldAwaitChildClose = true;
+        if (cancellationReason !== undefined) {
+          await beginOwnedTermination(owned, cancellationReason);
+        } else if (status === "completed") {
+          owned.stdin.end();
+        } else {
+          await beginOwnedTermination(owned, "cancelled");
+        }
+        const exit = await owned.closed;
+        await connection?.closed;
+        if (
+          status === "completed" &&
+          exit.completion !== "root_exit"
+        ) {
+          diagnostics.push("Kimi ACP owned process did not exit naturally");
+          status = "failed";
+        } else if (
+          status === "completed" &&
+          exit.rootExitCode !== 0
+        ) {
+          diagnostics.push(
+            `Kimi ACP owned process root exited unsuccessfully: code=${exit.rootExitCode}`,
+          );
+          status = "failed";
+        }
       } catch (error) {
-        diagnostics.push(`Process tree cleanup failed: ${String(error)}`);
-        if (status === "completed") status = "failed";
-      }
-    }
-    if (shouldAwaitChildClose) {
-      const childDidClose = await waitForChildClose(childClosed);
-      if (!childDidClose) {
-        child.stdin.destroy();
-        child.stdout.destroy();
-        child.stderr.destroy();
-        diagnostics.push(
-          `Kimi ACP child did not close within ${KIMI_CHILD_CLOSE_TIMEOUT_MS}ms after process tree termination`,
-        );
+        diagnostics.push(`Owned process cleanup failed: ${String(error)}`);
         status = "failed";
+      }
+    } else if (directChild !== undefined && directChildClosed !== undefined) {
+      let shouldAwaitChildClose = directChild.pid === undefined;
+      if (directChild.pid !== undefined) {
+        try {
+          await terminateProcessTree(directChild.pid);
+          shouldAwaitChildClose = true;
+        } catch (error) {
+          diagnostics.push(`Process tree cleanup failed: ${String(error)}`);
+          if (status === "completed") status = "failed";
+        }
+      }
+      if (shouldAwaitChildClose) {
+        const childDidClose = await waitForChildClose(directChildClosed);
+        if (!childDidClose) {
+          directChild.stdin.destroy();
+          directChild.stdout.destroy();
+          directChild.stderr.destroy();
+          diagnostics.push(
+            `Kimi ACP child did not close within ${POSIX_CHILD_CLOSE_TIMEOUT_MS}ms after process tree termination`,
+          );
+          status = "failed";
+        }
       }
     }
     if (stderr.trim() !== "") {

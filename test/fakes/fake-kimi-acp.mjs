@@ -15,7 +15,31 @@ const rootPidPath = process.env.FAKE_KIMI_ROOT_PID_FILE;
 const carrierPidPath = process.env.FAKE_KIMI_CARRIER_PID_FILE;
 const childPidPath = process.env.FAKE_KIMI_CHILD_PID_FILE;
 let grandchildCarrier;
+let grandchildPid;
 let pidFileSequence = 0;
+let descendantCleanupStarted = false;
+
+function cleanupDescendants() {
+  if (descendantCleanupStarted) return;
+  descendantCleanupStarted = true;
+  if (Number.isSafeInteger(grandchildPid) && grandchildPid > 0) {
+    try {
+      process.kill(grandchildPid);
+    } catch {
+      // It may already have exited.
+    }
+  }
+  if (grandchildCarrier !== undefined) {
+    try {
+      grandchildCarrier.kill();
+    } catch {
+      // It may already have exited.
+    }
+  }
+}
+
+process.stdin.once("end", cleanupDescendants);
+process.stdin.once("close", cleanupDescendants);
 
 function publishPid(filePath, pid) {
   if (!filePath) return;
@@ -43,7 +67,12 @@ function publishPid(filePath, pid) {
 publishPid(rootPidPath, process.pid);
 
 async function spawnGrandchildFixture() {
-  if (!childPidPath) return;
+  if (
+    !childPidPath &&
+    process.env.FAKE_KIMI_SCENARIO !== "complete-with-descendant"
+  ) {
+    return;
+  }
   grandchildCarrier = spawn(
     process.execPath,
     [fileURLToPath(new URL("./spawn-grandchild.mjs", import.meta.url))],
@@ -53,7 +82,7 @@ async function spawnGrandchildFixture() {
     },
   );
   publishPid(carrierPidPath, grandchildCarrier.pid);
-  const grandchildPid = await new Promise((resolve, reject) => {
+  grandchildPid = await new Promise((resolve, reject) => {
     let buffer = "";
     const cleanup = () => {
       grandchildCarrier.stdout.off("data", onData);
@@ -158,12 +187,21 @@ const agent = {
     const session = sessions.get(params.sessionId);
     if (!session) throw new Error("unknown session");
 
-    if (process.env.FAKE_KIMI_SCENARIO === "hang") {
+    if (
+      process.env.FAKE_KIMI_SCENARIO === "hang" ||
+      process.env.FAKE_KIMI_SCENARIO === "hang-ignore-native-cancel"
+    ) {
       await spawnGrandchildFixture();
       await new Promise((resolve) => {
-        session.cancel = resolve;
+        if (process.env.FAKE_KIMI_SCENARIO !== "hang-ignore-native-cancel") {
+          session.cancel = resolve;
+        }
       });
       return { stopReason: "cancelled" };
+    }
+
+    if (process.env.FAKE_KIMI_SCENARIO === "complete-with-descendant") {
+      await spawnGrandchildFixture();
     }
 
     const delayMs = Number.parseInt(process.env.FAKE_KIMI_DELAY_MS ?? "0", 10);
