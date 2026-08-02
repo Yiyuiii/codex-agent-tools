@@ -1,5 +1,12 @@
 # Stdio Lifecycle and Native Execution Budget Implementation Plan
 
+> **状态：历史实施记录。** Task 1–8 的已完成结果继续作为实现历史；未完成的旧
+> Task 9–12、Node 20/22/24 矩阵和重复验证步骤已被
+> [Windows 当前宿主 Owned Process 精简实施计划](2026-08-01-windows-current-host-owned-process.md)
+> 覆盖，后续不得从本文重新激活。现行产品边界仍以
+> [stdio 生命周期与外部 CLI 原生执行预算设计](../specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md)
+> 和上述当前宿主精简计划为准。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 让 Kimi/Pi 在调用方未显式传入 `timeoutMs` 时按外部 CLI 原生预算持续执行，同时把 MCP stdio 断开、宿主信号和显式取消可靠传播到在途任务，并在 owned 进程树清理完成后才结束会话。

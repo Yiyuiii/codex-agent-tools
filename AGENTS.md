@@ -181,7 +181,7 @@
 - [当前：外部 CLI 原生能力上限审计](docs/research/external-cli-native-limits.md)
 - [历史未采用：Windows split control channels 补充规格](docs/superpowers/specs/2026-08-01-windows-split-control-channels-amendment-proposal.md)
 - [当前宿主精简变更说明](docs/review/2026-08-01-windows-split-control-channels-approval.html)
-- [当前：stdio 生命周期与外部 CLI 原生执行预算实施计划](docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md)
+- [历史已覆盖：stdio 生命周期与外部 CLI 原生执行预算实施计划](docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md)
 - [当前：能力级资格复用与 Ark Coding Plan 晋级实施计划](docs/superpowers/plans/2026-07-29-capability-scoped-qualification.md)
 - [当前：Beta → Stable 发布实施计划](docs/superpowers/plans/2026-07-29-beta-to-stable-release.md)
 - [当前：长期默认授权与自主资格收敛实施计划](docs/superpowers/plans/2026-07-28-standing-authorization-and-autonomous-qualification.md)
