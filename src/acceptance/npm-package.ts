@@ -1,8 +1,18 @@
+import os from "node:os";
+
 import { assertReleasePackageMetadata } from "../release/assurance.js";
 import {
   assertLocalToolContract,
   type LocalToolContract,
 } from "./local.js";
+import {
+  DOCTOR_CHECK_NAMES,
+  DOCTOR_QUALIFIED_LLM_IDS,
+} from "../cli/doctor.js";
+import {
+  assertPublicExternalToolDefinitions,
+  PUBLIC_EXTERNAL_TOOL_DEFINITIONS,
+} from "../mcp/tools.js";
 export { classifyAgentProcesses } from "../runtime/agent-processes.js";
 
 const PUBLIC_REPOSITORY_URL =
@@ -10,29 +20,6 @@ const PUBLIC_REPOSITORY_URL =
 export const PUBLIC_NPM_REGISTRY = "https://registry.npmjs.org/";
 const VERSION_PATTERN =
   /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/u;
-const EXPECTED_DOCTOR_CHECKS = Object.freeze([
-  "Kimi executable",
-  "Kimi version",
-  "Kimi authentication",
-  "Pi executable",
-  "Pi version",
-  "Pi isolated config",
-  "Ark Pi models",
-  "Ark Coding authentication",
-  "Ark Agent authentication",
-  "Public MCP tools",
-  "LLM ark-agent-deepseek-v4-flash",
-  "LLM ark-agent-plan",
-  "LLM ark-coding-plan",
-  "LLM kimi-k3",
-] as const);
-const EXPECTED_LLMS = Object.freeze([
-  "ark-agent-deepseek-v4-flash",
-  "ark-agent-plan",
-  "ark-coding-plan",
-  "kimi-k3",
-] as const);
-
 export interface NpmPackageAcceptanceArguments {
   readonly version: string;
 }
@@ -216,29 +203,45 @@ export function assertDoctorAcceptance(value: unknown): void {
     const checks = report.checks.map((value) => recordOf(value));
     const names = checks.map(({ name }) => name);
     if (
-      names.length !== EXPECTED_DOCTOR_CHECKS.length ||
+      names.length !== DOCTOR_CHECK_NAMES.length ||
       new Set(names).size !== names.length ||
       JSON.stringify([...names].sort()) !==
-        JSON.stringify([...EXPECTED_DOCTOR_CHECKS].sort())
+        JSON.stringify([...DOCTOR_CHECK_NAMES].sort())
     ) {
       throw new Error("doctor check set drifted");
     }
     for (const check of checks) {
-      if (
-        check.ok !== true ||
-        check.level !== "ok" ||
-        typeof check.detail !== "string"
-      ) {
+      if (typeof check.detail !== "string") {
+        throw new Error("doctor check failed");
+      }
+      if (check.name === "Windows native helper") {
+        const validNativeCheck =
+          process.platform === "win32"
+            ? check.ok === true && check.level === "ok"
+            : check.ok === true &&
+              check.level === "warn" &&
+              check.detail === `not applicable on ${process.platform}`;
+        if (!validNativeCheck) throw new Error("doctor check failed");
+      } else if (check.ok !== true || check.level !== "ok") {
         throw new Error("doctor check failed");
       }
     }
+    const hostRuntime = checks.find(({ name }) => name === "Host runtime");
+    const expectedHostRuntime = `platform=${process.platform}; arch=${process.arch}; os=${os.release()}; node=${process.versions.node}; libuv=${process.versions.uv}`;
+    if (hostRuntime?.detail !== expectedHostRuntime) {
+      throw new Error("doctor host runtime drifted");
+    }
+    assertPublicExternalToolDefinitions();
     const publicTools = checks.find(
       ({ name }) => name === "Public MCP tools",
     );
-    if (publicTools?.detail !== "external_review, external_delegate") {
+    if (
+      publicTools?.detail !==
+      PUBLIC_EXTERNAL_TOOL_DEFINITIONS.map(({ name }) => name).join(", ")
+    ) {
       throw new Error("public tool surface drifted");
     }
-    for (const llm of EXPECTED_LLMS) {
+    for (const llm of DOCTOR_QUALIFIED_LLM_IDS) {
       const check = checks.find(({ name }) => name === `LLM ${llm}`);
       if (
         typeof check?.detail !== "string" ||
@@ -322,7 +325,7 @@ Capability-Index: pass
 ## 验收边界
 
 - 包从公共 npm registry 按精确版本安装到一次性临时目录，安装时禁用 lifecycle scripts。
-- CLI version/help 与使用伪 Kimi/Pi 的 doctor 全绿；doctor 的 Pi 配置只写入临时应用数据目录。
+- CLI version/help 与不启动 Kimi/Pi target 的 doctor 全绿；doctor 的 Pi 配置只写入临时应用数据目录。
 - 已安装包的 stdio MCP 与官方插件缓存副本都只暴露 \`external_review\`、\`external_delegate\`，且 \`llm\` 必填和读写注解正确。
 - 官方插件只在一次性临时 Codex home 中完成 marketplace add、plugin add/list、缓存副本 MCP 启动、plugin remove 与 marketplace remove；活动 Codex home 未读取或修改。
 - Kimi ACP / Pi RPC / real-smoke：\`0 / 0 / 0\`。

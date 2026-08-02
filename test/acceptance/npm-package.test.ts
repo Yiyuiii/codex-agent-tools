@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import os from "node:os";
 import { describe, expect, it, vi } from "vitest";
 import { resolve } from "node:path";
 
@@ -13,9 +14,31 @@ import {
   PUBLIC_NPM_REGISTRY,
   renderNpmPackageAcceptanceReport,
 } from "../../src/acceptance/npm-package.js";
+import { DOCTOR_CHECK_NAMES } from "../../src/cli/doctor.js";
 
 const repositoryUrl =
   "git+https://github.com/Yiyuiii/codex-agent-tools.git";
+
+function acceptedDoctorChecks() {
+  return DOCTOR_CHECK_NAMES.map((name) => ({
+    name,
+    ok: true,
+    level:
+      name === "Windows native helper" && process.platform !== "win32"
+        ? "warn"
+        : "ok",
+    detail:
+      name === "Host runtime"
+        ? `platform=${process.platform}; arch=${process.arch}; os=${os.release()}; node=${process.versions.node}; libuv=${process.versions.uv}`
+        : name === "Windows native helper" && process.platform !== "win32"
+          ? `not applicable on ${process.platform}`
+          : name === "Public MCP tools"
+            ? "external_review, external_delegate"
+            : name.startsWith("LLM ")
+              ? "route=direct; review=passed; delegate=passed"
+              : "fixture",
+  }));
+}
 
 function packageManifest(version = "0.1.0-beta.1") {
   return {
@@ -190,54 +213,7 @@ describe("npm-installed package acceptance contract", () => {
   });
 
   it("accepts only an all-green doctor report with the four qualified llms", () => {
-    const checks = [
-      { name: "Kimi executable", ok: true, level: "ok", detail: "fake" },
-      { name: "Kimi version", ok: true, level: "ok", detail: "fixture" },
-      {
-        name: "Kimi authentication",
-        ok: true,
-        level: "ok",
-        detail: "fixture",
-      },
-      { name: "Pi executable", ok: true, level: "ok", detail: "fake" },
-      { name: "Pi version", ok: true, level: "ok", detail: "fixture" },
-      {
-        name: "Pi isolated config",
-        ok: true,
-        level: "ok",
-        detail: "temp",
-      },
-      { name: "Ark Pi models", ok: true, level: "ok", detail: "models=3" },
-      {
-        name: "Ark Coding authentication",
-        ok: true,
-        level: "ok",
-        detail: "fixture",
-      },
-      {
-        name: "Ark Agent authentication",
-        ok: true,
-        level: "ok",
-        detail: "fixture",
-      },
-      {
-        name: "Public MCP tools",
-        ok: true,
-        level: "ok",
-        detail: "external_review, external_delegate",
-      },
-      ...[
-        "ark-agent-deepseek-v4-flash",
-        "ark-agent-plan",
-        "ark-coding-plan",
-        "kimi-k3",
-      ].map((llm) => ({
-        name: `LLM ${llm}`,
-        ok: true,
-        level: "ok",
-        detail: "route=direct; review=passed; delegate=passed",
-      })),
-    ];
+    const checks = acceptedDoctorChecks();
 
     expect(() =>
       assertDoctorAcceptance({ ok: true, checks }),
@@ -258,6 +234,52 @@ describe("npm-installed package acceptance contract", () => {
         ),
       }),
     ).toThrow(/doctor acceptance/iu);
+
+    const mismatchedPlatform = process.platform === "linux" ? "darwin" : "linux";
+    expect(() =>
+      assertDoctorAcceptance({
+        ok: true,
+        checks: checks.map((check) =>
+          check.name === "Host runtime"
+            ? {
+                ...check,
+                detail: `platform=${mismatchedPlatform}; arch=${process.arch}; os=${os.release()}; node=${process.versions.node}; libuv=${process.versions.uv}`,
+              }
+            : check.name === "Windows native helper"
+              ? {
+                  ...check,
+                  level: "warn",
+                  detail: `not applicable on ${mismatchedPlatform}`,
+                }
+            : check,
+        ),
+      }),
+    ).toThrow(/doctor acceptance/iu);
+
+    if (process.platform === "win32") {
+      expect(() =>
+        assertDoctorAcceptance({
+          ok: true,
+          checks: checks.map((check) =>
+            check.name === "Windows native helper"
+              ? {
+                  ...check,
+                  level: "warn",
+                  detail: "not applicable on linux",
+                }
+              : check,
+          ),
+        }),
+      ).toThrow(/doctor acceptance/iu);
+    } else {
+      expect(
+        checks.find(({ name }) => name === "Windows native helper"),
+      ).toMatchObject({
+        ok: true,
+        level: "warn",
+        detail: `not applicable on ${process.platform}`,
+      });
+    }
   });
 
   it("cleans up an owned MCP transport when connect or tool validation fails", async () => {

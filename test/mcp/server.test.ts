@@ -4,7 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { InFlightTasks } from "../../src/mcp/in-flight.js";
 import { createMcpServer } from "../../src/mcp/server.js";
-import { registerExternalTools } from "../../src/mcp/tools.js";
+import {
+  assertPublicExternalToolDefinitions,
+  PUBLIC_EXTERNAL_TOOL_DEFINITIONS,
+  registerExternalTools,
+} from "../../src/mcp/tools.js";
 import type {
   ExternalDelegateResult,
   ExternalReviewResult,
@@ -50,6 +54,46 @@ function delegateResult(): ExternalDelegateResult {
 }
 
 describe("codex_external_agents MCP server", () => {
+  it("uses one fail-closed static definition contract for registration and doctor", () => {
+    expect(() => assertPublicExternalToolDefinitions()).not.toThrow();
+    expect(PUBLIC_EXTERNAL_TOOL_DEFINITIONS.map(({ name }) => name).sort()).toEqual(
+      ["external_delegate", "external_review"],
+    );
+
+    const withoutLlm = PUBLIC_EXTERNAL_TOOL_DEFINITIONS.map((definition) =>
+      definition.name === "external_review"
+        ? {
+            ...definition,
+            registration: {
+              ...definition.registration,
+              inputSchema: {},
+            },
+          }
+        : definition,
+    );
+    expect(() => assertPublicExternalToolDefinitions(withoutLlm)).toThrow(
+      /public MCP tool definitions/iu,
+    );
+
+    const unsafeReview = PUBLIC_EXTERNAL_TOOL_DEFINITIONS.map((definition) =>
+      definition.name === "external_review"
+        ? {
+            ...definition,
+            registration: {
+              ...definition.registration,
+              annotations: {
+                ...definition.registration.annotations,
+                destructiveHint: true,
+              },
+            },
+          }
+        : definition,
+    );
+    expect(() => assertPublicExternalToolDefinitions(unsafeReview)).toThrow(
+      /public MCP tool definitions/iu,
+    );
+  });
+
   it("lists only the two approved tools with required llm and accurate annotations", async () => {
     const service = {
       review: vi.fn(async () => reviewResult()),

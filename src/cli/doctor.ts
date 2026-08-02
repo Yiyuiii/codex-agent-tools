@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import { execa } from "execa";
 
@@ -8,11 +10,43 @@ import {
   buildIsolatedPiConfig,
   type IsolatedPiConfig,
 } from "../adapters/pi/config.js";
-import { locatePi } from "../adapters/pi/locator.js";
-import { resolveLlm, supportedLlmIds } from "../llms/registry.js";
+import {
+  locatePi,
+  locatePiInvocation,
+  type PiInvocation,
+} from "../adapters/pi/locator.js";
+import { resolveLlm } from "../llms/registry.js";
+import {
+  assertPublicExternalToolDefinitions,
+  PUBLIC_EXTERNAL_TOOL_DEFINITIONS,
+} from "../mcp/tools.js";
 import { buildChildEnvironment } from "../runtime/environment.js";
 import { redactText } from "../runtime/redaction.js";
+import {
+  resolveWindowsJobHelper as resolveDefaultWindowsJobHelper,
+  type ResolvedWindowsJobHelper,
+} from "../runtime/windows-job-helper.js";
 import { VERSION } from "../version.js";
+
+export const DOCTOR_QUALIFIED_LLM_IDS = Object.freeze([
+  "ark-agent-deepseek-v4-flash",
+  "ark-agent-plan",
+  "ark-coding-plan",
+  "kimi-k3",
+] as const);
+
+export const DOCTOR_CHECK_NAMES = Object.freeze([
+  "Host runtime",
+  "Kimi executable",
+  "Pi executable",
+  "Pi isolated config",
+  "Ark Pi models",
+  "Windows native helper",
+  "Ark Coding authentication",
+  "Ark Agent authentication",
+  "Public MCP tools",
+  ...DOCTOR_QUALIFIED_LLM_IDS.map((id) => `LLM ${id}` as const),
+] as const);
 
 export interface DoctorCheck {
   name: string;
@@ -31,25 +65,36 @@ export interface CommandResult {
   output: string;
 }
 
+export interface WindowsJobHelperProbeRequest {
+  readonly executablePath: string;
+  readonly args: readonly ["--probe-v1"];
+  readonly environment: NodeJS.ProcessEnv;
+  readonly extendEnv: false;
+}
+
 export interface CollectDoctorOptions {
-  environment?: NodeJS.ProcessEnv;
-  locateKimiExecutable?: () => Promise<string>;
-  locatePiExecutable?: () => Promise<string>;
-  buildPiConfig?: () => Promise<IsolatedPiConfig>;
-  runCommand?: (
-    command: string,
-    args: readonly string[],
-    environment: NodeJS.ProcessEnv,
+  readonly environment?: NodeJS.ProcessEnv;
+  readonly platform?: NodeJS.Platform;
+  readonly architecture?: string;
+  readonly osRelease?: () => string;
+  readonly nodeVersion?: string;
+  readonly libuvVersion?: string;
+  readonly locateKimiExecutable?: () => Promise<string>;
+  readonly locatePiExecutable?: () => Promise<string>;
+  readonly locatePiInvocation?: () => Promise<PiInvocation>;
+  readonly buildPiConfig?: () => Promise<IsolatedPiConfig>;
+  readonly resolveWindowsJobHelper?: () => Promise<ResolvedWindowsJobHelper>;
+  readonly runWindowsJobHelperProbe?: (
+    request: WindowsJobHelperProbeRequest,
   ) => Promise<CommandResult>;
 }
 
-async function defaultRunCommand(
-  command: string,
-  args: readonly string[],
-  environment: NodeJS.ProcessEnv,
+async function defaultRunWindowsJobHelperProbe(
+  request: WindowsJobHelperProbeRequest,
 ): Promise<CommandResult> {
-  const result = await execa(command, [...args], {
-    env: environment,
+  const result = await execa(request.executablePath, [...request.args], {
+    env: request.environment,
+    extendEnv: request.extendEnv,
     reject: false,
     timeout: 30_000,
     windowsHide: true,
@@ -76,10 +121,14 @@ function selectedCredentialName(
   environment: NodeJS.ProcessEnv,
 ): string | undefined {
   for (const name of names) {
-    const entry = Object.entries(environment).find(
-      ([key, value]) => key.toUpperCase() === name.toUpperCase() && value?.trim(),
+    const matches = Object.entries(environment).filter(
+      ([key, value]) =>
+        key.toUpperCase() === name.toUpperCase() && value?.trim() !== "",
     );
-    if (entry !== undefined) return name;
+    if (matches.length > 1) {
+      throw new Error("ambiguous credential environment");
+    }
+    if (matches.length === 1) return matches[0]![0];
   }
   return undefined;
 }
@@ -89,6 +138,49 @@ function limitedDetail(value: string, secrets: readonly string[]): string {
   return redacted.length <= 1_000
     ? redacted
     : `${redacted.slice(0, 1_000)}[TRUNCATED]`;
+}
+
+function executableName(
+  executable: string,
+  platform: NodeJS.Platform,
+): string {
+  return platform === "win32"
+    ? path.win32.basename(executable)
+    : path.posix.basename(executable);
+}
+
+function assertLocatedExecutable(executable: string): void {
+  if (executable.trim() === "" || executable.includes("\0")) {
+    throw new Error("static executable locator returned an invalid path");
+  }
+}
+
+function assertPiInvocation(invocation: PiInvocation): void {
+  if (
+    invocation.executable !== process.execPath ||
+    invocation.argvPrefix.length !== 1 ||
+    invocation.argvPrefix[0].trim() === "" ||
+    invocation.argvPrefix[0].includes("\0") ||
+    invocation.identity.packageName !==
+      "@earendil-works/pi-coding-agent" ||
+    !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(
+      invocation.identity.packageVersion,
+    ) ||
+    !/^>=(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(
+      invocation.identity.nodeEngine,
+    )
+  ) {
+    throw new Error("Pi installation could not be verified");
+  }
+}
+
+function nodeMajor(version: string): number | undefined {
+  const match = /^v?(0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.exec(
+    version,
+  );
+  if (match === null) return undefined;
+  const major = Number(match[1]);
+  return Number.isSafeInteger(major) ? major : undefined;
 }
 
 const EXPECTED_ARK_MODELS = new Map([
@@ -122,7 +214,10 @@ async function validateArkPiConfig(config: IsolatedPiConfig): Promise<void> {
     >;
   };
   const providers = root.providers ?? {};
-  if (JSON.stringify(Object.keys(providers).sort()) !== JSON.stringify([...EXPECTED_ARK_MODELS.keys()].sort())) {
+  if (
+    JSON.stringify(Object.keys(providers).sort()) !==
+    JSON.stringify([...EXPECTED_ARK_MODELS.keys()].sort())
+  ) {
     throw new Error("isolated Pi Ark provider set mismatch");
   }
 
@@ -141,30 +236,20 @@ async function validateArkPiConfig(config: IsolatedPiConfig): Promise<void> {
       provider.apiKey !== expectedKey ||
       provider.baseUrl !== expectedBaseUrl
     ) {
-      throw new Error(`isolated Pi ${providerName} endpoint or protocol mismatch`);
+      throw new Error(
+        `isolated Pi ${providerName} endpoint or protocol mismatch`,
+      );
     }
     const actualModels = (provider.models ?? [])
       .map((model) => model.id)
       .filter((id): id is string => typeof id === "string")
       .sort();
-    if (JSON.stringify(actualModels) !== JSON.stringify([...expectedModels].sort())) {
+    if (
+      JSON.stringify(actualModels) !==
+      JSON.stringify([...expectedModels].sort())
+    ) {
       throw new Error(`isolated Pi ${providerName} model set mismatch`);
     }
-  }
-}
-
-function validateArkModelListing(output: string): void {
-  const listed = output
-    .split(/\r?\n/u)
-    .map((line) => line.trim().split(/\s+/u))
-    .filter(([provider]) => provider?.startsWith("ark-") === true)
-    .map(([provider, model]) => `${provider}/${model ?? ""}`)
-    .sort();
-  const expected = [...EXPECTED_ARK_MODELS.entries()]
-    .flatMap(([provider, models]) => models.map((model) => `${provider}/${model}`))
-    .sort();
-  if (JSON.stringify(listed) !== JSON.stringify(expected)) {
-    throw new Error("Pi model listing does not match the approved Ark model set");
   }
 }
 
@@ -172,23 +257,55 @@ export async function collectDoctorReport(
   options: CollectDoctorOptions = {},
 ): Promise<DoctorReport> {
   const environment = options.environment ?? process.env;
-  const locateKimiExecutable = options.locateKimiExecutable ?? (() => locateKimi());
-  const locatePiExecutable = options.locatePiExecutable ?? (() => locatePi());
+  const platform = options.platform ?? process.platform;
+  const architecture = options.architecture ?? process.arch;
+  const release = options.osRelease?.() ?? os.release();
+  const nodeVersion = options.nodeVersion ?? process.versions.node;
+  const libuvVersion = options.libuvVersion ?? process.versions.uv;
+  const locateKimiExecutable =
+    options.locateKimiExecutable ??
+    (() => locateKimi({ environment, platform }));
+  const locatePiExecutable =
+    options.locatePiExecutable ?? (() => locatePi({ environment, platform }));
+  const locateStrictPiInvocation =
+    options.locatePiInvocation ??
+    (() => locatePiInvocation({ environment, platform }));
   const buildPiConfig =
     options.buildPiConfig ??
     (() => buildIsolatedPiConfig({ version: VERSION, providers: ["ark"] }));
-  const runCommand = options.runCommand ?? defaultRunCommand;
+  const resolveWindowsJobHelper =
+    options.resolveWindowsJobHelper ?? resolveDefaultWindowsJobHelper;
+  const runWindowsJobHelperProbe =
+    options.runWindowsJobHelperProbe ?? defaultRunWindowsJobHelperProbe;
   const secrets = secretValues(environment);
   const checks: DoctorCheck[] = [];
 
-  let kimiExecutable: string | undefined;
+  const major = nodeMajor(nodeVersion);
+  const validHost =
+    major !== undefined &&
+    release.trim() !== "" &&
+    libuvVersion.trim() !== "" &&
+    (platform !== "win32" || (architecture === "x64" && major >= 24));
+  checks.push({
+    name: "Host runtime",
+    ok: validHost,
+    level: validHost ? "ok" : "error",
+    detail: limitedDetail(
+      validHost
+        ? `platform=${platform}; arch=${architecture}; os=${release}; node=${nodeVersion}; libuv=${libuvVersion}`
+        : `unsupported host: platform=${platform}; arch=${architecture}; os=${release}; node=${nodeVersion}; libuv=${libuvVersion}`,
+      secrets,
+    ),
+  });
+
   try {
-    kimiExecutable = await locateKimiExecutable();
+    const executable = await locateKimiExecutable();
+    assertLocatedExecutable(executable);
     checks.push({
       name: "Kimi executable",
       ok: true,
       level: "ok",
-      detail: kimiExecutable,
+      detail: `strict locator passed; executable=${executableName(executable, platform)}`,
     });
   } catch (error) {
     checks.push({
@@ -202,34 +319,26 @@ export async function collectDoctorReport(
     });
   }
 
-  if (kimiExecutable !== undefined) {
-    const [version, doctor] = await Promise.all([
-      runCommand(kimiExecutable, ["--version"], environment),
-      runCommand(kimiExecutable, ["doctor"], environment),
-    ]);
-    checks.push({
-      name: "Kimi version",
-      ok: version.ok,
-      level: version.ok ? "ok" : "error",
-      detail: limitedDetail(version.output || "version check failed", secrets),
-    });
-    checks.push({
-      name: "Kimi authentication",
-      ok: doctor.ok,
-      level: doctor.ok ? "ok" : "error",
-      detail: limitedDetail(doctor.output || "kimi doctor failed", secrets),
-    });
-  }
-
-  let piExecutable: string | undefined;
   try {
-    piExecutable = await locatePiExecutable();
-    checks.push({
-      name: "Pi executable",
-      ok: true,
-      level: "ok",
-      detail: piExecutable,
-    });
+    if (platform === "win32") {
+      const invocation = await locateStrictPiInvocation();
+      assertPiInvocation(invocation);
+      checks.push({
+        name: "Pi executable",
+        ok: true,
+        level: "ok",
+        detail: `strict locator passed; package=${invocation.identity.packageName}@${invocation.identity.packageVersion}; node=${invocation.identity.nodeEngine}`,
+      });
+    } else {
+      const executable = await locatePiExecutable();
+      assertLocatedExecutable(executable);
+      checks.push({
+        name: "Pi executable",
+        ok: true,
+        level: "ok",
+        detail: `static locator passed; executable=${executableName(executable, platform)}`,
+      });
+    }
   } catch (error) {
     checks.push({
       name: "Pi executable",
@@ -239,16 +348,6 @@ export async function collectDoctorReport(
         error instanceof Error ? error.message : String(error),
         secrets,
       ),
-    });
-  }
-
-  if (piExecutable !== undefined) {
-    const version = await runCommand(piExecutable, ["--version"], environment);
-    checks.push({
-      name: "Pi version",
-      ok: version.ok,
-      level: version.ok ? "ok" : "error",
-      detail: limitedDetail(version.output || "version check failed", secrets),
     });
   }
 
@@ -259,7 +358,7 @@ export async function collectDoctorReport(
       name: "Pi isolated config",
       ok: true,
       level: "ok",
-      detail: `${piConfig.agentDir}; sha256=${piConfig.contentSha256.slice(0, 12)}`,
+      detail: `generated; sha256=${piConfig.contentSha256.slice(0, 12)}`,
     });
   } catch (error) {
     checks.push({
@@ -273,32 +372,21 @@ export async function collectDoctorReport(
     });
   }
 
-  if (piExecutable !== undefined && piConfig !== undefined) {
+  if (piConfig === undefined) {
+    checks.push({
+      name: "Ark Pi models",
+      ok: false,
+      level: "error",
+      detail: "isolated Pi configuration unavailable",
+    });
+  } else {
     try {
       await validateArkPiConfig(piConfig);
-      const listEnvironment = {
-        ...buildChildEnvironment(
-          { network: "direct", credentialEnv: [] },
-          environment,
-        ),
-        ...piConfig.environment,
-        CODEX_AGENT_ARK_CODING_KEY: "doctor-config-check",
-        CODEX_AGENT_ARK_AGENT_KEY: "doctor-config-check",
-      };
-      const listing = await runCommand(
-        piExecutable,
-        ["--offline", "--list-models", "ark"],
-        listEnvironment,
-      );
-      if (!listing.ok) {
-        throw new Error(listing.output || "Pi model listing failed");
-      }
-      validateArkModelListing(listing.output);
       checks.push({
         name: "Ark Pi models",
         ok: true,
         level: "ok",
-        detail: `ark.cn-beijing.volces.com; models=3; sha256=${piConfig.contentSha256.slice(0, 12)}`,
+        detail: `static routes passed; providers=2; models=3; sha256=${piConfig.contentSha256.slice(0, 12)}`,
       });
     } catch (error) {
       checks.push({
@@ -313,33 +401,124 @@ export async function collectDoctorReport(
     }
   }
 
+  if (platform !== "win32") {
+    checks.push({
+      name: "Windows native helper",
+      ok: true,
+      level: "warn",
+      detail: `not applicable on ${platform}`,
+    });
+  } else if (!validHost) {
+    checks.push({
+      name: "Windows native helper",
+      ok: false,
+      level: "error",
+      detail: "requires win32-x64 with Node.js >=24",
+    });
+  } else {
+    let helper: ResolvedWindowsJobHelper | undefined;
+    try {
+      helper = await resolveWindowsJobHelper();
+      if (
+        path.win32.basename(helper.executablePath).toLowerCase() !==
+          "codex-agent-job-helper.exe" ||
+        !/^[0-9a-f]{64}$/u.test(helper.sha256)
+      ) {
+        throw new Error("invalid helper identity");
+      }
+    } catch {
+      checks.push({
+        name: "Windows native helper",
+        ok: false,
+        level: "error",
+        detail: "Windows job helper artifact validation failed",
+      });
+    }
+    if (helper !== undefined) {
+      try {
+        const probe = await runWindowsJobHelperProbe({
+          executablePath: helper.executablePath,
+          args: ["--probe-v1"],
+          environment: buildChildEnvironment(
+            { network: "direct", credentialEnv: [] },
+            environment,
+            platform,
+          ),
+          extendEnv: false,
+        });
+        if (!probe.ok) {
+          throw new Error("probe failed");
+        }
+        checks.push({
+          name: "Windows native helper",
+          ok: true,
+          level: "ok",
+          detail: `managed-x64; sha256=${helper.sha256.slice(0, 12)}; probe-v1=passed`,
+        });
+      } catch {
+        checks.push({
+          name: "Windows native helper",
+          ok: false,
+          level: "error",
+          detail: "Windows job helper probe failed",
+        });
+      }
+    }
+  }
+
   for (const [name, id] of [
     ["Ark Coding authentication", "ark-coding-plan"],
     ["Ark Agent authentication", "ark-agent-plan"],
   ] as const) {
     const profile = resolveLlm(id);
-    const sourceName = selectedCredentialName(profile.credentialEnv, environment);
-    const targetName = profile.credentialTargetEnv;
+    try {
+      const sourceName = selectedCredentialName(
+        profile.credentialEnv,
+        environment,
+      );
+      const targetName = profile.credentialTargetEnv;
+      const ok = sourceName !== undefined && targetName !== undefined;
+      checks.push({
+        name,
+        ok,
+        level: ok ? "ok" : "error",
+        detail: ok
+          ? `credential environment: ${sourceName} -> ${targetName}`
+          : `missing credential environment; checked ${profile.credentialEnv.join(", ")}`,
+      });
+    } catch (error) {
+      checks.push({
+        name,
+        ok: false,
+        level: "error",
+        detail: limitedDetail(
+          error instanceof Error ? error.message : String(error),
+          secrets,
+        ),
+      });
+    }
+  }
+
+  try {
+    assertPublicExternalToolDefinitions();
     checks.push({
-      name,
-      ok: sourceName !== undefined && targetName !== undefined,
-      level:
-        sourceName !== undefined && targetName !== undefined ? "ok" : "error",
-      detail:
-        sourceName === undefined || targetName === undefined
-          ? `missing credential environment; checked ${profile.credentialEnv.join(", ")}`
-          : `credential environment: ${sourceName} -> ${targetName}`,
+      name: "Public MCP tools",
+      ok: true,
+      level: "ok",
+      detail: PUBLIC_EXTERNAL_TOOL_DEFINITIONS.map(({ name }) => name).join(
+        ", ",
+      ),
+    });
+  } catch {
+    checks.push({
+      name: "Public MCP tools",
+      ok: false,
+      level: "error",
+      detail: "Public MCP tool definitions are invalid",
     });
   }
 
-  checks.push({
-    name: "Public MCP tools",
-    ok: true,
-    level: "ok",
-    detail: "external_review, external_delegate",
-  });
-
-  for (const id of supportedLlmIds()) {
+  for (const id of DOCTOR_QUALIFIED_LLM_IDS) {
     const profile = resolveLlm(id);
     const review = profile.qualityGates.review.status;
     const delegate = profile.qualityGates.delegate.status;
