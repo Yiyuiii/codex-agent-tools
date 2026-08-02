@@ -49,6 +49,7 @@ export function createMcpProgressReporter(
       pending.push(notification.catch(() => undefined));
     },
     async finish() {
+      if (pending.length === 0) return;
       const notifications = Promise.all(pending).then(() => undefined);
       const signal = extra.signal;
       if (signal === undefined) {

@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify, types as nodeUtilTypes } from "node:util";
 
+import { parseStrictJsonBytes } from "../runtime/strict-json.js";
 import { collectCanonicalRuntimeInputIdentity } from "./canonical-runtime-inputs.js";
 
 const execFileAsync = promisify(execFile);
@@ -1321,98 +1322,10 @@ export async function readStrictReleaseEvidenceFile(
 
 function parseJson(bytes: Buffer): unknown {
   try {
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    if (text.includes("\0")) fail();
-    assertNoDuplicateJsonObjectKeys(text);
-    return JSON.parse(text) as unknown;
+    return parseStrictJsonBytes(bytes);
   } catch {
     return fail();
   }
-}
-
-function assertNoDuplicateJsonObjectKeys(text: string): void {
-  let index = 0;
-  const whitespace = (): void => {
-    while (/\s/u.test(text[index] ?? "")) index += 1;
-  };
-  const jsonString = (): string => {
-    if (text[index] !== '"') fail();
-    const start = index;
-    index += 1;
-    while (index < text.length) {
-      const character = text[index];
-      if (character === '"') {
-        index += 1;
-        return JSON.parse(text.slice(start, index)) as string;
-      }
-      if (character === "\\") {
-        index += 2;
-      } else {
-        index += 1;
-      }
-    }
-    fail();
-  };
-  const value = (): void => {
-    whitespace();
-    if (text[index] === "{") {
-      index += 1;
-      whitespace();
-      const keys = new Set<string>();
-      if (text[index] === "}") {
-        index += 1;
-        return;
-      }
-      while (true) {
-        whitespace();
-        const key = jsonString();
-        if (keys.has(key)) fail();
-        keys.add(key);
-        whitespace();
-        if (text[index] !== ":") fail();
-        index += 1;
-        value();
-        whitespace();
-        if (text[index] === "}") {
-          index += 1;
-          return;
-        }
-        if (text[index] !== ",") fail();
-        index += 1;
-      }
-    }
-    if (text[index] === "[") {
-      index += 1;
-      whitespace();
-      if (text[index] === "]") {
-        index += 1;
-        return;
-      }
-      while (true) {
-        value();
-        whitespace();
-        if (text[index] === "]") {
-          index += 1;
-          return;
-        }
-        if (text[index] !== ",") fail();
-        index += 1;
-      }
-    }
-    if (text[index] === '"') {
-      jsonString();
-      return;
-    }
-    const remainder = text.slice(index);
-    const token = remainder.match(
-      /^(?:true|false|null|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)/u,
-    )?.[0];
-    if (token === undefined) fail();
-    index += token.length;
-  };
-  value();
-  whitespace();
-  if (index !== text.length) fail();
 }
 
 function projectCapabilityIndex(

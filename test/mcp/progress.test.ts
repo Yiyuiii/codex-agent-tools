@@ -11,6 +11,24 @@ function deferred<T>() {
 }
 
 describe("createMcpProgressReporter", () => {
+  it("finishes without installing an abort listener when no notification exists", async () => {
+    const controller = new AbortController();
+    const addEventListener = vi.spyOn(controller.signal, "addEventListener");
+    const removeEventListener = vi.spyOn(
+      controller.signal,
+      "removeEventListener",
+    );
+    const progress = createMcpProgressReporter({
+      signal: controller.signal,
+      _meta: { progressToken: "unused-token" },
+      sendNotification: vi.fn(async () => undefined),
+    });
+
+    await expect(progress.finish()).resolves.toBeUndefined();
+    expect(addEventListener).not.toHaveBeenCalled();
+    expect(removeEventListener).not.toHaveBeenCalled();
+  });
+
   it("submits ordered notifications and waits for all of them in finish", async () => {
     const controller = new AbortController();
     const first = deferred<void>();

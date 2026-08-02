@@ -17,6 +17,7 @@ import {
   type HostAcceptanceEventSink,
   type HostAcceptanceRequestIdentity,
 } from "./host-acceptance-events.js";
+import type { HostAcceptanceRequestResolver } from "./host-acceptance-client.js";
 import { InFlightTasks } from "./in-flight.js";
 import { createMcpProgressReporter } from "./progress.js";
 
@@ -141,14 +142,20 @@ export function registerExternalTools(
   server: McpServer,
   service: ExternalTaskService,
   inFlight: InFlightTasks = new InFlightTasks(),
-  hostAcceptanceEventSink?: HostAcceptanceEventSink,
+  hostAcceptanceObservation?:
+    | HostAcceptanceEventSink
+    | HostAcceptanceRequestResolver,
 ): InFlightTasks {
   server.registerTool(
     PUBLIC_EXTERNAL_TOOL_DEFINITIONS[0].name,
     PUBLIC_EXTERNAL_TOOL_DEFINITIONS[0].registration,
     (input, extra) => {
       let requestIdentity: HostAcceptanceRequestIdentity | undefined;
-      return inFlight.run(async () => {
+      let requestEventSink: HostAcceptanceEventSink | undefined;
+      const execute = async (
+        hostAcceptanceEventSink: HostAcceptanceEventSink | undefined,
+      ) => {
+        requestEventSink = hostAcceptanceEventSink;
         const lifecycle =
           hostAcceptanceEventSink === undefined
             ? undefined
@@ -181,9 +188,30 @@ export function registerExternalTools(
           await progress.finish();
           lifecycle?.finish(outputStatus);
         }
-      }, () => {
+      };
+      const factory =
+        hostAcceptanceObservation !== undefined &&
+        typeof hostAcceptanceObservation !== "function"
+          ? async () =>
+              resolveHostAcceptanceEventSink(
+                hostAcceptanceObservation,
+                "review",
+                input,
+              ).then((sink) => {
+                if (inFlight.shutdownSignal.aborted) {
+                  throw new Error("MCP session is shutting down.");
+                }
+                return execute(sink);
+              })
+          : () =>
+              execute(
+                typeof hostAcceptanceObservation === "function"
+                  ? hostAcceptanceObservation
+                  : undefined,
+              );
+      return inFlight.run(factory, () => {
         if (requestIdentity !== undefined) {
-          emitHostAcceptanceEvent(hostAcceptanceEventSink, {
+          emitHostAcceptanceEvent(requestEventSink, {
             type: "inFlightRemoved",
             ...requestIdentity,
           });
@@ -197,7 +225,11 @@ export function registerExternalTools(
     PUBLIC_EXTERNAL_TOOL_DEFINITIONS[1].registration,
     (input, extra) => {
       let requestIdentity: HostAcceptanceRequestIdentity | undefined;
-      return inFlight.run(async () => {
+      let requestEventSink: HostAcceptanceEventSink | undefined;
+      const execute = async (
+        hostAcceptanceEventSink: HostAcceptanceEventSink | undefined,
+      ) => {
+        requestEventSink = hostAcceptanceEventSink;
         const lifecycle =
           hostAcceptanceEventSink === undefined
             ? undefined
@@ -230,9 +262,30 @@ export function registerExternalTools(
           await progress.finish();
           lifecycle?.finish(outputStatus);
         }
-      }, () => {
+      };
+      const factory =
+        hostAcceptanceObservation !== undefined &&
+        typeof hostAcceptanceObservation !== "function"
+          ? async () =>
+              resolveHostAcceptanceEventSink(
+                hostAcceptanceObservation,
+                "delegate",
+                input,
+              ).then((sink) => {
+                if (inFlight.shutdownSignal.aborted) {
+                  throw new Error("MCP session is shutting down.");
+                }
+                return execute(sink);
+              })
+          : () =>
+              execute(
+                typeof hostAcceptanceObservation === "function"
+                  ? hostAcceptanceObservation
+                  : undefined,
+              );
+      return inFlight.run(factory, () => {
         if (requestIdentity !== undefined) {
-          emitHostAcceptanceEvent(hostAcceptanceEventSink, {
+          emitHostAcceptanceEvent(requestEventSink, {
             type: "inFlightRemoved",
             ...requestIdentity,
           });
@@ -242,6 +295,21 @@ export function registerExternalTools(
   );
 
   return inFlight;
+}
+
+async function resolveHostAcceptanceEventSink(
+  observation: HostAcceptanceEventSink | HostAcceptanceRequestResolver | undefined,
+  task: "review" | "delegate",
+  input: unknown,
+): Promise<HostAcceptanceEventSink | undefined> {
+  if (observation === undefined || typeof observation === "function") {
+    return observation;
+  }
+  try {
+    return await observation.openRequest(task, input);
+  } catch {
+    return undefined;
+  }
 }
 
 function createRequestLifecycle(

@@ -39,6 +39,7 @@ const QUALIFICATION_RUNTIME_INPUT_ROOTS = Object.freeze([
 ] as const);
 
 const SHARED_RUNTIME_INPUT_ROOTS = Object.freeze([
+  "host-acceptance/protocol/observer-protocol.v1.json",
   "src/adapters/adapter.ts",
   "src/mcp",
   "src/runtime",

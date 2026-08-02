@@ -46,8 +46,14 @@ describe("capability qualification runtime fingerprint", () => {
 
     expect(piRoots).toContain("src/adapters/pi");
     expect(piRoots).toContain("src/qualification/verifier.ts");
+    expect(piRoots).toContain(
+      "host-acceptance/protocol/observer-protocol.v1.json",
+    );
     expect(kimiRoots).toContain("src/adapters/kimi");
     expect(kimiRoots).toContain("src/qualification/verifier.ts");
+    expect(kimiRoots).toContain(
+      "host-acceptance/protocol/observer-protocol.v1.json",
+    );
     expect(piRoots).not.toContain("package-lock.json");
     expect(kimiRoots).not.toContain("package-lock.json");
     expect(piRoots).not.toContain("src/qualification");

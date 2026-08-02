@@ -726,6 +726,112 @@ describe("codex_external_agents MCP server", () => {
     expect(serialized).not.toContain("C:\\\\private");
   });
 
+  it("does not install lifecycle observation when the request-bound descriptor resolver is absent", async () => {
+    let callback:
+      | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    let receivedContext: TaskExecutionContext | undefined;
+    const service = {
+      review: vi.fn(),
+      delegate: vi.fn(
+        async (_input: unknown, context?: TaskExecutionContext) => {
+          receivedContext = context;
+          return delegateResult();
+        },
+      ),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        if (name === "external_delegate") callback = handler;
+      },
+    };
+    const resolver = {
+      openRequest: vi.fn(async () => undefined),
+    };
+    const controller = new AbortController();
+    const addAbortListener = vi.spyOn(controller.signal, "addEventListener");
+    registerExternalTools(
+      fakeServer as never,
+      service,
+      new InFlightTasks(),
+      resolver,
+    );
+    const input = {
+      llm: "ark-agent-plan",
+      prompt: "ordinary request",
+      cwd: process.cwd(),
+    };
+
+    const result = (await callback?.(input, {
+      requestId: "raw-request-must-not-be-hashed",
+      signal: controller.signal,
+      sendNotification: async () => undefined,
+    })) as { structuredContent: ExternalDelegateResult };
+
+    expect(resolver.openRequest).toHaveBeenCalledOnce();
+    expect(resolver.openRequest).toHaveBeenCalledWith("delegate", input);
+    expect(addAbortListener).not.toHaveBeenCalled();
+    expect(receivedContext?.onExecutionTelemetry).toBeUndefined();
+    expect(result.structuredContent).toEqual(delegateResult());
+    expect(JSON.stringify(result)).not.toContain("raw-request-must-not-be-hashed");
+  });
+
+  it("does not late-start a service when session shutdown wins during descriptor loading", async () => {
+    let callback:
+      | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    const descriptor = deferred<undefined>();
+    const service = {
+      review: vi.fn(),
+      delegate: vi.fn(async () => delegateResult()),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        if (name === "external_delegate") callback = handler;
+      },
+    };
+    const inFlight = new InFlightTasks();
+    registerExternalTools(fakeServer as never, service, inFlight, {
+      openRequest: vi.fn(() => descriptor.promise),
+    });
+    const controller = new AbortController();
+    const result = callback?.(
+      {
+        llm: "ark-agent-plan",
+        prompt: "must not late start",
+        cwd: process.cwd(),
+      },
+      {
+        requestId: "shutdown-during-descriptor",
+        signal: controller.signal,
+        sendNotification: async () => undefined,
+      },
+    );
+    await Promise.resolve();
+    expect(inFlight.size).toBe(1);
+
+    inFlight.closeAdmission();
+    descriptor.resolve(undefined);
+
+    await expect(result).rejects.toThrow(/session is shutting down/iu);
+    expect(service.delegate).not.toHaveBeenCalled();
+    expect(inFlight.size).toBe(0);
+  });
+
   it("records a pre-aborted SDK signal exactly once and isolates sink failures", async () => {
     let callback:
       | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)

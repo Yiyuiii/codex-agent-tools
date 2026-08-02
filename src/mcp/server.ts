@@ -12,6 +12,10 @@ import {
 } from "../llms/registry.js";
 import { ExternalAgentService } from "../tasks/service.js";
 import { SERVER_NAME, VERSION } from "../version.js";
+import {
+  createDefaultHostAcceptanceEventClient,
+  type HostAcceptanceRequestResolver,
+} from "./host-acceptance-client.js";
 import { InFlightTasks } from "./in-flight.js";
 import { createMcpStdioSession } from "./stdio-session.js";
 import {
@@ -37,9 +41,10 @@ export function createDefaultExternalAgentService(): ExternalAgentService {
 export function createMcpServer(
   service: ExternalTaskService,
   inFlight: InFlightTasks = new InFlightTasks(),
+  hostAcceptanceObservation?: HostAcceptanceRequestResolver,
 ): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: VERSION });
-  registerExternalTools(server, service, inFlight);
+  registerExternalTools(server, service, inFlight, hostAcceptanceObservation);
   return server;
 }
 
@@ -47,7 +52,8 @@ export async function serveMcp(
   service: ExternalTaskService = createDefaultExternalAgentService(),
 ): Promise<void> {
   const inFlight = new InFlightTasks();
-  const server = createMcpServer(service, inFlight);
+  const hostAcceptance = createDefaultHostAcceptanceEventClient();
+  const server = createMcpServer(service, inFlight, hostAcceptance);
   const transport = new StdioServerTransport(process.stdin, process.stdout);
   const session = createMcpStdioSession({
     server,
@@ -56,5 +62,9 @@ export async function serveMcp(
     inFlight,
     signalSource: process,
   });
-  await session.run();
+  try {
+    await session.run();
+  } finally {
+    hostAcceptance.shutdown();
+  }
 }
