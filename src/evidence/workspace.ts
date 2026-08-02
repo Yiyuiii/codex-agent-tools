@@ -5,7 +5,6 @@ import path from "node:path";
 import { execa } from "execa";
 
 const IGNORED_DIRECTORIES = new Set([".git", "node_modules", "dist"]);
-const MAX_GIT_EVIDENCE_CHARS = 200_000;
 
 interface FileEvidence {
   kind: "file" | "symlink";
@@ -75,13 +74,6 @@ async function runGit(
   return { ok: result.exitCode === 0, stdout: result.stdout };
 }
 
-function limitEvidence(value: string): string {
-  if (value.length <= MAX_GIT_EVIDENCE_CHARS) {
-    return value;
-  }
-  return `${value.slice(0, MAX_GIT_EVIDENCE_CHARS)}\n[TRUNCATED]`;
-}
-
 export async function captureWorkspace(
   cwd: string,
   options: CaptureWorkspaceOptions = {},
@@ -126,8 +118,8 @@ export async function captureWorkspace(
     cwd: root,
     fingerprint,
     entries,
-    gitStatus: limitEvidence(gitStatus),
-    gitDiff: options.includeGitDiff ? limitEvidence(fullGitDiff) : "",
+    gitStatus,
+    gitDiff: options.includeGitDiff ? fullGitDiff : "",
   };
 }
 
