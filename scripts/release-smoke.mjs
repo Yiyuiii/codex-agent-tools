@@ -4,7 +4,6 @@ import {
   mkdir,
   mkdtemp,
   readFile,
-  readdir,
   rm,
   stat,
 } from "node:fs/promises";
@@ -17,18 +16,19 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { execa } from "execa";
 
 import {
+  assertDeclaredPackageFilePaths,
   assertNoSensitiveContent,
   assertCapabilitySourcesPackaged,
   assertPackageDocumentLinkClosure,
   assertReleasePackageMetadata,
   capabilitySourcePathsFromIndex,
+  packageFilePathsFromManifest,
   resolveAllowedPackInspectionPaths,
   verifyReleaseWindowsJobHelperArtifact,
 } from "../dist/release-assurance.js";
 import {
   verifyCapabilityIndex,
 } from "../dist/capability-qualification.js";
-import { VERSION } from "../dist/index.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = path.join(root, "dist");
@@ -52,14 +52,8 @@ const pluginBundlePath = path.join(
   "runtime",
   "codex-external-agents-mcp.mjs",
 );
-const exactPluginFiles = [
-  ".agents/plugins/marketplace.json",
-  "plugins/codex-external-agents/.codex-plugin/plugin.json",
-  "plugins/codex-external-agents/.mcp.json",
-  "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
-  "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
-  "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
-];
+const packageRelative = (absolutePath) =>
+  path.relative(root, absolutePath).replaceAll("\\", "/");
 const exactLogicalLlms = [
   "ark-agent-deepseek-v4-flash",
   "ark-agent-plan",
@@ -71,26 +65,6 @@ const expectedPluginEnvironmentVariables = [
   "VOLCENGINE_API_KEY",
   "API_KEY_DOUBAO_CODING",
   "OPENAI_API_KEY_DOUBAO",
-];
-const retainedHistoricalPackageSources = [
-  "docs/smoke/pi-gemini.md",
-  "docs/smoke/evidence",
-];
-const requiredReviewPackageSources = [
-  "docs/release/four-llm-qualification-result-review.html",
-  "docs/release/four-llm-qualification-authorization-review.html",
-  "docs/release/four-llm-qualification-reauthorization-review.html",
-  "docs/release/qualification-carrier-rehearsal.md",
-  "docs/release/four-llm-qualification-execution-runbook.md",
-  "docs/release/real-plugin-install-review.md",
-  "docs/release/plugin-isolated-state.md",
-  "docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md",
-  "docs/superpowers/plans/2026-07-29-capability-scoped-qualification.md",
-  "docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md",
-];
-const requiredLifecyclePackageSources = [
-  "docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md",
-  "docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md",
 ];
 const worktreeMarker = `${path.sep}.worktrees${path.sep}`;
 const worktreeMarkerIndex = root
@@ -255,7 +229,7 @@ async function checkDoctorJson() {
   }
 }
 
-async function checkPluginArtifact() {
+async function checkPluginArtifact(runtimeVersion) {
   const [packageManifest, pluginManifest, marketplace, mcpManifest] =
     await Promise.all([
       readJson(path.join(root, "package.json")),
@@ -267,20 +241,9 @@ async function checkPluginArtifact() {
   assertReleasePackageMetadata({
     packageManifest,
     pluginManifest,
-    runtimeVersion: VERSION,
+    runtimeVersion,
   });
-  if (
-    !Array.isArray(packageManifest.files) ||
-    ![
-      ...retainedHistoricalPackageSources,
-      ...requiredReviewPackageSources,
-      ...requiredLifecyclePackageSources,
-    ].every(
-      (entry) => packageManifest.files.includes(entry),
-    )
-  ) {
-    throw new Error("package files omit required review or history documents");
-  }
+  const declaredFiles = packageFilePathsFromManifest(packageManifest);
 
   if (
     marketplace.name !== "codex-external-agents-local" ||
@@ -341,10 +304,30 @@ async function checkPluginArtifact() {
   await access(pluginBundlePath);
   await verifyReleaseWindowsJobHelperArtifact();
 
+  const expectedPluginFiles = [
+    packageRelative(marketplacePath),
+    packageRelative(pluginManifestPath),
+    packageRelative(pluginMcpPath),
+    packageRelative(pluginBundlePath),
+    "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+    "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
+  ].sort();
+  const declaredPluginFiles = declaredFiles
+    .filter(
+      (name) => name.startsWith("plugins/") || name.startsWith(".agents/"),
+    )
+    .sort();
+  if (
+    JSON.stringify(declaredPluginFiles) !==
+    JSON.stringify(expectedPluginFiles)
+  ) {
+    throw new Error("Declared npm package plugin file set is not exact");
+  }
+
   assertNoSensitiveContent(
     [
       {
-        name: exactPluginFiles[3],
+        name: packageRelative(pluginBundlePath),
         content: await readFile(pluginBundlePath, "utf8"),
       },
     ],
@@ -353,6 +336,7 @@ async function checkPluginArtifact() {
       secrets: releaseSecrets(process.env),
     },
   );
+  return packageManifest;
 }
 
 async function checkCodexPluginHelp() {
@@ -404,7 +388,9 @@ async function checkCodexPluginHelp() {
   }
 }
 
-async function checkPackage(capabilitySources) {
+async function checkPackage(packageManifest, capabilitySources) {
+  const declaredFiles = packageFilePathsFromManifest(packageManifest);
+  await assertDeclaredPackageFilePaths(root, declaredFiles);
   const packOutput = runNpm(["pack", "--dry-run", "--json"]);
   const packResult = JSON.parse(packOutput)?.[0];
   if (!packResult || !Array.isArray(packResult.files)) {
@@ -413,50 +399,38 @@ async function checkPackage(capabilitySources) {
   const fileNames = packResult.files.map((entry) => entry.path);
   const resolvedFileNames = await resolveAllowedPackInspectionPaths(
     fileNames,
-    async (candidateDirectory) => {
-      const entries = await readdir(path.join(root, candidateDirectory), {
-        recursive: true,
-      });
-      return entries.map((entry) =>
-        path.posix.join(candidateDirectory, entry.replaceAll("\\", "/")),
-      );
-    },
+    declaredFiles,
   );
 
-  for (const required of [
-    "package.json",
+  const publicBins = Object.values(requireObject(packageManifest.bin, "bins"));
+  if (
+    publicBins.length !== 2 ||
+    publicBins.some((binPath) => typeof binPath !== "string")
+  ) {
+    throw new Error("Package bins must be exact file paths");
+  }
+  const requiredPublicFiles = [
     "README.md",
     "LICENSE",
     "docs/operations.md",
     "docs/migration-from-codex-cc-tools.md",
-    "docs/smoke/pi-gemini.md",
-    ...requiredReviewPackageSources,
-    ...requiredLifecyclePackageSources,
-    "dist/cli.js",
-    "dist/mcp.js",
-    ...exactPluginFiles,
-  ]) {
-    if (!fileNames.includes(required)) {
-      throw new Error(`Required npm package file is missing: ${required}`);
-    }
-  }
-  const actualPluginFiles = fileNames
-    .filter(
-      (name) => name.startsWith("plugins/") || name.startsWith(".agents/"),
-    )
+    ...publicBins,
+  ];
+  const declaredDistFiles = declaredFiles
+    .filter((name) => name.startsWith("dist/"))
     .sort();
   if (
-    JSON.stringify(actualPluginFiles) !==
-    JSON.stringify([...exactPluginFiles].sort())
+    !requiredPublicFiles.every((name) => declaredFiles.includes(name)) ||
+    JSON.stringify(declaredDistFiles) !==
+      JSON.stringify([...publicBins].sort())
   ) {
-    throw new Error("npm package plugin file set is not exact");
+    throw new Error("Declared npm public runtime file set is not exact");
   }
 
   const textEntries = [];
-  const inspectedPackNames = new Set();
   const actualPackFileNames = new Set(resolvedFileNames);
   assertCapabilitySourcesPackaged(resolvedFileNames, capabilitySources);
-  for (const [index, name] of fileNames.entries()) {
+  for (const [index] of fileNames.entries()) {
     const inspectionName = resolvedFileNames[index];
     if (inspectionName === undefined) {
       throw new Error("Resolved npm package file list is incomplete");
@@ -469,23 +443,7 @@ async function checkPackage(capabilitySources) {
         name: inspectionName,
         content: await readFile(path.join(root, inspectionName), "utf8"),
       });
-      inspectedPackNames.add(name);
     }
-  }
-  const retainedHistory = fileNames.filter(
-    (name) =>
-      name === "docs/smoke/pi-gemini.md" ||
-      (name.startsWith("docs/smoke/evidence/") && name.endsWith(".json")),
-  );
-  const retainedEvidence = retainedHistory.filter((name) =>
-    name.startsWith("docs/smoke/evidence/"),
-  );
-  if (
-    !retainedHistory.includes("docs/smoke/pi-gemini.md") ||
-    retainedEvidence.length === 0 ||
-    retainedHistory.some((name) => !inspectedPackNames.has(name))
-  ) {
-    throw new Error("Retained history was not fully inspected");
   }
   assertNoSensitiveContent(textEntries, {
     forbiddenPaths: forbiddenDevelopmentPaths,
@@ -495,18 +453,18 @@ async function checkPackage(capabilitySources) {
 }
 
 await Promise.all([access(cliPath), access(mcpPath), access(pluginBundlePath)]);
-run(process.execPath, [cliPath, "--version"]);
+const runtimeVersion = run(process.execPath, [cliPath, "--version"]).trim();
 run(process.execPath, [cliPath, "--help"]);
 run(process.execPath, [mcpPath, "--help"]);
 run(process.execPath, [pluginBundlePath, "--help"], { cwd: pluginRoot });
 await checkMcpContract(pluginBundlePath, pluginRoot);
 await checkDoctorJson();
-await checkPluginArtifact();
+const packageManifest = await checkPluginArtifact(runtimeVersion);
 await checkCodexPluginHelp();
 const capabilityVerification = await verifyCapabilityIndex({
   repositoryRoot: root,
 });
-await checkPackage({
+await checkPackage(packageManifest, {
   indexPath: capabilityVerification.indexPath,
   sourcePaths: capabilitySourcePathsFromIndex(
     await readJson(path.join(root, capabilityVerification.indexPath)),

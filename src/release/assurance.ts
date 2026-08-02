@@ -1,3 +1,4 @@
+import { lstat, realpath } from "node:fs/promises";
 import { createRequire, isBuiltin } from "node:module";
 import path from "node:path";
 
@@ -89,34 +90,6 @@ export function assertReleasePackageMetadata(options: {
   }
 }
 
-const EXACT_PUBLIC_FILES = new Set([
-  "LICENSE",
-  "README.md",
-  "docs/operations.md",
-  "docs/migration-from-codex-cc-tools.md",
-  "docs/release/checklist.md",
-  "docs/release/four-llm-qualification-authorization-review.html",
-  "docs/release/four-llm-qualification-execution-runbook.md",
-  "docs/release/four-llm-qualification-reauthorization-review.html",
-  "docs/release/four-llm-qualification-result-review.html",
-  "docs/release/plugin-isolated-state.md",
-  "docs/release/qualification-carrier-rehearsal.md",
-  "docs/release/real-plugin-install-review.md",
-  "docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md",
-  "docs/superpowers/plans/2026-07-29-capability-scoped-qualification.md",
-  "docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md",
-  "package.json",
-]);
-
-const EXACT_PLUGIN_FILES = new Set([
-  ".agents/plugins/marketplace.json",
-  "plugins/codex-external-agents/.codex-plugin/plugin.json",
-  "plugins/codex-external-agents/.mcp.json",
-  "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
-  "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
-  "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
-]);
-
 const PLUGIN_BUNDLE =
   "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs";
 
@@ -174,19 +147,17 @@ export function resolvePackInspectionPath(
 
 export async function resolveAllowedPackInspectionPaths(
   fileNames: readonly string[],
-  listCandidates: (
-    candidateDirectory: string,
-  ) => Promise<readonly string[]>,
+  declaredFileNames: readonly string[],
 ): Promise<string[]> {
-  assertAllowedPackFiles(fileNames);
-  const prepared = fileNames.map((fileName) => {
+  const declared = exactDeclaredPackageFiles(declaredFileNames);
+  const resolved = fileNames.map((fileName) => {
     const normalized = assertSafePackPath(fileName);
     const redactionCount = normalized.split("***").length - 1;
     if (redactionCount === 0) {
       if (normalized.includes("*")) {
         throw new Error(`Unsafe npm package path: ${fileName}`);
       }
-      return { normalized };
+      return normalized;
     }
     if (
       redactionCount !== 1 ||
@@ -194,34 +165,9 @@ export async function resolveAllowedPackInspectionPaths(
     ) {
       throw new Error(`Unsafe npm package path: ${fileName}`);
     }
-    const candidateDirectory = path.posix.dirname(
-      normalized.slice(0, normalized.indexOf("***")),
-    );
-    if (
-      candidateDirectory === "." ||
-      candidateDirectory === ".." ||
-      candidateDirectory.startsWith("../") ||
-      path.posix.isAbsolute(candidateDirectory)
-    ) {
-      throw new Error("Unable to resolve redacted npm package path");
-    }
-    return { normalized, candidateDirectory };
+    return resolvePackInspectionPath(normalized, declared);
   });
-
-  const resolved: string[] = [];
-  for (const entry of prepared) {
-    if (entry.candidateDirectory === undefined) {
-      resolved.push(entry.normalized);
-      continue;
-    }
-    resolved.push(
-      resolvePackInspectionPath(
-        entry.normalized,
-        await listCandidates(entry.candidateDirectory),
-      ),
-    );
-  }
-  assertAllowedPackFiles(resolved);
+  assertAllowedPackFiles(resolved, declared);
   return resolved;
 }
 
@@ -758,18 +704,129 @@ function assertPluginBundleContent(entry: ReleaseTextEntry): void {
   }
 }
 
-export function assertAllowedPackFiles(fileNames: readonly string[]): void {
-  for (const originalName of fileNames) {
-    const name = assertSafePackPath(originalName);
-    const containsNodeModules = name.split("/").includes("node_modules");
-    const allowed =
-      EXACT_PUBLIC_FILES.has(name) ||
-      EXACT_PLUGIN_FILES.has(name) ||
-      name.startsWith("dist/") ||
-      name.startsWith("docs/smoke/");
-    if (!allowed || containsNodeModules) {
-      throw new Error(`Unexpected file in npm package: ${originalName}`);
+function exactDeclaredPackageFiles(
+  fileNames: readonly string[],
+): readonly string[] {
+  const normalized = fileNames.map((fileName) => {
+    const safe = assertSafePackPath(fileName);
+    const basename = path.posix.basename(safe);
+    if (
+      safe !== fileName ||
+      safe === "package.json" ||
+      safe.includes("*") ||
+      safe.split("/").includes("node_modules") ||
+      (basename !== "LICENSE" && !basename.includes("."))
+    ) {
+      throw new Error("Package files must be exact file paths");
     }
+    return safe;
+  });
+  if (new Set(normalized).size !== normalized.length) {
+    throw new Error("Package files must be exact file paths");
+  }
+  return Object.freeze(normalized);
+}
+
+export function packageFilePathsFromManifest(
+  packageManifest: unknown,
+): readonly string[] {
+  const manifest = plainRecord(packageManifest);
+  if (manifest === undefined || !Array.isArray(manifest.files)) {
+    throw new Error("Package files must be exact file paths");
+  }
+  return exactDeclaredPackageFiles(
+    manifest.files.map((value) => {
+      if (typeof value !== "string") {
+        throw new Error("Package files must be exact file paths");
+      }
+      return value;
+    }),
+  );
+}
+
+function sameFileSystemPath(left: string, right: string): boolean {
+  const resolvedLeft = path.resolve(left);
+  const resolvedRight = path.resolve(right);
+  return process.platform === "win32"
+    ? resolvedLeft.localeCompare(resolvedRight, "en-US", {
+        sensitivity: "accent",
+      }) === 0
+    : resolvedLeft === resolvedRight;
+}
+
+function isStrictlyContainedPath(parent: string, candidate: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return (
+    relative !== "" &&
+    relative !== ".." &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative) &&
+    !path.win32.isAbsolute(relative)
+  );
+}
+
+export async function assertDeclaredPackageFilePaths(
+  repositoryRoot: string,
+  fileNames: readonly string[],
+): Promise<readonly string[]> {
+  const declared = exactDeclaredPackageFiles(fileNames);
+  try {
+    const resolvedRoot = path.resolve(repositoryRoot);
+    const rootMetadata = await lstat(resolvedRoot);
+    if (!rootMetadata.isDirectory() || rootMetadata.isSymbolicLink()) {
+      throw new Error("unsafe repository root");
+    }
+    const canonicalRoot = await realpath(resolvedRoot);
+
+    for (const declaredFile of declared) {
+      const segments = declaredFile.split("/");
+      let currentPath = resolvedRoot;
+      let canonicalParent = canonicalRoot;
+      for (const [index, segment] of segments.entries()) {
+        const finalSegment = index === segments.length - 1;
+        currentPath = path.join(currentPath, segment);
+        const metadata = await lstat(currentPath);
+        if (
+          metadata.isSymbolicLink() ||
+          (finalSegment ? !metadata.isFile() : !metadata.isDirectory())
+        ) {
+          throw new Error("unsafe path component");
+        }
+        const canonicalCurrent = await realpath(currentPath);
+        const expectedCanonical = path.join(canonicalParent, segment);
+        if (
+          !sameFileSystemPath(canonicalCurrent, expectedCanonical) ||
+          !isStrictlyContainedPath(canonicalRoot, canonicalCurrent)
+        ) {
+          throw new Error("canonical path mismatch");
+        }
+        canonicalParent = canonicalCurrent;
+      }
+      const canonicalTarget = path.resolve(canonicalRoot, ...segments);
+      if (!sameFileSystemPath(canonicalParent, canonicalTarget)) {
+        throw new Error("canonical target mismatch");
+      }
+    }
+  } catch {
+    throw new Error("Unsafe declared npm package path");
+  }
+  return declared;
+}
+
+export function assertAllowedPackFiles(
+  fileNames: readonly string[],
+  declaredFileNames: readonly string[],
+): void {
+  const declared = exactDeclaredPackageFiles(declaredFileNames);
+  const actual = fileNames.map(assertSafePackPath);
+  const expected = new Set(["package.json", ...declared]);
+  if (
+    actual.length !== expected.size ||
+    new Set(actual).size !== actual.length ||
+    actual.some((name) => !expected.has(name)) ||
+    [...expected].some((name) => !actual.includes(name))
+  ) {
+    throw new Error("Unexpected file in npm package");
   }
 }
 
@@ -791,6 +848,17 @@ export function assertCapabilitySourcesPackaged(
         `Capability qualification source is missing from npm package: ${sourcePath}`,
       );
     }
+  }
+  const actualEvidence = [...packaged]
+    .filter((name) => name.startsWith("docs/smoke/evidence/"))
+    .sort((left, right) => left.localeCompare(right, "en"));
+  const expectedEvidence = [...new Set(required)].sort((left, right) =>
+    left.localeCompare(right, "en"),
+  );
+  if (JSON.stringify(actualEvidence) !== JSON.stringify(expectedEvidence)) {
+    throw new Error(
+      "Unexpected capability qualification source in npm package",
+    );
   }
 }
 

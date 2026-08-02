@@ -12,7 +12,10 @@ import { build, type Options } from "tsup";
 import { describe, expect, it } from "vitest";
 
 import pluginBuildConfig from "../../tsup.plugin.config.js";
-import { assertNoSensitiveContent } from "../../src/release/assurance.js";
+import {
+  capabilitySourcePathsFromIndex,
+  packageFilePathsFromManifest,
+} from "../../src/release/assurance.js";
 import { resolveWindowsJobHelperForModule } from "../../src/runtime/windows-job-helper.js";
 
 const repositoryRoot = resolve(
@@ -48,41 +51,6 @@ function markdownSection(source: string, heading: string): string {
   );
 }
 
-function sourceBlock(
-  source: string,
-  startMarker: string,
-  endMarker: string,
-): string {
-  const normalizedSource = source.replace(/\r\n?/gu, "\n");
-  const start = normalizedSource.indexOf(startMarker);
-  if (start < 0) {
-    throw new Error(`Missing source block start: ${startMarker}`);
-  }
-  const end = normalizedSource.indexOf(
-    endMarker,
-    start + startMarker.length,
-  );
-  if (end < 0) {
-    throw new Error(`Missing source block end: ${endMarker}`);
-  }
-  return normalizedSource.slice(start, end);
-}
-
-function assertLifecycleSourcesInRequiredFileLoop(
-  checkPackageBlock: string,
-): void {
-  const requiredFileLoop = sourceBlock(
-    checkPackageBlock,
-    "  for (const required of [",
-    "\n  const actualPluginFiles =",
-  );
-  if (!requiredFileLoop.includes("...requiredLifecyclePackageSources,")) {
-    throw new Error(
-      "Lifecycle package sources are missing from the required-file loop",
-    );
-  }
-}
-
 describe("Codex plugin artifact", () => {
   it("extracts Markdown sections identically from CRLF input", () => {
     const source = [
@@ -97,29 +65,6 @@ describe("Codex plugin artifact", () => {
     ].join("\r\n");
 
     expect(markdownSection(source, "## Current")).toBe("current line\n");
-  });
-
-  it("keeps release source-block mutation checks stable with CRLF input", () => {
-    const releaseSmoke = readProjectText(
-      "scripts/release-smoke.mjs",
-    ).replace(/\r?\n/gu, "\r\n");
-    const checkPackageBlock = sourceBlock(
-      releaseSmoke,
-      "async function checkPackage(capabilitySources) {",
-      "\nawait Promise.all([access(cliPath)",
-    );
-
-    expect(() =>
-      assertLifecycleSourcesInRequiredFileLoop(checkPackageBlock),
-    ).not.toThrow();
-    const withoutLifecycleSpread = checkPackageBlock.replace(
-      "    ...requiredLifecyclePackageSources,\n",
-      "",
-    );
-    expect(withoutLifecycleSpread).not.toBe(checkPackageBlock);
-    expect(() =>
-      assertLifecycleSourcesInRequiredFileLoop(withoutLifecycleSpread),
-    ).toThrow(/missing from the required-file loop/u);
   });
 
   it("declares the single repository-local marketplace entry", () => {
@@ -310,11 +255,27 @@ describe("Codex plugin artifact", () => {
       "npm run build:library && npm run build:plugin",
     );
     expect(scripts).not.toHaveProperty("smoke:pi");
-    expect(packageFiles).toEqual(
-      expect.arrayContaining([
-        "docs/smoke/pi-gemini.md",
-        "docs/smoke/evidence",
-      ]),
+    const capabilityIndex = readJson(
+      "docs/smoke/evidence/capabilities.json",
+    );
+    expect(packageFiles).toEqual([
+      "dist/cli.js",
+      "dist/mcp.js",
+      "README.md",
+      "LICENSE",
+      "docs/operations.md",
+      "docs/migration-from-codex-cc-tools.md",
+      ".agents/plugins/marketplace.json",
+      "plugins/codex-external-agents/.codex-plugin/plugin.json",
+      "plugins/codex-external-agents/.mcp.json",
+      "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
+      "docs/smoke/evidence/capabilities.json",
+      ...capabilitySourcePathsFromIndex(capabilityIndex),
+    ]);
+    expect(packageFilePathsFromManifest(packageManifest)).toEqual(
+      packageFiles,
     );
     expect(gitignoreLines).toContain(
       "plugins/codex-external-agents/runtime/",
@@ -339,7 +300,7 @@ describe("Codex plugin artifact", () => {
     ).toEqual(helperFiles);
 
     const resolved = await resolveWindowsJobHelperForModule(
-      new URL("../../dist/index.js", import.meta.url).href,
+      new URL("../../dist/cli.js", import.meta.url).href,
       "win32",
       "x64",
     );
@@ -357,7 +318,7 @@ describe("Codex plugin artifact", () => {
     );
   });
 
-  it("pins release smoke to the exact four active logical LLMs and retained history", () => {
+  it("pins release smoke to the exact four active logical LLMs and package manifest", () => {
     const releaseSmoke = readFileSync(
       resolve(repositoryRoot, "scripts/release-smoke.mjs"),
       "utf8",
@@ -367,78 +328,11 @@ describe("Codex plugin artifact", () => {
     expect(releaseSmoke).toContain('"ark-agent-plan"');
     expect(releaseSmoke).toContain('"ark-coding-plan"');
     expect(releaseSmoke).toContain('"kimi-k3"');
-    expect(releaseSmoke).toContain('"docs/smoke/pi-gemini.md"');
-    expect(releaseSmoke).toContain('"docs/smoke/evidence"');
+    expect(releaseSmoke).toContain("packageFilePathsFromManifest");
+    expect(releaseSmoke).toContain("assertDeclaredPackageFilePaths");
+    expect(releaseSmoke).toContain("assertCapabilitySourcesPackaged");
+    expect(releaseSmoke).not.toContain('"docs/smoke/evidence"');
     expect(releaseSmoke).not.toContain("expected 5");
-  });
-
-  it("packages the approved lifecycle design and plan through the release gate", () => {
-    const packageManifest = readJson("package.json");
-    const packageFiles = packageManifest.files as string[];
-    const releaseSmoke = readProjectText("scripts/release-smoke.mjs");
-    const lifecycleSources = [
-      "docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md",
-      "docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md",
-    ];
-    const lifecycleEntries = lifecycleSources.map((source) => ({
-      name: source,
-      content: readProjectText(source),
-    }));
-
-    for (const source of lifecycleSources) {
-      expect(packageFiles.filter((entry) => entry === source)).toEqual([
-        source,
-      ]);
-    }
-    assertNoSensitiveContent(lifecycleEntries, {
-      forbiddenPaths: [
-        repositoryRoot,
-        resolve(repositoryRoot, ".."),
-        resolve(repositoryRoot, "../.."),
-        "D:\\Codes",
-        "D:\\Temp",
-      ],
-      secrets: [],
-    });
-    for (const entry of lifecycleEntries) {
-      expect(entry.content).not.toMatch(/\b[A-Za-z]:[\\/]/u);
-    }
-
-    const lifecycleSourceList = sourceBlock(
-      releaseSmoke,
-      "const requiredLifecyclePackageSources = [",
-      "\n];",
-    );
-    for (const source of lifecycleSources) {
-      expect(lifecycleSourceList).toContain(`"${source}"`);
-    }
-
-    const checkPackageBlock = sourceBlock(
-      releaseSmoke,
-      "async function checkPackage(capabilitySources) {",
-      "\nawait Promise.all([access(cliPath)",
-    );
-    expect(() =>
-      assertLifecycleSourcesInRequiredFileLoop(checkPackageBlock),
-    ).not.toThrow();
-    const withoutLifecycleSpread = checkPackageBlock.replace(
-      "    ...requiredLifecyclePackageSources,\n",
-      "",
-    );
-    expect(withoutLifecycleSpread).not.toBe(checkPackageBlock);
-    expect(() =>
-      assertLifecycleSourcesInRequiredFileLoop(withoutLifecycleSpread),
-    ).toThrow(/missing from the required-file loop/u);
-
-    const capabilityVerificationIndex = releaseSmoke.indexOf(
-      "const capabilityVerification = await verifyCapabilityIndex({",
-    );
-    const packageCheckIndex = releaseSmoke.indexOf(
-      "await checkPackage({",
-      capabilityVerificationIndex,
-    );
-    expect(capabilityVerificationIndex).toBeGreaterThanOrEqual(0);
-    expect(packageCheckIndex).toBeGreaterThan(capabilityVerificationIndex);
   });
 
   it("documents optional native execution budgets and owned stdio shutdown", () => {

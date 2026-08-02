@@ -2,7 +2,6 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: {
-    index: "src/version.ts",
     cli: "src/cli/main.ts",
     "kimi-smoke": "src/smoke/kimi.ts",
     "smoke-evidence": "src/smoke/evidence.ts",
@@ -13,12 +12,12 @@ export default defineConfig({
     "plugin-isolated-report": "src/plugin/isolated-report.ts",
     "plugin-state-snapshot": "src/plugin/state-snapshot.ts",
     "release-assurance": "src/release/assurance.ts",
-    qualification: "src/qualification/manifest.ts",
     "capability-qualification": "src/qualification/capability-index.ts",
   },
   format: ["esm"],
-  dts: true,
+  splitting: false,
+  dts: false,
   clean: true,
-  sourcemap: true,
+  sourcemap: false,
   target: "node24",
 });

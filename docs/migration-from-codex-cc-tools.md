@@ -22,7 +22,7 @@
 | Anthropic Claude / Claude Code 后端 | 无 | 不进入新产品面 | 不迁移 |
 | OpenAI/Codex 模型家族 | 无 | 顶层已经是 Codex | 不作为外部来源 |
 
-当前 Kimi 只公开 K3；旧 Kimi、旧 Agent Plan 模型和 Gemini 记录只作为历史证据保留，不属于当前注册表。Gemini 的历史 Google / `proxy-10808` 路由与额度失败见 [退役历史页](smoke/pi-gemini.md)，不构成当前 provider 或待晋级能力。发布资格以能力索引和 verifier 为准：当前八项均因运行时指纹变化而 stale；候选只重跑 stale、缺失、新增或证据失效的精确能力，不静默切换到其它 LLM，也不改写历史 evidence。
+当前 Kimi 只公开 K3；旧 Kimi、旧 Agent Plan 模型和 Gemini 记录只作为历史证据保留，不属于当前注册表。Gemini 的历史 Google / `proxy-10808` 路由与额度失败见 [退役历史页](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/pi-gemini.md)，不构成当前 provider 或待晋级能力。发布资格以能力索引和 verifier 为准：当前八项均因运行时指纹变化而 stale；候选只重跑 stale、缺失、新增或证据失效的精确能力，不静默切换到其它 LLM，也不改写历史 evidence。
 
 ## 具备替代条件的门槛
 
@@ -36,7 +36,7 @@
 6. 完整 App 重启后的真实宿主代表性 review/delegate、普通 Stop 或 dedicated interrupt 和 Windows owned descendants zero 通过；
 7. 新旧工具共存状态经过验证，旧工具未被意外修改。
 
-隔离 CLI 生命周期只能证明官方安装器和缓存副本可用，不能替代真实 Codex App 宿主门禁。四层状态和停止条件见 [发布验收清单](release/checklist.md)。
+隔离 CLI 生命周期只能证明官方安装器和缓存副本可用，不能替代真实 Codex App 宿主门禁。四层状态和停止条件见 [发布验收清单](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/checklist.md)。
 
 ## 真实安装与回滚边界
 

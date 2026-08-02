@@ -14,7 +14,7 @@ ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、model�
 
 当前活动插件仍为已发布的 `0.1.1-beta.1`；本轮没有访问或修改 `~/.codex/config.toml`，没有移除 `codex_cc_tools`，也没有调用或修改 Claude Code。standing authorization 继续有效，本轮源码已使八项能力指纹失效，因此离线候选冻结后将定向运行这些 stale 能力，不因临时额度或无关能力重复运行整套资格。`npm run verify:capabilities` 是当前机器资格与发布权威；registry 的旧 passed 文案、历史授权页和批次结果页只作审计，不能越过当前 stale 状态。
 
-2026-07-27 的 105 秒演练只构成离线基础设施证据；后续真实批次证明同一 cell 可以承载到协调器正常终态，但不证明四小时存活。standing authorization 下的唯一承载和 fail-closed 边界见[执行承载手册](release/four-llm-qualification-execution-runbook.md)，演练原始结论见[承载演练报告](release/qualification-carrier-rehearsal.md)。package/release assurance 只证明离线候选，不构成资格、安装或发布。
+2026-07-27 的 105 秒演练只构成离线基础设施证据；后续真实批次证明同一 cell 可以承载到协调器正常终态，但不证明四小时存活。standing authorization 下的唯一承载和 fail-closed 边界见[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)，演练原始结论见[承载演练报告](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/qualification-carrier-rehearsal.md)。package/release assurance 只证明离线候选，不构成资格、安装或发布。
 
 项目代码和维护者都不得直接读取、写入、备份、恢复或手工编辑活动 `~/.codex/config.toml`。Codex 官方插件命令可能由官方机制更新该状态文件，因此真实 add/remove 每次都必须先准备权限包并取得针对该次动作的明确许可。
 
@@ -54,7 +54,7 @@ npm run acceptance:plugin:isolated
 
 ## 4. 查看隔离证据
 
-检查 [官方插件隔离状态报告](release/plugin-isolated-state.md)，确认：
+检查 [官方插件隔离状态报告](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/plugin-isolated-state.md)，确认：
 
 - 临时 `CODEX_HOME` 隔离边界成立；
 - 官方安装器接受插件 manifest、直接 server-map `.mcp.json` 与自包含 bundle；

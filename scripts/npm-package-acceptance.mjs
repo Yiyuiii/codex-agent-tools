@@ -12,7 +12,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import os from "node:os";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -20,6 +20,7 @@ import { execa } from "execa";
 
 import {
   assertDoctorAcceptance,
+  assertInstalledCapabilityProjection,
   assertInstalledPackageContract,
   assertNpmRegistryMetadata,
   buildIsolatedNpmEnvironment,
@@ -579,21 +580,31 @@ try {
     "plugins",
     "codex-external-agents",
   );
-  const [packageManifest, pluginManifest, runtime] = await Promise.all([
+  const [packageManifest, pluginManifest] = await Promise.all([
     readFile(path.join(packageRoot, "package.json"), "utf8").then(JSON.parse),
     readFile(
       path.join(pluginRoot, ".codex-plugin", "plugin.json"),
       "utf8",
     ).then(JSON.parse),
-    import(
-      `${pathToFileURL(path.join(packageRoot, "dist", "index.js")).href}?acceptance=${encodeURIComponent(version)}`
-    ),
   ]);
   assertInstalledPackageContract({
     packageManifest,
     pluginManifest,
-    runtimeVersion: runtime.VERSION,
     expectedVersion: version,
+  });
+  const capabilityIndexPath = path.join(
+    "docs",
+    "smoke",
+    "evidence",
+    "capabilities.json",
+  );
+  await assertInstalledCapabilityProjection({
+    repositoryIndex: await readFile(
+      path.join(repositoryRoot, capabilityIndexPath),
+    ),
+    installedIndex: await readFile(path.join(packageRoot, capabilityIndexPath)),
+    readInstalledFile: (relativePath) =>
+      readFile(path.join(packageRoot, ...relativePath.split("/"))),
   });
   for (const relative of [
     ".agents/plugins/marketplace.json",

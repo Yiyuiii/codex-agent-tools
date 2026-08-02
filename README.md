@@ -21,9 +21,9 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 全量测试还暴露并闭合了一个既有 Kimi ACP 时序竞态：client 可能早于 child close 返回，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3，最终 49 文件矩阵已包含该修复。Pi resolver 在生产隔离环境中找到 `C:\Program Files\Git\bin\bash.exe`，`ProgramFiles` 两键存在、代理变量为 0；精确 Ark Agent Plan 写入探针 exit 0、28 bytes、SHA-256 `81fcf915...`。
 
-注册表仍保留 8 passed / 0 pending 的历史文案，[`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 是当前候选的现行索引；当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。维护者本机已通过官方命令把活动插件升级到 `0.1.1-beta.1` 并移除同名开发期直连；旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。真实资格实验的 standing authorization 仍有效；当前宿主离线候选冻结后，只为 stale、缺失、新增或证据失效的能力生成新证据，临时额度恢复本身不触发额外全量重认证。现行规则见[能力粒度资格设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
+注册表仍保留 8 passed / 0 pending 的历史文案，[`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 是当前候选的现行索引；当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。维护者本机已通过官方命令把活动插件升级到 `0.1.1-beta.1` 并移除同名开发期直连；旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。真实资格实验的 standing authorization 仍有效；当前宿主离线候选冻结后，只为 stale、缺失、新增或证据失效的能力生成新证据，临时额度恢复本身不触发额外全量重认证。现行规则见[能力粒度资格设计](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)，历史批次执行边界仍见[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)。
 
-2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](docs/release/four-llm-qualification-execution-runbook.md)。
+2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)。
 
 项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端。
 
@@ -66,13 +66,13 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。后续又用官方命令移除同名开发期直连，旧 `codex_cc_tools` 保持 enabled。`0.1.1-beta.0` 补齐 `cwd: "."` 后由 GitHub Actions OIDC 发布到 npm `next` 并完成官方升级。维护者真正终止后台宿主并重开后，新任务已发现 `external_review` / `external_delegate` 与旧两项工具共存，真实 Kimi K3 review 通过；Ark Coding Plan review 在启动 Pi 前报告缺少凭据。根因是插件 manifest 没有声明 stdio MCP `env_vars`，宿主按隔离边界没有把父 App 中已存在的 Coding Plan 凭据转发给 MCP。历史阶段的 `0.1.1-beta.1` 已发布到 npm `next` 并已安装到活动官方插件；该版本增加了精确四项变量名白名单且不保存任何值，其 handoff 取消门禁失败促成本轮修复。真实 App 宿主门禁仍为 partial，不能称为已替代旧工具。
 
-完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](docs/release/checklist.md)。
+完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/checklist.md)。
 
 ## 模型证据
 
-- 当前 Kimi 只支持 K3；K2.7 记录仅作为历史证据保留，见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
-- Gemini 已退役，不再是当前 provider；旧 Google / `proxy-10808` 路由、额度失败和 blocked 批次只作为历史证据保留，见 [Pi / Gemini 退役历史](docs/smoke/pi-gemini.md)。
-- 三条 Ark 路线全部固定直连；Coding Plan 最新历史批次的 review/delegate 都通过，两个 Agent Plan profile 的 review/delegate 也各有历史 passed evidence。旧八项索引见 [能力资格索引](docs/smoke/evidence/capabilities.json)，当前候选必须等待 stale 能力证据更新后由 verifier 重新确认，叙述与历史见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
+- 当前 Kimi 只支持 K3；K2.7 记录仅作为历史证据保留，见 [Kimi 真实能力门禁](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/kimi.md)。
+- Gemini 已退役，不再是当前 provider；旧 Google / `proxy-10808` 路由、额度失败和 blocked 批次只作为历史证据保留，见 [Pi / Gemini 退役历史](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/pi-gemini.md)。
+- 三条 Ark 路线全部固定直连；Coding Plan 最新历史批次的 review/delegate 都通过，两个 Agent Plan profile 的 review/delegate 也各有历史 passed evidence。旧八项索引见 [能力资格索引](docs/smoke/evidence/capabilities.json)，当前候选必须等待 stale 能力证据更新后由 verifier 重新确认，叙述与历史见 [Ark / Pi 真实能力门禁](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/ark.md)。
 
 终端用户不需要手工维护 Pi 模型配置；Pi 使用由本项目在应用缓存下生成的版本化隔离配置，不读取或修改用户日常 `~/.pi/agent`。
 

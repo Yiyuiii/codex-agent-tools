@@ -1,6 +1,10 @@
 import os from "node:os";
+import { createHash } from "node:crypto";
 
-import { assertReleasePackageMetadata } from "../release/assurance.js";
+import {
+  assertReleasePackageMetadata,
+  capabilitySourcePathsFromIndex,
+} from "../release/assurance.js";
 import {
   DOCTOR_CHECK_NAMES,
   DOCTOR_QUALIFIED_LLM_IDS,
@@ -27,8 +31,15 @@ export interface RegistryPackageMetadata {
 export interface InstalledPackageContractOptions {
   readonly packageManifest: unknown;
   readonly pluginManifest: unknown;
-  readonly runtimeVersion: unknown;
   readonly expectedVersion: string;
+}
+
+export interface InstalledCapabilityProjectionOptions {
+  readonly repositoryIndex: Uint8Array;
+  readonly installedIndex: Uint8Array;
+  readonly readInstalledFile: (
+    relativePath: string,
+  ) => Promise<Uint8Array>;
 }
 
 export interface NpmPackageAcceptanceReportOptions
@@ -215,13 +226,104 @@ export function assertInstalledPackageContract(
     assertReleasePackageMetadata({
       packageManifest: options.packageManifest,
       pluginManifest: options.pluginManifest,
-      runtimeVersion: options.runtimeVersion,
+      runtimeVersion: expectedVersion,
     });
     if (recordOf(options.packageManifest).version !== expectedVersion) {
       throw new Error("version mismatch");
     }
   } catch {
     throw new Error("Installed package contract is invalid");
+  }
+}
+
+function sha256(content: Uint8Array): string {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+function parseJsonBytes(content: Uint8Array): unknown {
+  return JSON.parse(Buffer.from(content).toString("utf8"));
+}
+
+export async function assertInstalledCapabilityProjection(
+  options: InstalledCapabilityProjectionOptions,
+): Promise<{ readonly sourcePaths: readonly string[] }> {
+  try {
+    if (
+      !Buffer.from(options.repositoryIndex).equals(
+        Buffer.from(options.installedIndex),
+      )
+    ) {
+      throw new Error("index mismatch");
+    }
+    const index = recordOf(parseJsonBytes(options.installedIndex));
+    const sourcePaths = capabilitySourcePathsFromIndex(index);
+    const contents = new Map<string, Uint8Array>();
+    const readSource = async (relativePath: string): Promise<Uint8Array> => {
+      let content = contents.get(relativePath);
+      if (content === undefined) {
+        content = await options.readInstalledFile(relativePath);
+        contents.set(relativePath, content);
+      }
+      return content;
+    };
+    if (!Array.isArray(index.entries)) throw new Error("missing entries");
+    for (const entryValue of index.entries) {
+      const entry = recordOf(entryValue);
+      if (
+        typeof entry.llm !== "string" ||
+        (entry.task !== "review" && entry.task !== "delegate")
+      ) {
+        throw new Error("invalid capability identity");
+      }
+      const source = recordOf(entry.source);
+      if (
+        typeof source.evidencePath !== "string" ||
+        typeof source.evidenceSha256 !== "string" ||
+        !/^[a-f0-9]{64}$/u.test(source.evidenceSha256)
+      ) {
+        throw new Error("invalid evidence reference");
+      }
+      const evidence = await readSource(source.evidencePath);
+      if (sha256(evidence) !== source.evidenceSha256) {
+        throw new Error("evidence hash mismatch");
+      }
+      if (source.kind === "legacy-standalone") continue;
+      if (
+        source.kind !== "batch-case" ||
+        typeof source.manifestPath !== "string" ||
+        typeof source.manifestSha256 !== "string" ||
+        !/^[a-f0-9]{64}$/u.test(source.manifestSha256)
+      ) {
+        throw new Error("invalid manifest reference");
+      }
+      const manifestBytes = await readSource(source.manifestPath);
+      if (sha256(manifestBytes) !== source.manifestSha256) {
+        throw new Error("manifest hash mismatch");
+      }
+      const manifest = recordOf(parseJsonBytes(manifestBytes));
+      if (!Array.isArray(manifest.cases)) {
+        throw new Error("manifest cases missing");
+      }
+      const matchingCases = manifest.cases
+        .map(recordOf)
+        .filter(
+          (candidate) =>
+            candidate.llm === entry.llm && candidate.task === entry.task,
+        );
+      const matchingCase = matchingCases[0];
+      const reference = recordOf(matchingCase?.evidence);
+      if (
+        matchingCases.length !== 1 ||
+        matchingCase?.result !== "passed" ||
+        reference.path !== source.evidencePath ||
+        reference.sha256 !== source.evidenceSha256
+      ) {
+        throw new Error("manifest capability mismatch");
+      }
+    }
+    return Object.freeze({ sourcePaths });
+  } catch {
+    throw new Error("Installed capability projection is invalid");
   }
 }
 

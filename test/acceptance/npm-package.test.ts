@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import { describe, expect, it, vi } from "vitest";
@@ -7,6 +8,7 @@ import { resolve } from "node:path";
 import {
   assertDoctorAcceptance,
   assertInstalledPackageContract,
+  assertInstalledCapabilityProjection,
   assertNpmRegistryMetadata,
   buildIsolatedNpmEnvironment,
   establishInstalledMcpSession,
@@ -195,7 +197,6 @@ describe("npm-installed package acceptance contract", () => {
           name: "codex-external-agents",
           version: "0.1.0-beta.1",
         },
-        runtimeVersion: "0.1.0-beta.1",
         expectedVersion: "0.1.0-beta.1",
       }),
     ).not.toThrow();
@@ -207,7 +208,6 @@ describe("npm-installed package acceptance contract", () => {
           name: "codex-external-agents",
           version: "0.1.0-beta.0",
         },
-        runtimeVersion: "0.1.0-beta.1",
         expectedVersion: "0.1.0-beta.1",
       }),
     ).toThrow(/installed package contract/iu);
@@ -281,6 +281,96 @@ describe("npm-installed package acceptance contract", () => {
         detail: `not applicable on ${process.platform}`,
       });
     }
+  });
+
+  it("verifies the installed capability index and its exact evidence projection", async () => {
+    const digest = (content: Buffer) =>
+      createHash("sha256").update(content).digest("hex");
+    const batchEvidencePath =
+      "docs/smoke/evidence/batches/current/cases/review.json";
+    const manifestPath =
+      "docs/smoke/evidence/batches/current/manifest.json";
+    const legacyPath = "docs/smoke/evidence/legacy.json";
+    const batchEvidence = Buffer.from('{"passed":true}\n');
+    const legacyEvidence = Buffer.from('{"passed":true}\n');
+    const manifest = Buffer.from(
+      `${JSON.stringify({
+        cases: [
+          {
+            llm: "ark-coding-plan",
+            task: "review",
+            result: "passed",
+            evidence: {
+              path: batchEvidencePath,
+              sha256: digest(batchEvidence),
+            },
+          },
+        ],
+      })}\n`,
+    );
+    const index = Buffer.from(
+      `${JSON.stringify({
+        schemaVersion: 1,
+        entries: [
+          {
+            llm: "ark-coding-plan",
+            task: "review",
+            source: {
+              kind: "batch-case",
+              manifestPath,
+              manifestSha256: digest(manifest),
+              evidencePath: batchEvidencePath,
+              evidenceSha256: digest(batchEvidence),
+            },
+          },
+          {
+            llm: "ark-agent-deepseek-v4-flash",
+            task: "delegate",
+            source: {
+              kind: "legacy-standalone",
+              evidencePath: legacyPath,
+              evidenceSha256: digest(legacyEvidence),
+            },
+          },
+        ],
+      })}\n`,
+    );
+    const files = new Map<string, Buffer>([
+      [manifestPath, manifest],
+      [batchEvidencePath, batchEvidence],
+      [legacyPath, legacyEvidence],
+    ]);
+    const readInstalledFile = async (relativePath: string) => {
+      const content = files.get(relativePath);
+      if (content === undefined) throw new Error("missing fixture");
+      return content;
+    };
+
+    await expect(
+      assertInstalledCapabilityProjection({
+        repositoryIndex: index,
+        installedIndex: index,
+        readInstalledFile,
+      }),
+    ).resolves.toEqual({
+      sourcePaths: [legacyPath, manifestPath, batchEvidencePath].sort(),
+    });
+    await expect(
+      assertInstalledCapabilityProjection({
+        repositoryIndex: index,
+        installedIndex: Buffer.from(index.toString("utf8") + " "),
+        readInstalledFile,
+      }),
+    ).rejects.toThrow(/Installed capability projection is invalid/u);
+
+    files.set(batchEvidencePath, Buffer.from('{"passed":false}\n'));
+    await expect(
+      assertInstalledCapabilityProjection({
+        repositoryIndex: index,
+        installedIndex: index,
+        readInstalledFile,
+      }),
+    ).rejects.toThrow(/Installed capability projection is invalid/u);
   });
 
   it("proves only owned cleanup and ships the current-host native helper", () => {

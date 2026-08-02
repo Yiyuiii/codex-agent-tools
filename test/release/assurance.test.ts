@@ -1,13 +1,19 @@
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
   assertAllowedPackFiles,
   assertCapabilitySourcesPackaged,
+  assertDeclaredPackageFilePaths,
   assertNoSensitiveContent,
   assertPackageDocumentLinkClosure,
   assertPackageLocalLinks,
   assertReleasePackageMetadata,
   capabilitySourcePathsFromIndex,
+  packageFilePathsFromManifest,
   resolveAllowedPackInspectionPaths,
   resolvePackInspectionPath,
 } from "../../src/release/assurance.js";
@@ -150,7 +156,7 @@ describe("release assurance", () => {
       ]);
 
       await expect(
-        resolveAllowedPackInspectionPaths(fileNames, listCandidates),
+        resolveAllowedPackInspectionPaths(fileNames, ["README.md"]),
       ).rejects.toThrow();
       expect(listCandidates).not.toHaveBeenCalled();
     },
@@ -167,95 +173,118 @@ describe("release assurance", () => {
     });
 
     await expect(
-      resolveAllowedPackInspectionPaths([redacted], listCandidates),
-    ).resolves.toEqual([actual]);
-    expect(listCandidates).toHaveBeenCalledTimes(1);
+      resolveAllowedPackInspectionPaths(["package.json", redacted], [actual]),
+    ).resolves.toEqual(["package.json", actual]);
+    expect(listCandidates).not.toHaveBeenCalled();
   });
 
   it("revalidates resolved package paths after candidate I/O", async () => {
     const listCandidates = vi.fn(async () => ["docs/smoke/node_modules"]);
 
     await expect(
-      resolveAllowedPackInspectionPaths(["docs/smoke/***"], listCandidates),
-    ).rejects.toThrow(/Unexpected file in npm package/u);
-    expect(listCandidates).toHaveBeenCalledTimes(1);
+      resolveAllowedPackInspectionPaths(
+        ["docs/smoke/***"],
+        ["docs/smoke/node_modules"],
+      ),
+    ).rejects.toThrow(/exact file paths/u);
+    expect(listCandidates).not.toHaveBeenCalled();
   });
 
-  it("accepts only the documented runtime package surface", () => {
+  it("uses exact package manifest files as the sole package surface", () => {
+    const declared = [
+      "README.md",
+      "LICENSE",
+      "dist/cli.js",
+      "dist/mcp.js",
+      "docs/smoke/evidence/capabilities.json",
+    ];
+    expect(packageFilePathsFromManifest({ files: declared })).toEqual(
+      declared,
+    );
     expect(() =>
-      assertAllowedPackFiles([
+      assertAllowedPackFiles(
+        [
         "package.json",
-        "README.md",
-        "LICENSE",
-        "docs/operations.md",
-        "docs/migration-from-codex-cc-tools.md",
-        "docs/release/checklist.md",
-        "docs/release/four-llm-qualification-result-review.html",
-        "docs/release/four-llm-qualification-authorization-review.html",
-        "docs/release/four-llm-qualification-reauthorization-review.html",
-        "docs/release/qualification-carrier-rehearsal.md",
-        "docs/release/four-llm-qualification-execution-runbook.md",
-        "docs/release/real-plugin-install-review.md",
-        "docs/release/plugin-isolated-state.md",
-        "docs/superpowers/plans/2026-07-27-authorized-four-llm-qualification-and-convergence.md",
-        "docs/superpowers/plans/2026-07-29-capability-scoped-qualification.md",
-        "docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md",
-        "docs/smoke/pi-gemini.md",
-        "docs/smoke/evidence/gemini-review.json",
-        "docs/smoke/evidence/batches/legacy/manifest.json",
-        "dist/cli.js",
-        "dist/mcp.js",
-        "dist/index.d.ts",
-        ".agents/plugins/marketplace.json",
-        "plugins/codex-external-agents/.codex-plugin/plugin.json",
-        "plugins/codex-external-agents/.mcp.json",
-        "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
-        "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
-        "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
-      ]),
+          ...declared,
+        ],
+        declared,
+      ),
     ).not.toThrow();
 
     expect(() =>
-      assertAllowedPackFiles(["package.json", "src/cli/main.ts"]),
-    ).toThrow(/src\/cli\/main\.ts/);
-    expect(() => assertAllowedPackFiles(["package.json", "AGENTS.md"])).toThrow(
-      /AGENTS\.md/,
+      assertAllowedPackFiles(
+        ["package.json", ...declared, "dist/index.d.ts"],
+        declared,
+      ),
+    ).toThrow(/Unexpected file/u);
+    expect(() =>
+      assertAllowedPackFiles(
+        ["package.json", ...declared.filter((name) => name !== "dist/mcp.js")],
+        declared,
+      ),
+    ).toThrow(/Unexpected file/u);
+    expect(() =>
+      packageFilePathsFromManifest({ files: ["dist"] }),
+    ).toThrow(/exact file paths/u);
+    expect(() =>
+      packageFilePathsFromManifest({ files: ["dist/*.js"] }),
+    ).toThrow(/exact file paths/u);
+    expect(() =>
+      packageFilePathsFromManifest({ files: ["README.md", "README.md"] }),
+    ).toThrow(/exact file paths/u);
+    expect(() =>
+      packageFilePathsFromManifest({ files: ["dist\\cli.js"] }),
+    ).toThrow(/exact file paths/u);
+    expect(() =>
+      packageFilePathsFromManifest({ files: ["../../secret.md"] }),
+    ).toThrow(/Unsafe npm package path/u);
+  });
+
+  it("accepts only regular declared files through a stable repository path chain", async () => {
+    const repositoryRoot = await mkdtemp(
+      path.join(os.tmpdir(), "release-package-path-"),
     );
-    expect(() =>
-      assertAllowedPackFiles([
-        "plugins/codex-external-agents/node_modules/zod/index.js",
-      ]),
-    ).toThrow(/Unexpected file/u);
-    expect(() =>
-      assertAllowedPackFiles(["dist/node_modules/zod/index.js"]),
-    ).toThrow(/Unexpected file/u);
-    expect(() =>
-      assertAllowedPackFiles([
-        "plugins/codex-external-agents/runtime/unexpected.js",
-      ]),
-    ).toThrow(/Unexpected file/u);
-    expect(() =>
-      assertAllowedPackFiles([
-        "plugins/codex-external-agents/native/win32-x64/unexpected.exe",
-      ]),
-    ).toThrow(/Unexpected file/u);
-    expect(() =>
-      assertAllowedPackFiles([".agents/plugins/another-marketplace.json"]),
-    ).toThrow(/Unexpected file/u);
-    expect(() =>
-      assertAllowedPackFiles(["docs/release/unreviewed-status.md"]),
-    ).toThrow(/Unexpected file/u);
-    expect(() =>
-      assertAllowedPackFiles([
-        "docs/superpowers/plans/unreviewed-execution-plan.md",
-      ]),
-    ).toThrow(/Unexpected file/u);
-    expect(() => assertAllowedPackFiles(["../../secret.md"])).toThrow(
-      /Unsafe npm package path/u,
+    try {
+      await mkdir(path.join(repositoryRoot, "docs", "nested"), {
+        recursive: true,
+      });
+      await writeFile(
+        path.join(repositoryRoot, "docs", "nested", "review.md"),
+        "review\n",
+      );
+
+      await expect(
+        assertDeclaredPackageFilePaths(repositoryRoot, [
+          "docs/nested/review.md",
+        ]),
+      ).resolves.toEqual(["docs/nested/review.md"]);
+    } finally {
+      await rm(repositoryRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a symlink or Windows junction in any declared-file ancestor", async () => {
+    const repositoryRoot = await mkdtemp(
+      path.join(os.tmpdir(), "release-package-link-"),
     );
-    expect(() => assertAllowedPackFiles(["../../***"])).toThrow(
-      /Unsafe npm package path/u,
-    );
+    try {
+      const realDocs = path.join(repositoryRoot, "real-docs");
+      await mkdir(path.join(realDocs, "nested"), { recursive: true });
+      await writeFile(path.join(realDocs, "nested", "review.md"), "review\n");
+      await symlink(
+        realDocs,
+        path.join(repositoryRoot, "docs"),
+        process.platform === "win32" ? "junction" : "dir",
+      );
+
+      await expect(
+        assertDeclaredPackageFilePaths(repositoryRoot, [
+          "docs/nested/review.md",
+        ]),
+      ).rejects.toThrow(/unsafe declared npm package path/iu);
+    } finally {
+      await rm(repositoryRoot, { recursive: true, force: true });
+    }
   });
 
   it("requires the actual npm package to contain every verified capability source", () => {
@@ -296,6 +325,18 @@ describe("release assurance", () => {
         },
       ),
     ).toThrow(/Unsafe npm package path/u);
+    expect(() =>
+      assertCapabilitySourcesPackaged(
+        [
+          capabilityIndex,
+          manifest,
+          evidence,
+          "docs/smoke/evidence/unreferenced.json",
+          "package.json",
+        ],
+        verifiedSources,
+      ),
+    ).toThrow(/unexpected capability qualification source/iu);
   });
 
   it("extracts only canonical evidence paths from batch and legacy capability sources", () => {
@@ -1112,7 +1153,7 @@ describe("release assurance", () => {
   ])(
     "rejects a %s at the shared package path safety gate",
     (_kind, unsafePath) => {
-      expect(() => assertAllowedPackFiles([unsafePath])).toThrow(
+      expect(() => assertAllowedPackFiles([unsafePath], [])).toThrow(
         /Unsafe npm package path/u,
       );
       expect(() => resolvePackInspectionPath(unsafePath, [])).toThrow(
