@@ -172,6 +172,7 @@ export async function runPiRpc(
   let killTimer: NodeJS.Timeout | undefined;
   let owned: OwnedAgentProcess | undefined;
   let ownedExit: OwnedProcessExit | undefined;
+  let ownedProcessDrained: true | undefined;
   let ownedClosedError: unknown;
   let ownedTerminationPromise: Promise<void> | undefined;
   let ownedClosurePromise: Promise<void> | undefined;
@@ -724,6 +725,7 @@ export async function runPiRpc(
         await cancellationFlow;
       }
       ownedExit = await owned.closed;
+      if (ownedExit.ownershipDrained === true) ownedProcessDrained = true;
       validateOwnedExit(ownedExit, cancellationReason ?? "root_exit");
     }
     status =
@@ -767,7 +769,9 @@ export async function runPiRpc(
         reportOwnedFailure(error);
       }
       try {
-        ownedExit ??= await owned.closed;
+        const drainedExit = await owned.closed;
+        if (drainedExit.ownershipDrained === true) ownedProcessDrained = true;
+        ownedExit ??= drainedExit;
       } catch (error) {
         ownedClosedError ??= error;
         reportOwnedFailure(error);
@@ -827,6 +831,7 @@ export async function runPiRpc(
       runtimeReportedAutoRetryCount,
       adapterReportedFallbackUsed,
       source: "pi-rpc-observable",
+      ...(ownedProcessDrained === true ? { ownedProcessDrained: true } : {}),
     };
   }
 

@@ -11,6 +11,12 @@ export interface AdapterExecutionTelemetry {
   runtimeReportedAutoRetryCount: number;
   adapterReportedFallbackUsed: boolean;
   source: "kimi-acp-observable" | "pi-rpc-observable";
+  /**
+   * Present only after this Windows invocation's case-owned Job reports a
+   * terminal state and confirms that its complete ownership set is drained.
+   * This is not inferred from a PID or system-wide process scan.
+   */
+  readonly ownedProcessDrained?: true;
 }
 
 export interface AdapterRunRequest {

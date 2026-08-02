@@ -241,6 +241,9 @@ describe("Pi RPC client", () => {
       );
 
       expect(result.status).toBe("completed");
+      expect(result.executionTelemetry).toMatchObject({
+        ownedProcessDrained: true,
+      });
       expect(tracked.reasons).toEqual([]);
       expect(tracked.exits).toEqual([
         expect.objectContaining({
@@ -336,6 +339,7 @@ describe("Pi RPC client", () => {
       expect(result.executionTelemetry).toMatchObject({
         adapterClientInvocationCount: 0,
       });
+      expect(result.executionTelemetry?.ownedProcessDrained).toBeUndefined();
       expect(spawnCalls).toBe(0);
     },
   );
@@ -440,6 +444,13 @@ describe("Pi RPC client", () => {
       );
 
       expect(result.status).toBe("failed");
+      if (scenario === "invalid-json") {
+        expect(result.executionTelemetry).toBeNull();
+      } else {
+        expect(result.executionTelemetry).toMatchObject({
+          ownedProcessDrained: true,
+        });
+      }
       expect(result.diagnostics.join("\n")).toContain(expectedDiagnostic);
       expect(tracked.reasons).toEqual(["cancelled"]);
       expect(
@@ -527,6 +538,7 @@ describe("Pi RPC client", () => {
       );
 
       expect(result.status).toBe("failed");
+      expect(result.executionTelemetry?.ownedProcessDrained).toBeUndefined();
       expect(result.diagnostics.join("\n")).toContain(
         "synthetic Pi owned-process drain failure",
       );
@@ -601,6 +613,7 @@ describe("Pi RPC client", () => {
       );
 
       expect(result.status).toBe("failed");
+      expect(result.executionTelemetry?.ownedProcessDrained).toBeUndefined();
       expect(result.diagnostics.join("\n")).toContain(
         "synthetic Pi owned-process drain failure",
       );
@@ -681,6 +694,12 @@ describe("Pi RPC client", () => {
       "Authorization: [REDACTED]",
     );
     expect(result.diagnostics.join("\n")).not.toContain("fake-secret");
+    if (process.platform !== "win32") {
+      expect(result.executionTelemetry).not.toBeNull();
+      expect(result.executionTelemetry).not.toHaveProperty(
+        "ownedProcessDrained",
+      );
+    }
 
     const log = await readLog(logPath);
     const argv = log.find((entry) => entry.kind === "argv")?.value as string[];
@@ -767,6 +786,10 @@ describe("Pi RPC client", () => {
         },
       });
       expect(result.status).toBe("cancelled");
+      expect(result.executionTelemetry).not.toBeNull();
+      expect(result.executionTelemetry).not.toHaveProperty(
+        "ownedProcessDrained",
+      );
       const childPid = Number.parseInt(
         await readFile(childPidPath, "utf8"),
         10,

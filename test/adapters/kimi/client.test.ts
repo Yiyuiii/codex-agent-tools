@@ -228,13 +228,22 @@ describe("runKimiAcp", () => {
       }),
     );
     expect(result.status).toBe("failed");
-    expect(result.executionTelemetry).toEqual({
+    expect(result.executionTelemetry).toMatchObject({
       adapterClientInvocationCount: 0,
       adapterRetryCount: 0,
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
       source: "kimi-acp-observable",
     });
+    if (process.platform === "win32") {
+      expect(result.executionTelemetry).toMatchObject({
+        ownedProcessDrained: true,
+      });
+    } else {
+      expect(result.executionTelemetry).not.toHaveProperty(
+        "ownedProcessDrained",
+      );
+    }
     expect(result.diagnostics.join("\n")).toMatch(/model configuration.*not available/i);
   });
 
@@ -286,9 +295,29 @@ describe("runKimiAcp", () => {
       });
 
       expect(result).toMatchObject({ status: "cancelled", diagnostics: [] });
+      expect(result.executionTelemetry).not.toHaveProperty(
+        "ownedProcessDrained",
+      );
       expect(spawnCalls).toBe(0);
     },
   );
+
+  it("does not report owned drain when the Windows spawner rejects", async () => {
+    const result = await runKimiAcp(baseRequest(), {
+      platform: "win32",
+      async spawnOwnedAgentProcess() {
+        throw new Error("synthetic owned spawner rejection");
+      },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.executionTelemetry).not.toHaveProperty(
+      "ownedProcessDrained",
+    );
+    expect(result.diagnostics.join("\n")).toContain(
+      "synthetic owned spawner rejection",
+    );
+  });
 
   it("reconciles shutdown that arrives while the Windows spawner is pending without awaiting ready", async () => {
     const shutdown = new AbortController();

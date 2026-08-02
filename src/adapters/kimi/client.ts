@@ -304,6 +304,7 @@ export async function runKimiAcp(
   let directChildClosed: Promise<void> | undefined;
   let owned: OwnedAgentProcess | undefined;
   let ownedTermination: Promise<void> | undefined;
+  let ownedProcessDrained: true | undefined;
   const preStartCancellation = Symbol("pre-start-cancellation");
 
   const beginOwnedTermination = (
@@ -627,6 +628,7 @@ export async function runKimiAcp(
           await beginOwnedTermination(owned, "cancelled");
         }
         const exit = await owned.closed;
+        if (exit.ownershipDrained === true) ownedProcessDrained = true;
         await connection?.closed;
         if (
           status === "completed" &&
@@ -688,6 +690,7 @@ export async function runKimiAcp(
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
       source: "kimi-acp-observable",
+      ...(ownedProcessDrained === true ? { ownedProcessDrained: true } : {}),
     },
   };
   if (actualModel !== undefined) result.actualModel = actualModel;

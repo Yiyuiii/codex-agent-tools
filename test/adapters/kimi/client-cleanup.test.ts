@@ -146,6 +146,9 @@ describe("runKimiAcp Windows owned-process cleanup", () => {
     );
 
     expect(result).toMatchObject({ status: "completed", diagnostics: [] });
+    expect(result.executionTelemetry).toMatchObject({
+      ownedProcessDrained: true,
+    });
     expect(tracked.reasons).toEqual([]);
     expect(tracked.exits).toEqual([
       expect.objectContaining({
@@ -201,6 +204,9 @@ describe("runKimiAcp Windows owned-process cleanup", () => {
     );
 
     expect(result.status).toBe("failed");
+    expect(result.executionTelemetry).not.toHaveProperty(
+      "ownedProcessDrained",
+    );
     expect(tracked.reasons).toEqual([]);
     expect(result.diagnostics.join("\n")).toContain(
       "synthetic owned-process drain failure",
@@ -216,6 +222,9 @@ describe("runKimiAcp Windows owned-process cleanup", () => {
     );
 
     expect(result.status).toBe("failed");
+    expect(result.executionTelemetry).toMatchObject({
+      ownedProcessDrained: true,
+    });
     expect(tracked.reasons).toEqual([]);
     expect(result.diagnostics.join("\n")).toContain(
       "Kimi ACP owned process root exited unsuccessfully",
