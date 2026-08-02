@@ -17,7 +17,7 @@ import type {
   OwnedTerminationReason,
   SpawnOwnedAgentProcessRequest,
 } from "../../../src/runtime/owned-agent-process.js";
-import { terminateProcessTree } from "../../../src/runtime/process-tree.js";
+import { terminatePosixProcessGroup } from "../../../src/runtime/process-tree.js";
 import { resolveWindowsJobHelperForModule } from "../../../src/runtime/windows-job-helper.js";
 import { spawnWindowsOwnedAgentProcessWithDependencies } from "../../../src/runtime/windows-owned-agent-process.js";
 
@@ -183,7 +183,9 @@ async function waitUntilDead(pid: number): Promise<void> {
 afterEach(async () => {
   await Promise.all(ownedTeardowns.splice(0).map((teardown) => teardown()));
   for (const pid of fallbackPids.splice(0)) {
-    if (isAlive(pid)) await terminateProcessTree(pid).catch(() => undefined);
+    if (isAlive(pid)) {
+      await terminatePosixProcessGroup(pid).catch(() => undefined);
+    }
   }
   await Promise.all(
     tempDirectories
@@ -781,7 +783,7 @@ describe("Pi RPC client", () => {
   });
 
   posixIt(
-    "cancels without a timeout and removes the fake RPC process tree",
+    "cancels without a timeout and removes the fake RPC POSIX process group",
     async () => {
       const cwd = await tempDirectory();
       const logPath = path.join(cwd, "rpc-log.jsonl");

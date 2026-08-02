@@ -16,7 +16,7 @@ import {
   type SpawnOwnedAgentProcessRequest,
 } from "../../runtime/owned-agent-process.js";
 import { redactText } from "../../runtime/redaction.js";
-import { terminateProcessTree } from "../../runtime/process-tree.js";
+import { terminatePosixProcessGroup } from "../../runtime/process-tree.js";
 import {
   decidePermission,
   selectPermissionResponse,
@@ -371,7 +371,9 @@ export async function runKimiAcp(
     void nativeCancel();
     if (directChild?.pid !== undefined) {
       killTimer = setTimeout(() => {
-        void terminateProcessTree(directChild!.pid!).catch(() => undefined);
+        void terminatePosixProcessGroup(directChild!.pid!).catch(
+          () => undefined,
+        );
       }, request.terminationGraceMs ?? 1_000);
     }
   };
@@ -658,10 +660,12 @@ export async function runKimiAcp(
       let shouldAwaitChildClose = directChild.pid === undefined;
       if (directChild.pid !== undefined) {
         try {
-          await terminateProcessTree(directChild.pid);
+          await terminatePosixProcessGroup(directChild.pid);
           shouldAwaitChildClose = true;
         } catch (error) {
-          diagnostics.push(`Process tree cleanup failed: ${String(error)}`);
+          diagnostics.push(
+            `POSIX process-group cleanup failed: ${String(error)}`,
+          );
           if (status === "completed") status = "failed";
         }
       }
@@ -672,7 +676,7 @@ export async function runKimiAcp(
           directChild.stdout.destroy();
           directChild.stderr.destroy();
           diagnostics.push(
-            `Kimi ACP child did not close within ${POSIX_CHILD_CLOSE_TIMEOUT_MS}ms after process tree termination`,
+            `Kimi ACP child did not close within ${POSIX_CHILD_CLOSE_TIMEOUT_MS}ms after POSIX process-group termination`,
           );
           status = "failed";
         }

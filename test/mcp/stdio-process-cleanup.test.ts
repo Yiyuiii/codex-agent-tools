@@ -12,6 +12,7 @@ import { PassThrough } from "node:stream";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { execa } from "execa";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { KimiAdapter } from "../../src/adapters/kimi/adapter.js";
@@ -39,7 +40,6 @@ import {
   inspectProcessIdentity,
   type ProcessIdentity,
 } from "../../src/qualification/lock.js";
-import { terminateProcessTree } from "../../src/runtime/process-tree.js";
 import type { ExternalReviewResult } from "../../src/tasks/results.js";
 import { spawnWindowsOwnedAgentProcessWithDependencies } from "../../src/runtime/windows-owned-agent-process.js";
 import { resolveWindowsJobHelperForModule } from "../../src/runtime/windows-job-helper.js";
@@ -299,6 +299,43 @@ async function waitUntilDead(pid: number, timeoutMs = 10_000): Promise<void> {
     await new Promise<void>((resolve) => setTimeout(resolve, 25));
   }
   expect(isAlive(pid), `expected owned PID ${pid} to be dead`).toBe(false);
+}
+
+async function terminateCapturedFixtureProcess(
+  pid: number,
+  expectedStartTime: string,
+): Promise<void> {
+  const identity = await inspectProcessIdentity(pid);
+  if (
+    !mayTerminateRecordedProcess(pid, identity) ||
+    identity.startTime !== expectedStartTime
+  ) {
+    throw new Error(
+      `Refused to terminate reused fixture PID ${pid}: expected ${expectedStartTime}, observed ${String(identity.startTime)}`,
+    );
+  }
+
+  if (process.platform === "win32") {
+    // Test-only rescue for a failed assertion/harness path. Production ownership
+    // is drained by the native Job helper and never falls back to taskkill.
+    const systemRoot = process.env.SYSTEMROOT ?? process.env.WINDIR;
+    if (systemRoot === undefined) {
+      throw new Error("Windows test cleanup requires SYSTEMROOT or WINDIR");
+    }
+    const result = await execa(
+      path.join(systemRoot, "System32", "taskkill.exe"),
+      ["/PID", String(pid), "/T", "/F"],
+      { reject: false, timeout: 10_000, windowsHide: true },
+    );
+    if (result.exitCode !== 0 && isAlive(pid)) {
+      throw new Error(
+        `Test-only taskkill failed for fixture PID ${pid}: exit ${String(result.exitCode)}`,
+      );
+    }
+    return;
+  }
+
+  process.kill(pid, "SIGKILL");
 }
 
 function assertSafeTempDirectory(directory: string): void {
@@ -606,7 +643,7 @@ afterEach(async () => {
         );
         continue;
       }
-      await terminateProcessTree(pid);
+      await terminateCapturedFixtureProcess(pid, expectedStartTime);
       await waitUntilDead(pid);
     } catch (error) {
       cleanupFailures.push(String(error));
@@ -857,7 +894,7 @@ describe("MCP stdio owned-process cleanup", () => {
   );
 
   it(
-    "aborts a real Pi request once and waits for its complete owned tree cleanup",
+    "cancels a real Pi request through SDK session shutdown and waits for its complete owned tree cleanup",
     async () => {
       const cwd = await makeTempDirectory();
       const stateDirectory = await makeTempDirectory();
@@ -992,9 +1029,12 @@ describe("MCP stdio owned-process cleanup", () => {
       expect(
         commands.filter((command) => command.type === "prompt"),
       ).toHaveLength(1);
+      // Parent-side abort write attempt/order and a stalled callback are covered
+      // deterministically in test/adapters/pi/client.test.ts. This integration
+      // observes child consumption only, and Job termination may win that race.
       expect(
-        commands.filter((command) => command.type === "abort"),
-      ).toHaveLength(1);
+        commands.filter((command) => command.type === "abort").length,
+      ).toBeLessThanOrEqual(1);
       expect(adapterClientInvocationCount).toBe(1);
       expect(clientRequestHadTimeout).toBe(false);
       expect(clientRequestHadRetryOverride).toBe(false);

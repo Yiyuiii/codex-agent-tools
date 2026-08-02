@@ -12,7 +12,7 @@ import {
   type SpawnOwnedAgentProcessRequest,
 } from "../../runtime/owned-agent-process.js";
 import { redactText } from "../../runtime/redaction.js";
-import { terminateProcessTree } from "../../runtime/process-tree.js";
+import { terminatePosixProcessGroup } from "../../runtime/process-tree.js";
 import { LfJsonlDecoder } from "./jsonl.js";
 
 export type PiThinkingLevel =
@@ -445,7 +445,7 @@ export async function runPiRpc(
       if (owned !== undefined) {
         void startOwnedClosure("cancelled").catch(() => undefined);
       } else if (legacyChild?.pid !== undefined) {
-        void terminateProcessTree(legacyChild.pid).catch(() => undefined);
+        void terminatePosixProcessGroup(legacyChild.pid).catch(() => undefined);
       }
     }
     return internalFailure;
@@ -661,7 +661,9 @@ export async function runPiRpc(
       if (legacyChild?.pid !== undefined) {
         const terminationGraceMs = request.terminationGraceMs ?? 1_000;
         killTimer = setTimeout(() => {
-          void terminateProcessTree(legacyChild!.pid!).catch(() => undefined);
+          void terminatePosixProcessGroup(legacyChild!.pid!).catch(
+            () => undefined,
+          );
         }, terminationGraceMs);
       }
       cancellationFlow = Promise.resolve();
@@ -795,8 +797,10 @@ export async function runPiRpc(
       }
     } else {
       if (legacyChild?.pid !== undefined) {
-        await terminateProcessTree(legacyChild.pid).catch((error) => {
-          appendDiagnostic(`Process tree cleanup failed: ${String(error)}`);
+        await terminatePosixProcessGroup(legacyChild.pid).catch((error) => {
+          appendDiagnostic(
+            `POSIX process-group cleanup failed: ${String(error)}`,
+          );
           if (status === "completed") status = "failed";
         });
       }
