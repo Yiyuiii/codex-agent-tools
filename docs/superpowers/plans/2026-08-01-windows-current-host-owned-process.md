@@ -322,6 +322,8 @@ git diff --check
 
 **当前宿主去冗余尾项状态（2026-08-02，已完成实现）：** Windows生产路径已删除`taskkill`/PID-tree fallback；SDK client/transport close与Job-owned drain成为唯一正常和异常清理合同，test-only失败救援必须先核验已捕获PID与start identity。POSIX旧process-group分支保留但不构成当前宿主承诺。`pretest`改为一次完整build，插件artifact与隔离验收复用已构建bundle；npm launch path使用共享纯函数拒绝跨平台绝对路径、drive-relative、父级逃逸和控制字符。纯Markdown/日期/tsup源码/命令次数测试已删除，发布测试仅保留Node24、固定Codex CLI真值、E404-only fail closed、tag/branch/channel、marker顺序与OIDC语义。真实隔离验收进一步发现并修复官方版本化plugin cache布局不被helper resolver接受，以及旧fake Pi夹具不符合可信安装定位的问题；新cache分支严格绑定SemVer目录、plugin manifest、无reparse与helper SHA/PE，完整add/list/cache MCP/fake Pi/remove通过。全量结果为67文件1202 passed / 5 skipped；独立终审无P1/P2，唯一发布测试P3已最小修复。下一子批只处理observer artifact/build manifest/start script，不冻结、不发布。
 
+**Observer artifact与启动层状态（2026-08-02，已完成）：** `5046ab9`把当前Windows x64/net48 observer固定为checked-in release-only artifact，SHA256为`dd20110b1cbcae984ab9f3560ece1bfa8e7b1a0e542b206cec5d9ff5047f5a64`；唯一manifest严格覆盖6项共享输入与9个production C#源，`verify`从raw-byte snapshot确定性重建并逐字节比较，`update-artifact`只做同目录原子单文件替换且manifest最后写入。`4a0b3d0`新增固定无参启动层：只接受当前Windows x64/Node 24，从精确beta tag clean checkout核对公共npm identity和实际官方版本化plugin cache五文件，把目标delegate限制在`LOCALAPPDATA` nonce隔离workspace，并以可达的最终工具动作marker区分自然完成与真实Stop。启动层不build、restore、install、publish、轮询、扫描进程、读取活动`config.toml`或设置外部CLI默认/全局预算；真实本机发现的`execFile(npm.cmd)` EINVAL已改为当前`node.exe`直接运行受信固定`npm-cli.js`。fresh终审无P1/P2/P3；主代理复验observer managed 34/34、kernel 7/7、release 206/206、全库69文件1224 passed / 5 skipped、类型、语法、真实npm registry查询、dirty/non-tag fail-closed与diff均PASS。Task 7至此闭合，下一步只做Task 8当前宿主freeze与一次集成终审，不增加Node矩阵或兼容性认证。
+
 ## 9. Task 8：当前宿主冻结与独立终审
 
 在维护者当前宿主运行，不使用下载的替代Node：
