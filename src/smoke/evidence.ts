@@ -37,24 +37,25 @@ export type SmokeEvidenceEnvelope<T extends object> =
   | (T & {
       readonly schemaVersion: 3;
       readonly qualification: Readonly<SmokeQualificationContext>;
+    })
+  | (T & {
+      readonly schemaVersion: 4;
+      readonly qualification: Readonly<SmokeQualificationContext> | null;
     });
+
+export type CurrentSmokeEvidenceEnvelope<T extends object> = T & {
+  readonly schemaVersion: 4;
+  readonly qualification: Readonly<SmokeQualificationContext> | null;
+};
 
 export type SmokeInfrastructureStage =
   | "runtime_setup"
   | "workspace_setup"
   | "fixture_setup"
-  | "version_probe"
-  | "pre_process_snapshot"
   | "task_execution"
   | "acceptance_check"
-  | "post_process_snapshot"
   | "workspace_cleanup"
   | "smoke_execution";
-
-export interface SmokeInfrastructureCounts {
-  processIdsBefore?: number;
-  processIdsAfter?: number;
-}
 
 export interface SmokeEvidenceFileOperations {
   ensureDirectory(directory: string): Promise<void>;
@@ -84,30 +85,26 @@ export const defaultSmokeEvidenceFileOperations: SmokeEvidenceFileOperations =
 
 export class SmokeInfrastructureError extends Error {
   readonly stage: SmokeInfrastructureStage;
-  readonly counts: SmokeInfrastructureCounts;
 
   constructor(
     stage: SmokeInfrastructureStage,
-    counts: SmokeInfrastructureCounts = {},
     cause?: unknown,
   ) {
     super("Smoke infrastructure failure", { cause });
     this.name = "SmokeInfrastructureError";
     this.stage = stage;
-    this.counts = { ...counts };
   }
 }
 
 export async function inSmokeInfrastructureStage<T>(
   stage: SmokeInfrastructureStage,
   operation: () => Promise<T>,
-  counts: SmokeInfrastructureCounts = {},
 ): Promise<T> {
   try {
     return await operation();
   } catch (error) {
     if (error instanceof SmokeInfrastructureError) throw error;
-    throw new SmokeInfrastructureError(stage, counts, error);
+    throw new SmokeInfrastructureError(stage, error);
   }
 }
 
@@ -116,11 +113,47 @@ interface ParsedSmokeArguments {
   task: SmokeTask;
 }
 
-type SmokeEvidence = SmokeEvidenceEnvelope<{
+type SmokeEvidence = CurrentSmokeEvidenceEnvelope<{
   timestamp: string;
   passed: boolean;
   [key: string]: unknown;
 }>;
+
+function allRequiredChecksPassed(
+  kind: SmokeKind,
+  task: SmokeTask,
+  value: unknown,
+): value is Record<string, true> {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    Array.isArray(value)
+  ) {
+    return false;
+  }
+  const common = [
+    "actualModelMatches",
+    "executionTelemetryValid",
+    "ownedProcessDrained",
+  ];
+  const runtime = kind === "kimi" ? [] : ["environmentIsolated"];
+  const business =
+    task === "review"
+      ? ["knownDefectFound", "workspaceUnchanged"]
+      : [
+          "onlyExpectedFileChanged",
+          "requiredCommandObserved",
+          "resultFileObserved",
+          "resultFileValid",
+        ];
+  const expectedKeys = [...common, ...runtime, ...business].sort();
+  const record = value as Record<string, unknown>;
+  const actualKeys = Object.keys(record).sort();
+  return (
+    JSON.stringify(actualKeys) === JSON.stringify(expectedKeys) &&
+    actualKeys.every((key) => record[key] === true)
+  );
+}
 
 export interface SmokeEntrypointOptions<
   TOptions extends ParsedSmokeArguments,
@@ -470,6 +503,7 @@ function infrastructureEvidence(
     adapterRetryCount: null,
     runtimeReportedAutoRetryCount: null,
     adapterReportedFallbackUsed: null,
+    ownedProcessDrained: null,
     orchestratorFallbackUsed:
       qualification?.orchestratorFallbackUsed ?? null,
     executionTelemetrySource: null,
@@ -478,24 +512,16 @@ function infrastructureEvidence(
       stage: error.stage,
       count: 1,
     },
-    counts: { ...error.counts },
-    checks: {
-      postProcessSnapshot:
-        error.stage === "post_process_snapshot" ? "unknown" : "not_reached",
-      processCleanup: "unknown",
-    },
+    checks: { ownedProcessDrained: "unknown" },
   };
-  return qualification === null
-    ? {
-        schemaVersion: 2,
-        qualification: null,
-        ...payload,
-      }
-    : {
-        schemaVersion: 3,
-        qualification: freezeQualificationContext(qualification),
-        ...payload,
-      };
+  return {
+    schemaVersion: 4,
+    qualification:
+      qualification === null
+        ? null
+        : freezeQualificationContext(qualification),
+    ...payload,
+  };
 }
 
 export async function publishImmutableJson(
@@ -647,12 +673,27 @@ export async function runSmokeEntrypoint<
     const resultQualification = normalizeSmokeQualificationContext(
       resultRecord.qualification,
     );
-    const expectedSchemaVersion = qualification === null ? 2 : 3;
+    const ownedProcessDrained = resultRecord.ownedProcessDrained;
+    const checks = resultRecord.checks;
     if (
-      resultRecord.schemaVersion !== expectedSchemaVersion ||
+      resultRecord.schemaVersion !== 4 ||
+      typeof resultRecord.passed !== "boolean" ||
+      resultRecord.llm !== options.llm ||
+      resultRecord.task !== options.task ||
       !qualificationContextsEqual(resultQualification, qualification) ||
       resultRecord.orchestratorFallbackUsed !==
-        (qualification?.orchestratorFallbackUsed ?? null)
+        (qualification?.orchestratorFallbackUsed ?? null) ||
+      (ownedProcessDrained !== true && ownedProcessDrained !== null) ||
+      (resultRecord.passed === true &&
+        (resultRecord.status !== "completed" ||
+          resultRecord.adapterClientInvocationCount !== 1 ||
+          resultRecord.adapterRetryCount !== 0 ||
+          resultRecord.runtimeReportedAutoRetryCount !== 0 ||
+          resultRecord.adapterReportedFallbackUsed !== false ||
+          ownedProcessDrained !== true ||
+          !allRequiredChecksPassed(config.kind, options.task, checks) ||
+          checks.executionTelemetryValid !== true ||
+          checks.ownedProcessDrained !== true))
     ) {
       throw new Error("Smoke evidence identity mismatch");
     }
@@ -661,24 +702,20 @@ export async function runSmokeEntrypoint<
       orchestratorFallbackUsed:
         qualification?.orchestratorFallbackUsed ?? null,
     };
-    evidence =
-      qualification === null
-        ? (Object.freeze({
-            ...authoritativePayload,
-            schemaVersion: 2,
-            qualification: null,
-          }) as unknown as SmokeEvidence)
-        : (Object.freeze({
-            ...authoritativePayload,
-            schemaVersion: 3,
-            qualification: freezeQualificationContext(qualification),
-          }) as unknown as SmokeEvidence);
+    evidence = Object.freeze({
+      ...authoritativePayload,
+      schemaVersion: 4,
+      qualification:
+        qualification === null
+          ? null
+          : freezeQualificationContext(qualification),
+    }) as unknown as SmokeEvidence;
   } catch (error) {
     infrastructureFailure = true;
     const sanitized =
       error instanceof SmokeInfrastructureError
         ? error
-        : new SmokeInfrastructureError("smoke_execution", {}, error);
+        : new SmokeInfrastructureError("smoke_execution", error);
     evidence = infrastructureEvidence(
       options,
       sanitized,

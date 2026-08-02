@@ -16,7 +16,6 @@ import {
   type BuildIsolatedPiConfigOptions,
   type IsolatedPiConfig,
 } from "../adapters/pi/config.js";
-import { locatePi } from "../adapters/pi/locator.js";
 import type { LlmProfile, NetworkPolicy, RuntimeKind } from "../domain/types.js";
 import { createLlmRegistry, resolveLlm } from "../llms/registry.js";
 import type {
@@ -34,7 +33,7 @@ import {
   assertSmokeQualificationIdentity,
   inSmokeInfrastructureStage,
   normalizeSmokeQualificationContext,
-  type SmokeEvidenceEnvelope,
+  type CurrentSmokeEvidenceEnvelope,
   type SmokeQualificationContext,
 } from "./evidence.js";
 import {
@@ -66,7 +65,7 @@ export interface PiSmokeRuntimeEvidence {
 export interface PiSmokeChecks {
   actualModelMatches: boolean;
   environmentIsolated: boolean;
-  noNewPiRpcProcesses: boolean;
+  ownedProcessDrained: boolean;
   workspaceUnchanged?: boolean;
   knownDefectFound?: boolean;
   resultFileValid?: boolean;
@@ -78,7 +77,6 @@ export interface PiSmokeChecks {
 
 interface PiSmokeEvidencePayload {
   timestamp: string;
-  piVersion: string;
   llm: string;
   actualModel: string | null;
   expectedModel: string;
@@ -106,6 +104,7 @@ interface PiSmokeEvidencePayload {
   adapterRetryCount: number | null;
   runtimeReportedAutoRetryCount: number | null;
   adapterReportedFallbackUsed: boolean | null;
+  ownedProcessDrained: true | null;
   orchestratorFallbackUsed: boolean | null;
   executionTelemetrySource: AdapterExecutionTelemetry["source"] | null;
   checks: PiSmokeChecks;
@@ -120,7 +119,7 @@ interface PiSmokeEvidencePayload {
 }
 
 export type PiSmokeEvidence =
-  SmokeEvidenceEnvelope<PiSmokeEvidencePayload>;
+  CurrentSmokeEvidenceEnvelope<PiSmokeEvidencePayload>;
 
 export interface PiSmokeService {
   review(
@@ -136,8 +135,6 @@ export interface PiSmokeService {
 export interface PiSmokeDependencies {
   service?: PiSmokeService;
   runtimeEvidence?: PiSmokeRuntimeEvidence;
-  readPiVersion?: () => Promise<string>;
-  listPiRpcProcessIds?: () => Promise<number[]>;
   now?: () => Date;
 }
 
@@ -225,56 +222,6 @@ export async function createPiSmokeRuntime(
     }),
     evidence,
   };
-}
-
-async function defaultReadPiVersion(): Promise<string> {
-  const executable = await locatePi();
-  const result = await execa(executable, ["--version"], {
-    reject: false,
-    timeout: 30_000,
-    windowsHide: true,
-  });
-  if (result.exitCode !== 0) throw new Error("Unable to read Pi version");
-  return result.stdout.trim();
-}
-
-async function defaultListPiRpcProcessIds(): Promise<number[]> {
-  if (process.platform === "win32") {
-    const script = [
-      "Get-CimInstance Win32_Process",
-      "Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.Contains('--mode') -and $_.CommandLine.Contains('rpc') -and $_.CommandLine.Contains('codex-external-agents') }",
-      "ForEach-Object { $_.ProcessId }",
-    ].join(" | ");
-    const result = await execa(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-Command", script],
-      { reject: false, timeout: 30_000, windowsHide: true },
-    );
-    if (result.exitCode !== 0) {
-      throw new Error("Unable to list Pi RPC processes");
-    }
-    return result.stdout
-      .split(/\s+/u)
-      .filter((value) => /^\d+$/u.test(value))
-      .map(Number)
-      .sort((left, right) => left - right);
-  }
-  const result = await execa("ps", ["-eo", "pid=,args="], {
-    reject: false,
-    timeout: 30_000,
-  });
-  if (result.exitCode !== 0) throw new Error("Unable to list Pi RPC processes");
-  return result.stdout
-    .split(/\r?\n/u)
-    .filter(
-      (line) =>
-        line.includes("--mode") &&
-        line.includes("rpc") &&
-        line.includes("codex-external-agents"),
-    )
-    .map((line) => Number.parseInt(line.trim(), 10))
-    .filter(Number.isFinite)
-    .sort((left, right) => left - right);
 }
 
 async function runGit(cwd: string, args: readonly string[]): Promise<string> {
@@ -371,11 +318,6 @@ function knownDefectFound(review: string): boolean {
   );
 }
 
-function hasNoNewProcesses(before: readonly number[], after: readonly number[]): boolean {
-  const baseline = new Set(before);
-  return after.every((pid) => baseline.has(pid));
-}
-
 function inspectEnvironment(
   environment: NodeJS.ProcessEnv,
   profile: LlmProfile,
@@ -469,10 +411,7 @@ function resultFileArtifactFields(
 function commonEvidence(
   options: PiSmokeOptions,
   result: ExternalReviewResult | ExternalDelegateResult,
-  piVersion: string,
   runtimeEvidence: PiSmokeRuntimeEvidence,
-  processIdsBefore: readonly number[],
-  processIdsAfter: readonly number[],
   now: Date,
   profile: LlmProfile,
   checks: PiSmokeChecks,
@@ -497,7 +436,6 @@ function commonEvidence(
           : "acceptance_failed";
   const payload: PiSmokeEvidencePayload = {
     timestamp: now.toISOString(),
-    piVersion,
     llm: options.llm,
     actualModel: result.actualModel ?? null,
     expectedModel: profile.model,
@@ -523,29 +461,17 @@ function commonEvidence(
       telemetry?.runtimeReportedAutoRetryCount ?? null,
     adapterReportedFallbackUsed:
       telemetry?.adapterReportedFallbackUsed ?? null,
+    ownedProcessDrained:
+      telemetry?.ownedProcessDrained === true ? true : null,
     orchestratorFallbackUsed:
       qualification?.orchestratorFallbackUsed ?? null,
     executionTelemetrySource: telemetry?.source ?? null,
     checks: {
       ...checks,
       environmentIsolated: environment.isolated,
-      noNewPiRpcProcesses: hasNoNewProcesses(
-        processIdsBefore,
-        processIdsAfter,
-      ),
     },
   };
-  return qualification === null
-    ? {
-        schemaVersion: 2,
-        qualification: null,
-        ...payload,
-      }
-    : {
-        schemaVersion: 3,
-        qualification,
-        ...payload,
-      };
+  return { schemaVersion: 4, qualification, ...payload };
 }
 
 export async function runPiSmoke(
@@ -580,9 +506,6 @@ export async function runPiSmoke(
     service = runtime.service;
     runtimeEvidence = runtime.evidence;
   }
-  const readPiVersion = dependencies.readPiVersion ?? defaultReadPiVersion;
-  const listPiRpcProcessIds =
-    dependencies.listPiRpcProcessIds ?? defaultListPiRpcProcessIds;
   const now = dependencies.now ?? (() => new Date());
   const cwd = await inSmokeInfrastructureStage(
     "workspace_setup",
@@ -596,14 +519,6 @@ export async function runPiSmoke(
     await inSmokeInfrastructureStage(
       "fixture_setup",
       () => initializeFixture(cwd, options.task),
-    );
-    const piVersion = await inSmokeInfrastructureStage(
-      "version_probe",
-      readPiVersion,
-    );
-    const processIdsBefore = await inSmokeInfrastructureStage(
-      "pre_process_snapshot",
-      listPiRpcProcessIds,
     );
     let executionTelemetry: AdapterExecutionTelemetry | null | undefined;
     let executionTelemetryReportCount = 0;
@@ -637,11 +552,6 @@ export async function runPiSmoke(
         async () =>
           (await runGit(cwd, ["status", "--porcelain"])).trim() === "",
       );
-      const processIdsAfter = await inSmokeInfrastructureStage(
-        "post_process_snapshot",
-        listPiRpcProcessIds,
-        { processIdsBefore: processIdsBefore.length },
-      );
       const environment = inspectEnvironment(
         runtimeEvidence.childEnvironment,
         profile,
@@ -649,10 +559,7 @@ export async function runPiSmoke(
       const checks: PiSmokeChecks = {
         actualModelMatches: result.actualModel === profile.model,
         environmentIsolated: environment.isolated,
-        noNewPiRpcProcesses: hasNoNewProcesses(
-          processIdsBefore,
-          processIdsAfter,
-        ),
+        ownedProcessDrained: executionTelemetry?.ownedProcessDrained === true,
         workspaceUnchanged: result.filesChanged.length === 0 && gitClean,
         knownDefectFound: knownDefectFound(result.review),
         executionTelemetryValid: telemetryIsValid(
@@ -666,10 +573,7 @@ export async function runPiSmoke(
       return commonEvidence(
         options,
         result,
-        piVersion,
         runtimeEvidence,
-        processIdsBefore,
-        processIdsAfter,
         now(),
         profile,
         checks,
@@ -723,11 +627,6 @@ export async function runPiSmoke(
       expectedLine,
       maximumBytes: 65_536,
     });
-    const processIdsAfter = await inSmokeInfrastructureStage(
-      "post_process_snapshot",
-      listPiRpcProcessIds,
-      { processIdsBefore: processIdsBefore.length },
-    );
     const environment = inspectEnvironment(
       runtimeEvidence.childEnvironment,
       profile,
@@ -736,10 +635,7 @@ export async function runPiSmoke(
     const checks: PiSmokeChecks = {
       actualModelMatches: result.actualModel === profile.model,
       environmentIsolated: environment.isolated,
-      noNewPiRpcProcesses: hasNoNewProcesses(
-        processIdsBefore,
-        processIdsAfter,
-      ),
+      ownedProcessDrained: executionTelemetry?.ownedProcessDrained === true,
       resultFileValid: resultFile.valid,
       resultFileObserved: normalizedFiles.includes(resultFileName),
       onlyExpectedFileChanged:
@@ -763,10 +659,7 @@ export async function runPiSmoke(
       ...commonEvidence(
         options,
         result,
-        piVersion,
         runtimeEvidence,
-        processIdsBefore,
-        processIdsAfter,
         now(),
         profile,
         checks,

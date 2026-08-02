@@ -62,6 +62,7 @@ const validPiTelemetry: AdapterExecutionTelemetry = {
   runtimeReportedAutoRetryCount: 0,
   adapterReportedFallbackUsed: false,
   source: "pi-rpc-observable",
+  ownedProcessDrained: true,
 };
 
 const qualificationContext = {
@@ -119,8 +120,6 @@ describe("Ark Pi real-smoke harness", () => {
         runPiSmoke(options, {
           service,
           runtimeEvidence: runtimeEvidence(),
-          readPiVersion: async () => "0.80.10",
-          listPiRpcProcessIds: async () => [100],
         }),
       ).rejects.toBeInstanceOf(SmokeInfrastructureError);
 
@@ -211,7 +210,7 @@ describe("Ark Pi real-smoke harness", () => {
     },
   );
 
-  it("validates Ark review, direct environment isolation, and process cleanup", async () => {
+  it("validates Ark review, direct environment isolation, and case-owned drain without target probes or machine scans", async () => {
     const root = await tempRoot();
     const service: PiSmokeService = {
       review: async (_input, context) => {
@@ -241,18 +240,15 @@ describe("Ark Pi real-smoke harness", () => {
       {
         service,
         runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [100],
         now: () => new Date("2026-07-18T00:00:00.000Z"),
       },
     );
     expect(evidence).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 4,
       qualification: null,
       llm: "ark-agent-plan",
       task: "review",
       actualModel: "ark-code-latest",
-      piVersion: "0.80.10",
       route: "direct",
       credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
       passed: true,
@@ -260,17 +256,19 @@ describe("Ark Pi real-smoke harness", () => {
       adapterRetryCount: 0,
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
+      ownedProcessDrained: true,
       orchestratorFallbackUsed: null,
       executionTelemetrySource: "pi-rpc-observable",
       checks: {
         actualModelMatches: true,
         environmentIsolated: true,
-        noNewPiRpcProcesses: true,
+        ownedProcessDrained: true,
         workspaceUnchanged: true,
         knownDefectFound: true,
       },
     });
     expect(evidence).not.toHaveProperty("writeCommandObservations");
+    expect(evidence).not.toHaveProperty("piVersion");
     expect(evidence.configSha256).toBe("a".repeat(64));
     expect(await readdir(root)).toEqual([]);
   });
@@ -307,12 +305,10 @@ describe("Ark Pi real-smoke harness", () => {
       {
         service,
         runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [100],
       },
     );
 
-    expect(evidence.schemaVersion).toBe(3);
+    expect(evidence.schemaVersion).toBe(4);
     expect(evidence).not.toHaveProperty("writeCommandObservations");
     expect(await readdir(root)).toEqual([]);
   });
@@ -437,8 +433,6 @@ describe("Ark Pi real-smoke harness", () => {
       {
         service,
         runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [100],
       },
     );
     expect(evidence).toMatchObject({
@@ -466,7 +460,7 @@ describe("Ark Pi real-smoke harness", () => {
         resultFileObserved: true,
         onlyExpectedFileChanged: true,
         requiredCommandObserved: true,
-        noNewPiRpcProcesses: true,
+        ownedProcessDrained: true,
       },
     });
     expect(receivedPrompt).toBe(
@@ -536,13 +530,11 @@ describe("Ark Pi real-smoke harness", () => {
       {
         service,
         runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [100],
       },
     );
 
     expect(evidence).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       passed: false,
       failureReason: "acceptance_failed",
       commandCount: 2,
@@ -628,8 +620,6 @@ describe("Ark Pi real-smoke harness", () => {
       {
         service,
         runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [100],
       },
     );
 
@@ -639,7 +629,7 @@ describe("Ark Pi real-smoke harness", () => {
       checks: {
         actualModelMatches: true,
         environmentIsolated: true,
-        noNewPiRpcProcesses: true,
+        ownedProcessDrained: true,
         resultFileValid: true,
         resultFileObserved: true,
         onlyExpectedFileChanged: true,
@@ -710,8 +700,6 @@ describe("Ark Pi real-smoke harness", () => {
       {
         service,
         runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [100],
       },
     );
 
@@ -812,8 +800,6 @@ describe("Ark Pi real-smoke harness", () => {
         {
           service,
           runtimeEvidence: runtimeEvidence(),
-          readPiVersion: async () => "0.80.10",
-          listPiRpcProcessIds: async () => [100],
         },
       );
 
@@ -823,7 +809,7 @@ describe("Ark Pi real-smoke harness", () => {
         checks: {
           actualModelMatches: true,
           environmentIsolated: true,
-          noNewPiRpcProcesses: true,
+          ownedProcessDrained: true,
           resultFileValid: true,
           resultFileObserved: true,
           onlyExpectedFileChanged: true,
@@ -892,8 +878,6 @@ describe("Ark Pi real-smoke harness", () => {
         {
           service,
           runtimeEvidence: runtimeEvidence(),
-          readPiVersion: async () => "0.80.10",
-          listPiRpcProcessIds: async () => [100],
         },
       ).catch((error: unknown) => error);
 
@@ -946,8 +930,6 @@ describe("Ark Pi real-smoke harness", () => {
         {
           service,
           runtimeEvidence: runtimeEvidence(),
-          readPiVersion: async () => "0.80.10",
-          listPiRpcProcessIds: async () => [100],
         },
       );
 
@@ -985,8 +967,6 @@ describe("Ark Pi real-smoke harness", () => {
           HTTPS_PROXY: "http://127.0.0.1:11808",
           PI_CODING_AGENT_DIR: "C:\\cache\\pi",
         }),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [100],
       },
     );
     expect(evidence.passed).toBe(false);
@@ -1009,7 +989,24 @@ describe("Ark Pi real-smoke harness", () => {
       "reported fallback",
       { ...validPiTelemetry, adapterReportedFallbackUsed: true },
     ],
-  ] as const)("fails qualification telemetry gate for %s", async (_name, telemetry) => {
+    [
+      "missing case-owned drain",
+      {
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "pi-rpc-observable" as const,
+      },
+    ],
+    [
+      "false case-owned drain",
+      {
+        ...validPiTelemetry,
+        ownedProcessDrained: false,
+      } as unknown as AdapterExecutionTelemetry,
+    ],
+  ] as const)("fails smoke evidence gates for %s", async (name, telemetry) => {
     const root = await tempRoot();
     const service: PiSmokeService = {
       review: async (_input, context) => {
@@ -1037,87 +1034,17 @@ describe("Ark Pi real-smoke harness", () => {
       {
         service,
         runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [100],
       },
     );
 
     expect(evidence.passed).toBe(false);
-    expect(evidence.checks.executionTelemetryValid).toBe(false);
+    if (name.includes("case-owned drain")) {
+      expect(evidence.checks.executionTelemetryValid).toBe(true);
+      expect(evidence.checks.ownedProcessDrained).toBe(false);
+      expect(evidence.ownedProcessDrained).toBeNull();
+    } else {
+      expect(evidence.checks.executionTelemetryValid).toBe(false);
+    }
   });
 
-  it("labels a Pi version-probe exception without exposing its original message", async () => {
-    const root = await tempRoot();
-    const secret = "PI_VERSION_SECRET_SENTINEL";
-    const service: PiSmokeService = {
-      review: async () => {
-        throw new Error("not reached");
-      },
-      delegate: async () => {
-        throw new Error("not reached");
-      },
-    };
-
-    const failure = await runPiSmoke(
-      { llm: "ark-agent-plan", task: "review", tempRoot: root },
-      {
-        service,
-        runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => {
-          throw new Error(secret);
-        },
-      },
-    ).catch((error: unknown) => error);
-
-    expect(failure).toBeInstanceOf(SmokeInfrastructureError);
-    expect(failure).toMatchObject({
-      message: "Smoke infrastructure failure",
-      stage: "version_probe",
-    });
-    expect(String(failure)).not.toContain(secret);
-    expect(await readdir(root)).toEqual([]);
-  });
-
-  it("labels a missing post-task Pi snapshot and records the baseline count", async () => {
-    const root = await tempRoot();
-    const secret = "PI_POST_SNAPSHOT_SECRET_SENTINEL";
-    let calls = 0;
-    const service: PiSmokeService = {
-      review: async () => ({
-        ok: true,
-        status: "completed",
-        llm: "ark-agent-plan",
-        actualModel: "ark-code-latest",
-        elapsedMs: 12,
-        diagnostics: [],
-        filesChanged: [],
-        review: "Empty input has length zero and produces NaN.",
-      }),
-      delegate: async () => {
-        throw new Error("not reached");
-      },
-    };
-
-    const failure = await runPiSmoke(
-      { llm: "ark-agent-plan", task: "review", tempRoot: root },
-      {
-        service,
-        runtimeEvidence: runtimeEvidence(),
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => {
-          if (calls++ === 0) return [100, 101];
-          throw new Error(secret);
-        },
-      },
-    ).catch((error: unknown) => error);
-
-    expect(failure).toBeInstanceOf(SmokeInfrastructureError);
-    expect(failure).toMatchObject({
-      message: "Smoke infrastructure failure",
-      stage: "post_process_snapshot",
-      counts: { processIdsBefore: 2 },
-    });
-    expect(String(failure)).not.toContain(secret);
-    expect(await readdir(root)).toEqual([]);
-  });
 });

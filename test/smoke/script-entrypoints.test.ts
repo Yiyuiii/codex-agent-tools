@@ -359,7 +359,7 @@ describe("production real-smoke script entrypoints", () => {
         await readFile(path.join(caseDirectory, expectedFile), "utf8"),
       ) as Record<string, unknown>;
       expect(evidence).toMatchObject({
-        schemaVersion: 3,
+        schemaVersion: 4,
         qualification: qualificationContext,
         adapterClientInvocationCount: null,
         adapterRetryCount: null,

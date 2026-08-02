@@ -43,6 +43,7 @@ const validPiTelemetry: AdapterExecutionTelemetry = {
   runtimeReportedAutoRetryCount: 0,
   adapterReportedFallbackUsed: false,
   source: "pi-rpc-observable",
+  ownedProcessDrained: true,
 };
 
 const qualificationContext = {
@@ -119,14 +120,12 @@ describe("Ark real-smoke harness", () => {
             PI_CODING_AGENT_DIR: "C:\\cache\\pi",
           },
         },
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [101],
         now: () => new Date("2026-07-18T00:00:00.000Z"),
       },
     );
 
     expect(evidence).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       qualification: qualificationContext,
       llm: "ark-agent-plan",
       provider: "ark-agent-plan",
@@ -218,8 +217,6 @@ describe("Ark real-smoke harness", () => {
               PI_CODING_AGENT_DIR: "C:\\cache\\pi",
             },
           },
-          readPiVersion: async () => "0.80.10",
-          listPiRpcProcessIds: async () => [],
         },
       );
 
@@ -248,7 +245,7 @@ describe("Ark real-smoke harness", () => {
           onlyExpectedFileChanged: true,
           requiredCommandObserved: true,
           environmentIsolated: true,
-          noNewPiRpcProcesses: true,
+          ownedProcessDrained: true,
         },
       });
       expect(await readdir(root)).toEqual([]);
@@ -284,8 +281,6 @@ describe("Ark real-smoke harness", () => {
             PI_CODING_AGENT_DIR: "C:\\cache\\pi",
           },
         },
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [],
       },
     );
 
@@ -324,8 +319,6 @@ describe("Ark real-smoke harness", () => {
             PI_CODING_AGENT_DIR: "C:\\cache\\pi",
           },
         },
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [],
       },
     );
 
@@ -367,8 +360,6 @@ describe("Ark real-smoke harness", () => {
             PI_CODING_AGENT_DIR: "C:\\cache\\pi",
           },
         },
-        readPiVersion: async () => "0.80.10",
-        listPiRpcProcessIds: async () => [],
       },
     );
 
