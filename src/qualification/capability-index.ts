@@ -16,6 +16,10 @@ import {
   verifyQualification,
   type QualificationVerificationResult,
 } from "./verifier.js";
+import {
+  currentEvidenceCheckKeys,
+  validateCurrentEvidenceContract,
+} from "./evidence-contract.js";
 
 const MAX_RUNTIME_INPUT_BYTES = 4 * 1024 * 1024;
 
@@ -512,9 +516,14 @@ function exactTrueChecks(
 function expectedBatchCheckKeys(
   profile: LlmProfile,
   task: TaskKind,
+  currentOwnedEvidence: boolean,
 ): readonly string[] {
-  const processCheck =
-    profile.runtime === "pi-rpc"
+  if (currentOwnedEvidence) {
+    return currentEvidenceCheckKeys(profile.runtime, task);
+  }
+  const ownershipCheck = currentOwnedEvidence
+    ? "ownedProcessDrained"
+    : profile.runtime === "pi-rpc"
       ? "noNewPiRpcProcesses"
       : "noNewKimiProcesses";
   const environmentChecks =
@@ -525,14 +534,14 @@ function expectedBatchCheckKeys(
         ...environmentChecks,
         "executionTelemetryValid",
         "knownDefectFound",
-        processCheck,
+        ownershipCheck,
         "workspaceUnchanged",
       ]
     : [
         "actualModelMatches",
         ...environmentChecks,
         "executionTelemetryValid",
-        processCheck,
+        ownershipCheck,
         "onlyExpectedFileChanged",
         "requiredCommandObserved",
         "resultFileObserved",
@@ -563,11 +572,12 @@ function validateBatchEvidence(
   profile: LlmProfile,
   source: BatchCaseCapabilitySource,
   batchId: string,
+  currentOwnedEvidence: boolean,
 ): void {
   const evidence = plainRecord(evidenceValue);
   const qualification = plainRecord(evidence.qualification);
   if (
-    evidence.schemaVersion !== 3 ||
+    evidence.schemaVersion !== (currentOwnedEvidence ? 4 : 3) ||
     evidence.llm !== entry.llm ||
     evidence.task !== entry.task ||
     evidence.runtime !== profile.runtime ||
@@ -586,6 +596,9 @@ function validateBatchEvidence(
       (profile.runtime === "pi-rpc"
         ? "pi-rpc-observable"
         : "kimi-acp-observable") ||
+    (currentOwnedEvidence
+      ? evidence.ownedProcessDrained !== true
+      : Object.hasOwn(evidence, "ownedProcessDrained")) ||
     qualification.qualificationPlanId !== "four-llm-v1" ||
     qualification.batchId !== batchId ||
     qualification.llm !== entry.llm ||
@@ -603,9 +616,20 @@ function validateBatchEvidence(
   ) {
     throw capabilityQualificationError();
   }
+  if (currentOwnedEvidence) {
+    try {
+      validateCurrentEvidenceContract(evidence, {
+        llm: entry.llm,
+        task: entry.task,
+        runtime: profile.runtime,
+      });
+    } catch {
+      throw capabilityQualificationError();
+    }
+  }
   exactTrueChecks(
     evidence.checks,
-    expectedBatchCheckKeys(profile, entry.task),
+    expectedBatchCheckKeys(profile, entry.task, currentOwnedEvidence),
   );
 }
 
@@ -672,7 +696,10 @@ async function verifyBatchCapabilityEvidence(
     throw capabilityQualificationError();
   }
   const manifest = plainRecord(manifestFile.value);
+  const currentOwnedEvidence = manifest.schemaVersion === 3;
   if (
+    (manifest.schemaVersion !== 2 && manifest.schemaVersion !== 3) ||
+    manifest.qualificationPlanId !== "four-llm-v1" ||
     manifest.batchId !== batchId ||
     manifest.repositoryCommit !== source.frozenCommit ||
     manifest.buildIdentitySha256 !== source.buildIdentitySha256 ||
@@ -703,6 +730,7 @@ async function verifyBatchCapabilityEvidence(
     options.profile,
     source,
     batchId,
+    currentOwnedEvidence,
   );
   return Object.freeze({ sourceKind: "batch-case" });
 }

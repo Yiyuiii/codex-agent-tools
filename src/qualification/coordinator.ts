@@ -10,7 +10,6 @@ import type {
   QualificationCaseIdentity,
   QualificationLockHandle,
   QualificationTerminalManifest,
-  TargetAgentProcessCounts,
 } from "./types.js";
 import type { QualificationLedger } from "./manifest.js";
 
@@ -71,7 +70,6 @@ export interface QualificationCoordinatorDependencies {
     preflight: CurrentFrozenPreflightRecord;
     qualificationPlanId: "four-llm-v1";
   }): Promise<void>;
-  inspectTargetProcesses(): Promise<TargetAgentProcessCounts>;
   runCase(options: {
     identity: QualificationCaseIdentity;
     qualificationContext: Readonly<{
@@ -98,31 +96,6 @@ function safeTimestamp(dependencies: QualificationCoordinatorDependencies) {
     return dependencies.now().toISOString();
   } catch {
     throw new QualificationCoordinatorError("batch");
-  }
-}
-
-function assertZeroTargetProcesses(counts: TargetAgentProcessCounts): void {
-  const record = counts as unknown as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
-  if (
-    keys.length !== 3 ||
-    keys[0] !== "kimi" ||
-    keys[1] !== "piRpc" ||
-    keys[2] !== "realSmoke"
-  ) {
-    throw new QualificationCoordinatorError("batch");
-  }
-  for (const key of keys) {
-    const value = record[key];
-    if (
-      typeof value !== "object" ||
-      value === null ||
-      Array.isArray(value) ||
-      Object.keys(value).length !== 1 ||
-      (value as { count?: unknown }).count !== 0
-    ) {
-      throw new QualificationCoordinatorError("batch");
-    }
   }
 }
 
@@ -240,7 +213,7 @@ export async function runQualificationBatch(
         qualificationPlanId: protocol.qualificationPlanId,
       });
       if (
-        preflight.schemaVersion !== 2 ||
+        preflight.schemaVersion !== 3 ||
         preflight.qualificationPlanId !== protocol.qualificationPlanId
       ) {
         throw new Error("qualification preflight protocol mismatch");
@@ -277,7 +250,6 @@ export async function runQualificationBatch(
     for (let index = 0; index < protocol.schedule.length; index += 1) {
       const identity = protocol.schedule[index]!;
       let runningPublished = false;
-      let postProcessInspectionAttempted = false;
       try {
         await assertBatchLockOwner(dependencies, lockHandle);
         await dependencies.assertFrozenCandidate({
@@ -286,7 +258,6 @@ export async function runQualificationBatch(
           preflight,
           qualificationPlanId: protocol.qualificationPlanId,
         });
-        assertZeroTargetProcesses(await dependencies.inspectTargetProcesses());
         await ledger.publishCaseRunning({
           ...identity,
           recordedAt: safeTimestamp(dependencies),
@@ -310,8 +281,6 @@ export async function runQualificationBatch(
             evidenceDirectory: path.join(ledger.batchDirectory, "cases"),
           }),
         );
-        postProcessInspectionAttempted = true;
-        assertZeroTargetProcesses(await dependencies.inspectTargetProcesses());
         await assertBatchLockOwner(dependencies, lockHandle);
         await dependencies.assertFrozenCandidate({
           repositoryRoot: options.repositoryRoot,
@@ -345,16 +314,6 @@ export async function runQualificationBatch(
         if (terminalPublicationAttempted) {
           throw new QualificationCoordinatorError("batch");
         }
-        if (runningPublished && !postProcessInspectionAttempted) {
-          postProcessInspectionAttempted = true;
-          try {
-            assertZeroTargetProcesses(
-              await dependencies.inspectTargetProcesses(),
-            );
-          } catch {
-            // The terminal remains an infrastructure block; never retry the case.
-          }
-        }
         try {
           await assertBatchLockOwner(dependencies, lockHandle);
           terminalPublicationAttempted = true;
@@ -381,7 +340,6 @@ export async function runQualificationBatch(
           preflight,
           qualificationPlanId: protocol.qualificationPlanId,
         });
-        assertZeroTargetProcesses(await dependencies.inspectTargetProcesses());
       } catch (error) {
         if (error instanceof QualificationLockOwnershipLostError) {
           throw new QualificationCoordinatorError("batch");

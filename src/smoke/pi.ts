@@ -98,7 +98,7 @@ interface PiSmokeEvidencePayload {
   elapsedMs: number;
   outputSha256: string;
   filesChanged: string[];
-  commandCount: number;
+  commandCount?: number;
   diagnosticCount: number;
   adapterClientInvocationCount: number | null;
   adapterRetryCount: number | null;
@@ -452,7 +452,12 @@ function commonEvidence(
     elapsedMs: result.elapsedMs,
     outputSha256: sha256(output),
     filesChanged: [...result.filesChanged].sort(),
-    commandCount: "commandsRun" in result ? result.commandsRun.length : 0,
+    ...(options.task === "delegate"
+      ? {
+          commandCount:
+            "commandsRun" in result ? result.commandsRun.length : 0,
+        }
+      : {}),
     diagnosticCount: result.diagnostics.length,
     adapterClientInvocationCount:
       telemetry?.adapterClientInvocationCount ?? null,

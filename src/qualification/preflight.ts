@@ -7,12 +7,12 @@ import { execa } from "execa";
 
 import { locateKimi } from "../adapters/kimi/locator.js";
 import { buildIsolatedPiConfig } from "../adapters/pi/config.js";
-import { locatePi } from "../adapters/pi/locator.js";
-import { resolveLlm } from "../llms/registry.js";
 import {
-  classifyAgentProcesses,
-  type AgentProcessCounts,
-} from "../runtime/agent-processes.js";
+  locatePi,
+  locatePiInvocation,
+  type PiInvocation,
+} from "../adapters/pi/locator.js";
+import { resolveLlm } from "../llms/registry.js";
 import { VERSION } from "../version.js";
 import {
   assertAuthorizationReferenceUnused,
@@ -54,9 +54,9 @@ export type QualificationPreflightStage =
   | "package"
   | "build_initial"
   | "runtime_versions"
+  | "locators"
   | "pi_config"
   | "credentials"
-  | "target_processes"
   | "authorization"
   | "typecheck"
   | "test"
@@ -110,15 +110,16 @@ export interface QualificationPreflightOptions {
 export interface QualificationPreflightDependencies {
   environment?: NodeJS.ProcessEnv;
   nodeVersion?: string;
+  platform?: NodeJS.Platform;
   runCommand?: QualificationPreflightCommandRunner;
   locateKimiExecutable?: () => Promise<string>;
-  locatePiExecutable?: () => Promise<string>;
+  locatePiInvocation?: () => Promise<PiInvocation>;
+  locatePosixPiExecutable?: () => Promise<string>;
   createTemporaryCodexHome?: () => Promise<string>;
   removeTemporaryCodexHome?: (directory: string) => Promise<void>;
   buildQualificationPiConfig?: () => Promise<{
     contentSha256: string;
   }>;
-  classifyTargetProcesses?: () => Promise<AgentProcessCounts>;
   assertAuthorizationUnused?: (options: {
     repositoryRoot: string;
     authorizationReferenceSha256: string;
@@ -141,8 +142,6 @@ export interface QualificationCurrentSnapshot {
   runtimeVersions: Readonly<{
     node: string;
     codex: string;
-    kimi: string;
-    pi: string;
   }>;
   piConfigSha256: string;
   logicalLlms: readonly FrozenLogicalLlmIdentity[];
@@ -605,22 +604,14 @@ async function collectRuntimeVersions(options: {
   environment: NodeJS.ProcessEnv;
   nodeVersion: string;
   runner: QualificationPreflightCommandRunner;
-  locateKimiExecutable: () => Promise<string>;
-  locatePiExecutable: () => Promise<string>;
   createTemporaryCodexHome: () => Promise<string>;
   removeTemporaryCodexHome: (directory: string) => Promise<void>;
 }): Promise<{
   node: string;
   codex: string;
-  kimi: string;
-  pi: string;
 }> {
   return inStage("runtime_versions", async () => {
     const node = safeRuntimeVersion(options.nodeVersion);
-    const [kimiExecutable, piExecutable] = await Promise.all([
-      options.locateKimiExecutable(),
-      options.locatePiExecutable(),
-    ]);
     const temporaryCodexHome = await options.createTemporaryCodexHome();
     let codexOutput: string;
     try {
@@ -655,36 +646,78 @@ async function collectRuntimeVersions(options: {
         options.removeTemporaryCodexHome(temporaryCodexHome),
       );
     }
-    const [kimiOutput, piOutput] = await Promise.all([
-      runCheckedCommand(
-        options.runner,
-        {
-          command: kimiExecutable,
-          args: ["--version"],
-          cwd: options.repositoryRoot,
-          environment: options.environment,
-          captureStdout: true,
-        },
-        "runtime_versions",
-      ),
-      runCheckedCommand(
-        options.runner,
-        {
-          command: piExecutable,
-          args: ["--version"],
-          cwd: options.repositoryRoot,
-          environment: options.environment,
-          captureStdout: true,
-        },
-        "runtime_versions",
-      ),
-    ]);
     return Object.freeze({
       node,
       codex: safeRuntimeVersion(codexOutput),
-      kimi: safeRuntimeVersion(kimiOutput),
-      pi: safeRuntimeVersion(piOutput),
     });
+  });
+}
+
+function exactFrozenRecord(
+  value: unknown,
+  keys: readonly string[],
+): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.isFrozen(value) &&
+    JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort())
+  );
+}
+
+function assertWindowsPiInvocation(value: unknown): void {
+  if (!exactFrozenRecord(value, ["argvPrefix", "executable", "identity"])) {
+    throw new QualificationPreflightError("locators");
+  }
+  const executable = safeSingleLine(value.executable as string, "locators", 32_768);
+  const argvPrefix = value.argvPrefix;
+  const identity = value.identity;
+  if (
+    executable !== process.execPath ||
+    !Array.isArray(argvPrefix) ||
+    !Object.isFrozen(argvPrefix) ||
+    argvPrefix.length !== 1 ||
+    typeof argvPrefix[0] !== "string" ||
+    !path.win32.isAbsolute(safeSingleLine(argvPrefix[0], "locators", 32_768)) ||
+    !exactFrozenRecord(identity, [
+      "nodeEngine",
+      "packageName",
+      "packageVersion",
+    ]) ||
+    identity.packageName !== "@earendil-works/pi-coding-agent" ||
+    typeof identity.packageVersion !== "string" ||
+    !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(
+      identity.packageVersion,
+    ) ||
+    typeof identity.nodeEngine !== "string" ||
+    !/^>=(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(
+      identity.nodeEngine,
+    )
+  ) {
+    throw new QualificationPreflightError("locators");
+  }
+}
+
+async function assertStaticLocators(options: {
+  platform: NodeJS.Platform;
+  locateKimiExecutable: () => Promise<string>;
+  locatePiInvocation: () => Promise<PiInvocation>;
+  locatePosixPiExecutable: () => Promise<string>;
+}): Promise<void> {
+  await inStage("locators", async () => {
+    const [kimiExecutable, piLaunch] = await Promise.all([
+      options.locateKimiExecutable(),
+      options.platform === "win32"
+        ? options.locatePiInvocation()
+        : options.locatePosixPiExecutable(),
+    ]);
+    safeSingleLine(kimiExecutable, "locators", 32_768);
+    if (options.platform === "win32") {
+      assertWindowsPiInvocation(piLaunch);
+    } else {
+      safeSingleLine(piLaunch as string, "locators", 32_768);
+    }
   });
 }
 
@@ -737,28 +770,6 @@ function collectFixedIdentities(environment: NodeJS.ProcessEnv): {
   return Object.freeze({
     logicalLlms: Object.freeze(logicalLlms),
     credentialMatches: Object.freeze(credentialMatches),
-  });
-}
-
-function normalizeZeroTargetProcesses(
-  counts: AgentProcessCounts,
-): AgentProcessCounts {
-  const values = [
-    counts.kimi.count,
-    counts.piRpc.count,
-    counts.realSmoke.count,
-  ];
-  if (values.some((count) => !Number.isSafeInteger(count) || count < 0)) {
-    throw new QualificationPreflightError("target_processes");
-  }
-  const total = values.reduce((sum, count) => sum + count, 0);
-  if (total !== 0) {
-    throw new QualificationPreflightError("target_processes", total);
-  }
-  return Object.freeze({
-    kimi: Object.freeze({ count: 0 }),
-    piRpc: Object.freeze({ count: 0 }),
-    realSmoke: Object.freeze({ count: 0 }),
   });
 }
 
@@ -946,6 +957,7 @@ export async function collectQualificationCurrentSnapshot(
     }
     const repositoryRoot = path.resolve(options.repositoryRoot);
     const environment = dependencies.environment ?? process.env;
+    const platform = dependencies.platform ?? process.platform;
     const runner = dependencies.runCommand ?? defaultCommandRunner;
     const commit = safeSingleLine(
       await runCheckedCommand(
@@ -972,14 +984,23 @@ export async function collectQualificationCurrentSnapshot(
     } catch {
       throw new QualificationPreflightError("current_snapshot");
     }
+    await assertStaticLocators({
+      platform,
+      locateKimiExecutable:
+        dependencies.locateKimiExecutable ??
+        (() => locateKimi({ environment, platform })),
+      locatePiInvocation:
+        dependencies.locatePiInvocation ??
+        (() => locatePiInvocation({ environment, platform })),
+      locatePosixPiExecutable:
+        dependencies.locatePosixPiExecutable ??
+        (() => locatePi({ environment, platform })),
+    });
     const runtimeVersions = await collectRuntimeVersions({
       repositoryRoot,
       environment,
       nodeVersion: dependencies.nodeVersion ?? process.version,
       runner,
-      locateKimiExecutable:
-        dependencies.locateKimiExecutable ?? (() => locateKimi()),
-      locatePiExecutable: dependencies.locatePiExecutable ?? (() => locatePi()),
       createTemporaryCodexHome:
         dependencies.createTemporaryCodexHome ?? defaultTemporaryCodexHome,
       removeTemporaryCodexHome:
@@ -1010,9 +1031,8 @@ export async function runQualificationPreflight(
   validateInput(options);
   const repositoryRoot = path.resolve(options.repositoryRoot);
   const environment = dependencies.environment ?? process.env;
+  const platform = dependencies.platform ?? process.platform;
   const runner = dependencies.runCommand ?? defaultCommandRunner;
-  const inspectTargets =
-    dependencies.classifyTargetProcesses ?? (() => classifyAgentProcesses());
   const assertAuthorizationUnused =
     dependencies.assertAuthorizationUnused ??
     ((input) => assertAuthorizationReferenceUnused(input));
@@ -1028,14 +1048,23 @@ export async function runQualificationPreflight(
   const initialBuild = await inStage("build_initial", () =>
     collectQualificationBuildIdentity(repositoryRoot),
   );
+  await assertStaticLocators({
+    platform,
+    locateKimiExecutable:
+      dependencies.locateKimiExecutable ??
+      (() => locateKimi({ environment, platform })),
+    locatePiInvocation:
+      dependencies.locatePiInvocation ??
+      (() => locatePiInvocation({ environment, platform })),
+    locatePosixPiExecutable:
+      dependencies.locatePosixPiExecutable ??
+      (() => locatePi({ environment, platform })),
+  });
   const runtimeVersions = await collectRuntimeVersions({
     repositoryRoot,
     environment,
     nodeVersion: dependencies.nodeVersion ?? process.version,
     runner,
-    locateKimiExecutable:
-      dependencies.locateKimiExecutable ?? (() => locateKimi()),
-    locatePiExecutable: dependencies.locatePiExecutable ?? (() => locatePi()),
     createTemporaryCodexHome:
       dependencies.createTemporaryCodexHome ?? defaultTemporaryCodexHome,
     removeTemporaryCodexHome:
@@ -1044,9 +1073,6 @@ export async function runQualificationPreflight(
   const piConfigSha256 = await collectQualificationPiConfigSha256(dependencies);
   const fixedIdentities = await inStage("credentials", async () =>
     collectFixedIdentities(environment),
-  );
-  await inStage("target_processes", async () =>
-    normalizeZeroTargetProcesses(await inspectTargets()),
   );
   await inStage("authorization", () =>
     assertAuthorizationUnused({
@@ -1101,13 +1127,9 @@ export async function runQualificationPreflight(
   if (closedRepository.commit !== initialRepository.commit) {
     throw new QualificationPreflightError("repository_final");
   }
-  const finalProcesses = await inStage("target_processes", async () =>
-    normalizeZeroTargetProcesses(await inspectTargets()),
-  );
-
   return inStage("record", async () => {
     const preflight = freezePreflightRecord({
-      schemaVersion: 2,
+      schemaVersion: 3,
       qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       repositoryCommit: initialRepository.commit,
       repositoryBranch: initialRepository.branch,
@@ -1120,9 +1142,8 @@ export async function runQualificationPreflight(
       piConfigSha256,
       logicalLlms: fixedIdentities.logicalLlms,
       credentialMatches: fixedIdentities.credentialMatches,
-      targetProcesses: finalProcesses,
     });
-    if (preflight.schemaVersion !== 2) {
+    if (preflight.schemaVersion !== 3) {
       throw new QualificationPreflightError("record");
     }
     return preflight;

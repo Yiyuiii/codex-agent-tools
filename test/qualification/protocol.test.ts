@@ -80,10 +80,15 @@ describe("qualification protocol", () => {
     expect(
       qualificationPlanForEnvelope(2, ACTIVE_QUALIFICATION_PLAN_ID),
     ).toBe(ACTIVE_QUALIFICATION_PLAN_ID);
+    expect(
+      qualificationPlanForEnvelope(3, ACTIVE_QUALIFICATION_PLAN_ID),
+    ).toBe(ACTIVE_QUALIFICATION_PLAN_ID);
     expect(() => qualificationPlanForEnvelope(1, "four-llm-v1")).toThrow();
     expect(() => qualificationPlanForEnvelope(2, undefined)).toThrow();
     expect(() => qualificationPlanForEnvelope(2, "five-llm-v1")).toThrow();
-    expect(() => qualificationPlanForEnvelope(3, "four-llm-v1")).toThrow();
+    expect(() => qualificationPlanForEnvelope(3, undefined)).toThrow();
+    expect(() => qualificationPlanForEnvelope(3, "five-llm-v1")).toThrow();
+    expect(() => qualificationPlanForEnvelope(4, "four-llm-v1")).toThrow();
   });
 
   it("returns frozen schedules without exposing mutable identities", () => {

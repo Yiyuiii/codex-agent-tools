@@ -396,7 +396,10 @@ function codingProfile() {
   };
 }
 
-async function batchFixture(root: string): Promise<{
+async function batchFixture(
+  root: string,
+  currentOwnedEvidence = false,
+): Promise<{
   entry: CapabilityQualificationEntry;
   manifestPath: string;
   evidencePath: string;
@@ -412,7 +415,7 @@ async function batchFixture(root: string): Promise<{
   const frozenCommit = "a".repeat(40);
   const buildIdentitySha256 = "b".repeat(64);
   const evidence = {
-    schemaVersion: 3,
+    schemaVersion: currentOwnedEvidence ? 4 : 3,
     qualification: {
       qualificationPlanId: "four-llm-v1",
       batchId,
@@ -443,18 +446,21 @@ async function batchFixture(root: string): Promise<{
     adapterReportedFallbackUsed: false,
     orchestratorFallbackUsed: false,
     executionTelemetrySource: "pi-rpc-observable",
+    ...(currentOwnedEvidence ? { ownedProcessDrained: true } : {}),
     checks: {
       actualModelMatches: true,
       environmentIsolated: true,
       executionTelemetryValid: true,
       knownDefectFound: true,
-      noNewPiRpcProcesses: true,
+      ...(currentOwnedEvidence
+        ? { ownedProcessDrained: true }
+        : { noNewPiRpcProcesses: true }),
       workspaceUnchanged: true,
     },
   };
   const evidenceSha256 = await writeJson(root, evidencePath, evidence);
   const manifest = {
-    schemaVersion: 2,
+    schemaVersion: currentOwnedEvidence ? 3 : 2,
     qualificationPlanId: "four-llm-v1",
     batchId,
     status: "blocked",
@@ -530,6 +536,95 @@ describe("capability qualification evidence source", () => {
       path.join(root, fixture.manifestPath),
     ]);
   });
+
+  it("accepts current evidence only with exact owned-process drain proof", async () => {
+    const root = await temporaryRoot();
+    const fixture = await batchFixture(root, true);
+
+    await expect(
+      verifyCapabilityEvidenceSource(
+        {
+          repositoryRoot: root,
+          entry: fixture.entry,
+          profile: codingProfile(),
+        },
+        {
+          verifyBatchManifest: async () => ({
+            verified: true,
+            mode: "immutable-evidence",
+            batchId: "2026-07-29T00-00-00.000Z-batch",
+            qualificationPlanId: "four-llm-v1",
+            status: "blocked",
+            promotionEligible: false,
+          }),
+        },
+      ),
+    ).resolves.toEqual({ sourceKind: "batch-case" });
+  });
+
+  it.each([
+    ["missing top-level drain", (evidence: Record<string, unknown>) => {
+      delete evidence.ownedProcessDrained;
+    }],
+    ["false top-level drain", (evidence: Record<string, unknown>) => {
+      evidence.ownedProcessDrained = false;
+    }],
+    ["historical process check", (evidence: Record<string, unknown>) => {
+      evidence.checks = {
+        ...(evidence.checks as Record<string, unknown>),
+        noNewPiRpcProcesses: true,
+      };
+      delete (evidence.checks as Record<string, unknown>).ownedProcessDrained;
+    }],
+  ] as const)(
+    "rejects current capability evidence with %s",
+    async (_name, mutate) => {
+      const root = await temporaryRoot();
+      const fixture = await batchFixture(root, true);
+      mutate(fixture.evidence);
+      const evidenceSha256 = await writeJson(
+        root,
+        fixture.evidencePath,
+        fixture.evidence,
+      );
+      const manifestCase = (
+        fixture.manifest.cases as Array<Record<string, unknown>>
+      )[0]!;
+      manifestCase.evidence = {
+        ...(manifestCase.evidence as Record<string, unknown>),
+        sha256: evidenceSha256,
+      };
+      const manifestSha256 = await writeJson(
+        root,
+        fixture.manifestPath,
+        fixture.manifest,
+      );
+      Object.assign(fixture.entry.source, {
+        evidenceSha256,
+        manifestSha256,
+      });
+
+      await expect(
+        verifyCapabilityEvidenceSource(
+          {
+            repositoryRoot: root,
+            entry: fixture.entry,
+            profile: codingProfile(),
+          },
+          {
+            verifyBatchManifest: async () => ({
+              verified: true,
+              mode: "immutable-evidence",
+              batchId: "2026-07-29T00-00-00.000Z-batch",
+              qualificationPlanId: "four-llm-v1",
+              status: "blocked",
+              promotionEligible: false,
+            }),
+          },
+        ),
+      ).rejects.toThrow(/capability qualification/iu);
+    },
+  );
 
   it.each([
     {

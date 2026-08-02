@@ -10,6 +10,7 @@ import type {
   ExternalAgentAdapter,
 } from "../../src/adapters/adapter.js";
 import { createLlmRegistry, resolveLlm } from "../../src/llms/registry.js";
+import { validateCurrentEvidenceContract } from "../../src/qualification/evidence-contract.js";
 import {
   parseKimiSmokeArguments,
   runKimiSmoke,
@@ -167,7 +168,16 @@ describe("Kimi real-smoke harness", () => {
     };
 
     const evidence = await runKimiSmoke(
-      { llm: "kimi-k3", task: "review", tempRoot: root },
+      {
+        llm: "kimi-k3",
+        task: "review",
+        tempRoot: root,
+        qualificationContext: {
+          ...qualificationContext,
+          ordinal: 3,
+          task: "review",
+        },
+      },
       {
         service,
         now: () => new Date("2026-07-18T00:00:00.000Z"),
@@ -176,7 +186,11 @@ describe("Kimi real-smoke harness", () => {
 
     expect(evidence).toMatchObject({
       schemaVersion: 4,
-      qualification: null,
+      qualification: {
+        ...qualificationContext,
+        ordinal: 3,
+        task: "review",
+      },
       llm: "kimi-k3",
       task: "review",
       actualModel: "kimi-code/k3",
@@ -200,6 +214,14 @@ describe("Kimi real-smoke harness", () => {
     expect(evidence).not.toHaveProperty("kimiVersion");
     expect(evidence).not.toHaveProperty("commandObservations");
     expect(evidence).not.toHaveProperty("writeCommandObservations");
+    expect(evidence).not.toHaveProperty("commandCount");
+    expect(() =>
+      validateCurrentEvidenceContract(evidence, {
+        llm: "kimi-k3",
+        task: "review",
+        runtime: "kimi-acp",
+      }),
+    ).not.toThrow();
     expect(JSON.stringify(evidence)).not.toContain(secretCommand);
     expect(await readdir(root)).toEqual([]);
   });
@@ -277,6 +299,14 @@ describe("Kimi real-smoke harness", () => {
       commandObservations: [{ source: "late_update", match: "exact" }],
     });
     expect(evidence).not.toHaveProperty("writeCommandObservations");
+    expect(evidence).toHaveProperty("commandCount", 1);
+    expect(() =>
+      validateCurrentEvidenceContract(evidence, {
+        llm: "kimi-k3",
+        task: "delegate",
+        runtime: "kimi-acp",
+      }),
+    ).not.toThrow();
     expect(JSON.stringify(evidence)).not.toContain(observedCommand);
     expect(await readdir(root)).toEqual([]);
   });

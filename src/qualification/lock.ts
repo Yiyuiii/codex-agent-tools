@@ -16,7 +16,6 @@ import { types as nodeUtilTypes } from "node:util";
 
 import { execa } from "execa";
 
-import type { AgentProcessCounts } from "../runtime/agent-processes.js";
 import {
   ACTIVE_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_PLAN_ID,
@@ -705,36 +704,6 @@ export async function releaseQualificationLock(
   }
 }
 
-function targetsAreZero(counts: AgentProcessCounts): boolean {
-  const record = plainRecord(counts);
-  const keys = Object.keys(record).sort();
-  if (
-    keys.length !== 3 ||
-    keys[0] !== "kimi" ||
-    keys[1] !== "piRpc" ||
-    keys[2] !== "realSmoke"
-  ) {
-    throw new QualificationLockError();
-  }
-  const countOf = (value: unknown): number => {
-    const countRecord = plainRecord(value);
-    if (
-      Object.keys(countRecord).length !== 1 ||
-      typeof countRecord.count !== "number" ||
-      !Number.isSafeInteger(countRecord.count) ||
-      countRecord.count < 0
-    ) {
-      throw new QualificationLockError();
-    }
-    return countRecord.count;
-  };
-  return (
-    countOf(record.kimi) === 0 &&
-    countOf(record.piRpc) === 0 &&
-    countOf(record.realSmoke) === 0
-  );
-}
-
 function normalizeTerminalInspection(
   value: unknown,
 ): QualificationTerminalInspection {
@@ -785,7 +754,6 @@ export interface RecoverQualificationLockOptions {
   batchId: string;
   tempDirectory?: string;
   processIdentityInspector?: ProcessIdentityInspector;
-  inspectTargetProcesses: () => Promise<AgentProcessCounts>;
   inspectTerminalManifest: (
     batchId: string,
   ) => Promise<QualificationTerminalInspection>;
@@ -829,9 +797,6 @@ export async function recoverQualificationLock(
     ) {
       throw new QualificationLockError();
     }
-    const counts = await options.inspectTargetProcesses();
-    if (!targetsAreZero(counts)) throw new QualificationLockError();
-
     const terminal = normalizeTerminalInspection(
       await options.inspectTerminalManifest(owner.batchId),
     );

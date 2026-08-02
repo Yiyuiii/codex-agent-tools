@@ -14,6 +14,7 @@ import type {
   BuildIsolatedPiConfigOptions,
   IsolatedPiConfig,
 } from "../../src/adapters/pi/config.js";
+import { validateCurrentEvidenceContract } from "../../src/qualification/evidence-contract.js";
 import {
   buildPiDelegateSmokeContract,
   runPiSmoke,
@@ -268,6 +269,14 @@ describe("Ark Pi real-smoke harness", () => {
       },
     });
     expect(evidence).not.toHaveProperty("writeCommandObservations");
+    expect(evidence).not.toHaveProperty("commandCount");
+    expect(() =>
+      validateCurrentEvidenceContract(evidence, {
+        llm: "ark-agent-plan",
+        task: "review",
+        runtime: "pi-rpc",
+      }),
+    ).not.toThrow();
     expect(evidence).not.toHaveProperty("piVersion");
     expect(evidence.configSha256).toBe("a".repeat(64));
     expect(await readdir(root)).toEqual([]);
@@ -641,6 +650,14 @@ describe("Ark Pi real-smoke harness", () => {
         { source: "raw_input", match: "status_exact", outcome: "success" },
       ],
     });
+    expect(evidence).toHaveProperty("commandCount", 2);
+    expect(() =>
+      validateCurrentEvidenceContract(evidence, {
+        llm: "ark-agent-deepseek-v4-flash",
+        task: "delegate",
+        runtime: "pi-rpc",
+      }),
+    ).not.toThrow();
     expect(await readdir(root)).toEqual([]);
   });
 

@@ -13,6 +13,8 @@ import path from "node:path";
 
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
+import type { PiInvocation } from "../../src/adapters/pi/locator.js";
+
 import {
   assertQualificationFrozenCandidate,
   collectQualificationBuildIdentity,
@@ -30,11 +32,20 @@ const roots: string[] = [];
 const commit = "a".repeat(40);
 const authorizationReferenceSha256 = "b".repeat(64);
 const piConfigSha256 = "c".repeat(64);
-const zeroProcesses = Object.freeze({
-  kimi: Object.freeze({ count: 0 }),
-  piRpc: Object.freeze({ count: 0 }),
-  realSmoke: Object.freeze({ count: 0 }),
-});
+
+function verifiedPiInvocation(): PiInvocation {
+  return Object.freeze({
+    executable: process.execPath,
+    argvPrefix: Object.freeze([
+      "C:\\Users\\test\\AppData\\Roaming\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\cli.js",
+    ]) as readonly [string],
+    identity: Object.freeze({
+      packageName: "@earendil-works/pi-coding-agent",
+      packageVersion: "0.80.10",
+      nodeEngine: ">=20.0.0",
+    }),
+  });
+}
 
 async function tempRepository(): Promise<string> {
   const root = path.join(
@@ -73,11 +84,9 @@ interface HarnessOptions {
   failCommandStage?: string;
   failCommandOutput?: string;
   missingCredential?: string;
-  processSnapshots?: readonly {
-    kimi: { count: number };
-    piRpc: { count: number };
-    realSmoke: { count: number };
-  }[];
+  platform?: NodeJS.Platform;
+  failLocator?: "kimi" | "pi-invocation" | "pi-legacy";
+  piInvocation?: PiInvocation;
   authorizationUsed?: boolean;
   mutateBuildOnBuild?: boolean;
 }
@@ -130,14 +139,15 @@ async function harness(
   commands: QualificationPreflightCommandRequest[];
   codexHomes: string[];
   removedCodexHomes: string[];
+  locatorCalls: string[];
   authorizationChecks: number;
 }> {
   const commands: QualificationPreflightCommandRequest[] = [];
   const codexHomes: string[] = [];
   const removedCodexHomes: string[] = [];
+  const locatorCalls: string[] = [];
   let statusCalls = 0;
   let commitCalls = 0;
-  let processCalls = 0;
   let authorizationChecks = 0;
   let buildMutated = false;
   const activeCodexHome = path.join(repositoryRoot, "must-not-be-used");
@@ -154,8 +164,26 @@ async function harness(
   const dependencies: QualificationPreflightDependencies = {
     environment,
     nodeVersion: "v24.0.0",
-    locateKimiExecutable: async () => "kimi",
-    locatePiExecutable: async () => "pi",
+    platform: options.platform ?? "win32",
+    locateKimiExecutable: async () => {
+      locatorCalls.push("kimi");
+      if (options.failLocator === "kimi") throw new Error("locator failed");
+      return "kimi";
+    },
+    locatePiInvocation: async () => {
+      locatorCalls.push("pi-invocation");
+      if (options.failLocator === "pi-invocation") {
+        throw new Error("locator failed");
+      }
+      return options.piInvocation ?? verifiedPiInvocation();
+    },
+    locatePosixPiExecutable: async () => {
+      locatorCalls.push("pi-legacy");
+      if (options.failLocator === "pi-legacy") {
+        throw new Error("locator failed");
+      }
+      return "pi";
+    },
     createTemporaryCodexHome: async () => {
       const directory = path.join(
         os.tmpdir(),
@@ -170,15 +198,6 @@ async function harness(
     buildQualificationPiConfig: async () => ({
       contentSha256: piConfigSha256,
     }),
-    classifyTargetProcesses: async () => {
-      const snapshots = options.processSnapshots ?? [
-        zeroProcesses,
-        zeroProcesses,
-      ];
-      const result = snapshots[Math.min(processCalls, snapshots.length - 1)]!;
-      processCalls += 1;
-      return result;
-    },
     assertAuthorizationUnused: async () => {
       authorizationChecks += 1;
       if (options.authorizationUsed === true) {
@@ -237,11 +256,8 @@ async function harness(
       if (request.command === "codex") {
         return { exitCode: 0, stdout: "codex-cli 0.135.0\n" };
       }
-      if (request.command === "kimi") {
-        return { exitCode: 0, stdout: "kimi-code 0.27.0\n" };
-      }
-      if (request.command === "pi") {
-        return { exitCode: 0, stdout: "0.80.10\n" };
+      if (request.command === "kimi" || request.command === "pi") {
+        throw new Error("qualification preflight must not start target CLIs");
       }
       const stage = commandStage(request);
       if (stage === options.failCommandStage) {
@@ -271,6 +287,7 @@ async function harness(
     commands,
     codexHomes,
     removedCodexHomes,
+    locatorCalls,
     get authorizationChecks() {
       return authorizationChecks;
     },
@@ -354,7 +371,7 @@ describe("qualification preflight", () => {
     const record = await run(repositoryRoot, state.dependencies);
 
     expect(record).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       qualificationPlanId: "four-llm-v1",
       repositoryCommit: commit,
       repositoryBranch: "codex/ark-cutover",
@@ -364,12 +381,10 @@ describe("qualification preflight", () => {
       runtimeVersions: {
         node: "v24.0.0",
         codex: "codex-cli 0.135.0",
-        kimi: "kimi-code 0.27.0",
-        pi: "0.80.10",
       },
       piConfigSha256,
-      targetProcesses: zeroProcesses,
     });
+    expect(record).not.toHaveProperty("targetProcesses");
     expect(record).not.toHaveProperty("proxy10808");
     expect(record.logicalLlms.map((identity) => identity.llm)).toEqual([
       "ark-agent-deepseek-v4-flash",
@@ -417,6 +432,10 @@ describe("qualification preflight", () => {
       "--check-report",
     ]);
     expect(state.authorizationChecks).toBe(1);
+    expect(state.locatorCalls).toEqual(["kimi", "pi-invocation"]);
+    expect(
+      state.commands.some(({ command }) => command === "kimi" || command === "pi"),
+    ).toBe(false);
     expect(
       await readFile(
         path.join(
@@ -452,10 +471,10 @@ describe("qualification preflight", () => {
     const state = await harness(repositoryRoot);
     const baseRunner = state.dependencies.runCommand!;
     state.dependencies.runCommand = (request) =>
-      request.command === "kimi"
+      request.command === "codex"
         ? Promise.resolve({
             exitCode: 0,
-            stdout: "kimi-code 0.27.0 C:\\Users\\private\\config",
+            stdout: "codex-cli 0.135.0 C:\\Users\\private\\config",
           })
         : baseRunner(request);
 
@@ -480,18 +499,11 @@ describe("qualification preflight", () => {
       { missingCredential: "ARK_API_KEY" },
       "credentials",
     ],
+    ["static locator failure", { failLocator: "kimi" }, "locators"],
     [
-      "target process present",
-      {
-        processSnapshots: [
-          {
-            kimi: { count: 1 },
-            piRpc: { count: 0 },
-            realSmoke: { count: 0 },
-          },
-        ],
-      },
-      "target_processes",
+      "strict Pi invocation failure",
+      { failLocator: "pi-invocation" },
+      "locators",
     ],
     [
       "authorization already used",
@@ -551,32 +563,6 @@ describe("qualification preflight", () => {
     );
   });
 
-  it("normalizes malformed process snapshots into the fixed target-process error", async () => {
-    const repositoryRoot = await tempRepository();
-    const state = await harness(repositoryRoot);
-    const secret = "PROCESS_GETTER_SECRET";
-    state.dependencies.classifyTargetProcesses = async () =>
-      Object.defineProperty({}, "kimi", {
-        enumerable: true,
-        get() {
-          throw new Error(secret);
-        },
-      }) as typeof zeroProcesses;
-
-    let observed: unknown;
-    try {
-      await run(repositoryRoot, state.dependencies);
-    } catch (error) {
-      observed = error;
-    }
-    expect(observed).toMatchObject({
-      name: "QualificationPreflightError",
-      stage: "target_processes",
-      message: "Qualification preflight failed",
-    });
-    expect(String(observed)).not.toContain(secret);
-  });
-
   it("does not retain command output, credential values, or absolute paths in errors", async () => {
     const repositoryRoot = await tempRepository();
     const secret = "SUPER_SECRET_COMMAND_OUTPUT";
@@ -600,37 +586,6 @@ describe("qualification preflight", () => {
     expect(serialized).not.toContain("AGENT_SECRET_VALUE");
   });
 
-  it("rejects a target process appearing after deterministic gates", async () => {
-    const repositoryRoot = await tempRepository();
-    const state = await harness(repositoryRoot, {
-      processSnapshots: [
-        zeroProcesses,
-        {
-          kimi: { count: 0 },
-          piRpc: { count: 1 },
-          realSmoke: { count: 0 },
-        },
-      ],
-    });
-
-    await expect(run(repositoryRoot, state.dependencies)).rejects.toMatchObject(
-      {
-        stage: "target_processes",
-        count: 1,
-      },
-    );
-    expect(
-      state.commands.map(commandStage).filter((stage) => stage !== "other"),
-    ).toEqual([
-      "typecheck",
-      "test",
-      "build",
-      "release_smoke",
-      "isolated_acceptance",
-      "diff_check",
-    ]);
-  });
-
   it("stops the deterministic sequence at the first failed command", async () => {
     const repositoryRoot = await tempRepository();
     const state = await harness(repositoryRoot, {
@@ -645,6 +600,58 @@ describe("qualification preflight", () => {
     expect(
       state.commands.map(commandStage).filter((stage) => stage !== "other"),
     ).toEqual(["typecheck", "test", "build"]);
+  });
+
+  it("rejects a mutable or multi-prefix Windows Pi invocation without starting Pi", async () => {
+    const repositoryRoot = await tempRepository();
+    const mutable = {
+      ...verifiedPiInvocation(),
+      argvPrefix: ["C:\\one.js", "C:\\two.js"],
+    } as unknown as PiInvocation;
+    const state = await harness(repositoryRoot, { piInvocation: mutable });
+
+    await expect(run(repositoryRoot, state.dependencies)).rejects.toMatchObject(
+      { stage: "locators" },
+    );
+    expect(state.locatorCalls).toEqual(["kimi", "pi-invocation"]);
+    expect(
+      state.commands.some(
+        ({ command }) => command === "kimi" || command === "pi",
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a frozen Windows Pi invocation that substitutes another absolute executable", async () => {
+    const repositoryRoot = await tempRepository();
+    const invocation = Object.freeze({
+      ...verifiedPiInvocation(),
+      executable: "C:\\OtherRuntime\\node.exe",
+    });
+    const state = await harness(repositoryRoot, { piInvocation: invocation });
+
+    await expect(run(repositoryRoot, state.dependencies)).rejects.toMatchObject(
+      { stage: "locators" },
+    );
+    expect(state.locatorCalls).toEqual(["kimi", "pi-invocation"]);
+    expect(
+      state.commands.some(
+        ({ command }) => command === "kimi" || command === "pi",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps POSIX preflight on the legacy Pi string locator only", async () => {
+    const repositoryRoot = await tempRepository();
+    const state = await harness(repositoryRoot, { platform: "linux" });
+
+    await run(repositoryRoot, state.dependencies);
+
+    expect(state.locatorCalls).toEqual(["kimi", "pi-legacy"]);
+    expect(
+      state.commands.some(
+        ({ command }) => command === "kimi" || command === "pi",
+      ),
+    ).toBe(false);
   });
 
   it("rejects malformed authorization hashes without invoking dependencies", async () => {
@@ -860,7 +867,7 @@ describe("frozen candidate integration helpers", () => {
     expect(commitCalls).toBe(2);
   });
 
-  it("collects the verifier current snapshot without gates, authorization, or process checks", async () => {
+  it("collects the verifier current snapshot without gates or authorization checks", async () => {
     const repositoryRoot = await tempRepository();
     const state = await harness(repositoryRoot);
     const forbidden = async () => {
@@ -870,7 +877,6 @@ describe("frozen candidate integration helpers", () => {
       { repositoryRoot },
       {
         ...state.dependencies,
-        classifyTargetProcesses: forbidden,
         assertAuthorizationUnused: forbidden,
       },
     );
@@ -881,8 +887,6 @@ describe("frozen candidate integration helpers", () => {
       runtimeVersions: {
         node: "v24.0.0",
         codex: "codex-cli 0.135.0",
-        kimi: "kimi-code 0.27.0",
-        pi: "0.80.10",
       },
       piConfigSha256,
     });
@@ -895,6 +899,10 @@ describe("frozen candidate integration helpers", () => {
       state.commands.map(commandStage).filter((stage) => stage !== "other"),
     ).toEqual([]);
     expect(state.authorizationChecks).toBe(0);
+    expect(state.locatorCalls).toEqual(["kimi", "pi-invocation"]);
+    expect(
+      state.commands.some(({ command }) => command === "kimi" || command === "pi"),
+    ).toBe(false);
     expect(state.removedCodexHomes).toEqual(state.codexHomes);
     expect(Object.isFrozen(snapshot)).toBe(true);
   });
@@ -905,5 +913,21 @@ describe("frozen candidate integration helpers", () => {
         ? true
         : false;
     expectTypeOf<HasProxyDependency>().toEqualTypeOf<false>();
+  });
+
+  it("does not expose the removed whole-machine process scanner dependency", () => {
+    type HasTargetScannerDependency =
+      "classifyTargetProcesses" extends keyof QualificationPreflightDependencies
+        ? true
+        : false;
+    expectTypeOf<HasTargetScannerDependency>().toEqualTypeOf<false>();
+  });
+
+  it("does not expose the ambiguous cross-platform Pi string locator", () => {
+    type HasAmbiguousPiLocator =
+      "locatePiExecutable" extends keyof QualificationPreflightDependencies
+        ? true
+        : false;
+    expectTypeOf<HasAmbiguousPiLocator>().toEqualTypeOf<false>();
   });
 });

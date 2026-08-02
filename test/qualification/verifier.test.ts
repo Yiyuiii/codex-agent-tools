@@ -64,7 +64,7 @@ function frozenPreflight(): FrozenPreflightRecord {
     },
   ];
   return freezePreflightRecord({
-    schemaVersion: 2,
+    schemaVersion: 3,
     qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     repositoryCommit,
     repositoryBranch: "codex/ark-cutover",
@@ -76,8 +76,6 @@ function frozenPreflight(): FrozenPreflightRecord {
     runtimeVersions: {
       node: "v24.0.0",
       codex: "codex-cli 0.135.0",
-      kimi: "0.27.0",
-      pi: "0.80.10",
     },
     piConfigSha256: "e".repeat(64),
     logicalLlms: [
@@ -125,11 +123,6 @@ function frozenPreflight(): FrozenPreflightRecord {
       },
       { llm: "kimi-k3", environmentVariableName: null },
     ],
-    targetProcesses: {
-      kimi: { count: 0 },
-      piRpc: { count: 0 },
-      realSmoke: { count: 0 },
-    },
   });
 }
 
@@ -175,7 +168,7 @@ function acceptanceChecks(identity: QualificationCaseIdentity) {
     return identity.llm === "kimi-k3"
       ? {
           actualModelMatches: true,
-          noNewKimiProcesses: true,
+          ownedProcessDrained: true,
           workspaceUnchanged: true,
           knownDefectFound: true,
           executionTelemetryValid: true,
@@ -183,7 +176,7 @@ function acceptanceChecks(identity: QualificationCaseIdentity) {
       : {
           actualModelMatches: true,
           environmentIsolated: true,
-          noNewPiRpcProcesses: true,
+          ownedProcessDrained: true,
           workspaceUnchanged: true,
           knownDefectFound: true,
           executionTelemetryValid: true,
@@ -192,7 +185,7 @@ function acceptanceChecks(identity: QualificationCaseIdentity) {
   return identity.llm === "kimi-k3"
     ? {
         actualModelMatches: true,
-        noNewKimiProcesses: true,
+        ownedProcessDrained: true,
         resultFileValid: true,
         resultFileObserved: true,
         onlyExpectedFileChanged: true,
@@ -202,7 +195,7 @@ function acceptanceChecks(identity: QualificationCaseIdentity) {
     : {
         actualModelMatches: true,
         environmentIsolated: true,
-        noNewPiRpcProcesses: true,
+        ownedProcessDrained: true,
         resultFileValid: true,
         resultFileObserved: true,
         onlyExpectedFileChanged: true,
@@ -220,7 +213,7 @@ function evidenceForCase(
   )!;
   const expectedLine = expectedResultLine(identity);
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     qualification: {
       qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       batchId,
@@ -258,6 +251,7 @@ function evidenceForCase(
     adapterRetryCount: 0,
     runtimeReportedAutoRetryCount: 0,
     adapterReportedFallbackUsed: false,
+    ownedProcessDrained: true,
     orchestratorFallbackUsed: false,
     executionTelemetrySource:
       logicalIdentity.runtime === "kimi-acp"
@@ -321,7 +315,6 @@ async function createPassedBatch(
       recordedAt: "2026-07-26T00:00:00.000Z",
     });
     const evidence = evidenceForCase(identity, preflight);
-    options.mutateEvidence?.(evidence, identity);
     const evidencePath = path.join(
       repositoryRoot,
       "docs",
@@ -350,16 +343,28 @@ async function createPassedBatch(
     notRun: [],
     completedAt: "2026-07-26T00:00:00.000Z",
   });
+  const manifestPath = path.join(
+    repositoryRoot,
+    "docs",
+    "smoke",
+    "evidence",
+    "batches",
+    batchId,
+    "manifest.json",
+  );
+  if (options.mutateEvidence !== undefined) {
+    for (const identity of ACTIVE_QUALIFICATION_CASES) {
+      await coherentlyRewriteEvidenceReference({
+        repositoryRoot,
+        manifestPath,
+        ordinal: identity.ordinal,
+        mutateEvidence: (evidence) =>
+          options.mutateEvidence!(evidence, identity),
+      });
+    }
+  }
   return {
-    manifestPath: path.join(
-      repositoryRoot,
-      "docs",
-      "smoke",
-      "evidence",
-      "batches",
-      batchId,
-      "manifest.json",
-    ),
+    manifestPath,
     preflight,
   };
 }
@@ -369,6 +374,7 @@ async function createCurrentBlockedBatch(
   mutateEvidence?: (evidence: Record<string, unknown>) => void,
   failedIdentity: Readonly<QualificationCaseIdentity> =
     ACTIVE_QUALIFICATION_CASES[0],
+  applyMutationBeforeLedger = false,
 ): Promise<string> {
   const preflight = frozenPreflight();
   const ledger = createQualificationLedger({ repositoryRoot, batchId });
@@ -395,7 +401,7 @@ async function createCurrentBlockedBatch(
         ...acceptanceChecks(identity),
         resultFileValid: false,
       };
-      mutateEvidence?.(evidence);
+      if (applyMutationBeforeLedger) mutateEvidence?.(evidence);
     }
     const evidencePath = path.join(
       repositoryRoot,
@@ -425,7 +431,7 @@ async function createCurrentBlockedBatch(
     notRun: ACTIVE_QUALIFICATION_CASES.slice(failedIdentity.ordinal),
     completedAt: "2026-07-26T00:00:00.000Z",
   });
-  return path.join(
+  const manifestPath = path.join(
     repositoryRoot,
     "docs",
     "smoke",
@@ -434,18 +440,33 @@ async function createCurrentBlockedBatch(
     batchId,
     "manifest.json",
   );
+  if (mutateEvidence !== undefined && !applyMutationBeforeLedger) {
+    await coherentlyRewriteEvidenceReference({
+      repositoryRoot,
+      manifestPath,
+      ordinal: failedIdentity.ordinal,
+      mutateEvidence,
+    });
+  }
+  return manifestPath;
 }
 
 async function createCurrentBlockedKimiDelegateBatch(
   repositoryRoot: string,
   mutateEvidence?: (evidence: Record<string, unknown>) => void,
+  applyMutationBeforeLedger = false,
 ): Promise<string> {
   const identity = ACTIVE_QUALIFICATION_CASES.find(
     (candidate) =>
       candidate.llm === "kimi-k3" && candidate.task === "delegate",
   );
   if (identity === undefined) throw new Error("Missing Kimi delegate case");
-  return createCurrentBlockedBatch(repositoryRoot, mutateEvidence, identity);
+  return createCurrentBlockedBatch(
+    repositoryRoot,
+    mutateEvidence,
+    identity,
+    applyMutationBeforeLedger,
+  );
 }
 
 async function readJson(filePath: string): Promise<Record<string, unknown>> {
@@ -785,6 +806,39 @@ describe("qualification verifier", () => {
     });
   });
 
+  it("accepts a failed current case whose owned process did not produce drain proof", async () => {
+    const repositoryRoot = await tempRepository();
+    const manifestPath = await createCurrentBlockedBatch(
+      repositoryRoot,
+      (evidence) => {
+        evidence.ownedProcessDrained = null;
+        (evidence.checks as Record<string, unknown>).ownedProcessDrained = false;
+      },
+      ACTIVE_QUALIFICATION_CASES[0],
+      true,
+    );
+
+    await expect(
+      verifyQualification({
+        repositoryRoot,
+        manifestPath,
+        mode: "immutable-evidence",
+      }),
+    ).resolves.toMatchObject({ status: "blocked", promotionEligible: false });
+  });
+
+  it("rejects a current failure whose drain check contradicts top-level telemetry", async () => {
+    const repositoryRoot = await tempRepository();
+    const manifestPath = await createCurrentBlockedBatch(
+      repositoryRoot,
+      (evidence) => {
+        evidence.ownedProcessDrained = null;
+      },
+    );
+
+    await expectVerificationFailure(repositoryRoot, manifestPath);
+  });
+
   it("rejects current non-infrastructure failed evidence without task checks", async () => {
     const repositoryRoot = await tempRepository();
     const manifestPath = await createCurrentBlockedBatch(
@@ -832,6 +886,8 @@ describe("qualification verifier", () => {
         evidence.status = "failed";
         evidence.failureReason = "missing_credential";
       },
+      ACTIVE_QUALIFICATION_CASES[0],
+      true,
     );
 
     await expect(
@@ -858,10 +914,10 @@ describe("qualification verifier", () => {
         evidence.adapterRetryCount = null;
         evidence.runtimeReportedAutoRetryCount = null;
         evidence.adapterReportedFallbackUsed = null;
+        evidence.ownedProcessDrained = null;
         evidence.executionTelemetrySource = null;
         evidence.checks = {
-          postProcessSnapshot: "not_reached",
-          processCleanup: "unknown",
+          ownedProcessDrained: "unknown",
         };
         delete evidence.configSha256;
         delete evidence.credentialEnv;
@@ -879,6 +935,8 @@ describe("qualification verifier", () => {
           delete evidence[key];
         }
       },
+      ACTIVE_QUALIFICATION_CASES[0],
+      true,
     );
 
     await expect(
@@ -923,6 +981,7 @@ describe("qualification verifier", () => {
           const checks = evidence.checks as Record<string, unknown>;
           checks.requiredCommandObserved = false;
         },
+        true,
       );
 
       await expect(
@@ -1321,10 +1380,10 @@ describe("qualification verifier", () => {
           evidence.adapterRetryCount = null;
           evidence.runtimeReportedAutoRetryCount = null;
           evidence.adapterReportedFallbackUsed = null;
+          evidence.ownedProcessDrained = null;
           evidence.executionTelemetrySource = null;
           evidence.checks = {
-            postProcessSnapshot: "not_reached",
-            processCleanup: "unknown",
+            ownedProcessDrained: false,
           };
           for (const key of [
             "expectedResultNormalizedSha256",
@@ -1409,6 +1468,8 @@ describe("qualification verifier", () => {
             { source: "raw_input", match: "other", outcome: "success" },
           ];
         },
+        ACTIVE_QUALIFICATION_CASES[0],
+        true,
       );
 
       await expect(
@@ -1436,6 +1497,8 @@ describe("qualification verifier", () => {
           const checks = evidence.checks as Record<string, unknown>;
           checks.requiredCommandObserved = false;
         },
+        ACTIVE_QUALIFICATION_CASES[0],
+        true,
       );
 
       await expect(
@@ -1451,13 +1514,15 @@ describe("qualification verifier", () => {
       });
     });
 
-    it("keeps blocked current v3 evidence without the optional field compatible", async () => {
+    it("keeps blocked current v4 evidence without optional Pi diagnostics compatible", async () => {
       const repositoryRoot = await tempRepository();
       const manifestPath = await createCurrentBlockedBatch(
         repositoryRoot,
         (evidence) => {
           delete evidence.writeCommandObservations;
         },
+        ACTIVE_QUALIFICATION_CASES[0],
+        true,
       );
 
       await expect(
@@ -1871,6 +1936,21 @@ describe("qualification verifier", () => {
     });
   });
 
+  it("rejects a historical process-scan check mixed into current evidence", async () => {
+    const repositoryRoot = await tempRepository();
+    const { manifestPath } = await createPassedBatch(repositoryRoot, {
+      mutateEvidence: (evidence, identity) => {
+        if (identity.ordinal !== 1) return;
+        evidence.checks = {
+          ...acceptanceChecks(identity),
+          noNewPiRpcProcesses: true,
+        };
+      },
+    });
+
+    await expectVerificationFailure(repositoryRoot, manifestPath);
+  });
+
   it("rejects current HEAD drift only in frozen-candidate mode", async () => {
     const repositoryRoot = await tempRepository();
     const { manifestPath, preflight } = await createPassedBatch(repositoryRoot);
@@ -2036,7 +2116,7 @@ describe("qualification verifier", () => {
     await expectVerificationFailure(repositoryRoot, manifestPath);
   });
 
-  it("rejects mixed legacy v2 evidence in a current v3 batch even when its references are recomputed", async () => {
+  it("rejects mixed historical evidence in a current v4 batch even when its references are recomputed", async () => {
     const repositoryRoot = await tempRepository();
     const { manifestPath } = await createPassedBatch(repositoryRoot);
     await coherentlyRewriteEvidenceReference({

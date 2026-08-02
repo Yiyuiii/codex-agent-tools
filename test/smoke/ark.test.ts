@@ -6,6 +6,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { AdapterExecutionTelemetry } from "../../src/adapters/adapter.js";
+import { validateCurrentEvidenceContract } from "../../src/qualification/evidence-contract.js";
 import {
   parseArkSmokeArguments,
   runArkSmoke,
@@ -58,6 +59,51 @@ const qualificationContext = {
   orchestratorFallbackUsed: false as const,
 };
 
+const arkQualificationCases = [
+  {
+    llm: "ark-coding-plan",
+    actualModel: "ark-code-latest",
+    credentialEnv: "CODEX_AGENT_ARK_CODING_KEY",
+    task: "delegate",
+    ordinal: 1,
+  },
+  {
+    llm: "ark-coding-plan",
+    actualModel: "ark-code-latest",
+    credentialEnv: "CODEX_AGENT_ARK_CODING_KEY",
+    task: "review",
+    ordinal: 2,
+  },
+  {
+    llm: "ark-agent-plan",
+    actualModel: "ark-code-latest",
+    credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+    task: "review",
+    ordinal: 5,
+  },
+  {
+    llm: "ark-agent-plan",
+    actualModel: "ark-code-latest",
+    credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+    task: "delegate",
+    ordinal: 6,
+  },
+  {
+    llm: "ark-agent-deepseek-v4-flash",
+    actualModel: "deepseek-v4-flash",
+    credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+    task: "review",
+    ordinal: 7,
+  },
+  {
+    llm: "ark-agent-deepseek-v4-flash",
+    actualModel: "deepseek-v4-flash",
+    credentialEnv: "CODEX_AGENT_ARK_AGENT_KEY",
+    task: "delegate",
+    ordinal: 8,
+  },
+] as const;
+
 describe("Ark real-smoke harness", () => {
   it.each([
     "ark-coding-plan",
@@ -82,6 +128,109 @@ describe("Ark real-smoke harness", () => {
       /--llm/u,
     );
   });
+
+  it.each(arkQualificationCases)(
+    "emits current-contract production evidence for case $ordinal $llm/$task",
+    async ({ llm, actualModel, credentialEnv, task, ordinal }) => {
+      const root = await tempRoot();
+      const contract = buildPiDelegateSmokeContract(llm);
+      const service: PiSmokeService = {
+        review: async (_input, context) => {
+          context?.onExecutionTelemetry?.(validPiTelemetry);
+          return {
+            ok: true,
+            status: "completed",
+            llm,
+            actualModel,
+            elapsedMs: 10,
+            diagnostics: [],
+            filesChanged: [],
+            review:
+              "Empty input has length zero, so division returns NaN at average.js:2.",
+          };
+        },
+        delegate: async (input, context) => {
+          context?.onExecutionTelemetry?.(validPiTelemetry);
+          context?.onPiCommandLifecycleObservations?.([
+            {
+              source: "raw_input",
+              command: contract.writeCommand,
+              origin: "raw_input",
+              outcome: "success",
+            },
+            {
+              source: "raw_input",
+              command: "git status --short",
+              origin: "raw_input",
+              outcome: "success",
+            },
+          ]);
+          await writeFile(
+            path.join(input.cwd, contract.resultFileName),
+            `${contract.expectedLine}\n`,
+            "utf8",
+          );
+          return {
+            ok: true,
+            status: "completed",
+            llm,
+            actualModel,
+            elapsedMs: 10,
+            diagnostics: [],
+            filesChanged: [contract.resultFileName],
+            summary: "created and verified",
+            commandsRun: [contract.writeCommand, "git status --short"],
+            verification: [],
+            risks: [],
+          };
+        },
+      };
+      const evidence = await runArkSmoke(
+        {
+          llm,
+          task,
+          tempRoot: root,
+          qualificationContext: {
+            qualificationPlanId: "four-llm-v1",
+            batchId: "2026-07-26T12-00-00Z-a1b2c3d4",
+            ordinal,
+            llm,
+            task,
+            frozenCommit: "a".repeat(40),
+            frozenBuildIdentity: "b".repeat(64),
+            authorizationReferenceSha256: "c".repeat(64),
+            orchestratorFallbackUsed: false,
+          },
+        },
+        {
+          service,
+          runtimeEvidence: {
+            configSha256: "d".repeat(64),
+            childEnvironment: {
+              [credentialEnv]: "secret",
+              PI_CODING_AGENT_DIR: "C:\\cache\\pi",
+            },
+          },
+        },
+      );
+
+      expect(() =>
+        validateCurrentEvidenceContract(evidence, {
+          llm,
+          task,
+          runtime: "pi-rpc",
+        }),
+      ).not.toThrow();
+      if (task === "review") {
+        expect(evidence).not.toHaveProperty("commandCount");
+        expect(evidence).not.toHaveProperty("writeCommandObservations");
+      } else {
+        expect(evidence).toHaveProperty("commandCount", 2);
+        expect(evidence).toHaveProperty("writeCommandObservations");
+      }
+      expect(await readdir(root)).toEqual([]);
+    },
+  );
 
   it("records fixed Agent Plan identity, endpoint, isolation, and review evidence", async () => {
     const root = await tempRoot();
