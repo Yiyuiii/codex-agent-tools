@@ -243,6 +243,7 @@ describe("Pi RPC client", () => {
       expect(result.status).toBe("completed");
       expect(result.executionTelemetry).toMatchObject({
         ownedProcessDrained: true,
+        ownedProcessCompletion: "root_exit",
       });
       expect(tracked.reasons).toEqual([]);
       expect(tracked.exits).toEqual([
@@ -291,6 +292,10 @@ describe("Pi RPC client", () => {
       );
 
       expect(result.status).toBe(expectedStatus);
+      expect(result.executionTelemetry).toMatchObject({
+        ownedProcessDrained: true,
+        ownedProcessCompletion: "root_exit",
+      });
       expect(tracked.reasons).toEqual([expectedReason]);
       expect(tracked.exits).toEqual([
         expect.objectContaining({
@@ -340,6 +345,7 @@ describe("Pi RPC client", () => {
         adapterClientInvocationCount: 0,
       });
       expect(result.executionTelemetry?.ownedProcessDrained).toBeUndefined();
+      expect(result.executionTelemetry?.ownedProcessCompletion).toBeUndefined();
       expect(spawnCalls).toBe(0);
     },
   );
@@ -419,6 +425,12 @@ describe("Pi RPC client", () => {
       expect(outcome, JSON.stringify(outcome)).toMatchObject({
         status: "cancelled",
       });
+      expect(
+        typeof outcome === "symbol" ? null : outcome.executionTelemetry,
+      ).toMatchObject({
+        ownedProcessDrained: true,
+        ownedProcessCompletion: "cancelled",
+      });
       expect(tracked.reasons).toEqual(["cancelled"]);
       expect(tracked.operations).not.toContain("write:abort");
     },
@@ -444,13 +456,10 @@ describe("Pi RPC client", () => {
       );
 
       expect(result.status).toBe("failed");
-      if (scenario === "invalid-json") {
-        expect(result.executionTelemetry).toBeNull();
-      } else {
-        expect(result.executionTelemetry).toMatchObject({
-          ownedProcessDrained: true,
-        });
-      }
+      expect(result.executionTelemetry).toMatchObject({
+        ownedProcessDrained: true,
+        ownedProcessCompletion: "cancelled",
+      });
       expect(result.diagnostics.join("\n")).toContain(expectedDiagnostic);
       expect(tracked.reasons).toEqual(["cancelled"]);
       expect(
@@ -539,6 +548,7 @@ describe("Pi RPC client", () => {
 
       expect(result.status).toBe("failed");
       expect(result.executionTelemetry?.ownedProcessDrained).toBeUndefined();
+      expect(result.executionTelemetry?.ownedProcessCompletion).toBeUndefined();
       expect(result.diagnostics.join("\n")).toContain(
         "synthetic Pi owned-process drain failure",
       );
@@ -569,6 +579,10 @@ describe("Pi RPC client", () => {
       );
 
       expect(result.status).toBe("failed");
+      expect(result.executionTelemetry).toMatchObject({
+        ownedProcessDrained: true,
+        ownedProcessCompletion: "timed_out",
+      });
       expect(result.diagnostics.join("\n")).toContain(
         "expected=cancelled actual=timed_out",
       );
@@ -614,6 +628,7 @@ describe("Pi RPC client", () => {
 
       expect(result.status).toBe("failed");
       expect(result.executionTelemetry?.ownedProcessDrained).toBeUndefined();
+      expect(result.executionTelemetry?.ownedProcessCompletion).toBeUndefined();
       expect(result.diagnostics.join("\n")).toContain(
         "synthetic Pi owned-process drain failure",
       );
@@ -698,6 +713,9 @@ describe("Pi RPC client", () => {
       expect(result.executionTelemetry).not.toBeNull();
       expect(result.executionTelemetry).not.toHaveProperty(
         "ownedProcessDrained",
+      );
+      expect(result.executionTelemetry).not.toHaveProperty(
+        "ownedProcessCompletion",
       );
     }
 
@@ -818,6 +836,16 @@ describe("Pi RPC client", () => {
       onProgress: (message) => progress.push(message),
     });
     expect(result.status, JSON.stringify(result)).toBe("timed_out");
+    if (process.platform === "win32") {
+      expect(result.executionTelemetry).toMatchObject({
+        ownedProcessDrained: true,
+        ownedProcessCompletion: "timed_out",
+      });
+    } else {
+      expect(result.executionTelemetry).not.toHaveProperty(
+        "ownedProcessCompletion",
+      );
+    }
     expect(
       progress.some((message) => message.startsWith("pi heartbeat ")),
     ).toBe(true);

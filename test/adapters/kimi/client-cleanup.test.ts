@@ -148,6 +148,7 @@ describe("runKimiAcp Windows owned-process cleanup", () => {
     expect(result).toMatchObject({ status: "completed", diagnostics: [] });
     expect(result.executionTelemetry).toMatchObject({
       ownedProcessDrained: true,
+      ownedProcessCompletion: "root_exit",
     });
     expect(tracked.reasons).toEqual([]);
     expect(tracked.exits).toEqual([
@@ -182,6 +183,10 @@ describe("runKimiAcp Windows owned-process cleanup", () => {
       );
 
       expect(result.status).toBe("cancelled");
+      expect(result.executionTelemetry).toMatchObject({
+        ownedProcessDrained: true,
+        ownedProcessCompletion: "session_shutdown",
+      });
       expect(result.diagnostics.join("\n")).not.toContain(
         "ACP connection closed",
       );
@@ -207,6 +212,9 @@ describe("runKimiAcp Windows owned-process cleanup", () => {
     expect(result.executionTelemetry).not.toHaveProperty(
       "ownedProcessDrained",
     );
+    expect(result.executionTelemetry).not.toHaveProperty(
+      "ownedProcessCompletion",
+    );
     expect(tracked.reasons).toEqual([]);
     expect(result.diagnostics.join("\n")).toContain(
       "synthetic owned-process drain failure",
@@ -224,6 +232,7 @@ describe("runKimiAcp Windows owned-process cleanup", () => {
     expect(result.status).toBe("failed");
     expect(result.executionTelemetry).toMatchObject({
       ownedProcessDrained: true,
+      ownedProcessCompletion: "root_exit",
     });
     expect(tracked.reasons).toEqual([]);
     expect(result.diagnostics.join("\n")).toContain(
@@ -242,6 +251,10 @@ describe("runKimiAcp Windows owned-process cleanup", () => {
     );
 
     expect(result.status).toBe("failed");
+    expect(result.executionTelemetry).toMatchObject({
+      ownedProcessDrained: true,
+      ownedProcessCompletion: "cancelled",
+    });
     expect(result.diagnostics.join("\n")).toMatch(
       /model configuration.*not available/i,
     );

@@ -127,6 +127,8 @@ describe("PiAdapter", () => {
         runtimeReportedAutoRetryCount: 0,
         adapterReportedFallbackUsed: false,
         source: "pi-rpc-observable" as const,
+        ownedProcessDrained: true as const,
+        ownedProcessCompletion: "root_exit" as const,
       },
     }));
     const controlled = controlledPiLocators();
@@ -165,6 +167,10 @@ describe("PiAdapter", () => {
     });
 
     expect(result.status).toBe("completed");
+    expect(result.executionTelemetry).toMatchObject({
+      ownedProcessDrained: true,
+      ownedProcessCompletion: "root_exit",
+    });
     expect(result.events).toEqual([
       {
         type: "tool_call",

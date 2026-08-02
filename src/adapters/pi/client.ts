@@ -173,6 +173,7 @@ export async function runPiRpc(
   let owned: OwnedAgentProcess | undefined;
   let ownedExit: OwnedProcessExit | undefined;
   let ownedProcessDrained: true | undefined;
+  let ownedProcessCompletion: OwnedProcessExit["completion"] | undefined;
   let ownedClosedError: unknown;
   let ownedTerminationPromise: Promise<void> | undefined;
   let ownedClosurePromise: Promise<void> | undefined;
@@ -725,7 +726,10 @@ export async function runPiRpc(
         await cancellationFlow;
       }
       ownedExit = await owned.closed;
-      if (ownedExit.ownershipDrained === true) ownedProcessDrained = true;
+      if (ownedExit.ownershipDrained === true) {
+        ownedProcessDrained = true;
+        ownedProcessCompletion = ownedExit.completion;
+      }
       validateOwnedExit(ownedExit, cancellationReason ?? "root_exit");
     }
     status =
@@ -770,7 +774,10 @@ export async function runPiRpc(
       }
       try {
         const drainedExit = await owned.closed;
-        if (drainedExit.ownershipDrained === true) ownedProcessDrained = true;
+        if (drainedExit.ownershipDrained === true) {
+          ownedProcessDrained = true;
+          ownedProcessCompletion = drainedExit.completion;
+        }
         ownedExit ??= drainedExit;
       } catch (error) {
         ownedClosedError ??= error;
@@ -812,13 +819,27 @@ export async function runPiRpc(
       agentWillRetryCount,
     );
   let executionTelemetry: AdapterRunResult["executionTelemetry"];
-  if (
+  const runtimeIdentityUnavailable =
     adapterClientInvocationCount > 0 &&
-    (!assistantIdentityObserved || assistantIdentityUnknown)
-  ) {
+    (!assistantIdentityObserved || assistantIdentityUnknown);
+  if (runtimeIdentityUnavailable) {
     appendDiagnostic("pi_runtime_identity_unknown");
-    if (status === "completed") status = "failed";
-    executionTelemetry = null;
+    const completedWithoutIdentity = status === "completed";
+    if (completedWithoutIdentity) status = "failed";
+    executionTelemetry =
+      !completedWithoutIdentity &&
+      ownedProcessDrained === true &&
+      ownedProcessCompletion !== undefined
+        ? {
+            adapterClientInvocationCount,
+            adapterRetryCount: 0,
+            runtimeReportedAutoRetryCount,
+            adapterReportedFallbackUsed,
+            source: "pi-rpc-observable",
+            ownedProcessDrained: true,
+            ownedProcessCompletion,
+          }
+        : null;
   } else {
     if (assistantIdentityMismatch) {
       adapterReportedFallbackUsed = true;
@@ -831,7 +852,12 @@ export async function runPiRpc(
       runtimeReportedAutoRetryCount,
       adapterReportedFallbackUsed,
       source: "pi-rpc-observable",
-      ...(ownedProcessDrained === true ? { ownedProcessDrained: true } : {}),
+      ...(ownedProcessDrained === true && ownedProcessCompletion !== undefined
+        ? {
+            ownedProcessDrained: true,
+            ownedProcessCompletion,
+          }
+        : {}),
     };
   }
 

@@ -205,6 +205,16 @@ describe("runKimiAcp", () => {
     });
     const result = await run(requestWithoutTimeout);
     expect(result.status).toBe("cancelled");
+    if (process.platform === "win32") {
+      expect(result.executionTelemetry).toMatchObject({
+        ownedProcessDrained: true,
+        ownedProcessCompletion: "cancelled",
+      });
+    } else {
+      expect(result.executionTelemetry).not.toHaveProperty(
+        "ownedProcessCompletion",
+      );
+    }
     expect(result.diagnostics.join("\n")).not.toContain("ACP connection closed");
   });
 
@@ -219,6 +229,16 @@ describe("runKimiAcp", () => {
       }),
     );
     expect(result).toMatchObject({ status: "timed_out", diagnostics: [] });
+    if (process.platform === "win32") {
+      expect(result.executionTelemetry).toMatchObject({
+        ownedProcessDrained: true,
+        ownedProcessCompletion: "timed_out",
+      });
+    } else {
+      expect(result.executionTelemetry).not.toHaveProperty(
+        "ownedProcessCompletion",
+      );
+    }
   });
 
   it("fails rather than silently using the default model", async () => {
@@ -243,6 +263,9 @@ describe("runKimiAcp", () => {
       expect(result.executionTelemetry).not.toHaveProperty(
         "ownedProcessDrained",
       );
+      expect(result.executionTelemetry).not.toHaveProperty(
+        "ownedProcessCompletion",
+      );
     }
     expect(result.diagnostics.join("\n")).toMatch(/model configuration.*not available/i);
   });
@@ -263,6 +286,16 @@ describe("runKimiAcp", () => {
     const result = await run(requestWithoutTimeout);
 
     expect(result.status).toBe("cancelled");
+    if (process.platform === "win32") {
+      expect(result.executionTelemetry).toMatchObject({
+        ownedProcessDrained: true,
+        ownedProcessCompletion: "session_shutdown",
+      });
+    } else {
+      expect(result.executionTelemetry).not.toHaveProperty(
+        "ownedProcessCompletion",
+      );
+    }
     expect(result.diagnostics.join("\n")).not.toContain("ACP connection closed");
     expect(result.diagnostics.join("\n")).not.toMatch(/timed.?out/i);
   });
@@ -313,6 +346,9 @@ describe("runKimiAcp", () => {
     expect(result.status).toBe("failed");
     expect(result.executionTelemetry).not.toHaveProperty(
       "ownedProcessDrained",
+    );
+    expect(result.executionTelemetry).not.toHaveProperty(
+      "ownedProcessCompletion",
     );
     expect(result.diagnostics.join("\n")).toContain(
       "synthetic owned spawner rejection",
@@ -383,6 +419,10 @@ describe("runKimiAcp", () => {
 
     expect(earlyOutcome).not.toBe(watchdog);
     expect(result).toMatchObject({ status: "cancelled", diagnostics: [] });
+    expect(result.executionTelemetry).toMatchObject({
+      ownedProcessDrained: true,
+      ownedProcessCompletion: "session_shutdown",
+    });
     expect(terminationReasons).toEqual(["session_shutdown"]);
   });
 });

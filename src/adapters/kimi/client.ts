@@ -11,6 +11,7 @@ import { scheduleDeadline } from "../../runtime/deadline.js";
 import {
   spawnOwnedAgentProcess,
   type OwnedAgentProcess,
+  type OwnedProcessExit,
   type OwnedTerminationReason,
   type SpawnOwnedAgentProcessRequest,
 } from "../../runtime/owned-agent-process.js";
@@ -305,6 +306,7 @@ export async function runKimiAcp(
   let owned: OwnedAgentProcess | undefined;
   let ownedTermination: Promise<void> | undefined;
   let ownedProcessDrained: true | undefined;
+  let ownedProcessCompletion: OwnedProcessExit["completion"] | undefined;
   const preStartCancellation = Symbol("pre-start-cancellation");
 
   const beginOwnedTermination = (
@@ -628,7 +630,10 @@ export async function runKimiAcp(
           await beginOwnedTermination(owned, "cancelled");
         }
         const exit = await owned.closed;
-        if (exit.ownershipDrained === true) ownedProcessDrained = true;
+        if (exit.ownershipDrained === true) {
+          ownedProcessDrained = true;
+          ownedProcessCompletion = exit.completion;
+        }
         await connection?.closed;
         if (
           status === "completed" &&
@@ -690,7 +695,12 @@ export async function runKimiAcp(
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
       source: "kimi-acp-observable",
-      ...(ownedProcessDrained === true ? { ownedProcessDrained: true } : {}),
+      ...(ownedProcessDrained === true && ownedProcessCompletion !== undefined
+        ? {
+            ownedProcessDrained: true,
+            ownedProcessCompletion,
+          }
+        : {}),
     },
   };
   if (actualModel !== undefined) result.actualModel = actualModel;

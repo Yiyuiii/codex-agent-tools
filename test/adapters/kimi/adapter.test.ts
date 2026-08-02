@@ -21,6 +21,8 @@ describe("KimiAdapter", () => {
         runtimeReportedAutoRetryCount: 0,
         adapterReportedFallbackUsed: false,
         source: "kimi-acp-observable" as const,
+        ownedProcessDrained: true as const,
+        ownedProcessCompletion: "root_exit" as const,
       },
     }));
     const adapter = new KimiAdapter({
@@ -50,6 +52,8 @@ describe("KimiAdapter", () => {
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
       source: "kimi-acp-observable",
+      ownedProcessDrained: true,
+      ownedProcessCompletion: "root_exit",
     });
     expect(runClient).toHaveBeenCalledOnce();
     const clientRequest = runClient.mock.calls[0]![0];

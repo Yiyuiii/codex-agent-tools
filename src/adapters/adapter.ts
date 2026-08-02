@@ -1,4 +1,5 @@
 import type { LlmProfile, TaskKind } from "../domain/types.js";
+import type { OwnedCompletion } from "../runtime/owned-agent-process.js";
 
 export interface AdapterExecutionTelemetry {
   /**
@@ -17,6 +18,12 @@ export interface AdapterExecutionTelemetry {
    * This is not inferred from a PID or system-wide process scan.
    */
   readonly ownedProcessDrained?: true;
+  /**
+   * Exact terminal completion reported by the Windows owned-process helper.
+   * Adapters expose it only together with `ownedProcessDrained: true` after
+   * the same `closed` result proves that the complete ownership set drained.
+   */
+  readonly ownedProcessCompletion?: OwnedCompletion;
 }
 
 export interface AdapterRunRequest {
