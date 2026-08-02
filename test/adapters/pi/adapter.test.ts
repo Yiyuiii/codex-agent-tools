@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
@@ -5,7 +7,44 @@ import {
   type PiAdapterDependencies,
 } from "../../../src/adapters/pi/adapter.js";
 import type { PiRpcRunRequest } from "../../../src/adapters/pi/client.js";
+import type { IsolatedPiConfig } from "../../../src/adapters/pi/config.js";
+import type { PiInvocation } from "../../../src/adapters/pi/locator.js";
 import type { LlmProfile } from "../../../src/domain/types.js";
+
+const windowsIt = it.runIf(process.platform === "win32");
+const posixIt = it.runIf(process.platform !== "win32");
+const verifiedPiCli = path.resolve("test/fakes/fake-pi-rpc.mjs");
+
+interface ControlledPiLocators {
+  locateExecutable(environment: NodeJS.ProcessEnv): Promise<string>;
+  locateInvocation(environment: NodeJS.ProcessEnv): Promise<PiInvocation>;
+}
+
+function verifiedPiInvocation(): PiInvocation {
+  return {
+    executable: process.execPath,
+    argvPrefix: [verifiedPiCli],
+    identity: {
+      packageName: "@earendil-works/pi-coding-agent",
+      packageVersion: "0.80.10",
+      nodeEngine: ">=20.0.0",
+    },
+  };
+}
+
+function controlledPiLocators(
+  posixExecutable = "/usr/local/bin/pi",
+  invocation: PiInvocation = verifiedPiInvocation(),
+): ControlledPiLocators {
+  return {
+    async locateExecutable() {
+      return posixExecutable;
+    },
+    async locateInvocation() {
+      return invocation;
+    },
+  };
+}
 
 function profile(): LlmProfile {
   return {
@@ -26,12 +65,41 @@ function profile(): LlmProfile {
   };
 }
 
+function isolatedConfig(): IsolatedPiConfig {
+  return {
+    agentDir: "C:\\cache\\pi",
+    settingsPath: "C:\\cache\\pi\\settings.json",
+    modelsPath: "C:\\cache\\pi\\models.json",
+    environment: { PI_CODING_AGENT_DIR: "C:\\cache\\pi" },
+    contentSha256: "a".repeat(64),
+  };
+}
+
+function completedPiResult() {
+  return {
+    status: "completed" as const,
+    text: "done",
+    actualModel: "ark-code-latest",
+    elapsedMs: 1,
+    events: [],
+    diagnostics: [],
+    executionTelemetry: {
+      adapterClientInvocationCount: 1,
+      adapterRetryCount: 0,
+      runtimeReportedAutoRetryCount: 0,
+      adapterReportedFallbackUsed: false,
+      source: "pi-rpc-observable" as const,
+    },
+  };
+}
+
 describe("PiAdapter", () => {
   it("does not expose a retry-wait dependency", () => {
     expectTypeOf<PiAdapterDependencies>().not.toHaveProperty("waitForRetry");
   });
 
   it("uses isolated config, fixed provider/model/route, and maps tool events", async () => {
+    const shutdown = new AbortController();
     const runClient = vi.fn(async (_request: PiRpcRunRequest) => ({
       status: "completed" as const,
       text: "done",
@@ -61,8 +129,12 @@ describe("PiAdapter", () => {
         source: "pi-rpc-observable" as const,
       },
     }));
+    const controlled = controlledPiLocators();
+    const locateExecutable = vi.fn(controlled.locateExecutable);
+    const locateInvocation = vi.fn(controlled.locateInvocation);
     const adapter = new PiAdapter({
-      locateExecutable: async () => "C:\\npm\\pi.cmd",
+      locateExecutable,
+      locateInvocation,
       buildConfig: async () => ({
         agentDir: "C:\\cache\\codex-agent-tools\\pi\\0.1.0-alpha.1",
         settingsPath: "C:\\cache\\settings.json",
@@ -82,11 +154,13 @@ describe("PiAdapter", () => {
       cwd: process.cwd(),
       prompt: "Implement",
       timeoutMs: 1_800_000,
+      shutdownSignal: shutdown.signal,
       parentEnvironment: {
         PATH: "C:\\Windows",
         HTTPS_PROXY: "http://parent:9999",
         OPENAI_API_KEY_DOUBAO: "ark-secret",
         ANTHROPIC_API_KEY: "forbidden",
+        pi_coding_agent_dir: "C:\\parent-poison",
       },
     });
 
@@ -111,12 +185,14 @@ describe("PiAdapter", () => {
     ]);
     const request = runClient.mock.calls[0]![0];
     expect(request).toMatchObject({
-      executable: "C:\\npm\\pi.cmd",
+      executable:
+        process.platform === "win32" ? process.execPath : "/usr/local/bin/pi",
       provider: "ark-agent-plan",
       model: "ark-code-latest",
       thinkingLevel: "medium",
       task: "delegate",
       timeoutMs: 1_800_000,
+      shutdownSignal: shutdown.signal,
       environment: {
         PATH: "C:\\Windows",
         CODEX_AGENT_ARK_AGENT_KEY: "ark-secret",
@@ -127,9 +203,177 @@ describe("PiAdapter", () => {
     expect(request.environment.HTTPS_PROXY).toBeUndefined();
     expect(request.environment.ANTHROPIC_API_KEY).toBeUndefined();
     expect(request.environment.OPENAI_API_KEY_DOUBAO).toBeUndefined();
+    expect(
+      Object.keys(request.environment).filter(
+        (name) => name.toLowerCase() === "pi_coding_agent_dir",
+      ),
+    ).toEqual(["PI_CODING_AGENT_DIR"]);
+    if (process.platform === "win32") {
+      expect(request.executableArgs).toEqual([verifiedPiCli]);
+      expect(locateInvocation).toHaveBeenCalledOnce();
+      expect(locateExecutable).not.toHaveBeenCalled();
+    } else {
+      expect(request).not.toHaveProperty("executableArgs");
+      expect(locateExecutable).toHaveBeenCalledOnce();
+      expect(locateInvocation).not.toHaveBeenCalled();
+    }
   });
 
-  it("does not add a timeout when the caller omits it", async () => {
+  windowsIt("derives redaction secrets from the canonical child credential", async () => {
+    const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
+      completedPiResult(),
+    );
+    const adapter = new PiAdapter({
+      ...controlledPiLocators(),
+      buildConfig: async () => isolatedConfig(),
+      runClient,
+    });
+
+    await adapter.run({
+      profile: profile(),
+      task: "review",
+      cwd: process.cwd(),
+      prompt: "Review",
+      parentEnvironment: {
+        PATH: "C:\\Windows",
+        openai_api_key_doubao: "lowercase-secret",
+      },
+    });
+
+    const request = runClient.mock.calls[0]![0];
+    expect(request.environment.CODEX_AGENT_ARK_AGENT_KEY).toBe(
+      "lowercase-secret",
+    );
+    expect(request.secretValues).toEqual(["lowercase-secret"]);
+  });
+
+  windowsIt("fails closed on case-conflicting credential sources", async () => {
+    const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
+      completedPiResult(),
+    );
+    const adapter = new PiAdapter({
+      ...controlledPiLocators(),
+      buildConfig: async () => isolatedConfig(),
+      runClient,
+    });
+
+    await expect(
+      adapter.run({
+        profile: profile(),
+        task: "review",
+        cwd: process.cwd(),
+        prompt: "Review",
+        parentEnvironment: {
+          PATH: "C:\\Windows",
+          OPENAI_API_KEY_DOUBAO: "first-secret",
+          openai_api_key_doubao: "second-secret",
+        },
+      }),
+    ).rejects.toThrow("Invalid child environment");
+    expect(runClient).not.toHaveBeenCalled();
+  });
+
+  windowsIt("uses the canonical source key when no credential target exists", async () => {
+    const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
+      completedPiResult(),
+    );
+    const adapter = new PiAdapter({
+      ...controlledPiLocators(),
+      buildConfig: async () => isolatedConfig(),
+      runClient,
+    });
+    const { credentialTargetEnv: _omittedTarget, ...profileWithoutTarget } =
+      profile();
+
+    await adapter.run({
+      profile: profileWithoutTarget,
+      task: "review",
+      cwd: process.cwd(),
+      prompt: "Review",
+      parentEnvironment: {
+        PATH: "C:\\Windows",
+        openai_api_key_doubao: "source-secret",
+      },
+    });
+
+    const request = runClient.mock.calls[0]![0];
+    expect(request.environment.OPENAI_API_KEY_DOUBAO).toBe("source-secret");
+    expect(request.secretValues).toEqual(["source-secret"]);
+  });
+
+  windowsIt.each([
+    [
+      "non-Node executable",
+      { ...verifiedPiInvocation(), executable: verifiedPiCli },
+    ],
+    ["empty argv prefix", { ...verifiedPiInvocation(), argvPrefix: [] }],
+    [
+      "relative argv prefix",
+      { ...verifiedPiInvocation(), argvPrefix: ["relative-cli.js"] },
+    ],
+    [
+      "NUL argv prefix",
+      { ...verifiedPiInvocation(), argvPrefix: [`${verifiedPiCli}\0tail`] },
+    ],
+    [
+      "wrong package identity",
+      {
+        ...verifiedPiInvocation(),
+        identity: {
+          ...verifiedPiInvocation().identity,
+          packageName: "other-package",
+        },
+      },
+    ],
+    [
+      "empty package version",
+      {
+        ...verifiedPiInvocation(),
+        identity: {
+          ...verifiedPiInvocation().identity,
+          packageVersion: " ",
+        },
+      },
+    ],
+    [
+      "empty Node engine",
+      {
+        ...verifiedPiInvocation(),
+        identity: {
+          ...verifiedPiInvocation().identity,
+          nodeEngine: "",
+        },
+      },
+    ],
+  ])("rejects a malformed Windows invocation: %s", async (_label, malformed) => {
+    const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
+      completedPiResult(),
+    );
+    const adapter = new PiAdapter({
+      ...controlledPiLocators(
+        "/usr/local/bin/pi",
+        malformed as unknown as PiInvocation,
+      ),
+      buildConfig: async () => isolatedConfig(),
+      runClient,
+    });
+
+    await expect(
+      adapter.run({
+        profile: profile(),
+        task: "review",
+        cwd: process.cwd(),
+        prompt: "Review",
+        parentEnvironment: {
+          PATH: "C:\\Windows",
+          OPENAI_API_KEY_DOUBAO: "secret",
+        },
+      }),
+    ).rejects.toThrow("Pi Windows invocation is invalid");
+    expect(runClient).not.toHaveBeenCalled();
+  });
+
+  posixIt("does not add a timeout when the caller omits it", async () => {
     const runClient = vi.fn(async (_request: PiRpcRunRequest) => ({
       status: "completed" as const,
       text: "done",
@@ -146,7 +390,7 @@ describe("PiAdapter", () => {
       },
     }));
     const adapter = new PiAdapter({
-      locateExecutable: async () => "pi.cmd",
+      ...controlledPiLocators(),
       buildConfig: async () => ({
         agentDir: "C:\\cache\\pi",
         settingsPath: "C:\\cache\\pi\\settings.json",
@@ -167,8 +411,11 @@ describe("PiAdapter", () => {
         OPENAI_API_KEY_DOUBAO: "ark-secret",
       },
     });
-
     expect(runClient.mock.calls[0]![0]).not.toHaveProperty("timeoutMs");
+    expect(runClient.mock.calls[0]![0]).toMatchObject({
+      executable: "/usr/local/bin/pi",
+    });
+    expect(runClient.mock.calls[0]![0]).not.toHaveProperty("executableArgs");
   });
 
   it.each([
@@ -209,7 +456,7 @@ describe("PiAdapter", () => {
         },
       }));
       const adapter = new PiAdapter({
-        locateExecutable: async () => "C:\\npm\\pi.cmd",
+        ...controlledPiLocators("C:\\npm\\pi.cmd"),
         buildConfig: async () => ({
           agentDir: "C:\\cache\\codex-agent-tools\\pi\\0.1.0-alpha.1",
           settingsPath: "C:\\cache\\settings.json",
@@ -246,7 +493,7 @@ describe("PiAdapter", () => {
 
   it("fails explicitly when Pi reports a different actual model", async () => {
     const adapter = new PiAdapter({
-      locateExecutable: async () => "pi.cmd",
+      ...controlledPiLocators("pi.cmd"),
       buildConfig: async () => ({
         agentDir: "C:\\cache\\pi",
         settingsPath: "C:\\cache\\pi\\settings.json",
@@ -293,7 +540,7 @@ describe("PiAdapter", () => {
     "marks an observed model fallback even when the child status is %s",
     async (status) => {
       const adapter = new PiAdapter({
-        locateExecutable: async () => "pi.cmd",
+        ...controlledPiLocators("pi.cmd"),
         buildConfig: async () => ({
           agentDir: "C:\\cache\\pi",
           settingsPath: "C:\\cache\\pi\\settings.json",
@@ -338,7 +585,7 @@ describe("PiAdapter", () => {
 
   it("fails a completed result with missing model without inventing fallback", async () => {
     const adapter = new PiAdapter({
-      locateExecutable: async () => "pi.cmd",
+      ...controlledPiLocators("pi.cmd"),
       buildConfig: async () => ({
         agentDir: "C:\\cache\\pi",
         settingsPath: "C:\\cache\\pi\\settings.json",
@@ -398,7 +645,7 @@ describe("PiAdapter", () => {
       },
     }));
     const adapter = new PiAdapter({
-      locateExecutable: async () => "pi.cmd",
+      ...controlledPiLocators("pi.cmd"),
       buildConfig: async () => ({
         agentDir: "C:\\cache\\pi",
         settingsPath: "C:\\cache\\pi\\settings.json",
@@ -453,8 +700,8 @@ describe("PiAdapter", () => {
       },
     }));
     const adapter = new PiAdapter({
+      ...controlledPiLocators("pi.cmd"),
       retryMode: "qualification-single-attempt",
-      locateExecutable: async () => "pi.cmd",
       buildConfig: async () => ({
         agentDir: "C:\\cache\\pi",
         settingsPath: "C:\\cache\\pi\\settings.json",

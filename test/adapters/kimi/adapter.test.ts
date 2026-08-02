@@ -6,6 +6,7 @@ import { resolveLlm } from "../../../src/llms/registry.js";
 
 describe("KimiAdapter", () => {
   it("maps a logical profile and preserves an explicit per-call timeout", async () => {
+    const shutdown = new AbortController();
     const runClient = vi.fn(async (_request: KimiAcpRunRequest) => ({
       status: "completed" as const,
       text: "done",
@@ -34,6 +35,7 @@ describe("KimiAdapter", () => {
       cwd: process.cwd(),
       prompt: "Review this repository",
       timeoutMs: 1_800_000,
+      shutdownSignal: shutdown.signal,
       parentEnvironment: {
         PATH: "C:\\Windows",
         HTTPS_PROXY: "http://parent:9999",
@@ -57,6 +59,7 @@ describe("KimiAdapter", () => {
       task: "review",
       model: "kimi-code/k3",
       timeoutMs: 1_800_000,
+      shutdownSignal: shutdown.signal,
       environment: { PATH: "C:\\Windows" },
     });
     expect(clientRequest.environment.HTTPS_PROXY).toBeUndefined();

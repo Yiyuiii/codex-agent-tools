@@ -52,6 +52,9 @@ export class KimiAdapter implements ExternalAgentAdapter {
       clientRequest.timeoutMs = request.timeoutMs;
     }
     if (request.signal !== undefined) clientRequest.signal = request.signal;
+    if (request.shutdownSignal !== undefined) {
+      clientRequest.shutdownSignal = request.shutdownSignal;
+    }
     if (request.sessionId !== undefined) {
       clientRequest.sessionId = request.sessionId;
     }

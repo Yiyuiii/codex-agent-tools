@@ -9,7 +9,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { afterEach, describe, expect, it } from "vitest";
@@ -41,6 +41,8 @@ import {
 } from "../../src/qualification/lock.js";
 import { terminateProcessTree } from "../../src/runtime/process-tree.js";
 import type { ExternalReviewResult } from "../../src/tasks/results.js";
+import { spawnWindowsOwnedAgentProcessWithDependencies } from "../../src/runtime/windows-owned-agent-process.js";
+import { resolveWindowsJobHelperForModule } from "../../src/runtime/windows-job-helper.js";
 import {
   ExternalAgentService,
   type TaskExecutionContext,
@@ -52,6 +54,14 @@ const fakeKimiPath = fileURLToPath(
 const fakePiPath = fileURLToPath(
   new URL("../fakes/fake-pi-rpc.mjs", import.meta.url),
 );
+const repositoryRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+);
+const syntheticDistModuleUrl = pathToFileURL(
+  path.join(repositoryRoot, "dist", "stdio-process-cleanup-test.mjs"),
+).href;
 const tempPrefix = "codex-agent-stdio-cleanup-test-";
 const tempDirectories: string[] = [];
 const ownedPids: number[] = [];
@@ -859,6 +869,15 @@ describe("MCP stdio owned-process cleanup", () => {
       let clientRequestHadRetryOverride = false;
       const adapter = new PiAdapter({
         locateExecutable: async () => process.execPath,
+        locateInvocation: async () => ({
+          executable: process.execPath,
+          argvPrefix: [fakePiPath],
+          identity: {
+            packageName: "@earendil-works/pi-coding-agent",
+            packageVersion: "0.80.10",
+            nodeEngine: ">=20.0.0",
+          },
+        }),
         buildConfig: async () => testConfig,
         runClient: async (request) => {
           adapterClientInvocationCount += 1;
@@ -866,17 +885,30 @@ describe("MCP stdio owned-process cleanup", () => {
           clientRequestHadRetryOverride =
             Object.hasOwn(request, "autoRetry") ||
             Object.hasOwn(request, "autoCompaction");
-          clientResult = await runPiRpc({
-            ...request,
-            executableArgs: [fakePiPath],
-            environment: {
-              ...request.environment,
-              FAKE_PI_SCENARIO: "hold",
-              FAKE_PI_LOG: logPath,
-              FAKE_PI_ROOT_PID_FILE: rootPidPath,
-              FAKE_PI_CHILD_PID_FILE: childPidPath,
+          clientResult = await runPiRpc(
+            {
+              ...request,
+              executableArgs: request.executableArgs ?? [fakePiPath],
+              environment: {
+                ...request.environment,
+                FAKE_PI_SCENARIO: "hold",
+                FAKE_PI_LOG: logPath,
+                FAKE_PI_ROOT_PID_FILE: rootPidPath,
+                FAKE_PI_CHILD_PID_FILE: childPidPath,
+              },
             },
-          });
+            process.platform === "win32"
+              ? {
+                  spawnOwnedAgentProcess: (launch) =>
+                    spawnWindowsOwnedAgentProcessWithDependencies(launch, {
+                      resolveHelper: () =>
+                        resolveWindowsJobHelperForModule(
+                          syntheticDistModuleUrl,
+                        ),
+                    }),
+                }
+              : {},
+          );
           const [rootPid, childPid] = await Promise.all([
             readPid(rootPidPath),
             readPid(childPidPath),
