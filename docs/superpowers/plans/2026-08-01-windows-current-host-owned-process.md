@@ -185,13 +185,15 @@ git diff --check
 
 **第二子批状态（2026-08-01，已完成）：** 提交`564bbcb`在工具handler构造前执行factory式准入；首次stdio/signal/显式close同步关闭准入并以固定`session_shutdown` abort独立signal，然后才关闭server、drain既有任务和清理listener。SDK request abort仍为独立signal，service已把两者原样传给adapter；关闭后不得晚启handler/service。未使用`output`已机械删除，无client行为或timeout变化。主线程73/73、fresh复审79/79、类型与diff通过。下一子批由Kimi/Pi client消费该shutdown signal并把reason精确映射到owned termination。
 
-**第三子批状态（2026-08-02，clients已完成）：** 提交`a81e3fa`与`d2030b4`让Kimi/Pi的Windows client只通过`OwnedAgentProcess`运行；成功路径结束协议stdin并只接受自然`root_exit`且code 0，caller取消、显式调用级deadline与stdio shutdown分别锁存reason并请求一次Job终止，内部协议/decoder/business失败则立即以内部cleanup reason drain但公开保持`failed`。两条client都在spawner pending窗口、pre-READY、应用层cancel/abort写入永不settle、自然退出竞态、helper/closed/drain失败和spawn失败上fail closed；只有应用层取消写入是best effort，私有Job控制通道从不等待它。Windows测试不读取PID，POSIX旧direct spawn/process-group路径保留。三轮交叉审阅依次修复了预中止晚启、READY/pipe write挂死、协议失败误走成功EOF、Pi incomplete JSONL漏报、abort response伪诊断、POSIX pending未拒绝和nonzero root误判成功；最终Kimi 19/19、Pi 46 passed / 1 POSIX-only skipped，主线程类型与diff通过。adapter consumer、doctor/smoke/preflight与scanner删除仍待后续子批。
+**第三子批状态（2026-08-02，clients已完成）：** 提交`a81e3fa`与`d2030b4`让Kimi/Pi的Windows client只通过`OwnedAgentProcess`运行；成功路径结束协议stdin并只接受自然`root_exit`且code 0，caller取消、显式调用级deadline与stdio shutdown分别锁存reason并请求一次Job终止，内部协议/decoder/business失败则立即以内部cleanup reason drain但公开保持`failed`。两条client都在spawner pending窗口、pre-READY、应用层cancel/abort写入永不settle、自然退出竞态、helper/closed/drain失败和spawn失败上fail closed；只有应用层取消写入是best effort，私有Job控制通道从不等待它。Windows测试不读取PID，POSIX旧direct spawn/process-group路径保留。三轮交叉审阅依次修复了预中止晚启、READY/pipe write挂死、协议失败误走成功EOF、Pi incomplete JSONL漏报、abort response伪诊断、POSIX pending未拒绝和nonzero root误判成功；最终Kimi 19/19、Pi 46 passed / 1 POSIX-only skipped，主线程类型与diff通过。
+
+**第四子批状态（2026-08-02，adapter、telemetry与doctor已完成）：** 提交`10da9dc`让adapter传递独立shutdown signal，Windows Pi只接受经校验的`process.execPath + 单一绝对CLI入口`，凭据脱敏值从最终child environment提取；提交`e422ce5`增加`ownedProcessDrained?: true`，它只在本次Windows Job的`closed`成功证明`ownershipDrained === true`后出现，业务失败与排空事实保持正交，POSIX/no-spawn/closed失败不误报；提交`52be40e`把doctor改为targetless当前宿主静态诊断，仅对严格helper执行一次无凭据`--probe-v1`，并让MCP注册、doctor和npm acceptance共用唯一静态工具定义。独立复审修复了Windows验收接受伪Linux `not applicable`、工具硬编码伪绿、Ark负例只命中hash drift及helper路径泄漏；最终adapter/stdio聚焦25/25、telemetry 66 passed / 1 POSIX-only skipped、doctor/MCP/acceptance 30/30与类型/diff通过。smoke/preflight、qualification新schema、scanner删除及public acceptance遗留仍待后续子批。
 
 ### 7.1 RED
 
 - Kimi/Pi Windows路径仍依赖direct spawn、PID terminator或`pi.cmd`执行的合同测试先失败；
 - Pi locator尚不能从当前安装解析/验证package name/version/bin/realpath/engine并返回结构化`PiInvocation`；
-- adapter、doctor、`src/smoke/pi.ts`版本读取、qualification preflight和隔离/公共验收消费者仍把Pi locator当作字符串，尚未统一拼接`argvPrefix`；
+- `src/smoke/pi.ts`版本读取、qualification preflight和隔离/公共验收消费者仍有旧字符串locator或直接target探针，尚未收敛为结构化invocation或删除冗余探针；
 - stdio真实fake链尚不能证明handler/session只在owned tree归零后settle；
 - qualification preflight/coordinator/lock recovery与公共npm验收仍通过`src/runtime/agent-processes.ts`调用WMI/`ps`，把全机Kimi/Pi/real-smoke为零当作本case成功或恢复条件；无关外部CLI/旧插件会被误判为泄漏，现行current preflight仍生成该全机计数字段。
 
@@ -199,7 +201,7 @@ git diff --check
 
 - Kimi locator返回绝对`kimi.exe`并由`OwnedAgentProcess`启动。
 - Pi locator可用shim做发现但绝不执行或解析shim命令文本；Windows `PI_COMMAND`只作可验证package位置锚点，拒绝任意可执行覆盖。返回结构化`PiInvocation { executable: process.execPath, argvPrefix: [cliJsRealpath], identity }`并验证name/version/bin/engine/realpath。
-- adapter、doctor、`src/smoke/pi.ts`、qualification preflight及隔离/公共验收测试全部消费结构化invocation，在各自参数前拼接`argvPrefix`；Windows上的Kimi/Pi `--version`和其它只读诊断也必须走`OwnedAgentProcess`，不得保留direct `execa`旁路；POSIX行为不漂移。
+- adapter和需要真实启动目标的consumer消费结构化invocation并拼接`argvPrefix`；doctor与smoke的冗余Kimi/Pi `--version`/诊断探针直接删除，doctor只做严格locator、配置与native helper静态诊断。任何仍必要的Windows目标启动都必须走`OwnedAgentProcess`，不得保留direct `execa`旁路；POSIX最小回归不漂移。
 - 删除production `.cmd/.bat`、`cmd.exe`、shell quoting和Windows PID tree cleanup。
 - 两个client只在READY后发协议请求；取消先发送ACP/RPC原生cancel/abort，再走一次owned terminate。
 - 省略`timeoutMs`不创建deadline；显式timeout只属于该次调用；finally等待owned close无总截止。
