@@ -259,8 +259,8 @@ namespace CodexAgentTools.HostAcceptance
             var markerDirectory = RequireDirectory(Path.Combine(sessionRoot, "completion-markers"));
             var completionMarkerPath = Path.Combine(markerDirectory, descriptor.Request.CompletionMarkerId + ".marker");
             var receiptPath = Path.Combine(sessionRoot, "host-acceptance-receipt.v1.json");
-            RejectExistingOutput(completionMarkerPath);
-            RejectExistingOutput(receiptPath);
+            RequireOutputAbsent(completionMarkerPath);
+            RequireOutputAbsent(receiptPath);
 
             var binding = new HostAcceptanceBinding(
                 descriptor.Nonce,
@@ -455,11 +455,41 @@ namespace CodexAgentTools.HostAcceptance
             }
         }
 
-        private static void RejectExistingOutput(string path)
+        internal static void RequireOutputAbsent(string path)
         {
-            if (!File.Exists(path) && !Directory.Exists(path)) return;
-            EnsureNoReparse(path);
-            throw new ProtocolException();
+            try
+            {
+                if (string.IsNullOrEmpty(path) || path.IndexOf('\0') >= 0 || !Path.IsPathRooted(path))
+                {
+                    throw new ProtocolException();
+                }
+                var full = Path.GetFullPath(path);
+                var parent = Path.GetDirectoryName(full);
+                if (string.IsNullOrEmpty(parent)) throw new ProtocolException();
+                RequireDirectory(parent);
+                try
+                {
+                    File.GetAttributes(full);
+                }
+                catch (FileNotFoundException)
+                {
+                    RequireDirectory(parent);
+                    return;
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    throw new ProtocolException();
+                }
+                throw new ProtocolException();
+            }
+            catch (ProtocolException)
+            {
+                throw;
+            }
+            catch
+            {
+                throw new ProtocolException();
+            }
         }
     }
 }

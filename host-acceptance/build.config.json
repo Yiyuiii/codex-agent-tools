@@ -9,6 +9,7 @@
     "production": [
       "src/AcceptanceState.cs",
       "src/ObserverProtocol.cs",
+      "src/ObserverSession.cs",
       "src/ProcessChain.cs",
       "src/Program.cs",
       "src/ReceiptWriter.cs",

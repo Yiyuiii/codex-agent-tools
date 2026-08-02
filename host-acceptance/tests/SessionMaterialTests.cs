@@ -181,6 +181,21 @@ namespace CodexAgentTools.HostAcceptance.Tests
                     File.ReadAllText(existingPath, Encoding.UTF8),
                     "Rejecting a preexisting receipt must not alter it.");
             }
+
+            using (var fixture = MaterialFixture.Create())
+            {
+                var existingPath = Path.Combine(
+                    fixture.SessionRoot,
+                    "completion-markers",
+                    MaterialFixture.MarkerId + ".marker");
+                Directory.CreateDirectory(existingPath);
+                TestAssert.Throws<ProtocolException>(
+                    () => SessionMaterials.Load(fixture.RepositoryRoot, fixture.LocalAppData, fixture.DescriptorBytes),
+                    "A directory or reparse-style collision at the marker path must not be mistaken for absence.");
+                TestAssert.True(
+                    Directory.Exists(existingPath),
+                    "Rejecting a path collision must not alter the preexisting entry.");
+            }
         }
 
         private sealed class MaterialFixture : IDisposable

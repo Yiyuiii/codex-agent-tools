@@ -383,6 +383,7 @@ $managedTestRelative = @(
     "tests/BuildContractTests.cs",
     "tests/HashReceiptTests.cs",
     "tests/ManagedTestRunner.cs",
+    "tests/ObserverSessionTests.cs",
     "tests/ReceiptWriterTests.cs",
     "tests/SessionMaterialTests.cs",
     "tests/StateMachineTests.cs",
@@ -390,17 +391,29 @@ $managedTestRelative = @(
     "tests/TestAssert.cs"
 )
 $kernelTestRelative = @(
+    "tests/KernelObserverSessionTests.cs",
     "tests/KernelTestRunner.cs",
     "tests/KernelTests.cs",
     "tests/TestAssert.cs"
 )
 $fixtureRelative = "tests/ProcessFixture.cs"
+$nodePipeCloseFixtureRelative = "tests/node-pipe-close-fixture.mjs"
 $selectedTestRelative = if ($Action -ceq "test-managed") { $managedTestRelative } else { $kernelTestRelative }
 $testSources = @($selectedTestRelative | ForEach-Object {
     Resolve-RepositoryFile -RepositoryRoot $hostRoot -RelativePath $_
 })
 $fixtureSource = if ($Action -ceq "test-kernel") {
     Resolve-RepositoryFile -RepositoryRoot $hostRoot -RelativePath $fixtureRelative
+} else { $null }
+$nodePipeCloseFixture = if ($Action -ceq "test-kernel") {
+    Resolve-RepositoryFile -RepositoryRoot $hostRoot -RelativePath $nodePipeCloseFixtureRelative
+} else { $null }
+$nodeExecutable = if ($Action -ceq "test-kernel") {
+    $nodeCommand = Get-Command node -CommandType Application -ErrorAction Stop | Select-Object -First 1
+    if ($null -eq $nodeCommand -or [string]::IsNullOrEmpty($nodeCommand.Source)) {
+        throw "host-acceptance: current-host Node executable is unavailable"
+    }
+    Assert-NoReparseExistingPath -Path $nodeCommand.Source
 } else { $null }
 $temporaryBase = Join-Path ([System.IO.Path]::GetTempPath()) "codex-agent-tools\host-acceptance\build-v1"
 [void][System.IO.Directory]::CreateDirectory($temporaryBase)
@@ -472,7 +485,7 @@ try {
     Push-Location $repositoryRoot
     try {
         if ($Action -ceq "test-kernel") {
-            & $testExecutable $fixtureExecutable
+            & $testExecutable $fixtureExecutable $nodeExecutable $nodePipeCloseFixture
         }
         else {
             & $testExecutable

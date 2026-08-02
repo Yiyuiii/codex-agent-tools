@@ -107,7 +107,7 @@ namespace CodexAgentTools.HostAcceptance.Tests
             machine.Observe(new InflightRemovedFrame(Nonce, 5, "string", HashReceiptTests.Digest('d')), At(16));
         }
 
-        private static RequestStartedFrame RequestStarted()
+        internal static RequestStartedFrame RequestStarted()
         {
             return new RequestStartedFrame(
                 Nonce, 1, "string", HashReceiptTests.Digest('d'), HashReceiptTests.Digest('8'),
@@ -119,7 +119,7 @@ namespace CodexAgentTools.HostAcceptance.Tests
             return new HelloFrame(Nonce, 0, HashReceiptTests.Digest('7'), FixtureBinding().PublicBeta, 42, "codex-agent-tools", "0.2.0-beta.1");
         }
 
-        private static HostAcceptanceBinding FixtureBinding()
+        internal static HostAcceptanceBinding FixtureBinding()
         {
             var observer = new ObserverArtifactIdentity(
                 ProtocolV1.ObserverPath,
@@ -143,17 +143,17 @@ namespace CodexAgentTools.HostAcceptance.Tests
                 HashReceiptTests.Digest('8'), MarkerId, HashReceiptTests.Digest('9'));
         }
 
-        private static ProcessIdentity Process(char digest, int millisecond)
+        internal static ProcessIdentity Process(char digest, int millisecond)
         {
             return new ProcessIdentity(HashReceiptTests.Digest(digest), At(millisecond));
         }
 
-        private static DateTime At(int millisecond)
+        internal static DateTime At(int millisecond)
         {
             return new DateTime(2026, 8, 2, 0, 0, 0, DateTimeKind.Utc).AddMilliseconds(millisecond);
         }
 
-        private const string Nonce = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG";
-        private const string MarkerId = "completion_marker_01";
+        internal const string Nonce = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG";
+        internal const string MarkerId = "completion_marker_01";
     }
 }

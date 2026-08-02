@@ -8,7 +8,7 @@ namespace CodexAgentTools.HostAcceptance.Tests
     {
         private static int Main(string[] args)
         {
-            if (args.Length != 1 || !Path.IsPathRooted(args[0]))
+            if (args.Length != 3 || !Path.IsPathRooted(args[0]) || !Path.IsPathRooted(args[1]) || !Path.IsPathRooted(args[2]))
             {
                 Console.Error.WriteLine("host-acceptance: invalid kernel fixture");
                 return 64;
@@ -22,7 +22,10 @@ namespace CodexAgentTools.HostAcceptance.Tests
             {
                 try
                 {
-                    var cases = KernelTests.Run(Path.GetFullPath(args[0]));
+                    var cases = KernelTests.Run(
+                        Path.GetFullPath(args[0]),
+                        Path.GetFullPath(args[1]),
+                        Path.GetFullPath(args[2]));
                     Console.WriteLine("host-acceptance kernel tests: " + cases + " passed");
                     return 0;
                 }

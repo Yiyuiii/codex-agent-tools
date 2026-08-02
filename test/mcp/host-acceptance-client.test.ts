@@ -14,6 +14,7 @@ import {
   type LoadedHostAcceptanceDescriptor,
 } from "../../src/mcp/host-acceptance-descriptor.js";
 import {
+  createHostAcceptanceSocketCloser,
   createHostAcceptanceEventClient,
   type HostAcceptancePipeTransport,
 } from "../../src/mcp/host-acceptance-client.js";
@@ -538,6 +539,89 @@ describe("host acceptance event client", () => {
     expect(transport.close).toHaveBeenCalledOnce();
   });
 
+  it("drains a terminal request whose connector resolves after INFLIGHT_REMOVED and global shutdown", async () => {
+    let resolveConnection!: (transport: HostAcceptancePipeTransport) => void;
+    const connection = new Promise<HostAcceptancePipeTransport>((resolve) => {
+      resolveConnection = resolve;
+    });
+    const frames: Uint8Array[] = [];
+    const transport: HostAcceptancePipeTransport = {
+      write: vi.fn(async (frame) => {
+        frames.push(frame);
+      }),
+      close: vi.fn(async () => undefined),
+    };
+    const client = createHostAcceptanceEventClient({
+      platform: "win32",
+      processId: 82,
+      loadDescriptor: vi.fn(async () => loadedDescriptor()),
+      connect: vi.fn(() => connection),
+    });
+
+    const sink = await client.openRequest("delegate", ACCEPTANCE_INPUT);
+    sink?.(requestEvent());
+    sink?.(laterEvent("sdkAbort"));
+    sink?.(ownedEvent());
+    sink?.(laterEvent("handlerCancelled"));
+    sink?.(laterEvent("inFlightRemoved"));
+    client.shutdown();
+
+    resolveConnection(transport);
+    await client.settled();
+
+    expect(transport.close).toHaveBeenCalledOnce();
+    expect(
+      (decodeFrames(frames) as Array<{ type: string }>).map(({ type }) => type),
+    ).toEqual([
+      "HELLO",
+      "REQUEST_STARTED",
+      "REQUEST_ABORTED",
+      "OWNED_EXIT",
+      "HANDLER_CANCELLED",
+      "INFLIGHT_REMOVED",
+    ]);
+  });
+
+  it("waits for the real pipe close when an event overflow fails the session", async () => {
+    let releaseClose!: () => void;
+    const closeGate = new Promise<void>((resolve) => {
+      releaseClose = resolve;
+    });
+    const frames: Uint8Array[] = [];
+    const transport: HostAcceptancePipeTransport = {
+      write: vi.fn(async (frame) => {
+        frames.push(frame);
+      }),
+      close: vi.fn(() => closeGate),
+    };
+    const client = createHostAcceptanceEventClient({
+      platform: "win32",
+      processId: 83,
+      loadDescriptor: vi.fn(async () => loadedDescriptor()),
+      connect: vi.fn(async () => transport),
+    });
+
+    const sink = await client.openRequest("delegate", ACCEPTANCE_INPUT);
+    await vi.waitFor(() => expect(frames).toHaveLength(1));
+    sink?.(requestEvent());
+    for (let index = 0; index < 16; index += 1) {
+      sink?.(laterEvent("sdkAbort"));
+    }
+
+    const settling = client.settled();
+    const outcome = await Promise.race([
+      settling.then(() => "settled" as const),
+      new Promise<"pending">((resolve) =>
+        setImmediate(() => resolve("pending")),
+      ),
+    ]);
+
+    expect(transport.close).toHaveBeenCalledOnce();
+    expect(outcome).toBe("pending");
+    releaseClose();
+    await settling;
+  });
+
   it("does not connect when shutdown wins while the fixed descriptor read is pending", async () => {
     let resolveDescriptor!: (
       descriptor: LoadedHostAcceptanceDescriptor | undefined,
@@ -566,10 +650,14 @@ describe("host acceptance event client", () => {
   it("serializes HELLO and one matched request with transport backpressure and ignores late events", async () => {
     const frames: Uint8Array[] = [];
     const releases: Array<() => void> = [];
+    let releaseClose!: () => void;
+    const closeGate = new Promise<void>((resolve) => {
+      releaseClose = resolve;
+    });
     let activeWrites = 0;
     let maximumActiveWrites = 0;
     const transport: HostAcceptancePipeTransport = {
-      close: vi.fn(),
+      close: vi.fn(() => closeGate),
       write: vi.fn((frame) => {
         frames.push(frame);
         activeWrites += 1;
@@ -595,18 +683,33 @@ describe("host acceptance event client", () => {
     sink?.(laterEvent("sdkAbort"));
     sink?.(ownedEvent());
     sink?.(laterEvent("handlerCancelled"));
+    sink?.(laterEvent("sdkAbort", SHA256_B));
+    sink?.(laterEvent("inFlightRemoved"));
     sink?.(laterEvent("inFlightRemoved"));
     sink?.(laterEvent("sdkAbort"));
 
-    await vi.waitFor(() => expect(frames).toHaveLength(1));
-    while (releases.length > 0 || frames.length < 6) {
+    for (let expectedFrames = 1; expectedFrames <= 6; expectedFrames += 1) {
+      await vi.waitFor(() => expect(frames).toHaveLength(expectedFrames));
+      expect(transport.close).not.toHaveBeenCalled();
+      if (expectedFrames === 6) break;
       releases.shift()?.();
-      await new Promise<void>((resolve) => setImmediate(resolve));
     }
+
+    const settling = client.settled();
+    let settled = false;
+    void settling.then(() => {
+      settled = true;
+    });
+    expect(settled).toBe(false);
+
     releases.shift()?.();
-    await client.settled();
+    await vi.waitFor(() => expect(transport.close).toHaveBeenCalledOnce());
+    expect(settled).toBe(false);
+    releaseClose();
+    await settling;
 
     expect(maximumActiveWrites).toBe(1);
+    expect(transport.close).toHaveBeenCalledOnce();
     const decoded = decodeFrames(frames) as Array<Record<string, unknown>>;
     expect(decoded.map(({ type }) => type)).toEqual([
       "HELLO",
@@ -671,17 +774,121 @@ describe("host acceptance event client", () => {
       sink?.(requestEvent(SHA256_A));
       sink?.(laterEvent("sdkAbort", SHA256_A));
       sink?.(laterEvent("inFlightRemoved", SHA256_A));
-      client.shutdown();
       await client.settled();
       await new Promise<void>((resolve) => setImmediate(resolve));
 
       expect(loadDescriptor).toHaveBeenCalledTimes(2);
       expect(unhandled).toEqual([]);
+      expect(transport.close).toHaveBeenCalledOnce();
       const decoded = decodeFrames(frames) as Array<Record<string, unknown>>;
       expect(decoded.filter(({ type }) => type === "REQUEST_STARTED")).toHaveLength(1);
       expect(decoded.some(({ requestCorrelationSha256 }) => requestCorrelationSha256 === SHA256_B)).toBe(false);
     } finally {
       process.off("unhandledRejection", onUnhandled);
     }
+  });
+});
+
+describe("host acceptance socket terminal close", () => {
+  class FakeSocket {
+    destroyed = false;
+    closed = false;
+    readonly end = vi.fn(() => undefined);
+    readonly destroy = vi.fn(() => {
+      this.destroyed = true;
+    });
+    readonly #listeners = new Map<
+      string,
+      Set<(argument?: unknown) => void>
+    >();
+
+    on(event: "error", listener: (error: Error) => void): this {
+      const listeners = this.#listeners.get(event) ?? new Set();
+      listeners.add(listener as (argument?: unknown) => void);
+      this.#listeners.set(event, listeners);
+      return this;
+    }
+
+    once(event: "close", listener: () => void): this {
+      const wrapper = () => {
+        this.off(event, wrapper);
+        listener();
+      };
+      const listeners = this.#listeners.get(event) ?? new Set();
+      listeners.add(wrapper);
+      this.#listeners.set(event, listeners);
+      return this;
+    }
+
+    off(event: "error", listener: (error: Error) => void): this;
+    off(event: "close", listener: () => void): this;
+    off(
+      event: "close" | "error",
+      listener: ((error: Error) => void) | (() => void),
+    ): this {
+      this.#listeners
+        .get(event)
+        ?.delete(listener as (argument?: unknown) => void);
+      return this;
+    }
+
+    emit(event: "finish" | "close" | "error", ...arguments_: unknown[]): void {
+      for (const listener of [...(this.#listeners.get(event) ?? [])]) {
+        listener(arguments_[0]);
+      }
+    }
+  }
+
+  it("waits for close after finish or error and makes repeated close calls idempotent", async () => {
+    const socket = new FakeSocket();
+    const close = createHostAcceptanceSocketCloser(socket);
+
+    const first = close();
+    const second = close();
+    let settled = false;
+    void first.then(() => {
+      settled = true;
+    });
+
+    expect(second).toBe(first);
+    expect(socket.end).toHaveBeenCalledOnce();
+    socket.emit("finish");
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    socket.emit("error", new Error("terminal pipe error"));
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    socket.destroyed = true;
+    socket.closed = true;
+    socket.emit("close");
+    await first;
+    expect(settled).toBe(true);
+    expect(socket.end).toHaveBeenCalledOnce();
+  });
+
+  it("does not call end on destroyed sockets and still waits for their close event", async () => {
+    const socket = new FakeSocket();
+    socket.destroyed = true;
+    const close = createHostAcceptanceSocketCloser(socket);
+    const closing = close();
+    let settled = false;
+    void closing.then(() => {
+      settled = true;
+    });
+
+    await Promise.resolve();
+    expect(socket.end).not.toHaveBeenCalled();
+    expect(settled).toBe(false);
+    socket.closed = true;
+    socket.emit("close");
+    await closing;
+    expect(settled).toBe(true);
+
+    const alreadyClosed = new FakeSocket();
+    alreadyClosed.destroyed = true;
+    alreadyClosed.closed = true;
+    await createHostAcceptanceSocketCloser(alreadyClosed)();
+    expect(alreadyClosed.end).not.toHaveBeenCalled();
   });
 });

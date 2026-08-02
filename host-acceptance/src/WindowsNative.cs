@@ -49,6 +49,8 @@ namespace CodexAgentTools.HostAcceptance
         private const uint ProcessQueryLimitedInformation = 0x00001000;
         private const uint Synchronize = 0x00100000;
         private const int ErrorPipeConnected = 535;
+        private const int ErrorBrokenPipe = 109;
+        private const int ErrorNoData = 232;
         private const uint DaclSecurityInformation = 0x00000004;
         private const int SeKernelObject = 6;
         private const ushort SeDaclProtected = 0x1000;
@@ -290,6 +292,19 @@ namespace CodexAgentTools.HostAcceptance
             return creation.Value;
         }
 
+        internal static ulong GetProcessExitFileTime(SafeKernelObjectHandle process)
+        {
+            NativeFileTime creation;
+            NativeFileTime exit;
+            NativeFileTime kernel;
+            NativeFileTime user;
+            if (!GetProcessTimes(process, out creation, out exit, out kernel, out user) || exit.Value == 0)
+            {
+                throw new InvalidOperationException("host_acceptance_process_times_failed");
+            }
+            return exit.Value;
+        }
+
         internal static uint GetDirectParentProcessId(SafeKernelObjectHandle child)
         {
             var information = new ProcessBasicInformation64();
@@ -325,13 +340,39 @@ namespace CodexAgentTools.HostAcceptance
 
         internal static byte ReadPipeByte(SafeKernelObjectHandle pipe)
         {
-            var bytes = new byte[1];
-            uint read;
-            if (!ReadFile(pipe, bytes, 1, out read, IntPtr.Zero) || read != 1)
+            byte value;
+            if (!TryReadPipeByte(pipe, out value))
             {
                 throw new InvalidOperationException("host_acceptance_pipe_read_failed");
             }
-            return bytes[0];
+            return value;
+        }
+
+        internal static bool TryReadPipeByte(SafeKernelObjectHandle pipe, out byte value)
+        {
+            var bytes = new byte[1];
+            uint read;
+            if (ReadFile(pipe, bytes, 1, out read, IntPtr.Zero))
+            {
+                if (read == 1)
+                {
+                    value = bytes[0];
+                    return true;
+                }
+                if (read == 0)
+                {
+                    value = 0;
+                    return false;
+                }
+                throw new InvalidOperationException("host_acceptance_pipe_read_failed");
+            }
+            var error = Marshal.GetLastWin32Error();
+            if (error == ErrorBrokenPipe || error == ErrorNoData)
+            {
+                value = 0;
+                return false;
+            }
+            throw new InvalidOperationException("host_acceptance_pipe_read_failed");
         }
 
         internal static void WritePipeByte(SafeKernelObjectHandle pipe, byte value)

@@ -46,6 +46,18 @@ namespace CodexAgentTools.HostAcceptance
             WindowsNative.WaitForProcessExit(handle);
         }
 
+        internal ProcessIdentity Snapshot()
+        {
+            return new ProcessIdentity(IdentitySha256, CreatedAt);
+        }
+
+        internal ExitedProcessIdentity SnapshotExited()
+        {
+            if (!IsExited) throw new InvalidOperationException("host_acceptance_process_not_exited");
+            var exitFileTime = WindowsNative.GetProcessExitFileTime(handle);
+            return new ExitedProcessIdentity(Snapshot(), DateTime.FromFileTimeUtc(checked((long)exitFileTime)));
+        }
+
         internal static string ComputeIdentitySha256(uint processId, ulong creationFileTime)
         {
             var input = new byte[12];
@@ -126,6 +138,20 @@ namespace CodexAgentTools.HostAcceptance
             Grandparent.WaitForExit();
         }
 
+        internal HostChain Snapshot()
+        {
+            return new HostChain(Grandparent.Snapshot(), Parent.Snapshot(), Peer.Snapshot());
+        }
+
+        internal ExitedHostChain WaitForActualExits()
+        {
+            WaitForExit();
+            return new ExitedHostChain(
+                Grandparent.SnapshotExited(),
+                Parent.SnapshotExited(),
+                Peer.SnapshotExited());
+        }
+
         public void Dispose()
         {
             Peer.Dispose();
@@ -139,6 +165,7 @@ namespace CodexAgentTools.HostAcceptance
         private static readonly Regex PipeNamePattern = new Regex(ProtocolV1.PipeNamePattern, RegexOptions.CultureInvariant);
         private readonly SafeKernelObjectHandle pipe;
         private bool connected;
+        private bool disposed;
 
         private CurrentUserNamedPipeServer(string pipePath, SafeKernelObjectHandle pipe)
         {
@@ -150,10 +177,7 @@ namespace CodexAgentTools.HostAcceptance
 
         internal static CurrentUserNamedPipeServer Create(string pipeName)
         {
-            if (string.IsNullOrEmpty(pipeName) || pipeName.Length > 128 || !PipeNamePattern.IsMatch(pipeName))
-            {
-                throw new ProtocolException();
-            }
+            ProtocolValues.ExactMatch(pipeName, PipeNamePattern, 128);
             var pipePath = "\\\\.\\pipe\\" + pipeName;
             return new CurrentUserNamedPipeServer(pipePath, WindowsNative.CreateCurrentUserPipe(pipePath));
         }
@@ -177,6 +201,12 @@ namespace CodexAgentTools.HostAcceptance
             return WindowsNative.ReadPipeByte(pipe);
         }
 
+        internal bool TryReadClientByte(out byte value)
+        {
+            if (!connected) throw new InvalidOperationException("host_acceptance_pipe_not_connected");
+            return WindowsNative.TryReadPipeByte(pipe, out value);
+        }
+
         internal void WriteClientByte(byte value)
         {
             if (!connected) throw new InvalidOperationException("host_acceptance_pipe_not_connected");
@@ -185,6 +215,8 @@ namespace CodexAgentTools.HostAcceptance
 
         public void Dispose()
         {
+            if (disposed) return;
+            disposed = true;
             if (connected) WindowsNative.DisconnectPipe(pipe);
             pipe.Dispose();
         }

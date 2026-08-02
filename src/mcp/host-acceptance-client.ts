@@ -61,12 +61,18 @@ function frameBytes(frame: WireFrame): Uint8Array {
   return bytes;
 }
 
-function bestEffortClose(transport: HostAcceptancePipeTransport): void {
+function bestEffortClose(
+  transport: HostAcceptancePipeTransport,
+): Promise<void> {
   try {
     const result = transport.close();
-    if (result !== undefined) void Promise.resolve(result).catch(() => undefined);
+    return Promise.resolve(result).then(
+      () => undefined,
+      () => undefined,
+    );
   } catch {
     // The evidence side channel cannot alter the public task result.
+    return Promise.resolve();
   }
 }
 
@@ -75,12 +81,11 @@ class SessionAttempt {
   #transport: HostAcceptancePipeTransport | undefined;
   #tail: Promise<void>;
   #failed = false;
-  #closed = false;
+  #terminal: "open" | "graceful" | "abortive" = "open";
   #claimed = false;
   #eventCount = 0;
   #sequence = 1;
-  #helloSent = false;
-  #transportClosed = false;
+  #closing: Promise<void> | undefined;
 
   constructor(
     descriptor: LoadedHostAcceptanceDescriptor,
@@ -107,8 +112,8 @@ class SessionAttempt {
     this.#tail = connection
       .then(async (transport) => {
         this.#transport = transport;
-        if (this.#failed || this.#closed) {
-          this.#closeTransport();
+        if (this.#failed || this.#terminal === "abortive") {
+          await this.#closeTransport();
           return;
         }
         await transport.write(
@@ -127,10 +132,9 @@ class SessionAttempt {
             }),
           }),
         );
-        this.#helloSent = true;
       })
       .catch(() => {
-        this.#fail();
+        return this.#fail();
       });
   }
 
@@ -139,15 +143,15 @@ class SessionAttempt {
   }
 
   claim(): boolean {
-    if (this.#claimed || this.#failed || this.#closed) return false;
+    if (this.#claimed || this.#failed || this.#terminal !== "open") return false;
     this.#claimed = true;
     return true;
   }
 
   enqueue(frame: PartialWireFrame): void {
-    if (this.#failed || this.#closed) return;
+    if (this.#failed || this.#terminal !== "open") return;
     if (this.#eventCount >= HOST_ACCEPTANCE_MAXIMUM_EVENTS_PER_CONNECTION) {
-      this.#fail();
+      void this.#fail();
       return;
     }
     this.#eventCount += 1;
@@ -163,40 +167,53 @@ class SessionAttempt {
         if (
           this.#failed ||
           this.#transport === undefined ||
-          (this.#closed && !this.#helloSent)
+          this.#terminal === "abortive"
         ) {
           return;
         }
         await this.#transport.write(frameBytes(wire));
       })
       .catch(() => {
-        this.#fail();
+        return this.#fail();
       });
   }
 
-  shutdown(): void {
-    if (this.#failed || this.#closed) return;
-    this.#closed = true;
+  finish(): void {
+    if (this.#failed || this.#terminal !== "open") return;
+    this.#terminal = "graceful";
     this.#tail = this.#tail.finally(() => {
-      this.#closeTransport();
+      return this.#closeTransport();
+    });
+    void this.#tail.catch(() => undefined);
+  }
+
+  abort(): void {
+    if (this.#failed || this.#terminal !== "open") return;
+    this.#terminal = "abortive";
+    this.#tail = this.#tail.finally(() => {
+      return this.#closeTransport();
     });
     void this.#tail.catch(() => undefined);
   }
 
   settled(): Promise<void> {
-    return this.#tail.then(() => undefined, () => undefined);
+    return this.#tail
+      .then(() => undefined, () => undefined)
+      .then(() => this.#closing ?? Promise.resolve())
+      .then(() => undefined, () => undefined);
   }
 
-  #fail(): void {
-    if (this.#failed) return;
+  #fail(): Promise<void> {
+    if (this.#failed) return Promise.resolve();
     this.#failed = true;
-    this.#closeTransport();
+    this.#terminal = "abortive";
+    return this.#closeTransport();
   }
 
-  #closeTransport(): void {
-    if (this.#transport === undefined || this.#transportClosed) return;
-    this.#transportClosed = true;
-    bestEffortClose(this.#transport);
+  #closeTransport(): Promise<void> {
+    if (this.#transport === undefined) return Promise.resolve();
+    this.#closing ??= bestEffortClose(this.#transport);
+    return this.#closing;
   }
 }
 
@@ -259,6 +276,7 @@ function requestSink(
             requestIdType: event.requestIdType,
             requestCorrelationSha256: event.requestIdSha256,
           });
+          session.finish();
           removed = true;
           break;
       }
@@ -323,11 +341,76 @@ export function createHostAcceptanceEventClient(options: {
     shutdown() {
       if (closed) return;
       closed = true;
-      for (const session of attempts.values()) session.shutdown();
+      for (const session of attempts.values()) session.abort();
     },
     async settled() {
       await Promise.all([...attempts.values()].map((session) => session.settled()));
     },
+  };
+}
+
+export interface HostAcceptanceSocketCloseTarget {
+  readonly destroyed: boolean;
+  readonly closed: boolean;
+  end(): unknown;
+  destroy(): unknown;
+  on(event: "error", listener: (error: Error) => void): unknown;
+  once(event: "close", listener: () => void): unknown;
+  off(event: "error", listener: (error: Error) => void): unknown;
+  off(event: "close", listener: () => void): unknown;
+}
+
+export function createHostAcceptanceSocketCloser(
+  socket: HostAcceptanceSocketCloseTarget,
+): () => Promise<void> {
+  let closing: Promise<void> | undefined;
+  return () => {
+    if (closing !== undefined) return closing;
+    closing = new Promise<void>((resolve, reject) => {
+      if (socket.closed) {
+        resolve();
+        return;
+      }
+
+      let terminal = false;
+      const onError = () => {
+        // A socket error is not terminal until the corresponding close event.
+      };
+      const onClose = () => {
+        if (terminal) return;
+        terminal = true;
+        socket.off("error", onError);
+        socket.off("close", onClose);
+        resolve();
+      };
+      const rejectClose = (error: unknown) => {
+        if (terminal) return;
+        terminal = true;
+        socket.off("error", onError);
+        socket.off("close", onClose);
+        reject(error);
+      };
+
+      socket.on("error", onError);
+      socket.once("close", onClose);
+      if (socket.closed) {
+        onClose();
+        return;
+      }
+      if (socket.destroyed) return;
+
+      try {
+        socket.end();
+      } catch (error) {
+        try {
+          socket.destroy();
+          if (socket.closed) onClose();
+        } catch (destroyError) {
+          rejectClose(destroyError ?? error);
+        }
+      }
+    });
+    return closing;
   };
 }
 
@@ -348,6 +431,7 @@ function connectNamedPipe(pipePath: string): Promise<HostAcceptancePipeTransport
     });
     socket.once("connect", () => {
       connected = true;
+      const close = createHostAcceptanceSocketCloser(socket);
       resolve({
         write(frame) {
           if (terminalError !== undefined || socket.destroyed) {
@@ -366,9 +450,7 @@ function connectNamedPipe(pipePath: string): Promise<HostAcceptancePipeTransport
             }
           });
         },
-        close() {
-          socket.end();
-        },
+        close,
       });
     });
   });
