@@ -241,12 +241,9 @@ function freezeReceipt(
       dotNetFrameworkRelease: "528040",
     },
     checks: {
-      deterministicTests: "passed",
       nativePreflight: "passed",
       nativeVerify: "passed",
       observerVerify: "passed",
-      pluginIsolated: "passed",
-      packageDryRun: "passed",
       capabilityEvidenceValidCount: 8,
       prequalificationStaleCount: staleCount,
       realModelCalls: 0,
@@ -632,16 +629,7 @@ describe("strict release validation marker", () => {
 });
 
 describe("release receipts", () => {
-  it("binds all eight capability fingerprints and accepts stale count 0..8", () => {
-    expect(
-      assertCurrentHostFreezeReceipt(
-        freezeReceipt(core(), 0),
-        core(),
-        capabilities,
-        observerArtifact(),
-      )
-        .checks.prequalificationStaleCount,
-    ).toBe(0);
+  it("binds all eight capability fingerprints and requires all eight to be stale", () => {
     expect(
       assertCurrentHostFreezeReceipt(
         freezeReceipt(core(), 8),
@@ -651,7 +639,7 @@ describe("release receipts", () => {
       )
         .checks.prequalificationStaleCount,
     ).toBe(8);
-    for (const staleCount of [-1, 1.5, 9]) {
+    for (const staleCount of [0, 7, 9, 1.5]) {
       expect(() =>
         assertCurrentHostFreezeReceipt(
           freezeReceipt(core(), staleCount),

@@ -331,25 +331,23 @@ git diff --check
 ```powershell
 node --version
 node -p "process.versions.uv"
-npm run typecheck
-npx vitest run --maxWorkers=1
+npm --version
 npm run native:preflight
 npm run native:verify
-npm run acceptance:plugin:isolated -- --check-report
-npm pack --dry-run --json
+npm run observer:verify
 npm run verify:capabilities
 git diff --check
 ```
 
 这里的`verify:capabilities`在新真实8/8之前必须精确以exit 1失败。机器分析必须先完整证明8份历史证据仍有效，再证明8个已存schema1摘要均与current schema2 fingerprint不符；它不能从不可逆旧摘要反推八项历史上曾共享同一个旧digest。Task 8不得把该预期失败改写为PASS，也不重复运行必然失败的完整`smoke:release`。
 
+Task 8只冻结当前宿主特有事实。通用`typecheck`、确定性测试、隔离插件验收与精确pack闭包不再作为freeze自报字段重复运行：同一frozen SHA上的资格preflight仍会执行前三者，新的8/8写入后、beta tag前的`gate:offline`会执行完整release smoke并唯一一次真实pack。裸`npm pack --dry-run --json`本身不验证exact closure，而且资格证据随后会改变包内能力载荷，因此不属于prequalification freeze。
+
 本机证据必须记录：
 
-- 当前OS/Node/libuv/npm/CLR/Pi/Kimi身份，只作观测值；
-- helper实际SHA、单一独占临时根的source→artifact一致性与canonical runtime-input manifest/digest；
-- carrier与Task 4 kernel/parent/helper crash结果，以及Task 6最小fake Kimi/Pi/stdio接线结果；
-- 全部已知owned process/handle/temp root由各自case-owned Job drain归零，资格、恢复与公共npm验收没有调用WMI/`ps`全机zero gate；
-- 新current preflight不再生成`targetProcesses`，历史v1/v2记录仍可严格只读验证且没有任何历史manifest/evidence被改写；
+- 当前OS/Node/libuv/npm/CLR身份，只作观测值；
+- helper与observer实际SHA、各自确定性source→artifact验证，以及canonical runtime-input manifest/digest；
+- 当前宿主`native:preflight`、`native:verify`与`observer:verify`均通过；
 - 八项历史证据均有效，八个已存schema1摘要相对current schema2 fingerprint均为stale；
 - 真实模型、活动配置/插件、发布和外部CLI全局限制均为0。
 

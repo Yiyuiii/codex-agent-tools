@@ -114,13 +114,6 @@ function commandStage(request: QualificationPreflightCommandRequest): string {
     return "build";
   }
   if (
-    request.command === "npm" &&
-    request.args[0] === "run" &&
-    request.args[1] === "smoke:release:built"
-  ) {
-    return "release_smoke";
-  }
-  if (
     request.command === process.execPath &&
     request.args[0] === "scripts/plugin-isolated-acceptance.mjs" &&
     request.args[1] === "--check-report"
@@ -424,7 +417,6 @@ describe("qualification preflight", () => {
       "build",
       "typecheck",
       "test",
-      "release_smoke",
       "isolated_acceptance",
       "diff_check",
     ]);
@@ -448,6 +440,7 @@ describe("qualification preflight", () => {
           (args[0] === "test" ||
             (args[0] === "run" &&
               (args[1] === "smoke:release" ||
+                args[1] === "smoke:release:built" ||
                 args[1] === "acceptance:plugin:isolated"))),
       ),
     ).toBe(false);

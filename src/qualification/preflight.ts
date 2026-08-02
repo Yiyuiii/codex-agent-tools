@@ -61,7 +61,6 @@ export type QualificationPreflightStage =
   | "typecheck"
   | "test"
   | "build"
-  | "release_smoke"
   | "isolated_acceptance"
   | "diff_check"
   | "repository_final"
@@ -164,7 +163,6 @@ interface DeterministicCommand {
     | "typecheck"
     | "test"
     | "build"
-    | "release_smoke"
     | "isolated_acceptance"
     | "diff_check"
   >;
@@ -187,11 +185,6 @@ const DETERMINISTIC_COMMANDS: readonly DeterministicCommand[] = Object.freeze([
     stage: "test" as const,
     command: "npm",
     args: Object.freeze(["run", "test:deterministic"]),
-  }),
-  Object.freeze({
-    stage: "release_smoke" as const,
-    command: "npm",
-    args: Object.freeze(["run", "smoke:release:built"]),
   }),
   Object.freeze({
     stage: "isolated_acceptance" as const,

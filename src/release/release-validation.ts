@@ -782,14 +782,11 @@ export interface CurrentHostFreezeReceipt {
     dotNetFrameworkRelease: string;
   }>;
   readonly checks: Readonly<{
-    deterministicTests: "passed";
     nativePreflight: "passed";
     nativeVerify: "passed";
     observerVerify: "passed";
-    pluginIsolated: "passed";
-    packageDryRun: "passed";
     capabilityEvidenceValidCount: 8;
-    prequalificationStaleCount: number;
+    prequalificationStaleCount: 8;
     realModelCalls: 0;
     activeConfigAccesses: 0;
     activePluginChanges: 0;
@@ -844,12 +841,9 @@ export function assertCurrentHostFreezeReceipt(
     }
     const checks = plainRecord(record.checks);
     exactKeys(checks, [
-      "deterministicTests",
       "nativePreflight",
       "nativeVerify",
       "observerVerify",
-      "pluginIsolated",
-      "packageDryRun",
       "capabilityEvidenceValidCount",
       "prequalificationStaleCount",
       "realModelCalls",
@@ -858,16 +852,11 @@ export function assertCurrentHostFreezeReceipt(
       "publishes",
     ]);
     if (
-      checks.deterministicTests !== "passed" ||
       checks.nativePreflight !== "passed" ||
       checks.nativeVerify !== "passed" ||
       checks.observerVerify !== "passed" ||
-      checks.pluginIsolated !== "passed" ||
-      checks.packageDryRun !== "passed" ||
       checks.capabilityEvidenceValidCount !== 8 ||
-      !Number.isInteger(checks.prequalificationStaleCount) ||
-      (checks.prequalificationStaleCount as number) < 0 ||
-      (checks.prequalificationStaleCount as number) > 8 ||
+      checks.prequalificationStaleCount !== 8 ||
       checks.realModelCalls !== 0 ||
       checks.activeConfigAccesses !== 0 ||
       checks.activePluginChanges !== 0 ||
@@ -889,15 +878,11 @@ export function assertCurrentHostFreezeReceipt(
       capabilities,
       hostObservation: Object.freeze(observed),
       checks: Object.freeze({
-        deterministicTests: "passed",
         nativePreflight: "passed",
         nativeVerify: "passed",
         observerVerify: "passed",
-        pluginIsolated: "passed",
-        packageDryRun: "passed",
         capabilityEvidenceValidCount: 8,
-        prequalificationStaleCount:
-          checks.prequalificationStaleCount as number,
+        prequalificationStaleCount: 8,
         realModelCalls: 0,
         activeConfigAccesses: 0,
         activePluginChanges: 0,
