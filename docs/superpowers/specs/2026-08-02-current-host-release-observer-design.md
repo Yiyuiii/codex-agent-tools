@@ -125,7 +125,7 @@ beta 严格 JSON marker 必须在发布前绑定 release-only observer artifact�
 
 1. **runtime 内部证据（已完成）**：`ca9cf9e`让adapter只从同一次成功owned终态转发精确completion与drain；`f96e1ac`让MCP各职责点产生SDK abort、可信owned exit、handler cancelled与实际删除后的in-flight removed。两提交不接pipe、不改helper，聚焦验证与fresh只读复审均PASS。
 2. **显式事件客户端（已完成）**：`020c82d`实现 descriptor 严格读取、每 MCP/nonce 一次连接、复用已提交的`extra.requestId`/`extra.signal`事件sink和正常运行零 timer/watcher/常驻；协议作为共享 production fingerprint 输入。fake transport、关闭竞态、故障隔离、89项聚焦测试、类型检查、库构建和fresh只读复审均PASS。
-3. **原生 observer**：复用现有锁定 Roslyn/net48 toolchain/compiler contract，以不复制大型构建实现的薄入口维护 observer 自身 source set/artifact，测试 current-user ACL pipe、kernel peer PID、MCP/app-server/ChatGPT 三层 handles、旧新宿主状态机和唯一原子 receipt。建议提交：`feat: observe current-host release lifecycle`。
+3. **原生 observer（第一子批已完成）**：`4ccc715`先完成纯托管严格parser、状态机、跨语言哈希/receipt和no-replace writer；协议JSON通过临时生成C#源成为单一真值，build不复制共享compiler数组且只做白名单非递归清理。managed 19/19、TypeScript 59/59、类型、Node24 library build、diff、temp归零与fresh复审PASS。`Program`仍故意失败；current-user ACL pipe、kernel peer PID、MCP/app-server/ChatGPT三层handles、artifact/manifest/start脚本仍待后续子批。
 4. **marker/release整合（已完成）**：`1a029f1`保持精确npm包面不变，把release-only observer完整provenance、freeze observer身份与plugin tree纳入beta marker；stable verifier从beta tag重算observer/build inputs/plugin tree并严格核对公共npm identity和receipt。
 
 严格 release marker 已经完成TDD、主代理复验和fresh终审。终审发现的freeze observer身份漂移与build manifest源码漏列均已闭合：freeze逐项绑定完整observer identity，observer源码集合只从严格唯一production source set派生并必须精确覆盖。descriptor client也已完成；仍必须等原生observer完成并复审后，才能生成真实freeze与receipt。不得因marker或client测试通过、workflow已接线就发布。

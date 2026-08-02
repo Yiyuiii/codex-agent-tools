@@ -314,6 +314,8 @@ git diff --check
 
 四个职责批次都不得修改Job helper、fd3、`.mcp.json`、公开工具schema、活动配置或默认timeout；不得使用PID退出后重开、WMI/`ps`/Toolhelp scanner、`taskkill`或把人工文件当成受支持PASS。runtime内部证据、descriptor transport与marker消费者合同均已完成；只剩原生observer必须在当前宿主freeze和新真实8/8之前提交、复审并复验。同一Windows用户恶意篡改仓库、二进制或receipt不在本地ACL威胁模型内，但支持的固定流程必须由observer唯一写PASS并由stable verifier发现任何身份漂移。Node对pending named-pipe connect的取消能力与非重定向reparse tag识别只按当前固定私有路径合同处理，不为其它Node/Windows/机器增加兼容或安全承诺。
 
+**原生observer第一子批状态（2026-08-02，纯托管核心已完成）：** `4ccc715 feat: define strict host acceptance observer core`完成严格JSON/JSONL、exact-key frame、旧新宿主/请求事件纯状态机、TypeScript一致哈希/receipt与原子no-replace writer。协议JSON在临时构建目录生成C#常量，不保存第二份generated源；build入口直接消费共享compiler配置并使用白名单非递归清理。主代理复验managed 19/19、TypeScript 59/59、类型、Node24 library build、diff与temp归零，fresh复审PASS。`Program`仍故意失败；下一子批只绑定current-user named pipe、kernel peer PID和两层直接祖先handles，之后才冻结artifact/manifest/start脚本。
+
 ## 9. Task 8：当前宿主冻结与独立终审
 
 在维护者当前宿主运行，不使用下载的替代Node：
