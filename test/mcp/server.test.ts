@@ -90,6 +90,21 @@ describe("codex_external_agents MCP server", () => {
         expect(tool.inputSchema.properties).not.toHaveProperty("tools");
         expect(tool.inputSchema.properties).not.toHaveProperty("effort");
       }
+      expect(review.inputSchema).not.toHaveProperty(
+        "properties.prompt.maxLength",
+      );
+      expect(review.inputSchema).not.toHaveProperty(
+        "properties.context.maxLength",
+      );
+      expect(review.inputSchema).not.toHaveProperty(
+        "properties.acceptanceCriteria.maxItems",
+      );
+      expect(review.inputSchema).not.toHaveProperty(
+        "properties.acceptanceCriteria.items.maxLength",
+      );
+      expect(delegate.inputSchema).not.toHaveProperty(
+        "properties.prompt.maxLength",
+      );
     } finally {
       await client.close();
       await server.close();

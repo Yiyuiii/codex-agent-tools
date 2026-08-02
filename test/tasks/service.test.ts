@@ -1095,4 +1095,42 @@ describe("ExternalAgentService", () => {
     expect(receivedPrompt).toContain("No orphan process");
     expect(receivedPrompt).toContain("working change");
   });
+
+  it("passes uncapped prompt, context, and acceptance criteria through to adapters", async () => {
+    const promptTail = "<prompt-tail-sentinel>";
+    const contextTail = "<context-tail-sentinel>";
+    const criterionTail = "<criterion-tail-sentinel>";
+    const prompt = `${"p".repeat(200_001 - promptTail.length)}${promptTail}`;
+    const context = `${"c".repeat(100_001 - contextTail.length)}${contextTail}`;
+    const longCriterion = `${"a".repeat(10_001 - criterionTail.length)}${criterionTail}`;
+    const acceptanceCriteria = [
+      ...Array.from({ length: 100 }, (_, index) => `criterion-${index}`),
+      longCriterion,
+    ];
+    const receivedPrompts: string[] = [];
+    const service = createService(async (request) => {
+      receivedPrompts.push(request.prompt);
+      return completed();
+    });
+
+    await service.review({
+      llm: "kimi-k3",
+      task: "review_diff",
+      prompt,
+      cwd,
+      context,
+      acceptanceCriteria,
+    });
+    await service.delegate({
+      llm: "kimi-k3",
+      prompt,
+      cwd,
+    });
+
+    expect(receivedPrompts).toHaveLength(2);
+    expect(receivedPrompts[0]).toContain(prompt);
+    expect(receivedPrompts[0]).toContain(context);
+    expect(receivedPrompts[0]).toContain(longCriterion);
+    expect(receivedPrompts[1]).toBe(prompt);
+  });
 });
