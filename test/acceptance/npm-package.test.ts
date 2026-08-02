@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import os from "node:os";
 import { describe, expect, it, vi } from "vitest";
 import { resolve } from "node:path";
@@ -282,6 +283,21 @@ describe("npm-installed package acceptance contract", () => {
     }
   });
 
+  it("proves only owned cleanup and ships the current-host native helper", () => {
+    const entrypoint = readFileSync(
+      resolve("scripts", "npm-package-acceptance.mjs"),
+      "utf8",
+    );
+
+    expect(entrypoint).not.toMatch(
+      /classifyAgentProcesses|assertNoAgentProcesses|tasklist|Get-CimInstance|Win32_Process|\bpgrep\b/u,
+    );
+    expect(entrypoint).toContain("cleanupOwnedMcpTransport");
+    expect(entrypoint).toContain("assertNoQualificationLocks");
+    expect(entrypoint).toContain("codex-agent-job-helper.exe");
+    expect(entrypoint).toContain("codex-agent-job-helper.exe.sha256");
+  });
+
   it("cleans up an owned MCP transport when connect or tool validation fails", async () => {
     const transport = { id: "owned" };
     const cleanup = vi.fn(async () => undefined);
@@ -331,7 +347,7 @@ describe("npm-installed package acceptance contract", () => {
       "MCP-Smoke: pass",
       "Plugin-Isolated: pass",
       "Capability-Index: pass",
-      "Kimi ACP / Pi RPC / real-smoke：`0 / 0 / 0`",
+      "Owned-MCP-Cleanup: pass",
       "真实模型调用：`0`",
     ]) {
       expect(report).toContain(marker);

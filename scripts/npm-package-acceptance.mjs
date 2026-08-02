@@ -23,7 +23,6 @@ import {
   assertInstalledPackageContract,
   assertNpmRegistryMetadata,
   buildIsolatedNpmEnvironment,
-  classifyAgentProcesses,
   establishInstalledMcpSession,
   npmAcceptanceReportRelativePath,
   parseNpmPackageAcceptanceArguments,
@@ -259,17 +258,6 @@ async function assertNoQualificationLocks() {
       return;
     }
     throw error;
-  }
-}
-
-async function assertNoAgentProcesses() {
-  const counts = await classifyAgentProcesses();
-  if (
-    counts.kimi.count !== 0 ||
-    counts.piRpc.count !== 0 ||
-    counts.realSmoke.count !== 0
-  ) {
-    throw new Error("Target external-agent processes are not idle");
   }
 }
 
@@ -533,7 +521,6 @@ try {
     npmCache,
   });
   await assertNoQualificationLocks();
-  await assertNoAgentProcesses();
   await verifyCapabilityIndex({ repositoryRoot });
 
   const registryOutput = await run(
@@ -614,6 +601,8 @@ try {
     "dist/mcp.js",
     "docs/smoke/evidence/capabilities.json",
     "plugins/codex-external-agents/.mcp.json",
+    "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+    "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
     "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
   ]) {
     await access(path.join(packageRoot, ...relative.split("/")));
@@ -671,7 +660,6 @@ try {
 
   await officialPluginLifecycle(isolatedEnvironment);
   await assertNoQualificationLocks();
-  await assertNoAgentProcesses();
   const npmVersion = (
     await run(npmCommand(), ["--version"], {
       cwd: installRoot,

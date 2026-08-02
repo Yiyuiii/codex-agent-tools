@@ -13,7 +13,6 @@ import {
   assertPublicExternalToolDefinitions,
   PUBLIC_EXTERNAL_TOOL_DEFINITIONS,
 } from "../mcp/tools.js";
-export { classifyAgentProcesses } from "../runtime/agent-processes.js";
 
 const PUBLIC_REPOSITORY_URL =
   "git+https://github.com/Yiyuiii/codex-agent-tools.git";
@@ -321,6 +320,7 @@ Local-Npm-Smoke: pass
 MCP-Smoke: pass
 Plugin-Isolated: pass
 Capability-Index: pass
+Owned-MCP-Cleanup: pass
 
 ## 验收边界
 
@@ -328,7 +328,7 @@ Capability-Index: pass
 - CLI version/help 与不启动 Kimi/Pi target 的 doctor 全绿；doctor 的 Pi 配置只写入临时应用数据目录。
 - 已安装包的 stdio MCP 与官方插件缓存副本都只暴露 \`external_review\`、\`external_delegate\`，且 \`llm\` 必填和读写注解正确。
 - 官方插件只在一次性临时 Codex home 中完成 marketplace add、plugin add/list、缓存副本 MCP 启动、plugin remove 与 marketplace remove；活动 Codex home 未读取或修改。
-- Kimi ACP / Pi RPC / real-smoke：\`0 / 0 / 0\`。
+- 本次验收创建的 MCP transport 均已显式关闭，隔离目录由 finally 删除；不扫描或约束用户的其它 Kimi/Pi 进程。
 - 资格锁：\`absent\`。
 - 真实模型调用：\`0\`。
 `;
