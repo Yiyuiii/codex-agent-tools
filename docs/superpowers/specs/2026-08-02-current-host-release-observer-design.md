@@ -64,6 +64,8 @@ observer 记录的是非秘密身份摘要、创建/退出时序和内核 wait �
 
 ## 4. 会话状态机
 
+observer 的 stdout 只发布四条固定动作门，不输出 `PASS`：`READY` 表示首个受保护 pipe 已可用，`OLD_HOST_BOUND` 表示旧 MCP 与两层宿主 handle 已持有、维护者可以完整退出旧 App，`OLD_HOST_EXITED` 表示旧三层 handle 已实际退出且第二个同名受保护 pipe 已创建、维护者可以重开 App，`REQUEST_STARTED` 表示新宿主的目标请求首帧已被 observer 接受、维护者此时才可点击 Stop。最终成功只由退出码 0 与严格 receipt 共同表示，启动脚本不得靠固定 sleep 猜测操作时机。
+
 ### 4.1 启动与旧宿主绑定
 
 1. 先从公共 npm 精确安装beta并按官方命令升级插件。若当前App尚未实际加载该beta runtime，先完整退出/重开一次完成加载；这次准备动作不计入最终receipt。observer握手会核对beta identity，因此不能以旧runtime冒充。
@@ -125,10 +127,10 @@ beta 严格 JSON marker 必须在发布前绑定 release-only observer artifact�
 
 1. **runtime 内部证据（已完成）**：`ca9cf9e`让adapter只从同一次成功owned终态转发精确completion与drain；`f96e1ac`让MCP各职责点产生SDK abort、可信owned exit、handler cancelled与实际删除后的in-flight removed。两提交不接pipe、不改helper，聚焦验证与fresh只读复审均PASS。
 2. **显式事件客户端（已完成）**：`020c82d`实现 descriptor 严格读取、每 MCP/nonce 一次连接、复用已提交的`extra.requestId`/`extra.signal`事件sink和正常运行零 timer/watcher/常驻；协议作为共享 production fingerprint 输入。fake transport、关闭竞态、故障隔离、89项聚焦测试、类型检查、库构建和fresh只读复审均PASS。
-3. **原生 observer（前三子批已完成）**：`4ccc715`先完成纯托管严格parser、状态机、跨语言哈希/receipt和no-replace writer；协议JSON通过临时生成C#源成为单一真值，build不复制共享compiler数组且只做白名单非递归清理。`0feef26`随后针对维护者当前Windows x64宿主完成current-user protected ACL随机named pipe、kernel peer PID、从已持有peer handle通过x64 `ProcessBasicInformation`连续捕获两层直接祖先held handles，以及只由PID和完整creation FILETIME形成的进程身份；不扫描系统、不在退出后按PID重开、不设置生产默认timeout。`1c82fec`再从raw descriptor严格绑定beta marker、协议、Job helper、8项能力索引和current-host freeze，重算request/marker身份，只从`LOCALAPPDATA + nonce + markerId`派生输出，并拒绝预存marker/receipt；C#使用真正全串正则，显式调用级timeout对齐TypeScript既有JavaScript safe-integer合同，独立Node向量锁定canonical hash。最新复验managed 27/27、真实kernel 3/3、类型与diff PASS，fresh只读复审无P0-P2；局部kernel fixture的10秒watchdog不进入production，也不构成Kimi、Pi或其它外部CLI的全局限制。`Program`仍故意失败；artifact、build manifest、启动脚本、真实receipt PASS、current-host freeze和发布均待后续子批。
+3. **原生 observer（行为实现已完成）**：`4ccc715`、`0feef26`与`1c82fec`依次完成纯托管严格核心、当前Windows x64 kernel peer/两层祖先 held handles与严格会话材料绑定；`228c6a3`把 `Program` 接到完整双 pipe 会话，使用 held handle 的真实 exit FILETIME、严格EOF、五帧事件、派生marker absence及唯一no-replace receipt writer。MCP客户端同时锁存自然终态并排空`HELLO + 5`，真实socket只以`close`为关闭完成；全局shutdown不能吞掉已锁存终态。固定stdout仅含`READY / OLD_HOST_BOUND / OLD_HOST_EXITED / REQUEST_STARTED`四个动作门，无`PASS`。主代理最终复验managed 34/34、真实kernel 7/7、客户端26/26、全库67文件1204 passed / 3平台条件skipped、类型、构建与diff PASS；fresh综合审查无P1/P2，两个P3测试质量项也已闭合。局部10秒fixture watchdog不进入production，也不构成Kimi、Pi或其它外部CLI的全局限制。仍待artifact、build manifest、启动脚本、current-host freeze和发布。
 4. **marker/release整合（已完成）**：`1a029f1`保持精确npm包面不变，把release-only observer完整provenance、freeze observer身份与plugin tree纳入beta marker；stable verifier从beta tag重算observer/build inputs/plugin tree并严格核对公共npm identity和receipt。
 
-严格 release marker 已经完成TDD、主代理复验和fresh终审。终审发现的freeze observer身份漂移与build manifest源码漏列均已闭合：freeze逐项绑定完整observer identity，observer源码集合只从严格唯一production source set派生并必须精确覆盖。descriptor client、observer纯托管核心与当前宿主kernel primitives均已完成；仍必须完成Program编排、artifact/build manifest、启动脚本和真实receipt流程并复审，之后才能生成真实freeze。不得因marker、client或kernel primitive测试通过、workflow已接线就发布。
+严格 release marker 已经完成TDD、主代理复验和fresh终审。终审发现的freeze observer身份漂移与build manifest源码漏列均已闭合：freeze逐项绑定完整observer identity，observer源码集合只从严格唯一production source set派生并必须精确覆盖。descriptor client与observer运行时行为均已完成；仍必须生成并验证checked-in artifact/build manifest、完成固定启动脚本并做一次集成复审，之后才能生成真实freeze。不得因离线全链测试通过或workflow已接线就发布。
 
 ## 8. 失败语义与完成定义
 
