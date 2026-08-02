@@ -6,7 +6,7 @@
 
 **目标：** 在维护者当前 Windows 10 x64、Node v24.14.1、.NET Framework 4.8 环境上，用固定 native helper为每次Kimi/Pi invocation建立原子Job ownership，并删除与本机目标无关的三Node矩阵、split channel、`.cmd`执行、跨OS证明链和高成本重复测试。
 
-**现行规格：** [Windows 当前宿主最小可靠 owned process 设计](../specs/2026-08-01-windows-current-host-minimal-design.md)
+**现行规格：** [Windows 当前宿主最小可靠 owned process 设计](../specs/2026-08-01-windows-current-host-minimal-design.md)；stable 前的真实 App 重启/Stop 凭据见[当前宿主发布 Observer 最小设计](../specs/2026-08-02-current-host-release-observer-design.md)。
 
 **历史基线：** Task 1提交`88cf22b`与文档提交`b575dd9`有效保留；旧Task 2的单fd3 write-half-close失败由`0bb610e`保存。旧14项计划只作为历史，不再指导Task 2以后实现。
 
@@ -258,10 +258,12 @@ git diff --check
 
 **Canonical runtime-input子批状态（2026-08-02，已完成实现）：** 新增唯一内存manifest schema1，固定包含production build/generated protocol合同、protocol投影、只从`build.config.json#sourceSets.production`派生的9个C#源、4个Windows TypeScript wrapper和helper实际字节SHA；不建立第二份C#清单，也不纳入tests/fixtures/toolchain/generated文件/docs/evidence/marker/CI/POSIX/host值。纯helper inspector由production resolver与release/qualification共同复用。serializer/digest对unknown执行固定重投影，拒绝对象或数组proxy、getter、symbol、extra、missing、duplicate、sparse、路径/SHA不一致。能力指纹升为schema2并注入同一canonical digest；普通输入只排除已被摘要覆盖的4个wrapper，其余runtime仍收集。新分析入口只收集一次canonical identity、按runtime缓存并完整检查8项后返回状态；真实当前索引为8/8 evidence valid、8/8 stored schema1 fingerprint相对current schema2 stale，严格verifier仍generic fail closed。不得把该结果反向解释成八个历史摘要曾共享同一旧digest。fresh复审最终PASS；主线58/58、类型、library build与diff通过。索引、历史manifest/evidence与helper二进制均未改。
 
+**严格release marker子批状态（2026-08-02，已完成实现）：** 提交`1a029f1`把beta与stable的旧Markdown人工说明替换为`.release-validation/v<version>.json`严格schema和独立构建的可执行verifier，workflow固定单一Node 24与一次`gate:offline`，且在任何registry查询或publish前验marker。beta绑定runtime严格祖先、canonical/helper/capability/freeze、当前plugin tree、release-only observer artifact/protocol/build inputs；freeze逐项绑定observer完整身份和8项current capability投影。observer build config只有固定共享工具链引用、唯一production source set与固定artifact，manifest必须恰好覆盖由该source set派生的全部C#源及共享输入，不维护第二份源码清单。stable从beta tag回读并重算marker、observer、build inputs和plugin tree，核对公共npm identity与唯一receipt；真实Stop receipt绑定descriptor SHA、旧新三层宿主handle身份、事件哈希链、精确`cancelled + ownershipDrained:true`、handler/in-flight闭合和completion marker absent。fresh终审先后命中并修复plugin runtime大小、跨版本plugin tree、sessionShutdown伪Stop、observer/freeze祖先和build provenance等缺口，最终PASS；主代理最终release 20/20、类型、library build与diff通过。observer不进入公开npm包、不增加公开CLI/doctor面；descriptor transport已由`020c82d`完成，真实原生observer尚未实现，因此该消费者合同仍不得解释为可以发布beta或stable。
+
 1. Doctor/package：Windows strict doctor复用resolver并报告当前OS/Node/libuv/CLR/helper摘要，运行无target的`--probe-v1`但不重新构建/运行完整carrier preflight；production invocation不先跑probe。POSIX not-applicable。npm与plugin各包含唯一helper/SHA，隔离copy后可probe和跑fake MCP。
 2. Runtime inputs：建立唯一canonical manifest，精确列出native production source、TypeScript wrapper、protocol/build config和实际helper摘要，并由同一实现生成确定性digest。capability fingerprint把该digest作为运行输入；当前宿主冻结证据和tagged workflow复用同一manifest与算法，不再维护平行的`current-host runtime fingerprint`。不加入历史evidence、资格开关、计划/审阅稿或整个package-set raw-byte digest。
 3. Freeze/release smoke：不新增`smoke:prequalification`。Task 8逐项运行既有原子命令各一次，并单独记录八项能力唯一因runtime-input digest stale而fail closed；取得新8/8后只运行普通`smoke:release`。不得用candidate/core/prequalification多层wrapper重复build、pack或release core。
-4. Workflow：CI保持单一Node 24 Ubuntu job并删除不被release消费的dist/plugin artifact，不再有Windows三shard、partial/composite/selfDigest/fetcher；tag release job继续独立生成自己的package evidence。release继续Node24、branch/tag与npm Trusted Publishing/OIDC；beta tag新增版本化current-host prequalification/helper SHA/capability/canonical runtime-input digest marker，workflow在tagged tree以同一实现重算并精确比较；stable marker新增public-beta exact install、完整App restart、真实Stop、owned-zero、同helper SHA与同runtime-input digest，机器核对后才发布。
+4. Workflow：CI保持单一Node 24 Ubuntu job并删除不被release消费的dist/plugin artifact，不再有Windows三shard、partial/composite/selfDigest/fetcher；tag release job继续独立生成自己的package evidence。release继续Node24、branch/tag与npm Trusted Publishing/OIDC；beta tag使用严格JSON marker绑定版本化current-host freeze、helper SHA、capability index、canonical runtime-input digest、observer artifact和beta plugin tree，workflow在tagged tree以同一实现重算并精确比较；stable严格JSON marker新增public-beta exact install与observer唯一receipt，workflow从beta tag重算observer/plugin tree后才接受完整App restart、真实Stop和owned-zero事实。
 5. 文档：公开说明“维护者当前Windows宿主已验证”，不声称Node/Windows广泛兼容。
 6. 单宿主冗余闭包：删除EOL双checkout与未消费的CI artifact；统一`engines >=24`、tsup `node24`和公开Node要求，并注明只实测当前v24.14.1而非跨版本认证；活动文档只使用阶段名，不再绑定历史Task 9–12或某个beta序号。历史发布/失败记录留在仓库但不重写。
 7. 单一真值源：native `build.config.json`是sourceSets唯一清单，PowerShell严格验证schema、相对`.cs`路径、安全compiler flags、边界与reparse后消费，不再复制整份数组；npm只打包用户文档、helper/SHA和能力索引实际引用的证据，release smoke从同一清单核对并继续执行秘密扫描与链接闭包。
@@ -301,6 +303,17 @@ git diff --check
 
 提交：`feat: close current-host Windows release gates`
 
+### 8.5 当前宿主发布observer（Task 8冻结前必须完成）
+
+真实App完整退出/重启和Stop不能由App内组件自行证明，也不能回退到全机scanner。按[当前宿主发布 Observer 最小设计](../specs/2026-08-02-current-host-release-observer-design.md)分四个职责批次推进；第一批为保持adapter与MCP职责独立，实际拆成两个可复核提交：
+
+1. **runtime内部证据**：`ca9cf9e feat: expose exact owned process completion`只由adapter转发成功`owned.closed`的精确completion与drain；`f96e1ac feat: expose host acceptance lifecycle events`再由MCP各职责点产生SDK abort、可信owned exit、handler cancelled和实际删除后的in-flight removed。两提交均不接pipe、不改helper，聚焦验证与fresh复审已PASS；
+2. **显式事件客户端（已完成）**：`020c82d feat: connect host acceptance event transport`增加descriptor存在时每MCP/nonce一次连接的named-pipe客户端，接入上述事件sink；descriptor缺席的普通运行不计算request摘要、不安装abort listener，并保持零timer、零watcher、零常驻。严格协议JSON同时成为后续C# observer单一真值和八项能力共享production fingerprint输入；89项聚焦测试、类型检查、库构建和fresh复审均PASS；
+3. `feat: observe current-host release lifecycle`：复用锁定Roslyn/net48 toolchain、restore、`build.config.json`和x64 flags构建独立release-only observer；observer只维护自身最小production源码集合，并由自身build config唯一派生，工具链、restore和compiler flags继续复用现有真值，不复制大型native构建实现；用current-user ACL随机named pipe、kernel peer PID与直接祖先handles证明旧App退出和新App身份，由observer唯一原子写receipt；observer及其启动脚本不进入公开npm包，也不新增公开CLI/doctor命令；
+4. **marker/release整合（已完成）**：`1a029f1 feat: bind host acceptance to beta artifacts`保持精确package surface不变，把release-only observer完整provenance、freeze身份与plugin tree纳入beta严格JSON marker；stable从beta tag重算observer、build inputs和plugin tree，并严格消费公共beta本机验收receipt。该提交只建立消费者合同，不伪造尚未存在的observer、freeze或receipt。
+
+四个职责批次都不得修改Job helper、fd3、`.mcp.json`、公开工具schema、活动配置或默认timeout；不得使用PID退出后重开、WMI/`ps`/Toolhelp scanner、`taskkill`或把人工文件当成受支持PASS。runtime内部证据、descriptor transport与marker消费者合同均已完成；只剩原生observer必须在当前宿主freeze和新真实8/8之前提交、复审并复验。同一Windows用户恶意篡改仓库、二进制或receipt不在本地ACL威胁模型内，但支持的固定流程必须由observer唯一写PASS并由stable verifier发现任何身份漂移。Node对pending named-pipe connect的取消能力与非重定向reparse tag识别只按当前固定私有路径合同处理，不为其它Node/Windows/机器增加兼容或安全承诺。
+
 ## 9. Task 8：当前宿主冻结与独立终审
 
 在维护者当前宿主运行，不使用下载的替代Node：
@@ -330,7 +343,7 @@ git diff --check
 - 八项历史证据均有效，八个已存schema1摘要相对current schema2 fingerprint均为stale；
 - 真实模型、活动配置/插件、发布和外部CLI全局限制均为0。
 
-Task 8把这些事实写入仓库内脱敏的当前宿主prequalification证据，并固定runtime frozen commit、helper SHA和canonical runtime-input digest。它不提前创建尚未确定版本号的beta marker；真实8/8和版本元数据完成后，由后续beta候选提交生成同版本`.release-validation/v<version>.md`并引用该证据。tag workflow必须在tagged tree用同一manifest实现重算digest，不能只相信marker文本。
+Task 8把这些事实写入仓库内脱敏的当前宿主freeze evidence，并固定runtime frozen commit、helper SHA和canonical runtime-input digest。它不提前创建尚未确定版本号的beta marker；真实8/8和版本元数据完成后，由后续beta候选提交生成同版本`.release-validation/v<version>.json`并引用该证据。该JSON必须由严格可执行verifier解析，tag workflow必须在tagged tree用同一manifest实现重算digest、release-only observer artifact与plugin tree，不能只相信marker文本。
 
 一位fresh reviewer做规格与质量集成终审。任何代码问题退回所属Task修复和复审，Task 8不把补救清理或文档解释当作PASS。最终提交：`docs: freeze current-host Windows prequalification`
 
@@ -339,11 +352,11 @@ Task 8把这些事实写入仓库内脱敏的当前宿主prequalification证据�
 本阶段沿既有用户授权恢复，不属于离线Tasks 2–8：
 
 1. 在clean frozen SHA上按能力索引只运行stale/缺失的真实能力，目标8/8；单次失败遵守资格协议，不篡改历史manifest/evidence。
-2. 更新同一`capabilities.json`后，`verify:capabilities`和普通`smoke:release`转绿；设置beta版本，并生成同版本release marker，绑定Task 8 prequalification、runtime frozen commit、helper SHA、canonical runtime-input digest与8/8能力索引。
-3. 推送`next`，等待单Node CI；只有workflow核对beta marker后才创建/处理prerelease tag并由GitHub Actions OIDC发布beta，禁止本地publish。
-4. 从公共registry精确版本隔离安装；按官方命令升级活动插件，完整退出并重开App。
-5. 在当前宿主真实验证Kimi review、Pi/Ark review、隔离delegate和Stop/interrupt；只有helper/Job证据证明descendants归零才PASS。
-6. stable marker必须新增公共beta精确安装、完整App重启、真实Stop、owned descendants归零、helper SHA和同一canonical runtime-input digest精确项；合入`main`后由stable tag触发GitHub Actions OIDC发布`latest`。
+2. 更新同一`capabilities.json`后，`verify:capabilities`和普通`smoke:release`转绿；设置beta版本，并生成同版本`.release-validation/v<version>.json`，绑定Task 8 freeze evidence、runtime frozen commit、helper SHA、canonical runtime-input digest、observer artifact、beta plugin tree与8/8能力索引。
+3. 推送`next`，等待单Node CI；只有workflow在tagged tree重算并核对beta严格JSON marker后才创建/处理prerelease tag，并由GitHub Actions OIDC发布beta，禁止本地publish。
+4. 准备精确beta tag的clean checkout，从公共registry精确安装对应beta，并按官方命令升级活动插件。若当前App尚未加载该beta runtime，先完整退出/重开一次完成加载，该准备动作不计最终receipt。随后由外部PowerShell从beta tag运行固定repository script和已被beta marker预绑定的release-only observer；验收时不得restore、重建或改用stable工作树副本。公开npm包不携带observer，也不新增公开CLI/doctor入口。
+5. 在当前宿主用普通公开工具完成旧/新MCP握手，并在新App中真实执行Stop。observer必须以named-pipe kernel peer PID和直接祖先handles证明旧App完整退出与新App身份；同一request必须精确为`cancelled`、owned drained/Job zero、handler cancelled、in-flight removed且completion marker不存在。observer是receipt唯一原子写入者，人工或App内组件不能生成PASS。
+6. stable `.release-validation/v<version>.json`必须绑定公共beta精确npm identity和该receipt SHA；workflow从beta tag重算observer artifact与plugin tree，并核对同helper SHA、同canonical runtime-input digest和同beta marker后，才允许stable tag通过GitHub Actions OIDC发布`latest`。
 
 任一门禁失败即回到对应Task，不因“只支持本机”而放宽安全、资格或发布真实性。
 
