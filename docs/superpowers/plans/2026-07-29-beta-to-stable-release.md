@@ -4,6 +4,8 @@
 
 状态：已获维护者授权，执行中。
 
+> 2026-08-02 当前覆盖：发布实施以[Windows 当前宿主精简计划](2026-08-01-windows-current-host-owned-process.md)为准。下文 Node 20/22/24 矩阵、跨宿主兼容与旧 Markdown marker 只记录已发布版本的历史流程，不是下一版本门禁；下一版本只使用当前 Windows x64 / Node 24 宿主、严格 JSON marker、GitHub Actions OIDC、公共 npm 与官方插件完整重启/真实 Stop 验收。资格批次当前因 Ark Coding Plan 账户额度在首项外部阻断，发布尚未开始。
+
 ## 用户目标
 
 维护者授权 Codex 自主推进正式集成与公开发布，优先复用 `codex-cc-tools` 已验证的发布形态：先发布 beta，在本机从 npm 安装并验证，全部通过后再发布稳定版。

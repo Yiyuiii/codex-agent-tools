@@ -357,6 +357,8 @@ Task 8把这些事实写入仓库内脱敏的当前宿主freeze evidence，并�
 
 **状态（2026-08-02，已完成）：** 当前宿主freeze绑定clean runtime commit `0af4359c428006408d8c82171c0a33e74096042a`，凭据位于`.release-validation/evidence/current-host-0af4359c428006408d8c82171c0a33e74096042a.json`，SHA256为`1a5098682f6b5fb46554f0989e196d7dd420072ef28e5a92188fa31a956a297e`。实测宿主为Windows `10.0.19045.0` x64、Node `24.14.1`、libuv `1.51.0`、npm `11.11.0`、.NET Framework release `528372`；helper、observer、observer manifest/protocol/inputs与canonical runtime摘要均逐项匹配。`native:preflight`、`native:verify`、`observer:verify`通过；能力分析精确得到8/8 gate valid、8/8 evidence valid、8/8 current fingerprint stale，普通`verify:capabilities`按预期exit 1。严格freeze parser与fresh集成终审均PASS，无P1/P2/P3。Task 8期间真实模型、活动配置访问、活动插件变更和发布均为0；下一步只按stale-only协议运行新的真实8/8资格。
 
+**资格执行状态（2026-08-02，外部阻断）：** 新批次 `2026-08-02T14-17-27.683Z-307be99a-f536-4113-8738-51de40b56634` 在 frozen commit `9c40d2440b9ee30defdf92af11156e288785e755` 上从唯一标准入口启动。首项 `ark-coding-plan/delegate` 只调用一次并以 `account_quota_exceeded` 失败；零 retry/fallback、owned process 已排空，其余七项依首错停止合同未运行。终态 immutable verifier 通过，manifest SHA256为`da28beb431619adee599861c9b3cebbeb3d843496243be22ba39140b05d0d157`，证据提交为`29d8673`。这是外部账户额度阻碍，不触发代码修复、Node矩阵、补跑或新批；只有额度外部状态实际变化后，才能从新的clean candidate按同一stale-only合同启动独立新批。
+
 ## 10. Task 8后的资格与发布
 
 本阶段沿既有用户授权恢复，不属于离线Tasks 2–8：
