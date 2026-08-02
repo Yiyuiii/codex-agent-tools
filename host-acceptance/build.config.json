@@ -12,6 +12,7 @@
       "src/ProcessChain.cs",
       "src/Program.cs",
       "src/ReceiptWriter.cs",
+      "src/SessionMaterials.cs",
       "src/StrictJson.cs",
       "src/WindowsNative.cs"
     ]

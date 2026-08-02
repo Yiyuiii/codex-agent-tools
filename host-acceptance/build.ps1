@@ -384,6 +384,7 @@ $managedTestRelative = @(
     "tests/HashReceiptTests.cs",
     "tests/ManagedTestRunner.cs",
     "tests/ReceiptWriterTests.cs",
+    "tests/SessionMaterialTests.cs",
     "tests/StateMachineTests.cs",
     "tests/StrictJsonTests.cs",
     "tests/TestAssert.cs"

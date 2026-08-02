@@ -19,37 +19,37 @@ namespace CodexAgentTools.HostAcceptance
 
         internal static string Digest(string value)
         {
-            return Match(value, DigestPattern, 64);
+            return ExactMatch(value, DigestPattern, 64);
         }
 
         internal static string Commit(string value)
         {
-            return Match(value, CommitPattern, 40);
+            return ExactMatch(value, CommitPattern, 40);
         }
 
         internal static string Sha1(string value)
         {
-            return Match(value, Sha1Pattern, 40);
+            return ExactMatch(value, Sha1Pattern, 40);
         }
 
         internal static string Nonce(string value)
         {
-            return Match(value, NoncePattern, 128);
+            return ExactMatch(value, NoncePattern, 128);
         }
 
         internal static string MarkerId(string value)
         {
-            return Match(value, MarkerPattern, 64);
+            return ExactMatch(value, MarkerPattern, 64);
         }
 
         internal static string Version(string value)
         {
-            return Match(value, VersionPattern, 128);
+            return ExactMatch(value, VersionPattern, 128);
         }
 
         internal static string Integrity(string value)
         {
-            return Match(value, IntegrityPattern, 256);
+            return ExactMatch(value, IntegrityPattern, 256);
         }
 
         internal static string NonEmpty(string value, int maximumLength)
@@ -70,10 +70,11 @@ namespace CodexAgentTools.HostAcceptance
             return value;
         }
 
-        private static string Match(string value, Regex pattern, int maximumLength)
+        internal static string ExactMatch(string value, Regex pattern, int maximumLength)
         {
             NonEmpty(value, maximumLength);
-            if (!pattern.IsMatch(value))
+            var match = pattern.Match(value);
+            if (!match.Success || match.Index != 0 || match.Length != value.Length)
             {
                 throw new ProtocolException();
             }
@@ -413,20 +414,27 @@ namespace CodexAgentTools.HostAcceptance
             return new InflightRemovedFrame(frame.RequireString("nonce"), frame.RequireInt32("sequence"), frame.RequireString("requestIdType"), frame.RequireString("requestCorrelationSha256"));
         }
 
-        private static PublicBetaIdentity ParsePublicBeta(StrictJsonObject beta)
+        internal static PublicBetaIdentity ParsePublicBeta(StrictJsonObject beta)
         {
             beta.RequireExactKeys(ProtocolV1.PublicBetaKeys);
-            var observer = beta.RequireObject("observerArtifact");
-            observer.RequireExactKeys(ProtocolV1.ObserverArtifactKeys);
             var npm = beta.RequireObject("npm");
             npm.RequireExactKeys(ProtocolV1.NpmKeys);
             return new PublicBetaIdentity(
                 beta.RequireString("version"), beta.RequireString("tag"), beta.RequireString("taggedCommit"), beta.RequireString("markerPath"), beta.RequireString("markerSha256"), beta.RequireString("pluginArtifactTreeDigestSha256"),
-                new ObserverArtifactIdentity(observer.RequireString("path"), observer.RequireString("sha256"), observer.RequireInt32("protocolVersion"), ParseArtifact(observer.RequireObject("buildManifest")), ParseArtifact(observer.RequireObject("protocol")), observer.RequireString("inputsDigestSha256")),
+                ParseObserverArtifact(beta.RequireObject("observerArtifact")),
                 new NpmIdentity(npm.RequireString("integrity"), npm.RequireString("shasum")));
         }
 
-        private static ArtifactIdentity ParseArtifact(StrictJsonObject artifact)
+        internal static ObserverArtifactIdentity ParseObserverArtifact(StrictJsonObject observer)
+        {
+            observer.RequireExactKeys(ProtocolV1.ObserverArtifactKeys);
+            return new ObserverArtifactIdentity(
+                observer.RequireString("path"), observer.RequireString("sha256"), observer.RequireInt32("protocolVersion"),
+                ParseArtifact(observer.RequireObject("buildManifest")), ParseArtifact(observer.RequireObject("protocol")),
+                observer.RequireString("inputsDigestSha256"));
+        }
+
+        internal static ArtifactIdentity ParseArtifact(StrictJsonObject artifact)
         {
             artifact.RequireExactKeys(ProtocolV1.ArtifactIdentityKeys);
             return new ArtifactIdentity(artifact.RequireString("path"), artifact.RequireString("sha256"));

@@ -13,6 +13,7 @@ namespace CodexAgentTools.HostAcceptance.Tests
             tests.AddRange(HashReceiptTests.All());
             tests.AddRange(StateMachineTests.All());
             tests.AddRange(ReceiptWriterTests.All());
+            tests.AddRange(SessionMaterialTests.All());
 
             var passed = 0;
             foreach (var test in tests)
