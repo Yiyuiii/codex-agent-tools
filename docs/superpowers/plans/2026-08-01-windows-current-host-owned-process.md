@@ -189,11 +189,13 @@ git diff --check
 
 **第四子批状态（2026-08-02，adapter、telemetry与doctor已完成）：** 提交`10da9dc`让adapter传递独立shutdown signal，Windows Pi只接受经校验的`process.execPath + 单一绝对CLI入口`，凭据脱敏值从最终child environment提取；提交`e422ce5`增加`ownedProcessDrained?: true`，它只在本次Windows Job的`closed`成功证明`ownershipDrained === true`后出现，业务失败与排空事实保持正交，POSIX/no-spawn/closed失败不误报；提交`52be40e`把doctor改为targetless当前宿主静态诊断，仅对严格helper执行一次无凭据`--probe-v1`，并让MCP注册、doctor和npm acceptance共用唯一静态工具定义。独立复审修复了Windows验收接受伪Linux `not applicable`、工具硬编码伪绿、Ark负例只命中hash drift及helper路径泄漏；最终adapter/stdio聚焦25/25、telemetry 66 passed / 1 POSIX-only skipped、doctor/MCP/acceptance 30/30与类型/diff通过。smoke/preflight、qualification新schema、scanner删除及public acceptance遗留仍待后续子批。
 
+**第五子批状态（2026-08-02，smoke owned evidence已完成）：** 提交`3daff2b`把当前Kimi/Pi smoke producer统一升级为evidence schema v4，删除直接目标`--version`探针、`tasklist`/WMI/`pgrep`全机快照、PID计数与`process_residual`结论。四种runtime/task组合只接受精确完整的业务检查集合，并要求一次adapter调用、零retry/auto-retry、无fallback及本次调用`ownedProcessDrained:true`；业务失败仍可独立记录排空事实。历史v2/v3只读类型保留，current资格consumer尚未升级前必须继续fail closed。最终5个聚焦文件141/141、类型与diff通过，fresh只读复审PASS。下一子批按artifact protocol v3/evidence v4迁移preflight、checkpoint、manifest、verifier、capability index与coordinator，再删除全机scanner。
+
 ### 7.1 RED
 
 - Kimi/Pi Windows路径仍依赖direct spawn、PID terminator或`pi.cmd`执行的合同测试先失败；
 - Pi locator尚不能从当前安装解析/验证package name/version/bin/realpath/engine并返回结构化`PiInvocation`；
-- `src/smoke/pi.ts`版本读取、qualification preflight和隔离/公共验收消费者仍有旧字符串locator或直接target探针，尚未收敛为结构化invocation或删除冗余探针；
+- qualification preflight和公共验收消费者仍有旧target探针或全机扫描；smoke中的直接target探针已经删除；
 - stdio真实fake链尚不能证明handler/session只在owned tree归零后settle；
 - qualification preflight/coordinator/lock recovery与公共npm验收仍通过`src/runtime/agent-processes.ts`调用WMI/`ps`，把全机Kimi/Pi/real-smoke为零当作本case成功或恢复条件；无关外部CLI/旧插件会被误判为泄漏，现行current preflight仍生成该全机计数字段。
 
@@ -245,6 +247,8 @@ git diff --check
 **提前完成的冗余闭包（2026-08-01）：** 提交`548cc01`已删除公开MCP schema中无依据的prompt/context/acceptance-criteria字符与数量魔数，并用阈值+1、尾部sentinel、service逐字透传和MCP schema测试锁定，聚焦60/60；提交`06f5d4e`又删除Git status/diff的200,000字符静默裁剪，真实超阈值尾部sentinel聚焦4/4完整保留。Pi容量字段经本机0.80.10随包源码确认会真实影响API `max_tokens`、输出预算和compaction，不能机械删除；现有值只作为历史真实调用已接受的配置保留，不宣称最大容量已证明。
 
 **单宿主发布冗余复核（2026-08-02，只读）：** Node工作已收敛为`engines >=24`、tsup `node24`和单一Node 24 workflow，不恢复三版本矩阵。后续实现按风险拆分：先退役旧`acceptance:local`真实模型入口和双`core.autocrlf` checkout；再移除离线release smoke中的`npm view`、未消费CI/release artifacts与重复build/pack；随后以`package.json.files`为唯一包面声明，停止打包历史审阅稿/计划与整棵evidence树，只保留当前能力索引精确引用及native helper/SHA；最后用可执行marker verifier同时约束beta的当前宿主冻结证据和stable的公共beta精确安装、完整App重启、真实Stop与owned-zero。现行prerelease workflow会跳过validation marker，且npm files尚未包含native helper，这两项是必须补的非冗余发布阻断，不得随清理一起删除。
+
+**离线门禁子批状态（2026-08-02，已完成）：** 提交`a060f3f`把CI与release收敛为单一Node 24、单一`gate:offline`和每job一次build；删除重复build/pack、未消费artifact及release smoke中的npm registry名称探测。Codex CLI精确版本只保留在`package.json.config.codexCliVersion`一个真值源，workflow运行时读取并验证；发布前版本查询只有明确E404可进入publish，其它认证、网络、TLS、5xx或异常输出全部固定脱敏失败。`prepublishOnly`复用完整离线门禁，helper/SHA现在精确进入npm包并由strict resolver验证hash、x64 managed PE与目录闭包。聚焦187/187、类型、library build、strict helper、`npm pack --dry-run --json`与diff均通过。该提交只关闭门禁执行冗余；beta/stable可执行marker、exact package closure与已安装helper验收仍是发布阻断，不能据此发布。
 
 1. Doctor/package：Windows strict doctor复用resolver并报告当前OS/Node/libuv/CLR/helper摘要，运行无target的`--probe-v1`但不重新构建/运行完整carrier preflight；production invocation不先跑probe。POSIX not-applicable。npm与plugin各包含唯一helper/SHA，隔离copy后可probe和跑fake MCP。
 2. Runtime inputs：建立唯一canonical manifest，精确列出native production source、TypeScript wrapper、protocol/build config和实际helper摘要，并由同一实现生成确定性digest。capability fingerprint把该digest作为运行输入；当前宿主冻结证据和tagged workflow复用同一manifest与算法，不再维护平行的`current-host runtime fingerprint`。不加入历史evidence、资格开关、计划/审阅稿或整个package-set raw-byte digest。
