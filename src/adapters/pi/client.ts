@@ -1,19 +1,22 @@
 import { execa } from "execa";
+import type { ChildProcess } from "node:child_process";
+import type { Readable, Writable } from "node:stream";
 
 import type { AdapterRunResult } from "../adapter.js";
 import { scheduleDeadline } from "../../runtime/deadline.js";
+import {
+  spawnOwnedAgentProcess,
+  type OwnedAgentProcess,
+  type OwnedProcessExit,
+  type OwnedTerminationReason,
+  type SpawnOwnedAgentProcessRequest,
+} from "../../runtime/owned-agent-process.js";
 import { redactText } from "../../runtime/redaction.js";
 import { terminateProcessTree } from "../../runtime/process-tree.js";
 import { LfJsonlDecoder } from "./jsonl.js";
 
 export type PiThinkingLevel =
-  | "off"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max";
+  "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface PiRpcRunRequest {
   executable: string;
@@ -30,9 +33,16 @@ export interface PiRpcRunRequest {
   terminationGraceMs?: number;
   secretValues?: readonly string[];
   signal?: AbortSignal;
+  shutdownSignal?: AbortSignal;
   onProgress?: (message: string) => void;
   autoRetry?: boolean;
   autoCompaction?: boolean;
+}
+
+export interface PiRpcClientDependencies {
+  spawnOwnedAgentProcess?: (
+    request: SpawnOwnedAgentProcessRequest,
+  ) => Promise<OwnedAgentProcess>;
 }
 
 interface RpcResponse extends Record<string, unknown> {
@@ -104,9 +114,7 @@ function providerIdFromResponse(response: RpcResponse): string | undefined {
   return typeof model?.provider === "string" ? model.provider : undefined;
 }
 
-function retryAttemptKey(
-  event: Record<string, unknown>,
-): string | undefined {
+function retryAttemptKey(event: Record<string, unknown>): string | undefined {
   const attempt = event.attempt;
   if (typeof attempt === "number" && Number.isFinite(attempt)) {
     return `number:${attempt}`;
@@ -139,6 +147,7 @@ function sanitizedEvent(
 
 export async function runPiRpc(
   request: PiRpcRunRequest,
+  dependencies: PiRpcClientDependencies = {},
 ): Promise<AdapterRunResult> {
   const startedAt = Date.now();
   const secrets = request.secretValues ?? [];
@@ -148,21 +157,33 @@ export async function runPiRpc(
   const pending = new Map<string, PendingResponse>();
   const decoder = new LfJsonlDecoder();
   const heartbeatMs = request.heartbeatMs ?? 15_000;
-  const terminationGraceMs = request.terminationGraceMs ?? 1_000;
   let diagnosticBytes = 0;
   let sequence = 0;
   let actualModel: string | undefined;
   let stopReason: string | undefined;
-  let assistantError = false;
-  let cancellationReason: "cancelled" | "timed_out" | undefined;
+  let assistantFailure: Error | undefined;
+  let assistantFailureReported = false;
+  let cancellationReason: OwnedTerminationReason | undefined;
   let status: AdapterRunResult["status"] = "failed";
   let stderr = "";
   let stdoutEnded = false;
+  let decoderFinished = false;
   let completionFinished = false;
   let killTimer: NodeJS.Timeout | undefined;
+  let owned: OwnedAgentProcess | undefined;
+  let ownedExit: OwnedProcessExit | undefined;
+  let ownedClosedError: unknown;
+  let ownedTerminationPromise: Promise<void> | undefined;
+  let ownedClosurePromise: Promise<void> | undefined;
+  let ownedTerminationReason: OwnedTerminationReason | undefined;
+  let ownedReadyState: "pending" | "fulfilled" | "rejected" = "pending";
+  let ownedInputEnded = false;
+  let ownedFailureReported = false;
+  let internalFailure: Error | undefined;
   let adapterClientInvocationCount = 0;
   let adapterReportedFallbackUsed = false;
   const explicitRetryAttempts = new Set<string>();
+  const abortResponseIds = new Set<string>();
   let anonymousExplicitRetryCount = 0;
   let activeRetryAttempt: string | "anonymous" | undefined;
   let agentWillRetryCount = 0;
@@ -172,12 +193,36 @@ export async function runPiRpc(
   let assistantIdentityUnknown = false;
   let assistantIdentityMismatch = false;
 
+  const preStartCancellationReason: OwnedTerminationReason | undefined =
+    request.shutdownSignal?.aborted === true
+      ? "session_shutdown"
+      : request.signal?.aborted === true
+        ? "cancelled"
+        : undefined;
+  if (preStartCancellationReason !== undefined) {
+    return {
+      status: "cancelled",
+      text: "",
+      elapsedMs: Date.now() - startedAt,
+      events,
+      diagnostics,
+      executionTelemetry: {
+        adapterClientInvocationCount: 0,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        source: "pi-rpc-observable",
+      },
+    };
+  }
+
   const appendDiagnostic = (value: string): void => {
     if (diagnosticBytes >= 65_536) return;
     const redacted = redactText(value, secrets);
-    const limited = redacted.length <= 4_096
-      ? redacted
-      : `${redacted.slice(0, 4_096)}[TRUNCATED]`;
+    const limited =
+      redacted.length <= 4_096
+        ? redacted
+        : `${redacted.slice(0, 4_096)}[TRUNCATED]`;
     diagnosticBytes += Buffer.byteLength(limited, "utf8");
     diagnostics.push(limited);
   };
@@ -225,15 +270,66 @@ export async function runPiRpc(
     "--tools",
     request.task === "review" ? REVIEW_TOOLS : DELEGATE_TOOLS,
   ];
-  const child = execa(request.executable, args, {
-    cwd: request.cwd,
-    env: request.environment,
-    extendEnv: false,
-    detached: process.platform !== "win32",
-    reject: false,
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true,
-  });
+  let legacyChild: ChildProcess | undefined;
+  let legacyCompletion: Promise<unknown> | undefined;
+  let stdin: Writable;
+  let stdout: Readable;
+  let stderrStream: Readable;
+  try {
+    if (process.platform === "win32") {
+      owned = await (
+        dependencies.spawnOwnedAgentProcess ?? spawnOwnedAgentProcess
+      )({
+        executable: request.executable,
+        args,
+        cwd: request.cwd,
+        environment: request.environment,
+      });
+      stdin = owned.stdin;
+      stdout = owned.stdout;
+      stderrStream = owned.stderr;
+      void owned.ready.then(
+        () => {
+          ownedReadyState = "fulfilled";
+        },
+        () => {
+          ownedReadyState = "rejected";
+        },
+      );
+    } else {
+      const spawned = execa(request.executable, args, {
+        cwd: request.cwd,
+        env: request.environment,
+        extendEnv: false,
+        detached: true,
+        reject: false,
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+      });
+      legacyChild = spawned;
+      legacyCompletion = spawned;
+      if (
+        legacyChild.stdin === null ||
+        legacyChild.stdout === null ||
+        legacyChild.stderr === null
+      ) {
+        throw new Error("Pi RPC standard I/O is unavailable");
+      }
+      stdin = legacyChild.stdin;
+      stdout = legacyChild.stdout;
+      stderrStream = legacyChild.stderr;
+    }
+  } catch (error) {
+    appendDiagnostic(error instanceof Error ? error.message : String(error));
+    return {
+      status: "failed",
+      text: "",
+      elapsedMs: Date.now() - startedAt,
+      events,
+      diagnostics,
+      executionTelemetry: null,
+    };
+  }
   emitProgress("pi process started");
 
   let resolveCompletion!: () => void;
@@ -249,6 +345,119 @@ export async function runPiRpc(
     if (error === undefined) resolveCompletion();
     else rejectCompletion(error);
   };
+  const rejectPending = (error: Error): void => {
+    for (const waiter of pending.values()) waiter.reject(error);
+    pending.clear();
+  };
+  const terminateOwnedOnce = (
+    reason: OwnedTerminationReason,
+  ): Promise<void> => {
+    if (owned === undefined) return Promise.resolve();
+    ownedTerminationPromise ??= owned.terminate(reason);
+    void ownedTerminationPromise.catch(() => undefined);
+    return ownedTerminationPromise;
+  };
+  const publicCancellationStatus = (
+    reason: OwnedTerminationReason,
+  ): Extract<AdapterRunResult["status"], "cancelled" | "timed_out"> =>
+    reason === "timed_out" ? "timed_out" : "cancelled";
+  const reportOwnedFailure = (error: unknown): void => {
+    if (ownedFailureReported) return;
+    ownedFailureReported = true;
+    appendDiagnostic(
+      `Owned Pi process cleanup failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    status = "failed";
+  };
+  const validateOwnedExit = (
+    exit: OwnedProcessExit,
+    expected: "root_exit" | OwnedTerminationReason,
+  ): void => {
+    const expectedTermination = expected !== "root_exit";
+    if (
+      exit.completion !== expected &&
+      !(expectedTermination && exit.completion === "root_exit")
+    ) {
+      throw new Error(
+        `Owned Pi process completion mismatch: expected=${expected} actual=${exit.completion}`,
+      );
+    }
+    if (expected === "root_exit" && exit.rootExitCode !== 0) {
+      throw new Error(
+        `Owned Pi process root exited unsuccessfully: code=${exit.rootExitCode}`,
+      );
+    }
+  };
+  const normalizeError = (error: unknown): Error =>
+    error instanceof Error ? error : new Error(String(error));
+  const writeRpcLine = (value: Record<string, unknown>): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      try {
+        stdin.write(`${JSON.stringify(value)}\n`, (error?: Error | null) => {
+          if (error !== null && error !== undefined) reject(error);
+          else resolve();
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  const sendAbort = (): Promise<void> => {
+    const id = `pi-${++sequence}`;
+    abortResponseIds.add(id);
+    return writeRpcLine({ id, type: "abort" }).catch((error) => {
+      abortResponseIds.delete(id);
+      throw error;
+    });
+  };
+  const startOwnedClosure = (
+    reason: OwnedTerminationReason,
+  ): Promise<void> => {
+    if (owned === undefined || ownedExit !== undefined) return Promise.resolve();
+    ownedTerminationReason ??= reason;
+    if (ownedClosurePromise === undefined) {
+      if (ownedReadyState === "fulfilled") {
+        void sendAbort().catch((error) => {
+          appendDiagnostic(`Pi RPC abort failed: ${String(error)}`);
+        });
+      }
+      try {
+        ownedClosurePromise = terminateOwnedOnce(ownedTerminationReason);
+      } catch (error) {
+        ownedClosurePromise = Promise.reject(error);
+      }
+    }
+    void ownedClosurePromise.catch(() => undefined);
+    return ownedClosurePromise;
+  };
+  const latchInternalFailure = (error: unknown): Error => {
+    const normalized = normalizeError(error);
+    if (internalFailure === undefined) {
+      internalFailure = normalized;
+      if (!(normalized === assistantFailure && assistantFailureReported)) {
+        appendDiagnostic(normalized.message);
+      }
+      rejectPending(normalized);
+      finishCompletion(normalized);
+      if (owned !== undefined) {
+        void startOwnedClosure("cancelled").catch(() => undefined);
+      } else if (legacyChild?.pid !== undefined) {
+        void terminateProcessTree(legacyChild.pid).catch(() => undefined);
+      }
+    }
+    return internalFailure;
+  };
+  const finishDecoder = (): void => {
+    if (decoderFinished) return;
+    decoderFinished = true;
+    const tail = decoder.finish().incomplete;
+    if (tail !== undefined && cancellationReason === undefined) {
+      latchInternalFailure(
+        new Error("Pi RPC stdout ended with an incomplete JSONL record"),
+      );
+    }
+  };
 
   const handleRecord = (value: unknown): void => {
     const record = recordOf(value);
@@ -259,6 +468,7 @@ export async function runPiRpc(
     if (record.type === "response") {
       const response = record as RpcResponse;
       const id = response.id;
+      if (id !== undefined && abortResponseIds.delete(id)) return;
       const waiter = id === undefined ? undefined : pending.get(id);
       if (waiter === undefined) {
         appendDiagnostic(
@@ -322,13 +532,20 @@ export async function runPiRpc(
       const text = assistantText(record.message);
       if (text !== "") textChunks.push(text);
       const message = recordOf(record.message);
-      if (typeof message?.stopReason === "string") stopReason = message.stopReason;
+      if (typeof message?.stopReason === "string")
+        stopReason = message.stopReason;
       if (message?.role === "assistant") {
-        assistantError =
+        if (
           typeof message.errorMessage === "string" &&
-          message.errorMessage.trim() !== "";
-        if (assistantError) {
-          appendDiagnostic(`Pi assistant error: ${message.errorMessage}`);
+          message.errorMessage.trim() !== ""
+        ) {
+          assistantFailure = new Error(
+            `Pi assistant error: ${message.errorMessage}`,
+          );
+          appendDiagnostic(assistantFailure.message);
+          assistantFailureReported = true;
+        } else {
+          assistantFailure = undefined;
         }
       }
       return;
@@ -352,35 +569,57 @@ export async function runPiRpc(
     if (record.type === "agent_settled") finishCompletion();
   };
 
-  child.stdout?.on("data", (chunk: Buffer) => {
+  stdout.on("data", (chunk: Buffer) => {
+    if (decoderFinished || internalFailure !== undefined) return;
     try {
       for (const record of decoder.push(chunk)) handleRecord(record);
     } catch (error) {
-      finishCompletion(error instanceof Error ? error : new Error(String(error)));
-      if (child.pid !== undefined) {
-        void terminateProcessTree(child.pid).catch(() => undefined);
-      }
+      latchInternalFailure(error);
     }
   });
-  child.stdout?.once("end", () => {
+  stdout.once("end", () => {
     stdoutEnded = true;
-    const tail = decoder.finish().incomplete;
-    if (tail !== undefined && cancellationReason === undefined) {
-      finishCompletion(new Error("Pi RPC stdout ended with an incomplete JSONL record"));
-    }
+    finishDecoder();
   });
-  child.stderr?.on("data", (chunk: Buffer) => {
+  stderrStream.on("data", (chunk: Buffer) => {
     stderr = `${stderr}${chunk.toString("utf8")}`.slice(-65_536);
   });
-  child.once("error", (error) => finishCompletion(error));
-  child.once("exit", (code, signal) => {
-    const error = new Error(
-      `Pi RPC process exited before agent_settled: code=${String(code)} signal=${String(signal)}`,
+  if (owned !== undefined) {
+    const observedClosed = owned.closed.then(
+      (exit) => {
+        ownedExit = exit;
+        if (!completionFinished) {
+          const error = new Error(
+            `Pi RPC process closed before agent_settled: completion=${exit.completion} code=${String(exit.rootExitCode)}`,
+          );
+          rejectPending(error);
+          finishCompletion(error);
+        }
+        return exit;
+      },
+      (error: unknown) => {
+        ownedClosedError = error;
+        const normalized =
+          error instanceof Error ? error : new Error(String(error));
+        rejectPending(normalized);
+        finishCompletion(normalized);
+        throw error;
+      },
     );
-    for (const waiter of pending.values()) waiter.reject(error);
-    pending.clear();
-    finishCompletion(error);
-  });
+    void observedClosed.catch(() => undefined);
+  } else {
+    legacyChild!.once("error", (error) => {
+      rejectPending(error);
+      finishCompletion(error);
+    });
+    legacyChild!.once("exit", (code, signal) => {
+      const error = new Error(
+        `Pi RPC process exited before agent_settled: code=${String(code)} signal=${String(signal)}`,
+      );
+      rejectPending(error);
+      finishCompletion(error);
+    });
+  }
 
   const sendCommand = (
     command: string,
@@ -393,37 +632,50 @@ export async function runPiRpc(
     const response = new Promise<RpcResponse>((resolve, reject) => {
       pending.set(id, { command, resolve, reject });
     });
-    child.stdin?.write(`${JSON.stringify({ id, type: command, ...fields })}\n`, (error) => {
-      if (error !== null && error !== undefined) {
-        const waiter = pending.get(id);
-        pending.delete(id);
-        waiter?.reject(error);
-      }
+    void writeRpcLine({ id, type: command, ...fields }).catch((error) => {
+      const waiter = pending.get(id);
+      pending.delete(id);
+      waiter?.reject(error instanceof Error ? error : new Error(String(error)));
     });
     return response;
   };
 
-  const sendAbort = (): void => {
-    const id = `pi-${++sequence}`;
-    child.stdin?.write(`${JSON.stringify({ id, type: "abort" })}\n`);
-  };
-  const cancel = (reason: "cancelled" | "timed_out"): void => {
+  let cancellationFlow: Promise<void> | undefined;
+  let resolveCancellationStarted!: (reason: OwnedTerminationReason) => void;
+  const cancellationStarted = new Promise<OwnedTerminationReason>((resolve) => {
+    resolveCancellationStarted = resolve;
+  });
+  const cancel = (reason: OwnedTerminationReason): void => {
     if (cancellationReason !== undefined) return;
     cancellationReason = reason;
+    resolveCancellationStarted(reason);
     emitProgress(`pi ${reason}`);
-    sendAbort();
-    if (child.pid !== undefined) {
-      killTimer = setTimeout(() => {
-        void terminateProcessTree(child.pid!).catch(() => undefined);
-      }, terminationGraceMs);
+    if (owned !== undefined) {
+      cancellationFlow = startOwnedClosure(reason);
+    } else {
+      void sendAbort().catch((error) => {
+        appendDiagnostic(`Pi RPC abort failed: ${String(error)}`);
+      });
+      if (legacyChild?.pid !== undefined) {
+        const terminationGraceMs = request.terminationGraceMs ?? 1_000;
+        killTimer = setTimeout(() => {
+          void terminateProcessTree(legacyChild!.pid!).catch(() => undefined);
+        }, terminationGraceMs);
+      }
+      cancellationFlow = Promise.resolve();
     }
+    void cancellationFlow.catch(() => undefined);
   };
+  const onShutdownAbort = (): void => cancel("session_shutdown");
   const onCallerAbort = (): void => cancel("cancelled");
+  request.shutdownSignal?.addEventListener("abort", onShutdownAbort, {
+    once: true,
+  });
   request.signal?.addEventListener("abort", onCallerAbort, { once: true });
-  if (request.signal?.aborted) cancel("cancelled");
-  const deadline = scheduleDeadline(
-    request.timeoutMs,
-    () => cancel("timed_out"),
+  if (request.shutdownSignal?.aborted) cancel("session_shutdown");
+  else if (request.signal?.aborted) cancel("cancelled");
+  const deadline = scheduleDeadline(request.timeoutMs, () =>
+    cancel("timed_out"),
   );
   const heartbeat = setInterval(
     () => emitProgress(`pi heartbeat ${Date.now() - startedAt}ms`),
@@ -431,16 +683,22 @@ export async function runPiRpc(
   );
 
   try {
+    if (owned !== undefined) {
+      const readyOutcome = await Promise.race([
+        owned.ready.then(() => "ready" as const),
+        cancellationStarted.then(() => "cancelled" as const),
+      ]);
+      if (readyOutcome === "cancelled" || cancellationReason !== undefined) {
+        throw new Error(`Pi RPC ${cancellationReason}`);
+      }
+    }
     const modelResponse = await sendCommand("set_model", {
       provider: request.provider,
       modelId: request.model,
     });
     actualModel = modelIdFromResponse(modelResponse);
     const actualProvider = providerIdFromResponse(modelResponse);
-    if (
-      actualModel !== request.model ||
-      actualProvider !== request.provider
-    ) {
+    if (actualModel !== request.model || actualProvider !== request.provider) {
       adapterReportedFallbackUsed = true;
       throw new Error("Pi model binding response mismatch");
     }
@@ -457,33 +715,87 @@ export async function runPiRpc(
     await sendCommand("prompt", { message: request.prompt });
     emitProgress("pi prompt started");
     await completion;
-    status = cancellationReason ?? (assistantError ? "failed" : "completed");
-  } catch (error) {
-    status = cancellationReason ?? "failed";
-    if (cancellationReason === undefined) {
-      appendDiagnostic(error instanceof Error ? error.message : String(error));
+    if (assistantFailure !== undefined) throw assistantFailure;
+    if (owned !== undefined) {
+      if (cancellationReason === undefined) {
+        ownedInputEnded = true;
+        stdin.end();
+      } else {
+        await cancellationFlow;
+      }
+      ownedExit = await owned.closed;
+      validateOwnedExit(ownedExit, cancellationReason ?? "root_exit");
     }
+    status =
+      cancellationReason === undefined
+        ? "completed"
+        : publicCancellationStatus(cancellationReason);
+  } catch (error) {
+    if (cancellationReason === undefined) {
+      if (owned !== undefined && ownedClosedError !== undefined) {
+        reportOwnedFailure(error);
+      } else {
+        latchInternalFailure(error);
+      }
+    }
+    status =
+      internalFailure !== undefined || ownedFailureReported
+        ? "failed"
+        : cancellationReason === undefined
+          ? "failed"
+          : publicCancellationStatus(cancellationReason);
   } finally {
     deadline.cancel();
     clearInterval(heartbeat);
     if (killTimer !== undefined) clearTimeout(killTimer);
+    request.shutdownSignal?.removeEventListener("abort", onShutdownAbort);
     request.signal?.removeEventListener("abort", onCallerAbort);
-    if (child.pid !== undefined) {
-      await terminateProcessTree(child.pid).catch((error) => {
-        appendDiagnostic(`Process tree cleanup failed: ${String(error)}`);
-        if (status === "completed") status = "failed";
-      });
-    }
-    await child.catch(() => undefined);
-    if (!stdoutEnded) {
-      const tail = decoder.finish().incomplete;
-      if (tail !== undefined && cancellationReason === undefined) {
-        appendDiagnostic("Pi RPC stopped with an incomplete JSONL record");
-        if (status === "completed") status = "failed";
+    if (owned !== undefined) {
+      try {
+        if (cancellationFlow !== undefined) {
+          await cancellationFlow;
+        } else if (internalFailure !== undefined) {
+          await startOwnedClosure("cancelled");
+        } else if (
+          !ownedInputEnded &&
+          ownedExit === undefined &&
+          ownedClosedError === undefined
+        ) {
+          await startOwnedClosure("cancelled");
+        }
+      } catch (error) {
+        reportOwnedFailure(error);
       }
+      try {
+        ownedExit ??= await owned.closed;
+      } catch (error) {
+        ownedClosedError ??= error;
+        reportOwnedFailure(error);
+      }
+      if (ownedExit !== undefined) {
+        try {
+          validateOwnedExit(
+            ownedExit,
+            ownedTerminationReason ?? "root_exit",
+          );
+        } catch (error) {
+          reportOwnedFailure(error);
+        }
+      }
+    } else {
+      if (legacyChild?.pid !== undefined) {
+        await terminateProcessTree(legacyChild.pid).catch((error) => {
+          appendDiagnostic(`Process tree cleanup failed: ${String(error)}`);
+          if (status === "completed") status = "failed";
+        });
+      }
+      await legacyCompletion?.catch(() => undefined);
     }
+    if (!stdoutEnded) finishDecoder();
     if (stderr.trim() !== "") appendDiagnostic(stderr.trim());
   }
+
+  if (internalFailure !== undefined) status = "failed";
 
   if (activeRetryAttempt !== undefined) retryEventsUnbalanced = true;
   if (retryEventsUnbalanced) {
