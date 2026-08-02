@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 const EXECUTABLE_NAME = "codex-agent-job-helper.exe";
 const MANIFEST_NAME = `${EXECUTABLE_NAME}.sha256`;
 const FAILURE_MESSAGE = "Windows job helper artifact validation failed.";
+const PLUGIN_NAME = "codex-external-agents";
+const EXACT_SEMVER_PATTERN =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
 
 export interface ResolvedWindowsJobHelper {
   readonly executablePath: string;
@@ -38,7 +41,59 @@ async function assertNoReparseExistingPath(candidate: string): Promise<void> {
   if (!samePath(canonical, absolute)) fail();
 }
 
-function resolvePluginRoot(modulePath: string): string {
+function hasExactName(candidate: string, expected: string): boolean {
+  return path.basename(candidate).toLowerCase() === expected;
+}
+
+async function verifyCachedPluginRoot(
+  modulePath: string,
+  pluginRoot: string,
+): Promise<string> {
+  const version = path.basename(pluginRoot);
+  const pluginDirectory = path.dirname(pluginRoot);
+  const marketplaceDirectory = path.dirname(pluginDirectory);
+  const marketplace = path.basename(marketplaceDirectory);
+  const cacheDirectory = path.dirname(marketplaceDirectory);
+  const pluginsDirectory = path.dirname(cacheDirectory);
+  const moduleName = path.basename(modulePath);
+  if (
+    moduleName.length <= ".mjs".length ||
+    path.extname(moduleName).toLowerCase() !== ".mjs" ||
+    !EXACT_SEMVER_PATTERN.test(version) ||
+    !hasExactName(pluginDirectory, PLUGIN_NAME) ||
+    marketplace === "" ||
+    marketplace === "." ||
+    marketplace === ".." ||
+    !hasExactName(cacheDirectory, "cache") ||
+    !hasExactName(pluginsDirectory, "plugins")
+  ) {
+    fail();
+  }
+
+  const manifestPath = path.join(
+    pluginRoot,
+    ".codex-plugin",
+    "plugin.json",
+  );
+  await assertNoReparseExistingPath(modulePath);
+  await assertNoReparseExistingPath(pluginRoot);
+  await assertNoReparseExistingPath(manifestPath);
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as unknown;
+  if (
+    typeof manifest !== "object" ||
+    manifest === null ||
+    Array.isArray(manifest) ||
+    !("name" in manifest) ||
+    !("version" in manifest) ||
+    manifest.name !== PLUGIN_NAME ||
+    manifest.version !== version
+  ) {
+    fail();
+  }
+  return pluginRoot;
+}
+
+async function resolvePluginRoot(modulePath: string): Promise<string> {
   const moduleDirectory = path.dirname(modulePath);
   if (path.basename(moduleDirectory).toLowerCase() === "dist") {
     return path.join(
@@ -51,10 +106,13 @@ function resolvePluginRoot(modulePath: string): string {
   const pluginRoot = path.dirname(moduleDirectory);
   if (
     path.basename(moduleDirectory).toLowerCase() === "runtime" &&
-    path.basename(pluginRoot).toLowerCase() === "codex-external-agents" &&
+    path.basename(pluginRoot).toLowerCase() === PLUGIN_NAME &&
     path.basename(path.dirname(pluginRoot)).toLowerCase() === "plugins"
   ) {
     return pluginRoot;
+  }
+  if (path.basename(moduleDirectory).toLowerCase() === "runtime") {
+    return await verifyCachedPluginRoot(modulePath, pluginRoot);
   }
   return fail();
 }
@@ -133,7 +191,7 @@ export async function resolveWindowsJobHelperForModule(
   try {
     if (platform !== "win32" || architecture !== "x64") fail();
     const modulePath = fileURLToPath(moduleUrl);
-    const pluginRoot = resolvePluginRoot(modulePath);
+    const pluginRoot = await resolvePluginRoot(modulePath);
     const artifactRoot = path.join(pluginRoot, "native", "win32-x64");
 
     await assertNoReparseExistingPath(pluginRoot);

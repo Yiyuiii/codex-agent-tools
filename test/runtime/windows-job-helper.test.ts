@@ -33,12 +33,34 @@ const canonicalArtifact = resolve(
 const executableName = "codex-agent-job-helper.exe";
 const temporaryRoots: string[] = [];
 
-async function fixture(layout: "dist" | "plugin") {
+interface FixtureOptions {
+  cacheDirectoryName?: string;
+  manifestName?: string;
+  manifestVersion?: string;
+  versionDirectoryName?: string;
+}
+
+async function fixture(
+  layout: "cache" | "dist" | "plugin",
+  options: FixtureOptions = {},
+) {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), "cat-helper-resolver-")),
   );
   temporaryRoots.push(root);
-  const pluginRoot = join(root, "plugins", "codex-external-agents");
+  const versionDirectoryName =
+    options.versionDirectoryName ?? "0.1.1-beta.1";
+  const pluginRoot =
+    layout === "cache"
+      ? join(
+          root,
+          "plugins",
+          options.cacheDirectoryName ?? "cache",
+          "codex-external-agents-local",
+          "codex-external-agents",
+          versionDirectoryName,
+        )
+      : join(root, "plugins", "codex-external-agents");
   const artifactRoot = join(pluginRoot, "native", "win32-x64");
   const executablePath = join(artifactRoot, executableName);
   const manifestPath = `${executablePath}.sha256`;
@@ -53,8 +75,26 @@ async function fixture(layout: "dist" | "plugin") {
   const bytes = await readFile(executablePath);
   const digest = createHash("sha256").update(bytes).digest("hex");
   await writeFile(manifestPath, `${digest}  ${executableName}\n`, "utf8");
+  const pluginManifestPath = join(
+    pluginRoot,
+    ".codex-plugin",
+    "plugin.json",
+  );
+  if (layout === "cache") {
+    await mkdir(dirname(pluginManifestPath), { recursive: true });
+    await writeFile(
+      pluginManifestPath,
+      JSON.stringify({
+        name: options.manifestName ?? "codex-external-agents",
+        version: options.manifestVersion ?? versionDirectoryName,
+      }),
+      "utf8",
+    );
+  }
   return {
     root,
+    pluginRoot,
+    pluginManifestPath,
     artifactRoot,
     executablePath,
     manifestPath,
@@ -82,7 +122,7 @@ describe("Windows job helper resolver", () => {
     });
   });
 
-  it.each(["dist", "plugin"] as const)(
+  it.each(["dist", "plugin", "cache"] as const)(
     "resolves and verifies the canonical helper from the %s layout",
     async (layout) => {
       const value = await fixture(layout);
@@ -98,6 +138,58 @@ describe("Windows job helper resolver", () => {
       });
     },
   );
+
+  it.each([
+    ["wrong plugin name", { manifestName: "codex-external-agent" }],
+    ["version mismatch", { manifestVersion: "0.1.1-beta.2" }],
+    ["similar cache directory", { cacheDirectoryName: "cache-copy" }],
+    ["non-semver version", { versionDirectoryName: "v0.1.1-beta.1" }],
+  ] as const)("rejects a cache layout with %s", async (_label, options) => {
+    const value = await fixture("cache", options);
+
+    let failure: unknown;
+    try {
+      await resolveWindowsJobHelperForModule(
+        pathToFileURL(value.modulePath).href,
+        "win32",
+        "x64",
+      );
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toBe(
+      "Windows job helper artifact validation failed.",
+    );
+    expect((failure as Error).message).not.toContain(value.root);
+  });
+
+  it("rejects a reparse point in the cached plugin manifest path", async () => {
+    const value = await fixture("cache");
+    const realManifestDirectory = join(value.root, "real-plugin-manifest");
+    await mkdir(realManifestDirectory);
+    await copyFile(
+      value.pluginManifestPath,
+      join(realManifestDirectory, "plugin.json"),
+    );
+    await rm(dirname(value.pluginManifestPath), {
+      recursive: true,
+      force: true,
+    });
+    await symlink(
+      realManifestDirectory,
+      dirname(value.pluginManifestPath),
+      "junction",
+    );
+
+    await expect(
+      resolveWindowsJobHelperForModule(
+        pathToFileURL(value.modulePath).href,
+        "win32",
+        "x64",
+      ),
+    ).rejects.toThrow("Windows job helper artifact validation failed.");
+  });
 
   it("keeps production resolution bound to its own module URL", async () => {
     expect(resolveWindowsJobHelper).toHaveLength(0);

@@ -4,12 +4,13 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  realpath,
   readdir,
   rm,
   writeFile,
 } from "node:fs/promises";
 import os from "node:os";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -25,6 +26,7 @@ import {
   parseIsolatedReportArguments,
   synchronizeIsolatedReport,
 } from "../dist/plugin-isolated-report.js";
+import { isSafeRelativeLaunchPath } from "./lib/npm-launch-path.mjs";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -95,14 +97,29 @@ const mcpBaseEnvironmentVariables = new Set([
   "http_proxy",
   "all_proxy",
 ]);
-const temporaryRoot = await mkdtemp(
-  path.join(os.tmpdir(), "codex-plugin-isolated-acceptance-"),
+const windowsLocalAppData = process.env.LOCALAPPDATA?.trim();
+const temporaryBase =
+  process.platform === "win32" && windowsLocalAppData
+    ? path.join(windowsLocalAppData, "Temp")
+    : os.tmpdir();
+const temporaryRoot = await realpath(
+  await mkdtemp(
+    path.join(temporaryBase, "codex-plugin-isolated-acceptance-"),
+  ),
 );
 const isolatedHome = path.resolve(temporaryRoot, "codex-home");
 const isolatedLocalAppData = path.resolve(temporaryRoot, "local-app-data");
 const isolatedAppData = path.resolve(temporaryRoot, "roaming-app-data");
 const fixtureRoot = path.resolve(temporaryRoot, "fixture");
-const fakePiCommand = path.resolve(temporaryRoot, "fake-pi.cmd");
+const fakePiNpmRoot = path.resolve(temporaryRoot, "fake-pi-npm");
+const fakePiPackageRoot = path.resolve(
+  fakePiNpmRoot,
+  "node_modules",
+  "@earendil-works",
+  "pi-coding-agent",
+);
+const fakePiCommand = path.resolve(fakePiNpmRoot, "pi.cmd");
+const fakePiCli = path.resolve(fakePiPackageRoot, "dist", "cli.js");
 const fakePiInvocationLog = path.resolve(
   temporaryRoot,
   "fake-pi-invocations.log",
@@ -223,14 +240,6 @@ function assertPluginStatus(output, expectedStatus) {
   }
 }
 
-function isAbsoluteOnAnyPlatform(value) {
-  return (
-    path.isAbsolute(value) ||
-    path.win32.isAbsolute(value) ||
-    path.posix.isAbsolute(value)
-  );
-}
-
 function requireObject(value, label) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
@@ -321,7 +330,7 @@ async function readInstalledMcpServer(installedPluginRoot) {
   if (
     typeof server.command !== "string" ||
     server.command.trim() === "" ||
-    isAbsoluteOnAnyPlatform(server.command)
+    !isSafeRelativeLaunchPath(server.command)
   ) {
     throw new Error("Installed MCP command must be a relative command name");
   }
@@ -329,7 +338,7 @@ async function readInstalledMcpServer(installedPluginRoot) {
     !Array.isArray(server.args) ||
     !server.args.every(
       (argument) =>
-        typeof argument === "string" && !isAbsoluteOnAnyPlatform(argument),
+        isSafeRelativeLaunchPath(argument),
     )
   ) {
     throw new Error("Installed MCP args must all be relative strings");
@@ -395,42 +404,56 @@ function structuredContent(result) {
   return result.structuredContent;
 }
 
-function quoteCmdArgument(value) {
-  if (value.includes('"') || /[\r\n]/u.test(value)) {
-    throw new Error("Cannot safely quote fake Pi command path");
-  }
-  return `"${value}"`;
-}
-
-async function writeFakePiWrapper() {
+async function writeFakePiInstallation() {
   if (process.platform !== "win32") {
     throw new Error(
       "The isolated fake Pi environment gate currently requires Windows",
     );
   }
-  const wrapper = [
-    "@echo off",
-    `>>${quoteCmdArgument(fakePiInvocationLog)} echo invocation`,
-    "if defined HTTPS_PROXY exit /b 91",
-    "if defined HTTP_PROXY exit /b 92",
-    "if defined ALL_PROXY exit /b 93",
-    "if defined all_proxy exit /b 94",
-    "if defined https_proxy exit /b 95",
-    "if defined http_proxy exit /b 96",
-    `if not "%CODEX_AGENT_ARK_AGENT_KEY%"=="${credentialSentinel}" exit /b 97`,
-    "if defined OPENAI_API_KEY_DOUBAO exit /b 98",
-    "if defined CODEX_AGENT_ARK_CODING_KEY exit /b 99",
-    "if defined ARK_API_KEY exit /b 100",
-    "if defined VOLCENGINE_API_KEY exit /b 101",
-    "if defined API_KEY_DOUBAO_CODING exit /b 102",
-    "if defined GEMINI_API_KEY exit /b 103",
-    "if defined GOOGLE_API_KEY exit /b 104",
-    "if defined GOOGLE_GENERATIVE_AI_API_KEY exit /b 105",
-    `${quoteCmdArgument(process.execPath)} ${quoteCmdArgument(fakePiScript)} %*`,
-    "exit /b %ERRORLEVEL%",
+  const packageManifest = {
+    name: "@earendil-works/pi-coding-agent",
+    version: "0.80.10",
+    bin: { pi: "dist/cli.js" },
+    engines: { node: ">=22.19.0" },
+  };
+  const cli = [
+    'const { appendFileSync } = require("node:fs");',
+    "const environment = process.env;",
+    `appendFileSync(${JSON.stringify(fakePiInvocationLog)}, "invocation\\n", "utf8");`,
+    "function fail(code) { process.exit(code); }",
+    'if (environment.HTTPS_PROXY !== undefined) fail(91);',
+    'if (environment.HTTP_PROXY !== undefined) fail(92);',
+    'if (environment.ALL_PROXY !== undefined) fail(93);',
+    'if (environment.all_proxy !== undefined) fail(94);',
+    'if (environment.https_proxy !== undefined) fail(95);',
+    'if (environment.http_proxy !== undefined) fail(96);',
+    `if (environment.CODEX_AGENT_ARK_AGENT_KEY !== ${JSON.stringify(credentialSentinel)}) fail(97);`,
+    'if (environment.OPENAI_API_KEY_DOUBAO !== undefined) fail(98);',
+    'if (environment.CODEX_AGENT_ARK_CODING_KEY !== undefined) fail(99);',
+    'if (environment.ARK_API_KEY !== undefined) fail(100);',
+    'if (environment.VOLCENGINE_API_KEY !== undefined) fail(101);',
+    'if (environment.API_KEY_DOUBAO_CODING !== undefined) fail(102);',
+    'if (environment.GEMINI_API_KEY !== undefined) fail(103);',
+    'if (environment.GOOGLE_API_KEY !== undefined) fail(104);',
+    'if (environment.GOOGLE_GENERATIVE_AI_API_KEY !== undefined) fail(105);',
+    `void import(${JSON.stringify(pathToFileURL(fakePiScript).href)}).catch((error) => {`,
+    '  process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\\n`);',
+    "  process.exitCode = 1;",
+    "});",
     "",
-  ].join("\r\n");
-  await writeFile(fakePiCommand, wrapper, "utf8");
+  ].join("\n");
+  await mkdir(path.dirname(fakePiCli), { recursive: true });
+  await writeFile(
+    fakePiCommand,
+    "@echo this verified package anchor is intentionally never executed\r\n",
+    "utf8",
+  );
+  await writeFile(
+    path.join(fakePiPackageRoot, "package.json"),
+    `${JSON.stringify(packageManifest, undefined, 2)}\n`,
+    "utf8",
+  );
+  await writeFile(fakePiCli, cli, "utf8");
 }
 
 async function readFakePiInvocationCount() {
@@ -509,8 +532,8 @@ ${configLines}
 - \`external_review\` 为只读且非破坏性；\`external_delegate\` 为可写且具破坏性提示。
 - 已退役的 Gemini review 被已安装 MCP 以 unknown logical LLM 明确拒绝；错误列出精确四项活动 LLM，没有启动 Pi，也没有返回伪造的结构化成功结果。
 - fake Pi 的 Ark Agent Plan DeepSeek V4 Flash review 恰好调用一次并返回 \`completed\`，实际模型为 \`deepseek-v4-flash\`，且没有文件变化。
-- fake Pi 包装器确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 Agent Plan 目标凭据，未收到原始候选变量、其它 Ark 目标凭据或 Google 凭据。
-- 异常清理仅管理本脚本所启动 transport 的 PID，并在关闭 MCP client/transport 前终止其整个进程树。
+- fake Pi 可信包入口确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 Agent Plan 目标凭据，未收到原始候选变量、其它 Ark 目标凭据或 Google 凭据。
+- 正常与异常清理都依次通过 SDK \`client.close()\`、\`transport.close()\` 触发 stdio 关闭和 Job-owned drain；验收脚本不读取 PID，也不使用任何 PID-based fallback。
 
 ## 语义回滚
 
@@ -545,7 +568,7 @@ try {
     "# Isolated plugin acceptance fixture\n",
     "utf8",
   );
-  await writeFakePiWrapper();
+  await writeFakePiInstallation();
 
   const codexVersion = (await runCodex(["--version"])).trim();
   let previous = await snapshotDirectory(isolatedHome);
@@ -585,7 +608,6 @@ try {
 
   const installed = await resolveInstalledPluginRoot();
   const server = await readInstalledMcpServer(installed.root);
-  await writeFakePiWrapper();
   client = new Client({
     name: "codex-plugin-isolated-acceptance",
     version: "1.0.0",
