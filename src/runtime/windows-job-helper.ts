@@ -86,21 +86,18 @@ function assertX64ManagedPe(bytes: Buffer): void {
   }
 }
 
-/** @internal Tests inject only the loaded module identity, never an artifact path. */
-export async function resolveWindowsJobHelperForModule(
-  moduleUrl: string,
-  platform: NodeJS.Platform = process.platform,
-  architecture: string = process.arch,
+/**
+ * Verifies the packaged helper bytes and their exact sidecar without executing
+ * the artifact. This intentionally has no host-platform gate so release and
+ * qualification code can inspect the Windows artifact on any build host.
+ */
+export async function inspectWindowsJobHelperArtifact(
+  artifactRoot: string,
 ): Promise<ResolvedWindowsJobHelper> {
   try {
-    if (platform !== "win32" || architecture !== "x64") fail();
-    const modulePath = fileURLToPath(moduleUrl);
-    const pluginRoot = resolvePluginRoot(modulePath);
-    const artifactRoot = path.join(pluginRoot, "native", "win32-x64");
     const executablePath = path.join(artifactRoot, EXECUTABLE_NAME);
     const manifestPath = path.join(artifactRoot, MANIFEST_NAME);
 
-    await assertNoReparseExistingPath(pluginRoot);
     await assertNoReparseExistingPath(artifactRoot);
     await assertNoReparseExistingPath(executablePath);
     await assertNoReparseExistingPath(manifestPath);
@@ -122,6 +119,25 @@ export async function resolveWindowsJobHelperForModule(
     if (manifest !== `${digest}  ${EXECUTABLE_NAME}\n`) fail();
     assertX64ManagedPe(bytes);
     return Object.freeze({ executablePath, sha256: digest });
+  } catch {
+    return fail();
+  }
+}
+
+/** @internal Tests inject only the loaded module identity, never an artifact path. */
+export async function resolveWindowsJobHelperForModule(
+  moduleUrl: string,
+  platform: NodeJS.Platform = process.platform,
+  architecture: string = process.arch,
+): Promise<ResolvedWindowsJobHelper> {
+  try {
+    if (platform !== "win32" || architecture !== "x64") fail();
+    const modulePath = fileURLToPath(moduleUrl);
+    const pluginRoot = resolvePluginRoot(modulePath);
+    const artifactRoot = path.join(pluginRoot, "native", "win32-x64");
+
+    await assertNoReparseExistingPath(pluginRoot);
+    return await inspectWindowsJobHelperArtifact(artifactRoot);
   } catch {
     return fail();
   }

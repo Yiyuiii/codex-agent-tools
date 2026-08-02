@@ -16,6 +16,7 @@ import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  inspectWindowsJobHelperArtifact,
   resolveWindowsJobHelper,
   resolveWindowsJobHelperForModule,
 } from "../../src/runtime/windows-job-helper.js";
@@ -71,6 +72,16 @@ afterEach(async () => {
 });
 
 describe("Windows job helper resolver", () => {
+  it("inspects the canonical artifact without a host platform gate", async () => {
+    const value = await fixture("dist");
+    await expect(
+      inspectWindowsJobHelperArtifact(value.artifactRoot),
+    ).resolves.toEqual({
+      executablePath: value.executablePath,
+      sha256: value.digest,
+    });
+  });
+
   it.each(["dist", "plugin"] as const)(
     "resolves and verifies the canonical helper from the %s layout",
     async (layout) => {

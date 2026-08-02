@@ -6,16 +6,20 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  analyzeCapabilityIndex,
   capabilityDependencyInputFromPackageLock,
+  capabilityRuntimeInputExclusions,
   capabilityRuntimeInputRoots,
   collectCapabilityRuntimeInputs,
   computeCapabilityRuntimeFingerprint,
   fingerprintCapabilitySnapshot,
   verifyCapabilityEvidenceSource,
+  verifyCapabilityIndex,
   type BatchCaseCapabilitySource,
   type CapabilityQualificationEntry,
   type LegacyStandaloneCapabilitySource,
 } from "../../src/qualification/capability-index.js";
+import { collectCanonicalRuntimeInputIdentity } from "../../src/release/canonical-runtime-inputs.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -56,6 +60,12 @@ describe("capability qualification runtime fingerprint", () => {
     );
     expect(piRoots).not.toContain("src/llms/registry.ts");
     expect(kimiRoots).not.toContain("src/llms/registry.ts");
+    expect(capabilityRuntimeInputExclusions()).toEqual([
+      "src/runtime/owned-agent-process.ts",
+      "src/runtime/windows-owned-agent-process.ts",
+      "src/runtime/windows-job-helper.ts",
+      "src/runtime/windows-job-protocol.ts",
+    ]);
     expect(piRoots.some((entry) => entry.startsWith("docs/"))).toBe(false);
     expect(kimiRoots.some((entry) => entry.startsWith("docs/"))).toBe(false);
     expect(Object.isFrozen(piRoots)).toBe(true);
@@ -224,6 +234,7 @@ describe("capability qualification runtime fingerprint", () => {
         maxConcurrency: 1,
         concurrencyKey: "ark-coding-plan",
       },
+      canonicalRuntimeInputDigestSha256: "c".repeat(64),
       inputs: [
         { path: "src/a.ts", content: "export const a = 1;\r\n" },
         { path: "src/b.ts", content: "export const b = 2;\n" },
@@ -247,6 +258,12 @@ describe("capability qualification runtime fingerprint", () => {
     expect(
       fingerprintCapabilitySnapshot({
         ...base,
+        canonicalRuntimeInputDigestSha256: "e".repeat(64),
+      }),
+    ).not.toBe(fingerprint);
+    expect(
+      fingerprintCapabilitySnapshot({
+        ...base,
         profile: { ...base.profile, model: "changed-model" },
       }),
     ).not.toBe(fingerprint);
@@ -259,6 +276,71 @@ describe("capability qualification runtime fingerprint", () => {
         ],
       }),
     ).not.toBe(fingerprint);
+  });
+
+  it("injects one shared canonical digest into all eight schema-2 fingerprints while keeping runtime-specific inputs local", () => {
+    const llms = [
+      "ark-agent-deepseek-v4-flash",
+      "ark-agent-plan",
+      "ark-coding-plan",
+      "kimi-k3",
+    ] as const;
+    const tasks = ["delegate", "review"] as const;
+    const canonicalDigest = "a".repeat(64);
+    const snapshots = llms.flatMap((llm) =>
+      tasks.map((task) => ({
+        llm,
+        task,
+        canonicalRuntimeInputDigestSha256: canonicalDigest,
+        profile: {
+          id: llm,
+          runtime:
+            llm === "kimi-k3"
+              ? ("kimi-acp" as const)
+              : ("pi-rpc" as const),
+          model: `${llm}-model`,
+          network: "direct" as const,
+          credentialEnv: [`${llm}_KEY`],
+          maxConcurrency: 1,
+        },
+        inputs: [
+          { path: "src/shared.ts", content: "shared\n" },
+          {
+            path:
+              llm === "kimi-k3"
+                ? "src/adapters/kimi/runtime.ts"
+                : "src/adapters/pi/runtime.ts",
+            content: llm === "kimi-k3" ? "kimi\n" : "pi\n",
+          },
+        ],
+      })),
+    );
+    const baseline = snapshots.map(fingerprintCapabilitySnapshot);
+    const canonicalChanged = snapshots.map((snapshot) =>
+      fingerprintCapabilitySnapshot({
+        ...snapshot,
+        canonicalRuntimeInputDigestSha256: "b".repeat(64),
+      }),
+    );
+    const kimiChanged = snapshots.map((snapshot) =>
+      fingerprintCapabilitySnapshot({
+        ...snapshot,
+        inputs: snapshot.inputs.map((input) =>
+          input.path.includes("/kimi/")
+            ? { ...input, content: "kimi changed\n" }
+            : input,
+        ),
+      }),
+    );
+
+    expect(
+      canonicalChanged.every(
+        (value, index) => value !== baseline[index],
+      ),
+    ).toBe(true);
+    expect(
+      kimiChanged.map((value, index) => value !== baseline[index]),
+    ).toEqual([false, false, false, false, false, false, true, true]);
   });
 
   it("computes deterministic and task-scoped fingerprints for current inputs", async () => {
@@ -310,6 +392,21 @@ describe("capability qualification runtime fingerprint", () => {
       { path: "inputs/nested/a.ts", content: "a\n" },
       { path: "inputs/z.ts", content: "z\n" },
     ]);
+  });
+
+  it("excludes the four canonical wrappers only from the ordinary runtime input set", async () => {
+    const inputs = await collectCapabilityRuntimeInputs({
+      repositoryRoot: process.cwd(),
+      roots: ["src/runtime"],
+      excludePaths: capabilityRuntimeInputExclusions(),
+    });
+    const paths = inputs.map((input) => input.path);
+    expect(paths).toContain("src/runtime/credentials.ts");
+    expect(
+      paths.some((entry) =>
+        capabilityRuntimeInputExclusions().includes(entry),
+      ),
+    ).toBe(false);
   });
 
   it("fails closed for unsafe, missing, binary, or symbolic-link inputs", async () => {
@@ -860,5 +957,39 @@ describe("capability qualification evidence source", () => {
         profile,
       }),
     ).rejects.toThrow(/capability qualification/iu);
+  });
+});
+
+describe("current capability index schema-2 migration analysis", () => {
+  it("checks all eight evidence sources before reporting every old fingerprint stale", async () => {
+    let canonicalCollections = 0;
+    const analysis = await analyzeCapabilityIndex(
+      { repositoryRoot: process.cwd() },
+      {
+        collectCanonicalRuntimeInputIdentity: async (root) => {
+          canonicalCollections += 1;
+          return collectCanonicalRuntimeInputIdentity(root);
+        },
+      },
+    );
+
+    expect(canonicalCollections).toBe(1);
+    expect(analysis.entries).toHaveLength(8);
+    expect(analysis.entries.map((entry) => entry.evidenceStatus)).toEqual(
+      Array.from({ length: 8 }, () => "valid"),
+    );
+    expect(
+      analysis.entries.map((entry) => entry.runtimeFingerprintStatus),
+    ).toEqual(Array.from({ length: 8 }, () => "stale"));
+    expect(
+      analysis.entries.every((entry) =>
+        /^[a-f0-9]{64}$/u.test(
+          entry.currentRuntimeFingerprintSha256 ?? "",
+        ),
+      ),
+    ).toBe(true);
+    await expect(
+      verifyCapabilityIndex({ repositoryRoot: process.cwd() }),
+    ).rejects.toThrow("Capability qualification evidence is invalid");
   });
 });

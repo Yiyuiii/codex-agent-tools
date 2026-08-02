@@ -256,6 +256,8 @@ git diff --check
 
 **精确npm包面子批状态（2026-08-02，已完成实现）：** `package.json.files`已经成为唯一包面声明，精确列出23个仓库文件；真实`npm pack`只有这些文件与npm隐式`package.json`共24项。公开dist只保留CLI/MCP；能力资格只打包当前索引与其直接引用的manifest/evidence；不再发布内部entry、声明/source map、历史计划或审阅稿，`commonmark`移为开发依赖。已安装包验收逐字比较仓库与安装后能力索引，并复核source hash与batch case身份。fresh审阅发现并修复祖先Windows junction缺口：全部声明文件现逐级拒绝symlink/reparse，且realpath必须仍为仓库内的同一目标。主线聚焦181/181、类型、build、exact pack与diff通过；全库Vitest一次运行在既定240秒test watchdog内未取得终态、无失败输出且无残留进程，因此不记为PASS且不提高或重跑；release smoke按预期在八项现有stale资格处fail closed。下一子批只实现canonical runtime-input digest与严格release marker，不改能力索引、不调用真实模型。
 
+**Canonical runtime-input子批状态（2026-08-02，已完成实现）：** 新增唯一内存manifest schema1，固定包含production build/generated protocol合同、protocol投影、只从`build.config.json#sourceSets.production`派生的9个C#源、4个Windows TypeScript wrapper和helper实际字节SHA；不建立第二份C#清单，也不纳入tests/fixtures/toolchain/generated文件/docs/evidence/marker/CI/POSIX/host值。纯helper inspector由production resolver与release/qualification共同复用。serializer/digest对unknown执行固定重投影，拒绝对象或数组proxy、getter、symbol、extra、missing、duplicate、sparse、路径/SHA不一致。能力指纹升为schema2并注入同一canonical digest；普通输入只排除已被摘要覆盖的4个wrapper，其余runtime仍收集。新分析入口只收集一次canonical identity、按runtime缓存并完整检查8项后返回状态；真实当前索引为8/8 evidence valid、8/8 stored schema1 fingerprint相对current schema2 stale，严格verifier仍generic fail closed。不得把该结果反向解释成八个历史摘要曾共享同一旧digest。fresh复审最终PASS；主线58/58、类型、library build与diff通过。索引、历史manifest/evidence与helper二进制均未改。
+
 1. Doctor/package：Windows strict doctor复用resolver并报告当前OS/Node/libuv/CLR/helper摘要，运行无target的`--probe-v1`但不重新构建/运行完整carrier preflight；production invocation不先跑probe。POSIX not-applicable。npm与plugin各包含唯一helper/SHA，隔离copy后可probe和跑fake MCP。
 2. Runtime inputs：建立唯一canonical manifest，精确列出native production source、TypeScript wrapper、protocol/build config和实际helper摘要，并由同一实现生成确定性digest。capability fingerprint把该digest作为运行输入；当前宿主冻结证据和tagged workflow复用同一manifest与算法，不再维护平行的`current-host runtime fingerprint`。不加入历史evidence、资格开关、计划/审阅稿或整个package-set raw-byte digest。
 3. Freeze/release smoke：不新增`smoke:prequalification`。Task 8逐项运行既有原子命令各一次，并单独记录八项能力唯一因runtime-input digest stale而fail closed；取得新8/8后只运行普通`smoke:release`。不得用candidate/core/prequalification多层wrapper重复build、pack或release core。
@@ -316,7 +318,7 @@ npm run verify:capabilities
 git diff --check
 ```
 
-这里的`verify:capabilities`在新真实8/8之前必须精确以exit 1失败，且机器检查只能归因于八项runtime-input digest stale；Task 8不得把该预期失败改写为PASS，也不重复运行必然失败的完整`smoke:release`。
+这里的`verify:capabilities`在新真实8/8之前必须精确以exit 1失败。机器分析必须先完整证明8份历史证据仍有效，再证明8个已存schema1摘要均与current schema2 fingerprint不符；它不能从不可逆旧摘要反推八项历史上曾共享同一个旧digest。Task 8不得把该预期失败改写为PASS，也不重复运行必然失败的完整`smoke:release`。
 
 本机证据必须记录：
 
@@ -325,7 +327,7 @@ git diff --check
 - carrier与Task 4 kernel/parent/helper crash结果，以及Task 6最小fake Kimi/Pi/stdio接线结果；
 - 全部已知owned process/handle/temp root由各自case-owned Job drain归零，资格、恢复与公共npm验收没有调用WMI/`ps`全机zero gate；
 - 新current preflight不再生成`targetProcesses`，历史v1/v2记录仍可严格只读验证且没有任何历史manifest/evidence被改写；
-- 八项能力唯一因runtime fingerprint stale；
+- 八项历史证据均有效，八个已存schema1摘要相对current schema2 fingerprint均为stale；
 - 真实模型、活动配置/插件、发布和外部CLI全局限制均为0。
 
 Task 8把这些事实写入仓库内脱敏的当前宿主prequalification证据，并固定runtime frozen commit、helper SHA和canonical runtime-input digest。它不提前创建尚未确定版本号的beta marker；真实8/8和版本元数据完成后，由后续beta候选提交生成同版本`.release-validation/v<version>.md`并引用该证据。tag workflow必须在tagged tree用同一manifest实现重算digest，不能只相信marker文本。
