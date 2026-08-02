@@ -177,6 +177,16 @@ git diff --check
 
 ## 7. Task 6：Kimi、Pi与stdio接线
 
+**实施裁决（2026-08-01）：** 现有两个client在业务完成后都会无条件PID-tree kill，Pi fake还用`setInterval`阻止自然退出；机械替换成`await owned.closed`会永久等待，而把成功收尾伪装成`cancelled`又会污染terminal语义。现行最小合同固定为：成功路径先结束target stdin/协议输入，让CLI自然退出并只接受`root_exit`；取消、显式调用级timeout与stdio shutdown才先发送ACP cancel/Pi abort，再分别请求对应owned termination。离线fake必须锁定stdin EOF自然退出；公共beta阶段必须验证真实Kimi/Pi相同行为。若真实CLI不响应EOF，发布门禁应失败并回到设计，不得增加默认timeout、PID/taskkill fallback或把completed映射成cancelled。
+
+实现按最小依赖顺序拆为：定位器与Pi runtime env → Windows client owned接线 → stdio关闭准入/session reason/no-rebirth → 只读doctor/smoke/preflight消费者 → qualification新schema与全机scanner删除 → acceptance/PID/taskkill遗留收口。各子批只跑影响范围；Task 6结束后才运行一次全量回归。
+
+**第一子批状态（2026-08-01，已完成）：** 提交`3ab1743`建立严格Windows Kimi executable与Pi package invocation验证，并通过既有child-env白名单注入唯一Pi runtime目录。独立审查后删除不可达containment假覆盖、父环境整表复制与可写类型漂移；Windows真实文件系统用例只在当前Windows宿主运行，POSIX回归继续供单Node Ubuntu workflow执行。最终聚焦57/57、类型与diff通过。consumer仍暂留旧接口，下一子批必须完成client/adapter迁移后再删除Windows legacy string路径。
+
+**第二子批状态（2026-08-01，已完成）：** 提交`564bbcb`在工具handler构造前执行factory式准入；首次stdio/signal/显式close同步关闭准入并以固定`session_shutdown` abort独立signal，然后才关闭server、drain既有任务和清理listener。SDK request abort仍为独立signal，service已把两者原样传给adapter；关闭后不得晚启handler/service。未使用`output`已机械删除，无client行为或timeout变化。主线程73/73、fresh复审79/79、类型与diff通过。下一子批由Kimi/Pi client消费该shutdown signal并把reason精确映射到owned termination。
+
+**第三子批状态（2026-08-02，clients已完成）：** 提交`a81e3fa`与`d2030b4`让Kimi/Pi的Windows client只通过`OwnedAgentProcess`运行；成功路径结束协议stdin并只接受自然`root_exit`且code 0，caller取消、显式调用级deadline与stdio shutdown分别锁存reason并请求一次Job终止，内部协议/decoder/business失败则立即以内部cleanup reason drain但公开保持`failed`。两条client都在spawner pending窗口、pre-READY、应用层cancel/abort写入永不settle、自然退出竞态、helper/closed/drain失败和spawn失败上fail closed；只有应用层取消写入是best effort，私有Job控制通道从不等待它。Windows测试不读取PID，POSIX旧direct spawn/process-group路径保留。三轮交叉审阅依次修复了预中止晚启、READY/pipe write挂死、协议失败误走成功EOF、Pi incomplete JSONL漏报、abort response伪诊断、POSIX pending未拒绝和nonzero root误判成功；最终Kimi 19/19、Pi 46 passed / 1 POSIX-only skipped，主线程类型与diff通过。adapter consumer、doctor/smoke/preflight与scanner删除仍待后续子批。
+
 ### 7.1 RED
 
 - Kimi/Pi Windows路径仍依赖direct spawn、PID terminator或`pi.cmd`执行的合同测试先失败；
@@ -221,13 +231,18 @@ git diff --check
 - release workflow尚未实现beta当前宿主marker和stable公共beta/完整重启/真实Stop/owned-zero marker；
 - 当前宿主冻结、能力验证与tag workflow尚未复用同一runtime-input digest，且计划中仍存在重复的prequalification wrapper；
 - 活动测试仍真实创建`core.autocrlf=true/false`双checkout，插件文档门禁仍把历史Task 9–12和固定beta序号当现行路线；
-- `engines`、tsup target与公开文档仍声明Node 20兼容，npm文档清单仍把历史计划/审阅页当产品必需文件，旧`acceptance:local`仍可被误当现行真实模型门禁；
+- `engines >=24`、tsup `node24`与单Node 24 workflow已经收敛；剩余npm文档清单仍把历史计划/审阅页当产品必需文件，旧`acceptance:local`仍可被误当现行真实模型门禁；
 - CI仍上传不被release消费的dist/plugin artifact，native sourceSets与npm文档清单仍有重复真值源；
 - npm仍把整个`dist`作为公开运行面：未消费的`qualification` entry、仓库内部acceptance/smoke/release入口、无公共类型入口的声明/映射和仅release assurance使用的`commonmark`生产依赖尚未收敛；
 - CI/release在同一job内通过`pretest`与`smoke:release`重复build，release smoke已检查pack后workflow又重复pack并上传无人消费的完整dist/runtime；
 - 多项测试仍扫描脚本/tsup/计划Markdown的精确源码文本或锁定当前beta、branch、date与Windows条件测试数量；README与operations仍重复维护易变的活动安装、历史批次和执行合同。
+- `src/tasks/schemas.ts`仍有历史固定prompt/context字符上限，workspace evidence还在200,000字符静默截断Git上下文，Pi隔离模型定义仍固定`contextWindow`/`maxTokens`；必须先根据当前Pi schema与当前Ark路线区分“必需的真实容量元数据”和“会削弱外部CLI原生能力的保守限制”，只删除后者，不能把未经证实的数值继续当全局默认。
 
 ### 8.2 GREEN
+
+**提前完成的冗余闭包（2026-08-01）：** 提交`548cc01`已删除公开MCP schema中无依据的prompt/context/acceptance-criteria字符与数量魔数，并用阈值+1、尾部sentinel、service逐字透传和MCP schema测试锁定，聚焦60/60；提交`06f5d4e`又删除Git status/diff的200,000字符静默裁剪，真实超阈值尾部sentinel聚焦4/4完整保留。Pi容量字段经本机0.80.10随包源码确认会真实影响API `max_tokens`、输出预算和compaction，不能机械删除；现有值只作为历史真实调用已接受的配置保留，不宣称最大容量已证明。
+
+**单宿主发布冗余复核（2026-08-02，只读）：** Node工作已收敛为`engines >=24`、tsup `node24`和单一Node 24 workflow，不恢复三版本矩阵。后续实现按风险拆分：先退役旧`acceptance:local`真实模型入口和双`core.autocrlf` checkout；再移除离线release smoke中的`npm view`、未消费CI/release artifacts与重复build/pack；随后以`package.json.files`为唯一包面声明，停止打包历史审阅稿/计划与整棵evidence树，只保留当前能力索引精确引用及native helper/SHA；最后用可执行marker verifier同时约束beta的当前宿主冻结证据和stable的公共beta精确安装、完整App重启、真实Stop与owned-zero。现行prerelease workflow会跳过validation marker，且npm files尚未包含native helper，这两项是必须补的非冗余发布阻断，不得随清理一起删除。
 
 1. Doctor/package：Windows strict doctor复用resolver并报告当前OS/Node/libuv/CLR/helper摘要，运行无target的`--probe-v1`但不重新构建/运行完整carrier preflight；production invocation不先跑probe。POSIX not-applicable。npm与plugin各包含唯一helper/SHA，隔离copy后可probe和跑fake MCP。
 2. Runtime inputs：建立唯一canonical manifest，精确列出native production source、TypeScript wrapper、protocol/build config和实际helper摘要，并由同一实现生成确定性digest。capability fingerprint把该digest作为运行输入；当前宿主冻结证据和tagged workflow复用同一manifest与算法，不再维护平行的`current-host runtime fingerprint`。不加入历史evidence、资格开关、计划/审阅稿或整个package-set raw-byte digest。
@@ -242,6 +257,7 @@ git diff --check
 11. 行为测试替代文本耦合：把npm launch-path等validator提取为纯函数并测试输入输出；保留真实隔离bundle执行、package exact inclusion、链接闭包、秘密/绝对路径扫描和workflow发布语义。删除对tsup实现字段、release-smoke源代码列表、计划命令块、`windowsIt`数量、当前beta/branch/date及精确Codex CLI版本的重复文本断言；版本测试改为比较package、CLI、MCP、plugin与workflow共享pin的一致性，Codex CLI仍固定到一个仓库真值源而非浮动最新版。
 12. 文档真值源：`docs/operations.md`唯一维护完整安装、验收、回滚和发布流程；README只保留稳定产品合同、当前支持声明与链接。活动插件版本、历史批次ID/SHA/测试计数和一次性分支日期进入未打包的freeze/release evidence，不在两个公开文档重复维护。历史evidence/manifest保持不可变。
 13. 明确保留：Job原子归属、唯一owner、句柄/环境/凭据隔离、parent/helper crash、managed与kernel分层测试、source→artifact/SHA/PE/resolver、canonical runtime-input digest、资格与能力双verifier、pack秘密/链接检查、beta/stable marker、公共beta精确安装、完整App重启/真实Stop、OIDC发布、`prepublishOnly`、固定Codex CLI来源、最小POSIX release回归及provider `KeyedLimiter`均不因删冗余而弱化。
+14. 外部CLI原生能力：删除没有协议或当前provider事实依据的prompt/context/token保守上限与Git evidence静默字符截断；若Pi模型定义字段是当前安装版本执行所需的容量元数据，则保留字段，但数值必须由当前路线权威合同证明并记录来源，不把它扩张为step/turn/tool/runtime限制。显式调用级`timeoutMs`、qualification-only single-attempt和test teardown watchdog不受影响。
 
 ### 8.3 子批次A：artifact / resolver / doctor / package
 
