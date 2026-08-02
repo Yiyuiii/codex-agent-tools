@@ -95,7 +95,7 @@ npm run acceptance:plugin:isolated
 npm run acceptance:npm-package -- --version 0.1.0
 ```
 
-真实 Kimi/Pi 烟测会实际消耗本机计划额度，并使用全机进程快照检查残留，因此只在精确能力门禁中串行运行。例如：
+真实 Kimi/Pi 烟测会实际消耗本机计划额度，并以本次调用的 `ownedProcessDrained` / Job 归零证据检查残留，不扫描全机或要求无关 Kimi/Pi 进程为空，因此只在精确能力门禁中串行运行。例如：
 
 ```powershell
 npm run smoke:kimi -- --llm kimi-k3 --task review

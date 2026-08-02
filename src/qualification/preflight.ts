@@ -174,6 +174,11 @@ interface DeterministicCommand {
 
 const DETERMINISTIC_COMMANDS: readonly DeterministicCommand[] = Object.freeze([
   Object.freeze({
+    stage: "build" as const,
+    command: "npm",
+    args: Object.freeze(["run", "build"]),
+  }),
+  Object.freeze({
     stage: "typecheck" as const,
     command: "npm",
     args: Object.freeze(["run", "typecheck"]),
@@ -181,25 +186,18 @@ const DETERMINISTIC_COMMANDS: readonly DeterministicCommand[] = Object.freeze([
   Object.freeze({
     stage: "test" as const,
     command: "npm",
-    args: Object.freeze(["test"]),
-  }),
-  Object.freeze({
-    stage: "build" as const,
-    command: "npm",
-    args: Object.freeze(["run", "build"]),
+    args: Object.freeze(["run", "test:deterministic"]),
   }),
   Object.freeze({
     stage: "release_smoke" as const,
     command: "npm",
-    args: Object.freeze(["run", "smoke:release"]),
+    args: Object.freeze(["run", "smoke:release:built"]),
   }),
   Object.freeze({
     stage: "isolated_acceptance" as const,
-    command: "npm",
+    command: process.execPath,
     args: Object.freeze([
-      "run",
-      "acceptance:plugin:isolated",
-      "--",
+      "scripts/plugin-isolated-acceptance.mjs",
       "--check-report",
     ]),
   }),

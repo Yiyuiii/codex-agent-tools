@@ -99,7 +99,13 @@ function commandStage(request: QualificationPreflightCommandRequest): string {
   ) {
     return "typecheck";
   }
-  if (request.command === "npm" && request.args[0] === "test") return "test";
+  if (
+    request.command === "npm" &&
+    request.args[0] === "run" &&
+    request.args[1] === "test:deterministic"
+  ) {
+    return "test";
+  }
   if (
     request.command === "npm" &&
     request.args[0] === "run" &&
@@ -110,14 +116,14 @@ function commandStage(request: QualificationPreflightCommandRequest): string {
   if (
     request.command === "npm" &&
     request.args[0] === "run" &&
-    request.args[1] === "smoke:release"
+    request.args[1] === "smoke:release:built"
   ) {
     return "release_smoke";
   }
   if (
-    request.command === "npm" &&
-    request.args[0] === "run" &&
-    request.args[1] === "acceptance:plugin:isolated"
+    request.command === process.execPath &&
+    request.args[0] === "scripts/plugin-isolated-acceptance.mjs" &&
+    request.args[1] === "--check-report"
   ) {
     return "isolated_acceptance";
   }
@@ -415,9 +421,9 @@ describe("qualification preflight", () => {
     expect(
       state.commands.map(commandStage).filter((stage) => stage !== "other"),
     ).toEqual([
+      "build",
       "typecheck",
       "test",
-      "build",
       "release_smoke",
       "isolated_acceptance",
       "diff_check",
@@ -425,12 +431,26 @@ describe("qualification preflight", () => {
     const acceptance = state.commands.find(
       (request) => commandStage(request) === "isolated_acceptance",
     );
-    expect(acceptance?.args).toEqual([
-      "run",
-      "acceptance:plugin:isolated",
-      "--",
-      "--check-report",
-    ]);
+    expect(acceptance).toMatchObject({
+      command: process.execPath,
+      args: [
+        "scripts/plugin-isolated-acceptance.mjs",
+        "--check-report",
+      ],
+    });
+    expect(
+      state.commands.filter((request) => commandStage(request) === "build"),
+    ).toHaveLength(1);
+    expect(
+      state.commands.some(
+        ({ command, args }) =>
+          command === "npm" &&
+          (args[0] === "test" ||
+            (args[0] === "run" &&
+              (args[1] === "smoke:release" ||
+                args[1] === "acceptance:plugin:isolated"))),
+      ),
+    ).toBe(false);
     expect(state.authorizationChecks).toBe(1);
     expect(state.locatorCalls).toEqual(["kimi", "pi-invocation"]);
     expect(
@@ -589,17 +609,17 @@ describe("qualification preflight", () => {
   it("stops the deterministic sequence at the first failed command", async () => {
     const repositoryRoot = await tempRepository();
     const state = await harness(repositoryRoot, {
-      failCommandStage: "build",
+      failCommandStage: "test",
     });
 
     await expect(run(repositoryRoot, state.dependencies)).rejects.toMatchObject(
       {
-        stage: "build",
+        stage: "test",
       },
     );
     expect(
       state.commands.map(commandStage).filter((stage) => stage !== "other"),
-    ).toEqual(["typecheck", "test", "build"]);
+    ).toEqual(["build", "typecheck", "test"]);
   });
 
   it("rejects a mutable or multi-prefix Windows Pi invocation without starting Pi", async () => {
