@@ -98,6 +98,39 @@ function createPiService(
 
 describe("ExternalAgentService", () => {
   it.each(["review", "delegate"] as const)(
+    "passes independent request and session shutdown signals to the %s adapter",
+    async (task) => {
+      const requestSignal = new AbortController().signal;
+      const shutdownSignal = new AbortController().signal;
+      let observed: AdapterRunRequest | undefined;
+      const service = createService(async (request) => {
+        observed = request;
+        return completed();
+      });
+
+      if (task === "review") {
+        await service.review(
+          {
+            llm: "kimi-k3",
+            task: "review_diff",
+            prompt: "Review",
+            cwd,
+          },
+          { signal: requestSignal, shutdownSignal },
+        );
+      } else {
+        await service.delegate(
+          { llm: "kimi-k3", prompt: "Delegate", cwd },
+          { signal: requestSignal, shutdownSignal },
+        );
+      }
+
+      expect(observed?.signal).toBe(requestSignal);
+      expect(observed?.shutdownSignal).toBe(shutdownSignal);
+    },
+  );
+
+  it.each(["review", "delegate"] as const)(
     "reports %s adapter telemetry only through the internal observer",
     async (task) => {
       const telemetry: AdapterExecutionTelemetry = {

@@ -31,6 +31,14 @@ async function flushPromises(): Promise<void> {
   await Promise.resolve();
 }
 
+function createInFlightWithDrain(
+  drain: () => Promise<void>,
+): InFlightTasks {
+  const inFlight = new InFlightTasks();
+  vi.spyOn(inFlight, "drain").mockImplementation(drain);
+  return inFlight;
+}
+
 class FakeSignalSource implements McpSignalSource {
   readonly #emitter = new EventEmitter();
   readonly #onLastSessionListenerRemoved: (() => void) | undefined;
@@ -91,7 +99,6 @@ interface HarnessOptions {
 
 function createHarness(options: HarnessOptions = {}) {
   const input = options.input ?? new PassThrough();
-  const output = new PassThrough();
   const signalSource = options.signalSource ?? new FakeSignalSource();
   const server = {
     close: vi.fn(options.close ?? (async () => {})),
@@ -103,7 +110,6 @@ function createHarness(options: HarnessOptions = {}) {
     server,
     transport,
     input,
-    output,
     inFlight,
     signalSource,
     ...(options.reportError === undefined
@@ -116,7 +122,6 @@ function createHarness(options: HarnessOptions = {}) {
     connect: server.connect as unknown as ReturnType<typeof vi.fn>,
     inFlight,
     input,
-    output,
     session,
     signalSource,
   };
@@ -138,7 +143,7 @@ describe("MCP stdio session", () => {
       close: async () => {
         events.push("server.close");
       },
-      inFlight: { drain } as unknown as InFlightTasks,
+      inFlight: createInFlightWithDrain(drain),
       input,
     });
     const ended = new Promise<void>((resolve) => input.once("end", resolve));
@@ -180,7 +185,7 @@ describe("MCP stdio session", () => {
     const input = new PassThrough();
     const drain = vi.fn(async () => {});
     const harness = createHarness({
-      inFlight: { drain } as unknown as InFlightTasks,
+      inFlight: createInFlightWithDrain(drain),
       input,
     });
     const closed = new Promise<void>((resolve) => input.once("close", resolve));
@@ -231,7 +236,7 @@ describe("MCP stdio session", () => {
       close: async () => {
         events.push("server.close");
       },
-      inFlight: { drain } as unknown as InFlightTasks,
+      inFlight: createInFlightWithDrain(drain),
       input,
       reportError: (message) => reports.push(message),
     });
@@ -272,6 +277,9 @@ describe("MCP stdio session", () => {
     const events: string[] = [];
     const handler = deferred<void>();
     const inFlight = new InFlightTasks();
+    inFlight.shutdownSignal.addEventListener("abort", () => {
+      events.push(`shutdown.abort:${String(inFlight.shutdownSignal.reason)}`);
+    });
     inFlight.track(
       handler.promise.then(() => {
         events.push("handler.settle");
@@ -296,13 +304,13 @@ describe("MCP stdio session", () => {
     await completion;
 
     expect(events).toEqual([
+      "shutdown.abort:session_shutdown",
       "server.close",
       "handler.cancel",
       "handler.settle",
       "listeners.removed",
     ]);
     expect(harness.close).toHaveBeenCalledTimes(1);
-    expect(harness.output.writableEnded).toBe(false);
   });
 
   it.each([
@@ -393,8 +401,8 @@ describe("MCP stdio session", () => {
   it("records a synchronous pre-connect close request and shuts down only after connect", async () => {
     const connect = deferred<void>();
     const input = new PassThrough();
-    const output = new PassThrough();
     const signalSource = new FakeSignalSource();
+    const inFlight = new InFlightTasks();
     const server = {
       close: vi.fn(async () => {}),
       connect: vi.fn(() => {
@@ -406,8 +414,7 @@ describe("MCP stdio session", () => {
       server: server as unknown as McpServer,
       transport: {} as StdioServerTransport,
       input,
-      output,
-      inFlight: new InFlightTasks(),
+      inFlight,
       signalSource,
     });
     let settled = false;
@@ -418,6 +425,8 @@ describe("MCP stdio session", () => {
     });
     await flushPromises();
 
+    expect(inFlight.shutdownSignal.aborted).toBe(true);
+    expect(inFlight.shutdownSignal.reason).toBe("session_shutdown");
     expect(server.close).not.toHaveBeenCalled();
     expect(settled).toBe(false);
 
@@ -484,7 +493,7 @@ describe("MCP stdio session", () => {
     const input = new PassThrough();
     const harness = createHarness({
       close: () => close.promise,
-      inFlight: { drain } as unknown as InFlightTasks,
+      inFlight: createInFlightWithDrain(drain),
       input,
       reportError: (message) => reports.push(message),
     });
@@ -532,7 +541,7 @@ describe("MCP stdio session", () => {
       close: async () => {
         throw closeFailure;
       },
-      inFlight: { drain } as unknown as InFlightTasks,
+      inFlight: createInFlightWithDrain(drain),
       reportError: (message) => reports.push(message),
     });
     const completion = harness.session.run();

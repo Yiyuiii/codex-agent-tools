@@ -50,12 +50,13 @@ export function registerExternalTools(
       },
     },
     (input, extra) => {
-      const handler = (async () => {
+      return inFlight.run(async () => {
         const progress = createMcpProgressReporter(extra);
         try {
           const output = externalReviewResultSchema.parse(
             await service.review(input, {
               signal: extra.signal,
+              shutdownSignal: inFlight.shutdownSignal,
               onProgress: progress.report,
             }),
           );
@@ -66,8 +67,7 @@ export function registerExternalTools(
         } finally {
           await progress.finish();
         }
-      })();
-      return inFlight.track(handler);
+      });
     },
   );
 
@@ -87,12 +87,13 @@ export function registerExternalTools(
       },
     },
     (input, extra) => {
-      const handler = (async () => {
+      return inFlight.run(async () => {
         const progress = createMcpProgressReporter(extra);
         try {
           const output = externalDelegateResultSchema.parse(
             await service.delegate(input, {
               signal: extra.signal,
+              shutdownSignal: inFlight.shutdownSignal,
               onProgress: progress.report,
             }),
           );
@@ -103,8 +104,7 @@ export function registerExternalTools(
         } finally {
           await progress.finish();
         }
-      })();
-      return inFlight.track(handler);
+      });
     },
   );
 

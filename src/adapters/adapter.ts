@@ -21,6 +21,7 @@ export interface AdapterRunRequest {
   timeoutMs?: number;
   sessionId?: string;
   signal?: AbortSignal;
+  shutdownSignal?: AbortSignal;
   onProgress?: (message: string) => void;
   parentEnvironment: NodeJS.ProcessEnv;
 }

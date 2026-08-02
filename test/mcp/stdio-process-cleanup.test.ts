@@ -450,7 +450,6 @@ async function runStdioCancellation(
     server,
     transport,
     input,
-    output,
     inFlight,
     signalSource: process,
   });

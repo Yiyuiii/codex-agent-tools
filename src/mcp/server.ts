@@ -53,7 +53,6 @@ export async function serveMcp(
     server,
     transport,
     input: process.stdin,
-    output: process.stdout,
     inFlight,
     signalSource: process,
   });

@@ -100,15 +100,27 @@ describe("codex_external_agents MCP server", () => {
     let callback:
       | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
       | undefined;
-    const signal = new AbortController().signal;
+    const controller = new AbortController();
+    const signal = controller.signal;
     let observedSignal: AbortSignal | undefined;
+    let observedShutdownSignal: AbortSignal | undefined;
     const notifications: unknown[] = [];
     const service = {
-      review: vi.fn(async (_input: unknown, context?: { signal?: AbortSignal; onProgress?: (message: string) => void }) => {
-        observedSignal = context?.signal;
-        context?.onProgress?.("kimi heartbeat 1000ms");
-        return reviewResult();
-      }),
+      review: vi.fn(
+        async (
+          _input: unknown,
+          context?: {
+            signal?: AbortSignal;
+            shutdownSignal?: AbortSignal;
+            onProgress?: (message: string) => void;
+          },
+        ) => {
+          observedSignal = context?.signal;
+          observedShutdownSignal = context?.shutdownSignal;
+          context?.onProgress?.("kimi heartbeat 1000ms");
+          return reviewResult();
+        },
+      ),
       delegate: vi.fn(),
     };
     const fakeServer = {
@@ -120,7 +132,8 @@ describe("codex_external_agents MCP server", () => {
         if (name === "external_review") callback = handler;
       },
     };
-    registerExternalTools(fakeServer as never, service);
+    const inFlight = new InFlightTasks();
+    registerExternalTools(fakeServer as never, service, inFlight);
 
     const result = (await callback?.(
       {
@@ -139,6 +152,10 @@ describe("codex_external_agents MCP server", () => {
     )) as { structuredContent: ExternalReviewResult; content: Array<{ text: string }> };
 
     expect(observedSignal).toBe(signal);
+    expect(observedShutdownSignal).toBe(inFlight.shutdownSignal);
+    expect(observedShutdownSignal).not.toBe(signal);
+    controller.abort("sdk_request_cancelled");
+    expect(observedShutdownSignal?.aborted).toBe(false);
     expect(notifications).toEqual([
       {
         method: "notifications/progress",
@@ -225,6 +242,45 @@ describe("codex_external_agents MCP server", () => {
     notification.resolve();
     await handler;
     expect(handlerSettled).toBe(true);
+    expect(inFlight.size).toBe(0);
+  });
+
+  it("rejects synchronously before constructing a handler after admission closes", () => {
+    let callback:
+      | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    const service = {
+      review: vi.fn(async () => reviewResult()),
+      delegate: vi.fn(),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        if (name === "external_review") callback = handler;
+      },
+    };
+    const inFlight = new InFlightTasks();
+    registerExternalTools(fakeServer as never, service, inFlight);
+    inFlight.closeAdmission();
+
+    expect(() =>
+      callback?.(
+        {
+          llm: "kimi-k3",
+          task: "review_plan",
+          prompt: "Must not start",
+          cwd: process.cwd(),
+        },
+        {},
+      ),
+    ).toThrowError("In-flight task admission is closed.");
+    expect(service.review).not.toHaveBeenCalled();
     expect(inFlight.size).toBe(0);
   });
 

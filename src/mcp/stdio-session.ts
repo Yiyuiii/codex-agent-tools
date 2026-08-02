@@ -1,4 +1,4 @@
-import type { Readable, Writable } from "node:stream";
+import type { Readable } from "node:stream";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -14,7 +14,6 @@ export interface McpStdioSessionDependencies {
   server: McpServer;
   transport: StdioServerTransport;
   input: Readable;
-  output: Writable;
   inFlight: InFlightTasks;
   signalSource: McpSignalSource;
   reportError?: (message: string) => void;
@@ -165,6 +164,7 @@ export function createMcpStdioSession(
   function requestClose(error?: unknown, message?: string): Promise<void> {
     if (!closeRequested) {
       closeRequested = true;
+      dependencies.inFlight.closeAdmission();
     }
     if (message !== undefined && firstFailure === undefined) {
       recordFailure(error, message);

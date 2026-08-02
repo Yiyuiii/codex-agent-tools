@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { InFlightTasks } from "../../src/mcp/in-flight.js";
 
@@ -19,6 +19,23 @@ describe("InFlightTasks", () => {
 
     expect(inFlight.size).toBe(1);
     expect(tracked).toBe(task.promise);
+    task.resolve("done");
+    await expect(tracked).resolves.toBe("done");
+    expect(inFlight.size).toBe(0);
+  });
+
+  it("starts a task from a factory only after admission succeeds", async () => {
+    const inFlight = new InFlightTasks();
+    const task = deferred<string>();
+    let factoryCalls = 0;
+
+    const tracked = inFlight.run(() => {
+      factoryCalls += 1;
+      return task.promise;
+    });
+
+    expect(factoryCalls).toBe(1);
+    expect(inFlight.size).toBe(1);
     task.resolve("done");
     await expect(tracked).resolves.toBe("done");
     expect(inFlight.size).toBe(0);
@@ -67,25 +84,50 @@ describe("InFlightTasks", () => {
     expect(order).toEqual(["tracked", "drain"]);
   });
 
-  it("drains tasks added after draining starts", async () => {
+  it("closes admission idempotently, rejects new tasks, and drains existing tasks", async () => {
     const inFlight = new InFlightTasks();
     const first = deferred<void>();
     const second = deferred<void>();
     inFlight.track(first.promise);
 
+    expect(inFlight.shutdownSignal.aborted).toBe(false);
+    expect(inFlight.shutdownSignal.reason).toBeUndefined();
+
+    inFlight.closeAdmission();
+    expect(inFlight.shutdownSignal.aborted).toBe(true);
+    expect(inFlight.shutdownSignal.reason).toBe("session_shutdown");
+
+    inFlight.closeAdmission();
+    expect(inFlight.shutdownSignal.reason).toBe("session_shutdown");
+
     let drained = false;
     const drain = inFlight.drain().then(() => {
       drained = true;
     });
-    inFlight.track(second.promise);
 
-    first.resolve();
+    expect(() => inFlight.track(second.promise)).toThrowError(
+      "In-flight task admission is closed.",
+    );
+    expect(inFlight.size).toBe(1);
+
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect(drained).toBe(false);
 
-    second.resolve();
+    first.resolve();
     await drain;
     expect(drained).toBe(true);
+    expect(inFlight.size).toBe(0);
+  });
+
+  it("rejects synchronously without invoking a task factory after admission closes", () => {
+    const inFlight = new InFlightTasks();
+    const factory = vi.fn(() => Promise.resolve("should not start"));
+    inFlight.closeAdmission();
+
+    expect(() => inFlight.run(factory)).toThrowError(
+      "In-flight task admission is closed.",
+    );
+    expect(factory).not.toHaveBeenCalled();
     expect(inFlight.size).toBe(0);
   });
 });
