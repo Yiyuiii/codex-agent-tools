@@ -37,6 +37,7 @@ const WINDOWS_IDENTITY_ENVIRONMENT_KEYS = [
 ] as const;
 
 const INVALID_CHILD_ENVIRONMENT = "Invalid child environment";
+const PI_CODING_AGENT_DIRECTORY_ENV = "PI_CODING_AGENT_DIR";
 
 interface SelectedCredential {
   sourceName: string;
@@ -127,6 +128,26 @@ function selectCredential(
   return undefined;
 }
 
+function assertPiRuntimeNamespace(
+  policy: ChildEnvironmentPolicy,
+  platform: NodeJS.Platform,
+): void {
+  const runtimeName = environmentNameKey(
+    PI_CODING_AGENT_DIRECTORY_ENV,
+    platform,
+  );
+  const conflictsWithRuntime = (name: string): boolean =>
+    environmentNameKey(name, platform) === runtimeName;
+
+  if (
+    policy.credentialEnv.some(conflictsWithRuntime) ||
+    (policy.credentialTargetEnv !== undefined &&
+      conflictsWithRuntime(policy.credentialTargetEnv))
+  ) {
+    throw new Error(INVALID_CHILD_ENVIRONMENT);
+  }
+}
+
 export function buildChildEnvironment(
   policy: ChildEnvironmentPolicy,
   parentEnvironment: NodeJS.ProcessEnv = process.env,
@@ -175,5 +196,25 @@ export function buildChildEnvironment(
     );
   }
 
+  return childEnvironment;
+}
+
+export function buildPiChildEnvironment(
+  policy: ChildEnvironmentPolicy,
+  piCodingAgentDir: string,
+  parentEnvironment: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv {
+  if (piCodingAgentDir.trim() === "" || piCodingAgentDir.includes("\0")) {
+    throw new Error(INVALID_CHILD_ENVIRONMENT);
+  }
+  assertPiRuntimeNamespace(policy, platform);
+
+  const childEnvironment = buildChildEnvironment(
+    policy,
+    parentEnvironment,
+    platform,
+  );
+  childEnvironment[PI_CODING_AGENT_DIRECTORY_ENV] = piCodingAgentDir;
   return childEnvironment;
 }

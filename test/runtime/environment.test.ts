@@ -1,7 +1,10 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { NetworkPolicy } from "../../src/domain/types.js";
-import { buildChildEnvironment } from "../../src/runtime/environment.js";
+import {
+  buildChildEnvironment,
+  buildPiChildEnvironment,
+} from "../../src/runtime/environment.js";
 
 describe("child environment", () => {
   const invalidEnvironmentError = "Invalid child environment";
@@ -305,5 +308,126 @@ describe("child environment", () => {
         {},
       ),
     ).toThrow("Missing credential: PRIMARY_KEY or SECONDARY_KEY");
+  });
+
+  describe("Pi runtime environment", () => {
+    it("adds only the isolated Pi directory after building the Windows child environment", () => {
+      const env = buildPiChildEnvironment(
+        {
+          network: "direct",
+          credentialEnv: ["PROJECT_API_KEY"],
+          credentialTargetEnv: "PRIVATE_KEY",
+        },
+        "C:\\isolated\\pi-agent",
+        {
+          PATH: "C:\\Windows",
+          PROJECT_API_KEY: "selected-secret",
+          PI_CODING_AGENT_DIR: "C:\\poison\\canonical",
+          pi_coding_agent_dir: "C:\\poison\\variant",
+          HTTPS_PROXY: "http://parent:1",
+          UNRELATED_SECRET: "forbidden",
+        },
+        "win32",
+      );
+
+      expect(env).toEqual({
+        PATH: "C:\\Windows",
+        PRIVATE_KEY: "selected-secret",
+        PI_CODING_AGENT_DIR: "C:\\isolated\\pi-agent",
+      });
+    });
+
+    it.each([
+      {
+        policy: {
+          network: "direct" as const,
+          credentialEnv: ["pi_coding_agent_dir"],
+        },
+      },
+      {
+        policy: {
+          network: "direct" as const,
+          credentialEnv: ["PROJECT_API_KEY"],
+          credentialTargetEnv: "Pi_Coding_Agent_Dir",
+        },
+      },
+    ])(
+      "rejects Windows credential and Pi runtime namespace collisions without disclosing values",
+      ({ policy }) => {
+        expect(() =>
+          buildPiChildEnvironment(
+            policy,
+            "C:\\isolated\\pi-agent",
+            { PROJECT_API_KEY: "selected-secret" },
+            "win32",
+          ),
+        ).toThrowError(new Error(invalidEnvironmentError));
+      },
+    );
+
+    it.each([
+      {
+        policy: {
+          network: "direct" as const,
+          credentialEnv: ["PI_CODING_AGENT_DIR"],
+        },
+      },
+      {
+        policy: {
+          network: "direct" as const,
+          credentialEnv: ["PROJECT_API_KEY"],
+          credentialTargetEnv: "PI_CODING_AGENT_DIR",
+        },
+      },
+    ])(
+      "rejects exact POSIX credential and Pi runtime namespace collisions",
+      ({ policy }) => {
+        expect(() =>
+          buildPiChildEnvironment(
+            policy,
+            "/isolated/pi-agent",
+            { PROJECT_API_KEY: "selected-secret" },
+            "linux",
+          ),
+        ).toThrowError(new Error(invalidEnvironmentError));
+      },
+    );
+
+    it("preserves a distinct POSIX credential name while replacing the exact parent Pi runtime", () => {
+      const env = buildPiChildEnvironment(
+        {
+          network: "direct",
+          credentialEnv: ["PROJECT_API_KEY", "pi_coding_agent_dir"],
+          credentialTargetEnv: "PRIVATE_KEY",
+        },
+        "/isolated/pi-agent",
+        {
+          PATH: "/usr/bin",
+          PI_CODING_AGENT_DIR: "/poison/canonical",
+          pi_coding_agent_dir: "lowercase-credential",
+        },
+        "linux",
+      );
+
+      expect(env).toEqual({
+        PATH: "/usr/bin",
+        PRIVATE_KEY: "lowercase-credential",
+        PI_CODING_AGENT_DIR: "/isolated/pi-agent",
+      });
+    });
+
+    it.each(["", "   ", "C:\\isolated\0pi-agent"])(
+      "rejects an invalid Pi runtime value with a fixed error",
+      (piCodingAgentDir) => {
+        expect(() =>
+          buildPiChildEnvironment(
+            { network: "direct", credentialEnv: [] },
+            piCodingAgentDir,
+            {},
+            "win32",
+          ),
+        ).toThrowError(new Error(invalidEnvironmentError));
+      },
+    );
   });
 });
