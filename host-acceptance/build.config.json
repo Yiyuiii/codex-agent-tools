@@ -9,9 +9,11 @@
     "production": [
       "src/AcceptanceState.cs",
       "src/ObserverProtocol.cs",
+      "src/ProcessChain.cs",
       "src/Program.cs",
       "src/ReceiptWriter.cs",
-      "src/StrictJson.cs"
+      "src/StrictJson.cs",
+      "src/WindowsNative.cs"
     ]
   },
   "artifact": {

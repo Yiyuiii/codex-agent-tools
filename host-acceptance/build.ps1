@@ -1,10 +1,13 @@
 param(
-    [ValidateSet("test-managed")]
+    [ValidateSet("test-managed", "test-kernel")]
     [string]$Action = "test-managed"
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+if ($Action -cne "test-managed" -and $Action -cne "test-kernel") {
+    throw "host-acceptance: action casing must be canonical"
+}
 
 function Resolve-RepositoryFile {
     param(
@@ -274,26 +277,37 @@ function Assert-FixedTemporaryBuildRoot {
 function Remove-VerifiedTemporaryBuildRoot {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Base
+        [Parameter(Mandatory = $true)][string]$Base,
+        [Parameter(Mandatory = $true)][string[]]$AllowedFileNames
     )
 
     $resolvedRoot = Assert-FixedTemporaryBuildRoot -Path $Path -Base $Base
+    $allowed = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($name in $AllowedFileNames) {
+        if (
+            ($name -cne "ManagedTests.exe" -and $name -cne "KernelTests.exe" -and $name -cne "ProcessFixture.exe") -or
+            -not $allowed.Add($name)
+        ) {
+            throw "host-acceptance: invalid temporary cleanup allowlist"
+        }
+    }
     $items = @(Get-ChildItem -LiteralPath $resolvedRoot -Force)
-    if ($items.Count -gt 1) {
+    if ($items.Count -gt $allowed.Count) {
         throw "host-acceptance: unexpected temporary build output"
     }
     foreach ($item in $items) {
         if (
             ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 -or
             $item.PSIsContainer -or
-            $item.Name -cne "ManagedTests.exe" -or
+            -not $allowed.Contains($item.Name) -or
             [System.IO.Path]::GetFullPath($item.DirectoryName) -cne $resolvedRoot
         ) {
             throw "host-acceptance: unexpected temporary build output"
         }
     }
-    if ($items.Count -eq 1) {
-        [System.IO.File]::Delete($items[0].FullName)
+    foreach ($item in $items) {
+        [void](Assert-NoReparseExistingPath -Path $item.FullName)
+        [System.IO.File]::Delete($item.FullName)
     }
     [void](Assert-FixedTemporaryBuildRoot -Path $resolvedRoot -Base $Base)
     if (@(Get-ChildItem -LiteralPath $resolvedRoot -Force).Count -ne 0) {
@@ -365,7 +379,7 @@ $referenceRoot = Assert-NoReparseExistingPath -Path $referenceRoot
 $productionSources = @($productionRelative | ForEach-Object {
     Resolve-RepositoryFile -RepositoryRoot $hostRoot -RelativePath $_
 })
-$testRelative = @(
+$managedTestRelative = @(
     "tests/BuildContractTests.cs",
     "tests/HashReceiptTests.cs",
     "tests/ManagedTestRunner.cs",
@@ -374,9 +388,19 @@ $testRelative = @(
     "tests/StrictJsonTests.cs",
     "tests/TestAssert.cs"
 )
-$testSources = @($testRelative | ForEach-Object {
+$kernelTestRelative = @(
+    "tests/KernelTestRunner.cs",
+    "tests/KernelTests.cs",
+    "tests/TestAssert.cs"
+)
+$fixtureRelative = "tests/ProcessFixture.cs"
+$selectedTestRelative = if ($Action -ceq "test-managed") { $managedTestRelative } else { $kernelTestRelative }
+$testSources = @($selectedTestRelative | ForEach-Object {
     Resolve-RepositoryFile -RepositoryRoot $hostRoot -RelativePath $_
 })
+$fixtureSource = if ($Action -ceq "test-kernel") {
+    Resolve-RepositoryFile -RepositoryRoot $hostRoot -RelativePath $fixtureRelative
+} else { $null }
 $temporaryBase = Join-Path ([System.IO.Path]::GetTempPath()) "codex-agent-tools\host-acceptance\build-v1"
 [void][System.IO.Directory]::CreateDirectory($temporaryBase)
 $temporaryBase = Assert-NoReparseExistingPath -Path $temporaryBase
@@ -384,18 +408,43 @@ $temporaryRoot = Join-Path $temporaryBase ([Guid]::NewGuid().ToString("N"))
 [void][System.IO.Directory]::CreateDirectory($temporaryRoot)
 $temporaryRoot = Assert-FixedTemporaryBuildRoot -Path $temporaryRoot -Base $temporaryBase
 try {
-    $testExecutable = Join-Path $temporaryRoot "ManagedTests.exe"
+    $testExecutableName = if ($Action -ceq "test-managed") { "ManagedTests.exe" } else { "KernelTests.exe" }
+    $testMain = if ($Action -ceq "test-managed") {
+        "CodexAgentTools.HostAcceptance.Tests.ManagedTestRunner"
+    } else {
+        "CodexAgentTools.HostAcceptance.Tests.KernelTestRunner"
+    }
+    $testExecutable = Join-Path $temporaryRoot $testExecutableName
+    $fixtureExecutable = if ($Action -ceq "test-kernel") { Join-Path $temporaryRoot "ProcessFixture.exe" } else { $null }
     $generatedProtocolPath = Join-Path $temporaryRoot "ProtocolV1.g.cs"
     $compilerExitCode = 1
     try {
         Write-GeneratedProtocolSource -Protocol $protocol -Path $generatedProtocolPath
         $generatedProtocolPath = Assert-NoReparseExistingPath -Path $generatedProtocolPath
+        if ($Action -ceq "test-kernel") {
+            $fixtureArguments = [System.Collections.Generic.List[string]]::new()
+            foreach ($argument in $sharedBuild.compilerArguments) {
+                [void]$fixtureArguments.Add([string]$argument)
+            }
+            [void]$fixtureArguments.Add("/out:" + $fixtureExecutable)
+            [void]$fixtureArguments.Add("/main:CodexAgentTools.HostAcceptance.Tests.ProcessFixture")
+            [void]$fixtureArguments.Add("/pathmap:" + $hostRoot + "=/_/host-acceptance")
+            foreach ($reference in $sharedBuild.references) {
+                [void]$fixtureArguments.Add("/reference:" + (Assert-NoReparseExistingPath -Path (Join-Path $referenceRoot ([string]$reference))))
+            }
+            [void]$fixtureArguments.Add($fixtureSource)
+            & $compilerPath @fixtureArguments
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $fixtureExecutable -PathType Leaf)) {
+                throw "host-acceptance: process fixture compilation failed"
+            }
+            [void](Assert-NoReparseExistingPath -Path $fixtureExecutable)
+        }
         $arguments = [System.Collections.Generic.List[string]]::new()
         foreach ($argument in $sharedBuild.compilerArguments) {
             [void]$arguments.Add([string]$argument)
         }
         [void]$arguments.Add("/out:" + $testExecutable)
-        [void]$arguments.Add("/main:CodexAgentTools.HostAcceptance.Tests.ManagedTestRunner")
+        [void]$arguments.Add("/main:" + $testMain)
         [void]$arguments.Add("/pathmap:" + $hostRoot + "=/_/host-acceptance," + $temporaryRoot + "=/_/host-acceptance/generated")
         foreach ($reference in $sharedBuild.references) {
             $referencePath = Join-Path $referenceRoot ([string]$reference)
@@ -417,13 +466,18 @@ try {
         Remove-VerifiedGeneratedProtocolSource -Path $generatedProtocolPath -TemporaryRoot $temporaryRoot
     }
     if ($compilerExitCode -ne 0) {
-        throw "host-acceptance: managed test compilation failed"
+        throw "host-acceptance: $Action compilation failed"
     }
     Push-Location $repositoryRoot
     try {
-        & $testExecutable
+        if ($Action -ceq "test-kernel") {
+            & $testExecutable $fixtureExecutable
+        }
+        else {
+            & $testExecutable
+        }
         if ($LASTEXITCODE -ne 0) {
-            throw "host-acceptance: managed tests failed"
+            throw "host-acceptance: $Action tests failed"
         }
     }
     finally {
@@ -432,6 +486,11 @@ try {
 }
 finally {
     if (Test-Path -LiteralPath $temporaryRoot) {
-        Remove-VerifiedTemporaryBuildRoot -Path $temporaryRoot -Base $temporaryBase
+        $cleanupNames = if ($Action -ceq "test-managed") {
+            @("ManagedTests.exe")
+        } else {
+            @("KernelTests.exe", "ProcessFixture.exe")
+        }
+        Remove-VerifiedTemporaryBuildRoot -Path $temporaryRoot -Base $temporaryBase -AllowedFileNames $cleanupNames
     }
 }

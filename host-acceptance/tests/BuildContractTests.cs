@@ -11,6 +11,7 @@ namespace CodexAgentTools.HostAcceptance.Tests
             yield return TemporaryCleanupIsNarrowAndNonRecursive;
             yield return SharedCompilerConfigurationIsConsumedWithoutCopyingIt;
             yield return GeneratedProtocolSourceIsEphemeral;
+            yield return KernelBuildAndNativeScopeRemainExplicit;
         }
 
         private static void TemporaryCleanupIsNarrowAndNonRecursive()
@@ -18,9 +19,11 @@ namespace CodexAgentTools.HostAcceptance.Tests
             var script = BuildScript();
             TestAssert.True(script.IndexOf("Remove-Item", StringComparison.Ordinal) < 0, "The observer build entry must not use broad Remove-Item cleanup.");
             TestAssert.True(script.IndexOf("Get-ChildItem -LiteralPath $resolvedRoot -Force -Recurse", StringComparison.Ordinal) < 0, "Cleanup must reject a child directory before traversal.");
-            TestAssert.True(script.IndexOf("[System.IO.File]::Delete($items[0].FullName)", StringComparison.Ordinal) >= 0, "Cleanup must delete only the verified test executable.");
+            TestAssert.True(script.IndexOf("[System.IO.File]::Delete($item.FullName)", StringComparison.Ordinal) >= 0, "Cleanup must delete only verified test executables.");
             TestAssert.True(script.IndexOf("[System.IO.Directory]::Delete($resolvedRoot, $false)", StringComparison.Ordinal) >= 0, "Cleanup must delete only an empty GUID directory.");
-            TestAssert.True(script.IndexOf("$item.Name -cne \"ManagedTests.exe\"", StringComparison.Ordinal) >= 0, "Cleanup must allow only the fixed test executable name.");
+            TestAssert.True(script.IndexOf("$name -cne \"ManagedTests.exe\"", StringComparison.Ordinal) >= 0, "Cleanup must allow only fixed test executable names.");
+            TestAssert.True(script.IndexOf("$name -cne \"KernelTests.exe\"", StringComparison.Ordinal) >= 0, "Kernel test output must be explicitly allowlisted.");
+            TestAssert.True(script.IndexOf("$name -cne \"ProcessFixture.exe\"", StringComparison.Ordinal) >= 0, "Fixture output must be explicitly allowlisted.");
         }
 
         private static void SharedCompilerConfigurationIsConsumedWithoutCopyingIt()
@@ -40,6 +43,27 @@ namespace CodexAgentTools.HostAcceptance.Tests
             var script = BuildScript();
             TestAssert.True(script.IndexOf("Write-GeneratedProtocolSource -Protocol $protocol", StringComparison.Ordinal) >= 0, "Every compile must derive protocol constants from the checked-in JSON.");
             TestAssert.True(script.IndexOf("Remove-VerifiedGeneratedProtocolSource", StringComparison.Ordinal) >= 0, "The derived source must be removed before outer cleanup.");
+        }
+
+        private static void KernelBuildAndNativeScopeRemainExplicit()
+        {
+            var script = BuildScript();
+            TestAssert.True(script.IndexOf("[ValidateSet(\"test-managed\", \"test-kernel\")]", StringComparison.Ordinal) >= 0, "The build entry must expose only the two reviewed test actions.");
+            TestAssert.True(script.IndexOf("$Action -cne \"test-managed\" -and $Action -cne \"test-kernel\"", StringComparison.Ordinal) >= 0, "The build entry must reject non-canonical action casing before selecting sources.");
+            TestAssert.True(script.IndexOf("ProcessFixture.exe", StringComparison.Ordinal) >= 0, "The real kernel fixture must be built explicitly.");
+
+            var repositoryRoot = Directory.GetCurrentDirectory();
+            var native = File.ReadAllText(Path.Combine(repositoryRoot, "host-acceptance", "src", "WindowsNative.cs"));
+            var chain = File.ReadAllText(Path.Combine(repositoryRoot, "host-acceptance", "src", "ProcessChain.cs"));
+            foreach (var forbidden in new[] { "CreateToolhelp32Snapshot", "Process.GetProcesses", "GetProcessById", "taskkill", "Win32_Process" })
+            {
+                TestAssert.True(native.IndexOf(forbidden, StringComparison.OrdinalIgnoreCase) < 0, "The native observer must not contain a system process scanner.");
+                TestAssert.True(chain.IndexOf(forbidden, StringComparison.OrdinalIgnoreCase) < 0, "The retained process chain must not reopen or scan by PID.");
+            }
+            TestAssert.True(native.IndexOf("ProcessQueryLimitedInformation", StringComparison.Ordinal) >= 0, "Process handles must request only limited query access plus synchronize.");
+            TestAssert.True(native.IndexOf("FileFlagFirstPipeInstance", StringComparison.Ordinal) >= 0, "The named pipe must be the first instance.");
+            TestAssert.True(native.IndexOf("PipeRejectRemoteClients", StringComparison.Ordinal) >= 0, "Remote pipe clients must be rejected.");
+            TestAssert.True(native.IndexOf("WaitForSingleObject(process, Infinite)", StringComparison.Ordinal) >= 0, "Production process waits must not impose a timeout budget.");
         }
 
         private static string BuildScript()
