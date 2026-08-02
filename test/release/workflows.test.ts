@@ -150,6 +150,7 @@ describe("GitHub release workflows", () => {
       "npm run build && npm run smoke:release:built",
     );
     expect(scripts.prepublishOnly).toBe("npm run gate:offline");
+    expect(scripts).not.toHaveProperty("acceptance:local");
     expect(scripts["gate:offline"]).not.toMatch(
       /native:verify|acceptance:|smoke:kimi|smoke:ark|qualify:/u,
     );

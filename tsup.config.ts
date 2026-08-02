@@ -8,7 +8,6 @@ export default defineConfig({
     "smoke-evidence": "src/smoke/evidence.ts",
     mcp: "src/mcp/main.ts",
     "ark-smoke": "src/smoke/ark.ts",
-    "local-acceptance": "src/acceptance/local.ts",
     "npm-package-acceptance": "src/acceptance/npm-package.ts",
     "plugin-mcp-cleanup": "src/plugin/mcp-cleanup.ts",
     "plugin-isolated-report": "src/plugin/isolated-report.ts",

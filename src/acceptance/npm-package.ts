@@ -2,10 +2,6 @@ import os from "node:os";
 
 import { assertReleasePackageMetadata } from "../release/assurance.js";
 import {
-  assertLocalToolContract,
-  type LocalToolContract,
-} from "./local.js";
-import {
   DOCTOR_CHECK_NAMES,
   DOCTOR_QUALIFIED_LLM_IDS,
 } from "../cli/doctor.js";
@@ -43,9 +39,18 @@ export interface NpmPackageAcceptanceReportOptions
   readonly npmVersion: string;
 }
 
+interface InstalledToolContract {
+  readonly name: string;
+  readonly inputSchema?: { readonly required?: readonly string[] };
+  readonly annotations?: {
+    readonly readOnlyHint?: boolean;
+    readonly destructiveHint?: boolean;
+  };
+}
+
 export interface InstalledMcpClient {
   connect(transport: unknown): Promise<void>;
-  listTools(): Promise<{ tools: readonly LocalToolContract[] }>;
+  listTools(): Promise<{ tools: readonly InstalledToolContract[] }>;
 }
 
 export interface InstalledMcpSession<TClient, TTransport> {
@@ -81,6 +86,33 @@ const SYSTEM_ENVIRONMENT_ALLOWLIST = new Set([
   "PROGRAMFILES",
   "PROGRAMFILES(X86)",
 ]);
+
+function assertInstalledToolContract(
+  tools: readonly InstalledToolContract[],
+): void {
+  const names = tools.map(({ name }) => name).sort();
+  if (
+    JSON.stringify(names) !==
+    JSON.stringify(["external_delegate", "external_review"])
+  ) {
+    throw new Error(`Unexpected MCP tools: ${names.join(", ")}`);
+  }
+  for (const tool of tools) {
+    if (!tool.inputSchema?.required?.includes("llm")) {
+      throw new Error(`${tool.name} requires llm`);
+    }
+  }
+  const review = tools.find(({ name }) => name === "external_review");
+  const delegate = tools.find(({ name }) => name === "external_delegate");
+  if (
+    review?.annotations?.readOnlyHint !== true ||
+    review.annotations.destructiveHint !== false ||
+    delegate?.annotations?.readOnlyHint !== false ||
+    delegate.annotations.destructiveHint !== true
+  ) {
+    throw new Error("Installed MCP tool annotations are unsafe");
+  }
+}
 
 function acceptanceArgumentError(): Error {
   return new Error("Invalid npm package acceptance arguments");
@@ -268,7 +300,7 @@ export async function establishInstalledMcpSession<
   try {
     await options.client.connect(options.transport);
     const listed = await options.client.listTools();
-    assertLocalToolContract(listed.tools);
+    assertInstalledToolContract(listed.tools);
     return Object.freeze({
       client: options.client,
       transport: options.transport,

@@ -331,6 +331,41 @@ describe("npm-installed package acceptance contract", () => {
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
+  it("accepts exactly the installed public tools and safety annotations", async () => {
+    const transport = { id: "owned" };
+    const client = {
+      connect: vi.fn(async () => undefined),
+      listTools: vi.fn(async () => ({
+        tools: [
+          {
+            name: "external_review",
+            inputSchema: { required: ["llm", "prompt", "cwd", "task"] },
+            annotations: {
+              readOnlyHint: true,
+              destructiveHint: false,
+            },
+          },
+          {
+            name: "external_delegate",
+            inputSchema: { required: ["llm", "prompt", "cwd"] },
+            annotations: {
+              readOnlyHint: false,
+              destructiveHint: true,
+            },
+          },
+        ],
+      })),
+    };
+
+    await expect(
+      establishInstalledMcpSession({
+        client,
+        transport,
+        cleanup: vi.fn(async () => undefined),
+      }),
+    ).resolves.toEqual({ client, transport });
+  });
+
   it("renders a redacted, machine-readable beta acceptance record", () => {
     const report = renderNpmPackageAcceptanceReport({
       version: "0.1.0-beta.1",

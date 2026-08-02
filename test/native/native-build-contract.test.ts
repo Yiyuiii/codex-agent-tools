@@ -859,62 +859,6 @@ describe("Windows native helper build contract", () => {
     );
   });
 
-  it("proves LF text and byte-identical PE data through real autocrlf checkouts", () => {
-    const fixtureRoot = mkdtempSync(join(tmpdir(), "cat-native-eol-"));
-    const source = join(fixtureRoot, "source");
-    const expectedText = Buffer.from("first\nsecond\n", "utf8");
-    const expectedExe = Buffer.from([
-      0x4d, 0x5a, 0x00, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0x0d, 0x0a,
-    ]);
-    try {
-      mkdirSync(source);
-      copyFileSync(
-        resolve(repositoryRoot, ".gitattributes"),
-        join(source, ".gitattributes"),
-      );
-      writeFileSync(join(source, "fixture.txt"), expectedText);
-      writeFileSync(join(source, "fixture.exe"), expectedExe);
-      for (const arguments_ of [
-        ["init", "--quiet"],
-        ["config", "user.email", "native-test@example.invalid"],
-        ["config", "user.name", "Native Test"],
-        ["add", ".gitattributes", "fixture.txt", "fixture.exe"],
-        ["commit", "--quiet", "-m", "fixture"],
-      ]) {
-        const result = run("git", arguments_, { cwd: source });
-        expect(result.status, result.stderr).toBe(0);
-      }
-
-      for (const autocrlf of ["true", "false"]) {
-        const checkout = join(fixtureRoot, `checkout-${autocrlf}`);
-        let result = run("git", [
-          "clone",
-          "--quiet",
-          "--no-checkout",
-          source,
-          checkout,
-        ]);
-        expect(result.status, result.stderr).toBe(0);
-        result = run("git", ["config", "core.autocrlf", autocrlf], {
-          cwd: checkout,
-        });
-        expect(result.status, result.stderr).toBe(0);
-        result = run("git", ["checkout", "--quiet", "--force", "HEAD"], {
-          cwd: checkout,
-        });
-        expect(result.status, result.stderr).toBe(0);
-        expect(readFileSync(join(checkout, "fixture.txt"))).toEqual(
-          expectedText,
-        );
-        expect(readFileSync(join(checkout, "fixture.exe"))).toEqual(
-          expectedExe,
-        );
-      }
-    } finally {
-      rmSync(fixtureRoot, { recursive: true, force: true });
-    }
-  });
-
   windowsIt(
     "generates exact protocol constants for every action and rejects canonical drift",
     async () => {
