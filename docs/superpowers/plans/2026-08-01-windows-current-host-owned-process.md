@@ -316,6 +316,8 @@ git diff --check
 
 **原生observer第一子批状态（2026-08-02，纯托管核心已完成）：** `4ccc715 feat: define strict host acceptance observer core`完成严格JSON/JSONL、exact-key frame、旧新宿主/请求事件纯状态机、TypeScript一致哈希/receipt与原子no-replace writer。协议JSON在临时构建目录生成C#常量，不保存第二份generated源；build入口直接消费共享compiler配置并使用白名单非递归清理。主代理复验managed 19/19、TypeScript 59/59、类型、Node24 library build、diff与temp归零，fresh复审PASS。`Program`仍故意失败；下一子批只绑定current-user named pipe、kernel peer PID和两层直接祖先handles，之后才冻结artifact/manifest/start脚本。
 
+**原生observer第二、三子批状态（2026-08-02，kernel与会话材料已完成）：** `0feef26 feat: bind host observer to current Windows kernel`在当前Windows x64宿主上完成current-user protected named pipe、kernel peer PID及从已持有peer handle连续取得并持有两层直接祖先handle；不扫描系统、不按PID重开、不设置production timeout。`1c82fec feat: bind host acceptance session materials`从raw descriptor严格绑定beta marker、协议、Job helper、8项能力索引和current-host freeze，重算跨语言request/marker身份，只从`LOCALAPPDATA + nonce + markerId`派生输出，并拒绝任何预存marker/receipt；同时修复.NET正则末尾LF差异并把显式调用级timeout对齐既有JavaScript safe-integer合同。最新复验为managed 27/27、真实kernel 3/3、类型和diff PASS，fresh只读复审无P0-P2。`Program`仍故意失败；下一子批只编排双pipe旧/新宿主与五个请求事件并唯一写receipt，之后才进入artifact/build manifest/start脚本。
+
 ## 9. Task 8：当前宿主冻结与独立终审
 
 在维护者当前宿主运行，不使用下载的替代Node：
