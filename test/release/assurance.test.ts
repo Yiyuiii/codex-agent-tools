@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   assertAllowedPackFiles,
   assertCapabilitySourcesPackaged,
-  assertNpmPackageIdentity,
   assertNoSensitiveContent,
   assertPackageDocumentLinkClosure,
   assertPackageLocalLinks,
@@ -25,85 +24,6 @@ function assertBundleContent(content: string): void {
 }
 
 describe("release assurance", () => {
-  it("accepts an available npm name or the package owned by the canonical repository", () => {
-    expect(
-      assertNpmPackageIdentity(
-        {
-          status: 1,
-          stdout: "",
-          stderr: "npm error code E404\nnpm error 404 Not Found",
-        },
-        {
-          packageName: "codex-agent-tools",
-          repositoryUrl:
-            "git+https://github.com/Yiyuiii/codex-agent-tools.git",
-        },
-      ),
-    ).toBe("available");
-
-    expect(
-      assertNpmPackageIdentity(
-        {
-          status: 0,
-          stdout: JSON.stringify({
-            name: "codex-agent-tools",
-            "repository.url":
-              "git+https://github.com/Yiyuiii/codex-agent-tools.git",
-          }),
-          stderr: "",
-        },
-        {
-          packageName: "codex-agent-tools",
-          repositoryUrl:
-            "git+https://github.com/Yiyuiii/codex-agent-tools.git",
-        },
-      ),
-    ).toBe("registered");
-  });
-
-  it("fails closed on npm package identity drift or an indeterminate registry response", () => {
-    const expected = {
-      packageName: "codex-agent-tools",
-      repositoryUrl:
-        "git+https://github.com/Yiyuiii/codex-agent-tools.git",
-    };
-
-    expect(() =>
-      assertNpmPackageIdentity(
-        {
-          status: 0,
-          stdout: JSON.stringify({
-            name: "codex-agent-tools",
-            "repository.url":
-              "git+https://github.com/another-owner/codex-agent-tools.git",
-          }),
-          stderr: "",
-        },
-        expected,
-      ),
-    ).toThrow(/identity does not match/u);
-    expect(() =>
-      assertNpmPackageIdentity(
-        {
-          status: 0,
-          stdout: "{not-json",
-          stderr: "",
-        },
-        expected,
-      ),
-    ).toThrow(/registry response is invalid/u);
-    expect(() =>
-      assertNpmPackageIdentity(
-        {
-          status: 1,
-          stdout: "",
-          stderr: "npm error code E500",
-        },
-        expected,
-      ),
-    ).toThrow(/Unable to verify npm package identity/u);
-  });
-
   it("binds package, runtime, plugin, and public repository release metadata", () => {
     const packageManifest = {
       name: "codex-agent-tools",
@@ -290,6 +210,8 @@ describe("release assurance", () => {
         "plugins/codex-external-agents/.codex-plugin/plugin.json",
         "plugins/codex-external-agents/.mcp.json",
         "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+        "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+        "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
       ]),
     ).not.toThrow();
 
@@ -310,6 +232,11 @@ describe("release assurance", () => {
     expect(() =>
       assertAllowedPackFiles([
         "plugins/codex-external-agents/runtime/unexpected.js",
+      ]),
+    ).toThrow(/Unexpected file/u);
+    expect(() =>
+      assertAllowedPackFiles([
+        "plugins/codex-external-agents/native/win32-x64/unexpected.exe",
       ]),
     ).toThrow(/Unexpected file/u);
     expect(() =>

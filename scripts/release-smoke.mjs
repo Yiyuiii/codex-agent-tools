@@ -17,13 +17,13 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { execa } from "execa";
 
 import {
-  assertNpmPackageIdentity,
   assertNoSensitiveContent,
   assertCapabilitySourcesPackaged,
   assertPackageDocumentLinkClosure,
   assertReleasePackageMetadata,
   capabilitySourcePathsFromIndex,
   resolveAllowedPackInspectionPaths,
+  verifyReleaseWindowsJobHelperArtifact,
 } from "../dist/release-assurance.js";
 import {
   verifyCapabilityIndex,
@@ -57,6 +57,8 @@ const exactPluginFiles = [
   "plugins/codex-external-agents/.codex-plugin/plugin.json",
   "plugins/codex-external-agents/.mcp.json",
   "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+  "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+  "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
 ];
 const exactLogicalLlms = [
   "ark-agent-deepseek-v4-flash",
@@ -116,46 +118,6 @@ function runNpm(args) {
   return npmExecPath
     ? run(process.execPath, [npmExecPath, ...args])
     : run("npm", args);
-}
-
-function checkNpmNameAvailability() {
-  const npmExecPath = process.env.npm_execpath;
-  const result = npmExecPath
-    ? spawnSync(
-        process.execPath,
-        [
-          npmExecPath,
-          "view",
-          "codex-agent-tools",
-          "name",
-          "repository.url",
-          "--json",
-        ],
-        { cwd: root, encoding: "utf8", windowsHide: true },
-      )
-    : spawnSync(
-        process.platform === "win32" ? "npm.cmd" : "npm",
-        [
-          "view",
-          "codex-agent-tools",
-          "name",
-          "repository.url",
-          "--json",
-        ],
-        { cwd: root, encoding: "utf8", windowsHide: true },
-      );
-  assertNpmPackageIdentity(
-    {
-      status: result.status,
-      stdout: result.stdout ?? "",
-      stderr: result.stderr ?? "",
-    },
-    {
-      packageName: "codex-agent-tools",
-      repositoryUrl:
-        "git+https://github.com/Yiyuiii/codex-agent-tools.git",
-    },
-  );
 }
 
 function releaseSecrets(environment) {
@@ -377,6 +339,7 @@ async function checkPluginArtifact() {
     throw new Error("plugin MCP server resolves outside the expected bundle");
   }
   await access(pluginBundlePath);
+  await verifyReleaseWindowsJobHelperArtifact();
 
   assertNoSensitiveContent(
     [
@@ -549,6 +512,4 @@ await checkPackage({
     await readJson(path.join(root, capabilityVerification.indexPath)),
   ),
 });
-checkNpmNameAvailability();
-
 process.stdout.write("release smoke passed\n");

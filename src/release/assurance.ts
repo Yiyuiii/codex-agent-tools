@@ -3,6 +3,8 @@ import path from "node:path";
 
 import type * as TypeScript from "typescript";
 
+import { resolveWindowsJobHelperForModule } from "../runtime/windows-job-helper.js";
+
 interface CommonMarkNode {
   readonly type: string;
   readonly destination: string | null;
@@ -41,17 +43,6 @@ export interface SensitiveContentOptions {
   secrets: readonly string[];
 }
 
-interface CommandResult {
-  readonly status: number | null;
-  readonly stdout: string;
-  readonly stderr: string;
-}
-
-interface ExpectedNpmPackageIdentity {
-  readonly packageName: string;
-  readonly repositoryUrl: string;
-}
-
 type PlainRecord = Record<string, unknown>;
 
 function plainRecord(value: unknown): PlainRecord | undefined {
@@ -60,34 +51,6 @@ function plainRecord(value: unknown): PlainRecord | undefined {
     !Array.isArray(value)
     ? (value as PlainRecord)
     : undefined;
-}
-
-export function assertNpmPackageIdentity(
-  result: CommandResult,
-  expected: ExpectedNpmPackageIdentity,
-): "available" | "registered" {
-  const output = `${result.stdout}\n${result.stderr}`;
-  if (result.status !== 0) {
-    if (/E404|Not Found/iu.test(output)) {
-      return "available";
-    }
-    throw new Error("Unable to verify npm package identity");
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(result.stdout);
-  } catch {
-    throw new Error("npm registry response is invalid");
-  }
-  const record = plainRecord(parsed);
-  if (
-    record?.name !== expected.packageName ||
-    record["repository.url"] !== expected.repositoryUrl
-  ) {
-    throw new Error("npm package identity does not match this repository");
-  }
-  return "registered";
 }
 
 export function assertReleasePackageMetadata(options: {
@@ -150,10 +113,16 @@ const EXACT_PLUGIN_FILES = new Set([
   "plugins/codex-external-agents/.codex-plugin/plugin.json",
   "plugins/codex-external-agents/.mcp.json",
   "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+  "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+  "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
 ]);
 
 const PLUGIN_BUNDLE =
   "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs";
+
+export async function verifyReleaseWindowsJobHelperArtifact(): Promise<void> {
+  await resolveWindowsJobHelperForModule(import.meta.url, "win32", "x64");
+}
 
 function normalizePackPath(fileName: string): string {
   return path.posix.normalize(fileName.replaceAll("\\", "/"));

@@ -16,6 +16,9 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
+  "config": {
+    "codexCliVersion": "0.146.0"
+  },
   "engines": {
     "node": ">=24"
   },
@@ -27,6 +30,8 @@
     "plugins/codex-external-agents/.codex-plugin/plugin.json",
     "plugins/codex-external-agents/.mcp.json",
     "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+    "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+    "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
     "docs/operations.md",
     "docs/migration-from-codex-cc-tools.md",
     "docs/release/checklist.md",
@@ -58,8 +63,11 @@
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build:library",
     "test": "vitest run",
+    "test:deterministic": "vitest run --maxWorkers=1",
     "test:watch": "vitest",
-    "smoke:release": "npm run build && node scripts/release-smoke.mjs",
+    "smoke:release": "npm run build && npm run smoke:release:built",
+    "smoke:release:built": "node scripts/release-smoke.mjs",
+    "gate:offline": "npm run build && npm run typecheck && npm run test:deterministic && npm run smoke:release:built",
     "smoke:kimi": "npm run build && node scripts/real-kimi-smoke.mjs",
     "smoke:ark": "npm run build && node scripts/real-ark-smoke.mjs",
     "acceptance:local": "npm run build && node scripts/local-acceptance.mjs",
@@ -73,7 +81,7 @@
     "native:test:kernel": "node scripts/windows-native-helper.mjs test-kernel",
     "native:verify": "node scripts/windows-native-helper.mjs verify",
     "native:update-artifact": "node scripts/windows-native-helper.mjs update-artifact",
-    "prepublishOnly": "npm run smoke:release"
+    "prepublishOnly": "npm run gate:offline"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.2.1",

@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import pluginBuildConfig from "../../tsup.plugin.config.js";
 import { assertNoSensitiveContent } from "../../src/release/assurance.js";
+import { resolveWindowsJobHelperForModule } from "../../src/runtime/windows-job-helper.js";
 
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -320,6 +321,39 @@ describe("Codex plugin artifact", () => {
     );
     expect(dirname(pluginRoot)).toBe(
       resolve(repositoryRoot, "plugins"),
+    );
+  });
+
+  it("packages exactly the verified Windows x64 managed job helper pair", async () => {
+    const packageManifest = readJson("package.json");
+    const packageFiles = packageManifest.files as string[];
+    const helperFiles = [
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
+    ];
+
+    expect(
+      packageFiles.filter((entry) =>
+        entry.startsWith("plugins/codex-external-agents/native/"),
+      ),
+    ).toEqual(helperFiles);
+
+    const resolved = await resolveWindowsJobHelperForModule(
+      new URL("../../dist/index.js", import.meta.url).href,
+      "win32",
+      "x64",
+    );
+    expect(resolved.executablePath).toBe(
+      resolve(repositoryRoot, helperFiles[0]!),
+    );
+    expect(resolved.sha256).toMatch(/^[0-9a-f]{64}$/u);
+
+    const releaseSmoke = readProjectText("scripts/release-smoke.mjs");
+    for (const helperFile of helperFiles) {
+      expect(releaseSmoke).toContain(`"${helperFile}"`);
+    }
+    expect(releaseSmoke).toContain(
+      "await verifyReleaseWindowsJobHelperArtifact()",
     );
   });
 

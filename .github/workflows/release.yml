@@ -9,9 +9,6 @@ on:
 permissions:
   contents: read
 
-env:
-  CODEX_CLI_VERSION: 0.146.0
-
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -48,8 +45,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install --global "@openai/codex@${CODEX_CLI_VERSION}"
-          test "$(codex --version)" = "codex-cli ${CODEX_CLI_VERSION}"
+          codex_cli_version="$(node -p "require('./package.json').config.codexCliVersion")"
+          if [[ ! "$codex_cli_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::package.json config.codexCliVersion must be an exact version"
+            exit 1
+          fi
+          npm install --global "@openai/codex@${codex_cli_version}"
+          test "$(codex --version)" = "codex-cli ${codex_cli_version}"
 
       - name: Resolve release channel
         id: channel
@@ -124,23 +126,7 @@ jobs:
           }
 
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test -- --maxWorkers=1
-      - run: npm run smoke:release
-
-      - name: Create npm pack dry-run manifest
-        run: npm pack --dry-run --json > npm-pack-dry-run.json
-
-      - name: Upload package evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-${{ github.ref_name }}-package-evidence
-          path: |
-            npm-pack-dry-run.json
-            dist/
-            plugins/codex-external-agents/runtime/
-          if-no-files-found: error
-          retention-days: 30
+      - run: npm run gate:offline
 
       - name: Check whether the version already exists
         id: existing
@@ -148,15 +134,21 @@ jobs:
         run: |
           set -euo pipefail
           version="${{ steps.version.outputs.tag_version }}"
-          existing="$(npm view "codex-agent-tools@${version}" version 2>/dev/null || true)"
-          if [[ -n "$existing" && "$existing" != "$version" ]]; then
-            echo "::error::npm returned unexpected version '$existing' for codex-agent-tools@${version}"
-            exit 1
-          fi
-          if [[ "$existing" == "$version" ]]; then
+          set +e
+          view_output="$(npm view "codex-agent-tools@${version}" version 2>&1)"
+          view_status="$?"
+          set -e
+          if [[ "$view_status" -eq 0 ]]; then
+            if [[ "$view_output" != "$version" ]]; then
+              echo "::error::npm returned an unexpected package version"
+              exit 1
+            fi
             echo "published=true" >> "$GITHUB_OUTPUT"
-          else
+          elif grep -Eqi '^npm (error|ERR!)[[:space:]]+code[[:space:]]+E404([[:space:]]|$)' <<< "$view_output"; then
             echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Unable to determine whether the package version already exists"
+            exit 1
           fi
 
       - name: Publish package through npm OIDC
