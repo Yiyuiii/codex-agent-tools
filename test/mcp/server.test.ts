@@ -2,6 +2,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it, vi } from "vitest";
 
+import type { AdapterExecutionTelemetry } from "../../src/adapters/adapter.js";
+import type { HostAcceptanceLifecycleEvent } from "../../src/mcp/host-acceptance-events.js";
 import { InFlightTasks } from "../../src/mcp/in-flight.js";
 import { createMcpServer } from "../../src/mcp/server.js";
 import {
@@ -13,6 +15,7 @@ import type {
   ExternalDelegateResult,
   ExternalReviewResult,
 } from "../../src/tasks/results.js";
+import type { TaskExecutionContext } from "../../src/tasks/service.js";
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -50,6 +53,19 @@ function delegateResult(): ExternalDelegateResult {
     commandsRun: ["npm test"],
     verification: [],
     risks: [],
+  };
+}
+
+function executionTelemetry(
+  overrides: Partial<AdapterExecutionTelemetry> = {},
+): AdapterExecutionTelemetry {
+  return {
+    adapterClientInvocationCount: 1,
+    adapterRetryCount: 0,
+    runtimeReportedAutoRetryCount: 0,
+    adapterReportedFallbackUsed: false,
+    source: "pi-rpc-observable",
+    ...overrides,
   };
 }
 
@@ -571,5 +587,292 @@ describe("codex_external_agents MCP server", () => {
     expect(JSON.stringify(result.structuredContent)).not.toContain(
       "LifecycleObservation",
     );
+  });
+
+  it("emits isolated Stop evidence only after progress and in-flight closure", async () => {
+    const callbacks = new Map<
+      string,
+      (input: unknown, extra: Record<string, unknown>) => Promise<unknown>
+    >();
+    const signals = new Map<string, AbortController>();
+    const events: HostAcceptanceLifecycleEvent[] = [];
+    const telemetryCallbacks = new Map<
+      string,
+      NonNullable<TaskExecutionContext["onExecutionTelemetry"]>
+    >();
+    const serviceResults = new Map([
+      ["secret prompt one", deferred<ExternalDelegateResult>()],
+      ["secret prompt two", deferred<ExternalDelegateResult>()],
+    ]);
+    const service = {
+      review: vi.fn(),
+      delegate: vi.fn(
+        (
+          input: unknown,
+          context?: TaskExecutionContext,
+        ) => {
+          const prompt = (input as { prompt: string }).prompt;
+          telemetryCallbacks.set(prompt, context!.onExecutionTelemetry!);
+          return serviceResults.get(prompt)!.promise;
+        },
+      ),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        callbacks.set(name, handler);
+      },
+    };
+    const inFlight = new InFlightTasks();
+    registerExternalTools(
+      fakeServer as never,
+      service,
+      inFlight,
+      (event) => {
+        events.push(event);
+      },
+    );
+
+    const start = (
+      prompt: string,
+      requestId: string,
+    ) => {
+      const controller = new AbortController();
+      signals.set(prompt, controller);
+      const handler = callbacks.get("external_delegate")!;
+      return handler(
+        { llm: "ark-agent-plan", prompt, cwd: `C:\\private\\${prompt}` },
+        {
+          requestId,
+          signal: controller.signal,
+          sendNotification: async () => undefined,
+        },
+      );
+    };
+
+    const first = start("secret prompt one", "raw-request-one");
+    const second = start("secret prompt two", "raw-request-two");
+    expect(events.map(({ type }) => type)).toEqual([
+      "requestStarted",
+      "requestStarted",
+    ]);
+    expect(events[0]).not.toEqual(events[1]);
+    const firstRequestSha = events[0]!.requestIdSha256;
+    const secondRequestSha = events[1]!.requestIdSha256;
+
+    signals.get("secret prompt one")!.abort("sdk_request_cancelled");
+    signals.get("secret prompt one")!.abort("duplicate");
+    telemetryCallbacks.get("secret prompt one")!({
+      ...executionTelemetry({
+        ownedProcessCompletion: "cancelled",
+        ownedProcessDrained: true,
+      }),
+    });
+    telemetryCallbacks.get("secret prompt one")!(
+      executionTelemetry({
+        ownedProcessCompletion: "cancelled",
+        ownedProcessDrained: true,
+      }),
+    );
+    serviceResults.get("secret prompt one")!.resolve({
+      ...delegateResult(),
+      ok: false,
+      status: "cancelled",
+    });
+    await first;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(events.map(({ type }) => type)).toEqual([
+      "requestStarted",
+      "requestStarted",
+      "sdkAbort",
+      "ownedExit",
+      "handlerCancelled",
+      "inFlightRemoved",
+    ]);
+    expect(
+      events.slice(2).map(({ requestIdSha256 }) => requestIdSha256),
+    ).toEqual(Array(4).fill(firstRequestSha));
+    expect(inFlight.size).toBe(1);
+
+    signals.get("secret prompt one")!.abort("late");
+    telemetryCallbacks.get("secret prompt one")!(
+      executionTelemetry({
+        ownedProcessCompletion: "cancelled",
+        ownedProcessDrained: true,
+      }),
+    );
+    expect(events).toHaveLength(6);
+
+    serviceResults.get("secret prompt two")!.resolve(delegateResult());
+    await second;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(events.at(-1)?.type).toBe("inFlightRemoved");
+    expect(events.at(-1)?.requestIdSha256).toBe(secondRequestSha);
+    expect(events.filter(({ type }) => type === "handlerCancelled")).toHaveLength(
+      1,
+    );
+    expect(inFlight.size).toBe(0);
+
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain("raw-request-one");
+    expect(serialized).not.toContain("raw-request-two");
+    expect(serialized).not.toContain("secret prompt");
+    expect(serialized).not.toContain("C:\\\\private");
+  });
+
+  it("records a pre-aborted SDK signal exactly once and isolates sink failures", async () => {
+    let callback:
+      | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    let telemetryCallback:
+      | NonNullable<TaskExecutionContext["onExecutionTelemetry"]>
+      | undefined;
+    const events: HostAcceptanceLifecycleEvent[] = [];
+    const service = {
+      review: vi.fn(
+        async (
+          _input: unknown,
+          context?: TaskExecutionContext,
+        ): Promise<ExternalReviewResult> => {
+          telemetryCallback = context?.onExecutionTelemetry;
+          context?.onExecutionTelemetry?.(executionTelemetry({
+            ownedProcessCompletion: "root_exit",
+            ownedProcessDrained: true,
+          }));
+          context?.onExecutionTelemetry?.(executionTelemetry({
+            ownedProcessCompletion: "cancelled",
+          }));
+          return { ...reviewResult(), ok: false, status: "cancelled" };
+        },
+      ),
+      delegate: vi.fn(),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        if (name === "external_review") callback = handler;
+      },
+    };
+    const controller = new AbortController();
+    controller.abort("already stopped");
+    registerExternalTools(
+      fakeServer as never,
+      service,
+      new InFlightTasks(),
+      (event) => {
+        events.push(event);
+        if (event.type === "sdkAbort") {
+          return Promise.reject(new Error("observer failed"));
+        }
+        throw new Error("observer failed");
+      },
+    );
+
+    const result = (await callback?.(
+      {
+        llm: "kimi-k3",
+        task: "review_plan",
+        prompt: "Review",
+        cwd: process.cwd(),
+      },
+      {
+        requestId: 99,
+        signal: controller.signal,
+        sendNotification: async () => undefined,
+      },
+    )) as { structuredContent: ExternalReviewResult };
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(result.structuredContent.status).toBe("cancelled");
+    expect(events.map(({ type }) => type)).toEqual([
+      "requestStarted",
+      "sdkAbort",
+      "handlerCancelled",
+      "inFlightRemoved",
+    ]);
+    telemetryCallback?.(executionTelemetry({
+      ownedProcessCompletion: "cancelled",
+      ownedProcessDrained: true,
+    }));
+    expect(events).toHaveLength(4);
+  });
+
+  it("emits handler cancellation after progress finishes and before removal", async () => {
+    let callback:
+      | ((input: unknown, extra: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    const notification = deferred<void>();
+    const events: HostAcceptanceLifecycleEvent[] = [];
+    const service = {
+      review: vi.fn(
+        async (
+          _input: unknown,
+          context?: TaskExecutionContext,
+        ): Promise<ExternalReviewResult> => {
+          context?.onProgress?.("cancellation pending");
+          return { ...reviewResult(), ok: false, status: "cancelled" };
+        },
+      ),
+      delegate: vi.fn(),
+    };
+    const fakeServer = {
+      registerTool(
+        name: string,
+        _config: unknown,
+        handler: (
+          input: unknown,
+          extra: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) {
+        if (name === "external_review") callback = handler;
+      },
+    };
+    const controller = new AbortController();
+    registerExternalTools(
+      fakeServer as never,
+      service,
+      new InFlightTasks(),
+      (event) => {
+        events.push(event);
+      },
+    );
+
+    const handler = callback?.(
+      {
+        llm: "kimi-k3",
+        task: "review_plan",
+        prompt: "Review",
+        cwd: process.cwd(),
+      },
+      {
+        requestId: "progress-order",
+        signal: controller.signal,
+        _meta: { progressToken: "progress-order" },
+        sendNotification: () => notification.promise,
+      },
+    );
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(events.map(({ type }) => type)).toEqual(["requestStarted"]);
+
+    notification.resolve();
+    await handler;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(events.map(({ type }) => type)).toEqual([
+      "requestStarted",
+      "handlerCancelled",
+      "inFlightRemoved",
+    ]);
   });
 });

@@ -16,27 +16,45 @@ export class InFlightTasks {
     this.#shutdownController.abort("session_shutdown");
   }
 
-  track<T>(promise: Promise<T>): Promise<T> {
+  track<T>(
+    promise: Promise<T>,
+    onRemoved?: () => void | Promise<void>,
+  ): Promise<T> {
     if (this.#admissionClosed) {
       throw new Error("In-flight task admission is closed.");
     }
 
-    return this.#trackAdmitted(promise);
+    return this.#trackAdmitted(promise, onRemoved);
   }
 
-  run<T>(factory: () => Promise<T>): Promise<T> {
+  run<T>(
+    factory: () => Promise<T>,
+    onRemoved?: () => void | Promise<void>,
+  ): Promise<T> {
     if (this.#admissionClosed) {
       throw new Error("In-flight task admission is closed.");
     }
 
-    return this.#trackAdmitted(factory());
+    return this.#trackAdmitted(factory(), onRemoved);
   }
 
-  #trackAdmitted<T>(promise: Promise<T>): Promise<T> {
+  #trackAdmitted<T>(
+    promise: Promise<T>,
+    onRemoved?: () => void | Promise<void>,
+  ): Promise<T> {
     this.#tasks.add(promise);
     void promise
       .finally(() => {
-        this.#tasks.delete(promise);
+        if (this.#tasks.delete(promise) && onRemoved !== undefined) {
+          try {
+            const result = onRemoved();
+            if (result !== undefined) {
+              void Promise.resolve(result).catch(() => undefined);
+            }
+          } catch {
+            // Removal observation is best effort and cannot affect the task.
+          }
+        }
       })
       .catch(() => undefined);
     return promise;

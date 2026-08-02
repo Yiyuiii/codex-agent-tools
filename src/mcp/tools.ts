@@ -11,6 +11,12 @@ import {
   externalReviewInputSchema,
 } from "../tasks/schemas.js";
 import type { TaskExecutionContext } from "../tasks/service.js";
+import {
+  createHostAcceptanceRequestIdentity,
+  emitHostAcceptanceEvent,
+  type HostAcceptanceEventSink,
+  type HostAcceptanceRequestIdentity,
+} from "./host-acceptance-events.js";
 import { InFlightTasks } from "./in-flight.js";
 import { createMcpProgressReporter } from "./progress.js";
 
@@ -135,27 +141,52 @@ export function registerExternalTools(
   server: McpServer,
   service: ExternalTaskService,
   inFlight: InFlightTasks = new InFlightTasks(),
+  hostAcceptanceEventSink?: HostAcceptanceEventSink,
 ): InFlightTasks {
   server.registerTool(
     PUBLIC_EXTERNAL_TOOL_DEFINITIONS[0].name,
     PUBLIC_EXTERNAL_TOOL_DEFINITIONS[0].registration,
     (input, extra) => {
+      let requestIdentity: HostAcceptanceRequestIdentity | undefined;
       return inFlight.run(async () => {
+        const lifecycle =
+          hostAcceptanceEventSink === undefined
+            ? undefined
+            : createRequestLifecycle(
+                hostAcceptanceEventSink,
+                createHostAcceptanceRequestIdentity(extra.requestId),
+                "review",
+                extra.signal,
+              );
+        requestIdentity = lifecycle?.identity;
         const progress = createMcpProgressReporter(extra);
+        let outputStatus: ExternalReviewResult["status"] | undefined;
         try {
           const output = externalReviewResultSchema.parse(
             await service.review(input, {
               signal: extra.signal,
               shutdownSignal: inFlight.shutdownSignal,
               onProgress: progress.report,
+              ...(lifecycle === undefined
+                ? {}
+                : { onExecutionTelemetry: lifecycle.onExecutionTelemetry }),
             }),
           );
+          outputStatus = output.status;
           return {
             content: textContent(output),
             structuredContent: output,
           };
         } finally {
           await progress.finish();
+          lifecycle?.finish(outputStatus);
+        }
+      }, () => {
+        if (requestIdentity !== undefined) {
+          emitHostAcceptanceEvent(hostAcceptanceEventSink, {
+            type: "inFlightRemoved",
+            ...requestIdentity,
+          });
         }
       });
     },
@@ -165,26 +196,110 @@ export function registerExternalTools(
     PUBLIC_EXTERNAL_TOOL_DEFINITIONS[1].name,
     PUBLIC_EXTERNAL_TOOL_DEFINITIONS[1].registration,
     (input, extra) => {
+      let requestIdentity: HostAcceptanceRequestIdentity | undefined;
       return inFlight.run(async () => {
+        const lifecycle =
+          hostAcceptanceEventSink === undefined
+            ? undefined
+            : createRequestLifecycle(
+                hostAcceptanceEventSink,
+                createHostAcceptanceRequestIdentity(extra.requestId),
+                "delegate",
+                extra.signal,
+              );
+        requestIdentity = lifecycle?.identity;
         const progress = createMcpProgressReporter(extra);
+        let outputStatus: ExternalDelegateResult["status"] | undefined;
         try {
           const output = externalDelegateResultSchema.parse(
             await service.delegate(input, {
               signal: extra.signal,
               shutdownSignal: inFlight.shutdownSignal,
               onProgress: progress.report,
+              ...(lifecycle === undefined
+                ? {}
+                : { onExecutionTelemetry: lifecycle.onExecutionTelemetry }),
             }),
           );
+          outputStatus = output.status;
           return {
             content: textContent(output),
             structuredContent: output,
           };
         } finally {
           await progress.finish();
+          lifecycle?.finish(outputStatus);
+        }
+      }, () => {
+        if (requestIdentity !== undefined) {
+          emitHostAcceptanceEvent(hostAcceptanceEventSink, {
+            type: "inFlightRemoved",
+            ...requestIdentity,
+          });
         }
       });
     },
   );
 
   return inFlight;
+}
+
+function createRequestLifecycle(
+  sink: HostAcceptanceEventSink,
+  identity: HostAcceptanceRequestIdentity,
+  task: "review" | "delegate",
+  signal: AbortSignal,
+): {
+  readonly identity: HostAcceptanceRequestIdentity;
+  readonly onExecutionTelemetry: NonNullable<
+    TaskExecutionContext["onExecutionTelemetry"]
+  >;
+  finish(status: ExternalReviewResult["status"] | undefined): void;
+} {
+  let active = true;
+  let sdkAbortEmitted = false;
+  let ownedExitEmitted = false;
+
+  const emit = (
+    event: Parameters<HostAcceptanceEventSink>[0],
+  ): void => {
+    emitHostAcceptanceEvent(sink, event);
+  };
+  const onAbort = (): void => {
+    if (!active || sdkAbortEmitted) return;
+    sdkAbortEmitted = true;
+    emit({ type: "sdkAbort", ...identity });
+  };
+
+  emit({ type: "requestStarted", task, ...identity });
+  signal.addEventListener("abort", onAbort, { once: true });
+  if (signal.aborted) onAbort();
+
+  return {
+    identity,
+    onExecutionTelemetry(telemetry) {
+      if (
+        active &&
+        !ownedExitEmitted &&
+        telemetry?.ownedProcessCompletion === "cancelled" &&
+        telemetry.ownedProcessDrained === true
+      ) {
+        ownedExitEmitted = true;
+        emit({
+          type: "ownedExit",
+          completion: "cancelled",
+          ownershipDrained: true,
+          ...identity,
+        });
+      }
+    },
+    finish(status) {
+      if (!active) return;
+      active = false;
+      signal.removeEventListener("abort", onAbort);
+      if (status === "cancelled") {
+        emit({ type: "handlerCancelled", ...identity });
+      }
+    },
+  };
 }

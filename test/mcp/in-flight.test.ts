@@ -130,4 +130,48 @@ describe("InFlightTasks", () => {
     expect(factory).not.toHaveBeenCalled();
     expect(inFlight.size).toBe(0);
   });
+
+  it("runs a best-effort removal hook only after deleting the settled promise", async () => {
+    const removalOrder: string[] = [];
+    const task = deferred<string>();
+    const inFlight = new InFlightTasks();
+
+    const tracked = inFlight.track(task.promise, () => {
+      removalOrder.push(`removed:${inFlight.size}`);
+      throw new Error("observer unavailable");
+    });
+
+    task.resolve("done");
+    await expect(tracked).resolves.toBe("done");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(removalOrder).toEqual(["removed:0"]);
+    expect(inFlight.size).toBe(0);
+  });
+
+  it("absorbs an asynchronously rejected removal hook", async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+
+    try {
+      const inFlight = new InFlightTasks();
+      const tracked = inFlight.run(
+        async () => "done",
+        async () => {
+          throw new Error("observer rejected");
+        },
+      );
+
+      await expect(tracked).resolves.toBe("done");
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(inFlight.size).toBe(0);
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
 });
