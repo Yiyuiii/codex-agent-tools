@@ -750,17 +750,30 @@ describe("MCP stdio owned-process cleanup", () => {
         runClient: async (request) => {
           adapterClientInvocationCount += 1;
           clientRequestHadTimeout = Object.hasOwn(request, "timeoutMs");
-          clientResult = await runKimiAcp({
-            ...request,
-            args: [fakeKimiPath],
-            environment: {
-              ...request.environment,
-              FAKE_KIMI_SCENARIO: "hang",
-              FAKE_KIMI_ROOT_PID_FILE: rootPidPath,
-              FAKE_KIMI_CARRIER_PID_FILE: carrierPidPath,
-              FAKE_KIMI_CHILD_PID_FILE: childPidPath,
+          clientResult = await runKimiAcp(
+            {
+              ...request,
+              args: [fakeKimiPath],
+              environment: {
+                ...request.environment,
+                FAKE_KIMI_SCENARIO: "hang",
+                FAKE_KIMI_ROOT_PID_FILE: rootPidPath,
+                FAKE_KIMI_CARRIER_PID_FILE: carrierPidPath,
+                FAKE_KIMI_CHILD_PID_FILE: childPidPath,
+              },
             },
-          });
+            process.platform === "win32"
+              ? {
+                  spawnOwnedAgentProcess: (launch) =>
+                    spawnWindowsOwnedAgentProcessWithDependencies(launch, {
+                      resolveHelper: () =>
+                        resolveWindowsJobHelperForModule(
+                          syntheticDistModuleUrl,
+                        ),
+                    }),
+                }
+              : {},
+          );
           const [rootPid, carrierPid, childPid] = await Promise.all([
             readPid(rootPidPath),
             readPid(carrierPidPath),
@@ -970,7 +983,11 @@ describe("MCP stdio owned-process cleanup", () => {
       expect(observation.abortCount).toBe(1);
       expect(observation.result?.status).toBe("cancelled");
       expect(clientResult?.status).toBe("cancelled");
-      expect(clientResult?.executionTelemetry).toBeNull();
+      expect(clientResult?.executionTelemetry).toMatchObject({
+        adapterClientInvocationCount: 1,
+        ownedProcessCompletion: "session_shutdown",
+        ownedProcessDrained: true,
+      });
       expect(clientResult?.diagnostics).toContain("pi_runtime_identity_unknown");
       expect(
         commands.filter((command) => command.type === "prompt"),
