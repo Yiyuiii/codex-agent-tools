@@ -80,19 +80,16 @@ describe("GitHub release workflows", () => {
     expect(content).toContain("required_branch=origin/main");
     expect(content).toContain("package.json version");
     expect(content).toContain("git merge-base --is-ancestor");
-    expect(content).toContain(".release-validation/v${tag_version}.md");
-    for (const marker of [
-      "Doctor: pass",
-      "Local-Npm-Smoke: pass",
-      "MCP-Smoke: pass",
-      "Plugin-Isolated: pass",
-      "Capability-Index: pass",
-      "Release-Review: pass",
-      "RC: v",
-    ]) {
-      expect(content).toContain(marker);
-    }
+    expect(content).toContain(".release-validation/v${tag_version}.json");
+    expect(content).toContain("node dist/release-validation.js");
+    expect(content).toContain('--npm-channel "${{ steps.channel.outputs.npm_tag }}"');
+    expect(content).not.toContain(".release-validation/v${tag_version}.md");
+    expect(content).not.toContain("grep -Fxq");
+    expect(content).not.toContain("if [[ \"${{ steps.channel.outputs.npm_tag }}\" != \"latest\" ]]");
     expect(content.match(/npm run gate:offline/gu)).toHaveLength(1);
+    expect(content.indexOf("npm run gate:offline")).toBeLessThan(
+      content.indexOf("node dist/release-validation.js"),
+    );
     expect(content).not.toContain("npm run typecheck");
     expect(content).not.toContain("npm test");
     expect(content).not.toContain("npm run smoke:release");

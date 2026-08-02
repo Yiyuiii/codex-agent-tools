@@ -92,41 +92,23 @@ jobs:
             exit 1
           fi
 
-      - name: Verify stable release validation evidence
+      - run: npm ci
+      - run: npm run gate:offline
+
+      - name: Verify release validation evidence
         id: validation
         shell: bash
         run: |
           set -euo pipefail
           tag_version="${{ steps.version.outputs.tag_version }}"
-          validation_file=".release-validation/v${tag_version}.md"
+          validation_file=".release-validation/v${tag_version}.json"
           echo "validation_file=${validation_file}" >> "$GITHUB_OUTPUT"
-          if [[ "${{ steps.channel.outputs.npm_tag }}" != "latest" ]]; then
-            exit 0
-          fi
-          if [[ ! -s "$validation_file" ]]; then
-            echo "::error::Stable release requires $validation_file at the tagged commit."
-            exit 1
-          fi
-          sed -i 's/\r$//' "$validation_file"
-          for marker in \
-            "Doctor: pass" \
-            "Local-Npm-Smoke: pass" \
-            "MCP-Smoke: pass" \
-            "Plugin-Isolated: pass" \
-            "Capability-Index: pass" \
-            "Release-Review: pass"; do
-            grep -Fxq "$marker" "$validation_file" || {
-              echo "::error::$validation_file must contain exact marker: $marker"
-              exit 1
-            }
-          done
-          grep -Eq '^RC: v[0-9]+\.[0-9]+\.[0-9]+-' "$validation_file" || {
-            echo "::error::$validation_file must contain an RC marker such as RC: v0.1.0-beta.1"
-            exit 1
-          }
-
-      - run: npm ci
-      - run: npm run gate:offline
+          node dist/release-validation.js \
+            --repository-root . \
+            --package-version "$tag_version" \
+            --tag "$GITHUB_REF_NAME" \
+            --tagged-commit "$GITHUB_SHA" \
+            --npm-channel "${{ steps.channel.outputs.npm_tag }}"
 
       - name: Check whether the version already exists
         id: existing
@@ -197,7 +179,7 @@ jobs:
             echo "- release smoke: passed"
             echo "- npm package and dist-tag: verified"
             if [[ "$npm_tag" == "latest" ]]; then
-              echo "- beta local npm acceptance: passed (see \`${validation_file}\`)"
+              echo "- public beta host acceptance: passed (see \`${validation_file}\`)"
             else
               echo "- beta local npm acceptance: required before stable promotion"
             fi

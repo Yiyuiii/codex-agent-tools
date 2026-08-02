@@ -12,6 +12,7 @@ export default defineConfig({
     "plugin-isolated-report": "src/plugin/isolated-report.ts",
     "plugin-state-snapshot": "src/plugin/state-snapshot.ts",
     "release-assurance": "src/release/assurance.ts",
+    "release-validation": "src/release/release-validation.ts",
     "capability-qualification": "src/qualification/capability-index.ts",
   },
   format: ["esm"],
