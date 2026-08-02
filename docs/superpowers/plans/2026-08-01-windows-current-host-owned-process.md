@@ -193,13 +193,13 @@ git diff --check
 
 **第六子批状态（2026-08-02，资格协议与scanner接线已完成）：** 提交`754a796`建立current preflight/checkpoint/manifest schema v3与evidence v4，历史schema v1/evidence v2及schema v2/evidence v3继续严格验证；共享current evidence contract在ledger写checkpoint前、immutable verifier和capability index三处统一校验四种runtime/task精确checks、owned drain、结果文件与命令诊断，runner不能用伪`passed:true`生成promotionEligible terminal。preflight只记录Node/Codex版本，Windows静态Pi检查与adapter同为`process.execPath + 单一绝对CLI`，不启动目标；coordinator/gate删除全部全机扫描，lock recovery只用owner PID+start identity并可按磁盘协议把历史未终结schema2批次关闭为interrupted。review producer同时删去冗余`commandCount:0`，真实四LLM×两任务八种生产形状直接通过共享contract。终审三轮修复伪passed、历史恢复、scanner类型残留及review形状漂移后PASS；主线程最终12文件416 passed / 1 POSIX-only skipped、类型/diff通过。公共npm acceptance的最后两次全机扫描与runtime scanner文件本身仍待下一子批删除。
 
+**第七子批状态（2026-08-02，公共验收scanner已删除）：** 提交`7823d47`删除公共npm acceptance开始/结束的全机Kimi/Pi/real-smoke枚举，并移除`src/runtime/agent-processes.ts`及其专用测试。公共包验收现在只核对它实际拥有的MCP transport显式关闭、资格锁缺席、隔离临时目录最终删除，并要求已安装包存在native helper与SHA边车；已安装`doctor`继续严格校验hash、x64 managed PE并执行无target的`--probe-v1`。报告不再伪称用户整机idle，明确不扫描或约束其它Kimi/Pi进程；qualification lock owner PID+start identity与Job-owned drain保持不变。聚焦31/31、类型、library build与diff通过，fresh只读复审PASS。
+
 ### 7.1 RED
 
 - Kimi/Pi Windows路径仍依赖direct spawn、PID terminator或`pi.cmd`执行的合同测试先失败；
 - Pi locator尚不能从当前安装解析/验证package name/version/bin/realpath/engine并返回结构化`PiInvocation`；
-- 公共npm验收仍有全机扫描；smoke、preflight、coordinator、gate与lock recovery中的target探针/扫描已经删除；
 - stdio真实fake链尚不能证明handler/session只在owned tree归零后settle；
-- 公共npm验收仍通过`src/runtime/agent-processes.ts`调用WMI/`ps`并要求全机Kimi/Pi/real-smoke为零；资格producer、coordinator和lock recovery已不再消费该字段，下一子批必须删除公共验收调用与scanner实现/专用测试。
 
 ### 7.2 GREEN
 
