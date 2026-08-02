@@ -47,10 +47,10 @@ npm run build
 ## 3. 运行隔离官方生命周期验收
 
 ```powershell
-npm run acceptance:plugin:isolated
+npm run acceptance:plugin:isolated:built
 ```
 
-脚本只在自动创建的临时 `CODEX_HOME` 中调用官方 marketplace/plugin add、list 与 remove，并从官方缓存副本启动 MCP。它不得使用活动 Codex home，也不构成真实 Codex App 宿主门禁。
+该入口复用第2节已经构建的候选，只在自动创建的临时 `CODEX_HOME` 中调用官方 marketplace/plugin add、list 与 remove，并从官方缓存副本启动 MCP。它不得使用活动 Codex home，也不构成真实 Codex App 宿主门禁。若跳过第2节而单独运行本验收，使用`npm run acceptance:plugin:isolated`让脚本先构建一次。
 
 ## 4. 查看隔离证据
 

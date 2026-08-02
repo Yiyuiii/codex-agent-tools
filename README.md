@@ -80,13 +80,11 @@ ordinal 1–5 均 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、`a
 
 ```powershell
 npm ci
-npm run typecheck
-npm test
-npm run build
-npm run verify:capabilities
-npm run smoke:release
-npm run acceptance:plugin:isolated
+npm run gate:offline
+npm run acceptance:plugin:isolated:built
 ```
+
+`gate:offline`只构建一次候选，随后依次复用该候选完成类型检查、单 worker 确定性测试与 release smoke；隔离插件验收继续复用同一 bundle。若只单独运行插件验收，使用自包含的`npm run acceptance:plugin:isolated`，它会先构建候选。
 
 公共 beta 或 stable 已发布后，可从官方 registry 对精确版本运行一次不调用
 真实模型、也不接触活动 Codex home 的消费者视角验收：

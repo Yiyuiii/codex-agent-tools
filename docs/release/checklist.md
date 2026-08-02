@@ -42,11 +42,7 @@ beta.1 handoff 只证明旧宿主断开会留下服务端任务，不是 stable 
 ### 通过标准
 
 ```powershell
-npm run typecheck
-npm test
-npm run build
-npm run verify:capabilities
-npm run smoke:release
+npm run gate:offline
 git diff --check
 ```
 
@@ -77,10 +73,10 @@ git diff --check
 ### 通过标准
 
 ```powershell
-npm run acceptance:plugin:isolated
+npm run acceptance:plugin:isolated:built
 ```
 
-脚本必须在唯一临时 `CODEX_HOME` 中完成官方 marketplace add/list、plugin add/list、从官方缓存副本启动 MCP、plugin remove/list 与 marketplace remove/list。调用门禁先证明已退役的 `gemini-3.5-flash` 以 unknown logical LLM 被明确拒绝、错误精确列出四项活动 LLM 且没有启动 Pi，再用 qualified 的 `ark-agent-deepseek-v4-flash` 验证从官方缓存副本恰好调用 fake Pi 一次、direct 路由、父代理清除、只注入目标 Agent 凭据和进程清理。脚本还必须验证 MCP 契约和官方列表语义回滚。
+该入口复用第1层已经构建的候选。脚本必须在唯一临时 `CODEX_HOME` 中完成官方 marketplace add/list、plugin add/list、从官方缓存副本启动 MCP、plugin remove/list 与 marketplace remove/list。调用门禁先证明已退役的 `gemini-3.5-flash` 以 unknown logical LLM 被明确拒绝、错误精确列出四项活动 LLM 且没有启动 Pi，再用 qualified 的 `ark-agent-deepseek-v4-flash` 验证从官方缓存副本恰好调用 fake Pi 一次、direct 路由、父代理清除、只注入目标 Agent 凭据和进程清理。脚本还必须验证 MCP 契约和官方列表语义回滚。单独运行第2层时改用`npm run acceptance:plugin:isolated`先构建一次。
 
 ### 当前证据
 

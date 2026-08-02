@@ -49,7 +49,7 @@
 8. C# helper对target cleanup禁止PID reopen、WMI、`taskkill`、全机扫描、`AssignProcessToJobObject`事后归属、`TerminateProcess`和breakaway；任何前置失败禁止direct-spawn或自动fallback；
 9. helper、协议、hash、路径、架构、CLR、环境或 transport 前置条件失败时 fail closed；cleanup 成功不能把业务/协议失败改写为成功；
 10. qualification、lock recovery、smoke与公共包验收只能用本次case的Job terminal/drain、既有handle与lock owner identity证明本项目owned资源归零；不得以WMI、`ps`或命令行模式扫描要求全机Kimi/Pi/smoke为零，也不得因无关外部CLI或旧插件仍在运行而阻断本项目；
-11. POSIX process-group 路径、现有provider `KeyedLimiter`并发合同与公开 MCP 语义不因本设计改变；本轮只保留既有回归，不新增 POSIX owned-process 设计、集成矩阵或兼容认证。进程内provider并发池不是外部CLI的step、turn、tool、context、token或执行时长上限，不在“删除全局执行预算”名义下静默移除。
+11. 现有provider `KeyedLimiter`并发合同与公开 MCP 语义不因本设计改变。POSIX process-group旧分支暂不在本轮删除，但不属于当前宿主发布承诺，也不新增POSIX owned-process设计、集成矩阵或兼容认证；未来若退役必须把生产分支与相应测试作为独立产品范围变更一起处理。进程内provider并发池不是外部CLI的step、turn、tool、context、token或执行时长上限，不在“删除全局执行预算”名义下静默移除。
 
 Job Object 仍是生命周期承载，不是权限沙箱。通过系统 broker、服务或其它 Job 外机制显式创建的进程不属于可证明的 owned tree；若真实验收发现逃逸，停止发布并保存脱敏证据，不用模糊清理伪造通过。
 

@@ -137,7 +137,7 @@ describe("production real-smoke script entrypoints", () => {
       scripts?: Record<string, string>;
     };
 
-    expect(packageJson.scripts?.pretest).toBe("npm run build:library");
+    expect(packageJson.scripts?.pretest).toBe("npm run build");
   });
 
   it("does not expose a standalone Pi smoke script or build entry", async () => {

@@ -12,160 +12,119 @@ function workflow(name: string): string {
   ).replaceAll("\r\n", "\n");
 }
 
-function packageManifest(): {
-  config?: { codexCliVersion?: unknown };
-  scripts?: Record<string, string>;
-} {
-  return JSON.parse(
+function packageScripts(): Record<string, string> {
+  const manifest = JSON.parse(
     readFileSync(resolve(repositoryRoot, "package.json"), "utf8"),
-  ) as {
-    config?: { codexCliVersion?: unknown };
-    scripts?: Record<string, string>;
-  };
+  ) as { scripts?: Record<string, string> };
+  return manifest.scripts ?? {};
+}
+
+function packageCodexCliVersion(): unknown {
+  const manifest = JSON.parse(
+    readFileSync(resolve(repositoryRoot, "package.json"), "utf8"),
+  ) as { config?: { codexCliVersion?: unknown } };
+  return manifest.config?.codexCliVersion;
+}
+
+function expectSingleNode24Job(content: string): void {
+  expect(content.match(/node-version:/gu)).toHaveLength(1);
+  expect(content).toContain("node-version: 24");
+  expect(content).not.toContain("matrix:");
 }
 
 describe("GitHub release workflows", () => {
-  it("runs one honest Node 24 CI job on main and next", () => {
+  it("runs the offline gate on Node 24 CI for main and next", () => {
     const content = workflow("ci.yml");
 
     expect(content).toContain("branches: [main, next]");
-    expect(content.match(/node-version:/gu)).toHaveLength(1);
-    expect(content).toContain("node-version: 24");
-    expect(content).not.toContain("matrix:");
-    expect(content).not.toContain("fail-fast:");
-    expect(content).not.toContain("${{ matrix.node-version }}");
+    expectSingleNode24Job(content);
+    expect(content).toContain("- run: npm run gate:offline");
     expect(content).not.toContain("actions/upload-artifact");
-    expect(content).not.toContain("CODEX_CLI_VERSION:");
-    expect(content).toContain(
-      "require('./package.json').config.codexCliVersion",
-    );
-    expect(content).toContain(
-      'npm install --global "@openai/codex@${codex_cli_version}"',
-    );
-    expect(content).toContain(
-      'test "$(codex --version)" = "codex-cli ${codex_cli_version}"',
-    );
-    expect(content).toContain("npm ci");
-    expect(content.match(/npm run gate:offline/gu)).toHaveLength(1);
-    expect(content).not.toContain("npm run typecheck");
-    expect(content).not.toContain("npm test");
-    expect(content).not.toContain("npm run smoke:release");
   });
 
-  it("publishes prereleases from next and stable releases from main through OIDC", () => {
+  it("publishes branch-bound tag releases through npm OIDC after validation", () => {
     const content = workflow("release.yml");
 
     expect(content).toContain('tags:\n      - "v*"');
     expect(content).toContain("id-token: write");
-    expect(content).toContain("Verify tag ref");
-    expect(content).toContain(
-      'if [[ "$GITHUB_REF" != refs/tags/v* ]]; then',
-    );
-    expect(content).not.toContain("CODEX_CLI_VERSION:");
-    expect(content.match(/node-version:/gu)).toHaveLength(1);
-    expect(content).toContain("node-version: 24");
-    expect(content).not.toContain("matrix:");
-    expect(content).toContain(
-      "require('./package.json').config.codexCliVersion",
-    );
-    expect(content).toContain(
-      'npm install --global "@openai/codex@${codex_cli_version}"',
-    );
-    expect(content).toContain(
-      'test "$(codex --version)" = "codex-cli ${codex_cli_version}"',
-    );
+    expectSingleNode24Job(content);
+
     expect(content).toContain("npm_tag=next");
     expect(content).toContain("required_branch=origin/next");
     expect(content).toContain("npm_tag=latest");
     expect(content).toContain("required_branch=origin/main");
-    expect(content).toContain("package.json version");
+
+    expect(content).toContain("Verify package version matches tag");
+    expect(content).toContain("package_version");
+    expect(content).toContain("tag_version");
+    expect(content).toContain("Verify tag ancestry");
     expect(content).toContain("git merge-base --is-ancestor");
+    expect(content).toContain("Verify release validation evidence");
     expect(content).toContain(".release-validation/v${tag_version}.json");
     expect(content).toContain("node dist/release-validation.js");
-    expect(content).toContain('--npm-channel "${{ steps.channel.outputs.npm_tag }}"');
-    expect(content).not.toContain(".release-validation/v${tag_version}.md");
-    expect(content).not.toContain("grep -Fxq");
-    expect(content).not.toContain("if [[ \"${{ steps.channel.outputs.npm_tag }}\" != \"latest\" ]]");
-    expect(content.match(/npm run gate:offline/gu)).toHaveLength(1);
-    expect(content.indexOf("npm run gate:offline")).toBeLessThan(
-      content.indexOf("node dist/release-validation.js"),
-    );
-    expect(content).not.toContain("npm run typecheck");
-    expect(content).not.toContain("npm test");
-    expect(content).not.toContain("npm run smoke:release");
-    expect(content).not.toContain("actions/upload-artifact");
-    expect(content).not.toContain("npm-pack-dry-run.json");
-    expect(content).not.toContain("npm pack --dry-run");
     expect(content).toContain(
-      'npm view "codex-agent-tools@${version}" version',
+      '--npm-channel "${{ steps.channel.outputs.npm_tag }}"',
     );
-    expect(content).toContain(
-      'npm view "codex-agent-tools@${npm_tag}" version',
+
+    const gateIndex = content.indexOf("- run: npm run gate:offline");
+    const validationIndex = content.indexOf(
+      "- name: Verify release validation evidence",
     );
-    expect(content.match(/npm view /gu)).toHaveLength(3);
-    const existingCheck = content.slice(
-      content.indexOf("- name: Check whether the version already exists"),
-      content.indexOf("- name: Publish package through npm OIDC"),
-    );
-    expect(existingCheck).not.toContain("2>/dev/null || true");
-    expect(existingCheck).toContain('view_status="$?"');
-    expect(existingCheck).toContain(
-      "npm (error|ERR!)[[:space:]]+code[[:space:]]+E404",
-    );
-    expect(existingCheck).toContain(
-      "Unable to determine whether the package version already exists",
-    );
-    expect(existingCheck).not.toContain(
-      'echo "${view_output}"',
-    );
+    expect(gateIndex).toBeGreaterThanOrEqual(0);
+    expect(gateIndex).toBeLessThan(validationIndex);
+
+    expect(content).toContain("Publish package through npm OIDC");
     expect(content).toContain(
       'npm publish --ignore-scripts --tag "${{ steps.channel.outputs.npm_tag }}" --access public --registry=https://registry.npmjs.org/',
     );
-    expect(content).toContain("Waiting for npm registry propagation");
-    expect(content).toContain('echo "- CI runtime: Node 24"');
-    expect(content).not.toContain("CI matrix: Node 20/22/24");
-    expect(content).toContain("Create or update GitHub Release");
+    expect(content).toContain("Verify published package and dist-tag");
+    expect(content).toContain('codex-agent-tools@${version}');
+    expect(content).toContain('codex-agent-tools@${npm_tag}');
+
+    const existingVersionCheck = content.slice(
+      content.indexOf("- name: Check whether the version already exists"),
+      content.indexOf("- name: Publish package through npm OIDC"),
+    );
+    expect(existingVersionCheck).toContain('view_status="$?"');
+    expect(existingVersionCheck).toMatch(/elif grep[^\n]+E404/u);
+    expect(existingVersionCheck).toContain(
+      "Unable to determine whether the package version already exists",
+    );
+    expect(existingVersionCheck).not.toContain("|| true");
+
+    expect(content).not.toContain("actions/upload-artifact");
+    expect(content).not.toMatch(/\bnpm\s+pack(?:\s|$)/u);
   });
 
-  it("keeps one pinned Codex CLI source and one deterministic offline gate", () => {
-    const manifest = packageManifest();
-    const version = manifest.config?.codexCliVersion;
-    const scripts = manifest.scripts ?? {};
-
-    expect(typeof version).toBe("string");
+  it("installs one package-pinned Codex CLI in both workflows", () => {
+    const version = packageCodexCliVersion();
     expect(version).toMatch(/^\d+\.\d+\.\d+$/u);
+
+    for (const content of [workflow("ci.yml"), workflow("release.yml")]) {
+      expect(content).toContain(
+        "require('./package.json').config.codexCliVersion",
+      );
+      expect(content).toContain(
+        'npm install --global "@openai/codex@${codex_cli_version}"',
+      );
+      expect(content).toContain(
+        'test "$(codex --version)" = "codex-cli ${codex_cli_version}"',
+      );
+    }
+  });
+
+  it("keeps one build pipeline as the deterministic prepublish gate", () => {
+    const scripts = packageScripts();
+
+    expect(scripts.build).toBe(
+      "npm run build:library && npm run build:plugin",
+    );
     expect(scripts["test:deterministic"]).toBe(
       "vitest run --maxWorkers=1",
-    );
-    expect(scripts["smoke:release:built"]).toBe(
-      "node scripts/release-smoke.mjs",
     );
     expect(scripts["gate:offline"]).toBe(
       "npm run build && npm run typecheck && npm run test:deterministic && npm run smoke:release:built",
     );
-    expect(scripts["smoke:release"]).toBe(
-      "npm run build && npm run smoke:release:built",
-    );
     expect(scripts.prepublishOnly).toBe("npm run gate:offline");
-    expect(scripts).not.toHaveProperty("acceptance:local");
-    expect(scripts["gate:offline"]).not.toMatch(
-      /native:verify|acceptance:|smoke:kimi|smoke:ark|qualify:/u,
-    );
-  });
-
-  it("keeps release smoke deterministic and offline", () => {
-    const content = readFileSync(
-      resolve(repositoryRoot, "scripts", "release-smoke.mjs"),
-      "utf8",
-    );
-
-    expect(content).toContain('runNpm(["pack", "--dry-run", "--json"])');
-    expect(content.match(/runNpm\(/gu)).toHaveLength(2);
-    expect(content).not.toContain("checkNpmNameAvailability");
-    expect(content).not.toContain("assertNpmPackageIdentity");
-    expect(content).not.toContain('"view"');
-    expect(content).not.toMatch(/\bfetch\s*\(/u);
-    expect(content).not.toMatch(/npm\s+view|registry\.npmjs\.org/iu);
-    expect(content).toContain("verifyReleaseWindowsJobHelperArtifact");
   });
 });

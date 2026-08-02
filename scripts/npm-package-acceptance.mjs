@@ -32,6 +32,7 @@ import {
 } from "../dist/npm-package-acceptance.js";
 import { cleanupOwnedMcpTransport } from "../dist/plugin-mcp-cleanup.js";
 import { verifyCapabilityIndex } from "../dist/capability-qualification.js";
+import { isSafeRelativeLaunchPath } from "./lib/npm-launch-path.mjs";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -117,14 +118,6 @@ function samePath(left, right) {
     path.resolve(left).localeCompare(path.resolve(right), undefined, {
       sensitivity: process.platform === "win32" ? "accent" : "variant",
     }) === 0
-  );
-}
-
-function isAbsoluteOnAnyPlatform(value) {
-  return (
-    path.isAbsolute(value) ||
-    path.win32.isAbsolute(value) ||
-    path.posix.isAbsolute(value)
   );
 }
 
@@ -315,14 +308,9 @@ async function installedPluginServer(installedPluginRoot) {
     "codex_external_agents",
   );
   if (
-    typeof server.command !== "string" ||
-    server.command.trim() === "" ||
-    isAbsoluteOnAnyPlatform(server.command) ||
+    !isSafeRelativeLaunchPath(server.command) ||
     !Array.isArray(server.args) ||
-    !server.args.every(
-      (argument) =>
-        typeof argument === "string" && !isAbsoluteOnAnyPlatform(argument),
-    )
+    !server.args.every(isSafeRelativeLaunchPath)
   ) {
     throw new Error("Installed plugin MCP launch contract is invalid");
   }
