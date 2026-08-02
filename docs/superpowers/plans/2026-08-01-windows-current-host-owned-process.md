@@ -195,6 +195,8 @@ git diff --check
 
 **第七子批状态（2026-08-02，公共验收scanner已删除）：** 提交`7823d47`删除公共npm acceptance开始/结束的全机Kimi/Pi/real-smoke枚举，并移除`src/runtime/agent-processes.ts`及其专用测试。公共包验收现在只核对它实际拥有的MCP transport显式关闭、资格锁缺席、隔离临时目录最终删除，并要求已安装包存在native helper与SHA边车；已安装`doctor`继续严格校验hash、x64 managed PE并执行无target的`--probe-v1`。报告不再伪称用户整机idle，明确不扫描或约束其它Kimi/Pi进程；qualification lock owner PID+start identity与Job-owned drain保持不变。聚焦31/31、类型、library build与diff通过，fresh只读复审PASS。
 
+**第八子批状态（2026-08-02，旧本地验收与跨环境checkout已退役）：** 提交`33b70a2`删除`acceptance:local`的package script、真实模型脚本、source/build entry与专用测试；该旧入口包含600秒SDK等待、模型重试和整机进程扫描，已被能力资格及beta后的真实App验收覆盖。公共npm acceptance内联保留installed MCP精确工具集合、`llm`必填和安全注解合同。`native-build-contract`同时删除`core.autocrlf=true/false`两套合成Git checkout；精确`.gitattributes`、真实helper目录闭包、字节SHA、MZ/PE/x64/managed身份、resolver与pack校验不变。聚焦28/28、类型、library build与diff通过；fresh差异复审在项目记忆同步后PASS。
+
 ### 7.1 RED
 
 - Kimi/Pi Windows路径仍依赖direct spawn、PID terminator或`pi.cmd`执行的合同测试先失败；
@@ -236,9 +238,9 @@ git diff --check
 - capability fingerprint尚未复用唯一canonical runtime-input manifest/digest；
 - release workflow尚未实现beta当前宿主marker和stable公共beta/完整重启/真实Stop/owned-zero marker；
 - 当前宿主冻结、能力验证与tag workflow尚未复用同一runtime-input digest，且计划中仍存在重复的prequalification wrapper；
-- 活动测试仍真实创建`core.autocrlf=true/false`双checkout，插件文档门禁仍把历史Task 9–12和固定beta序号当现行路线；
-- `engines >=24`、tsup `node24`与单Node 24 workflow已经收敛；剩余npm文档清单仍把历史计划/审阅页当产品必需文件，旧`acceptance:local`仍可被误当现行真实模型门禁；
-- CI仍上传不被release消费的dist/plugin artifact，native sourceSets与npm文档清单仍有重复真值源；
+- EOL双checkout与旧`acceptance:local`已删除，但插件文档测试仍锁定当前beta、branch、date、测试数量与长段措辞；
+- `engines >=24`、tsup `node24`与单Node 24 workflow已经收敛；剩余npm文档清单仍把历史计划/审阅页当产品必需文件；
+- CI/release已无artifact往返；native sourceSets与npm文档清单仍有重复真值源；
 - npm仍把整个`dist`作为公开运行面：未消费的`qualification` entry、仓库内部acceptance/smoke/release入口、无公共类型入口的声明/映射和仅release assurance使用的`commonmark`生产依赖尚未收敛；
 - CI/release在同一job内通过`pretest`与`smoke:release`重复build，release smoke已检查pack后workflow又重复pack并上传无人消费的完整dist/runtime；
 - 多项测试仍扫描脚本/tsup/计划Markdown的精确源码文本或锁定当前beta、branch、date与Windows条件测试数量；README与operations仍重复维护易变的活动安装、历史批次和执行合同。
