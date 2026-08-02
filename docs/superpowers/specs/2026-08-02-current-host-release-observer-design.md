@@ -134,6 +134,8 @@ beta 严格 JSON marker 必须在发布前绑定 release-only observer artifact�
 
 后续去冗余审计把freeze严格收敛为当前宿主特有事实：host observation、native preflight、helper/observer确定性验证、canonical/runtime/capability绑定、历史证据有效而当前指纹stale，以及零真实模型/活动配置/插件/发布副作用。通用确定性测试、隔离插件验收和exact package closure不在freeze中重复自报；它们分别由同一frozen SHA的资格preflight与新8/8后的`gate:offline`执行。资格preflight也不再提前调用要求8/8已转绿的release smoke，避免stale-only资格启动前形成循环门禁。
 
+Task 8 current-host freeze 已完成并通过fresh集成终审：它绑定runtime commit `0af4359c428006408d8c82171c0a33e74096042a`，机器复核8份历史证据有效且8项当前指纹全部stale，三项当前宿主native/observer验证均通过；freeze receipt SHA256为`1a5098682f6b5fb46554f0989e196d7dd420072ef28e5a92188fa31a956a297e`。该事实只批准进入stale-only真实资格阶段，不等于beta或stable发布批准。
+
 ## 8. 失败语义与完成定义
 
 以下任一情况均 fail closed：descriptor 或 pipe ACL 不可信、MCP/app-server/ChatGPT 任一 handle 无法取得、旧三层进程未完整退出、新旧身份未分离、Stop 不是 SDK abort、owned completion 不是精确 `cancelled`、`ownershipDrained` 未证明既有 Job-zero 合同、handler 或 in-flight 未闭合、派生 completion marker 存在、observer/plugin/beta 身份漂移、receipt 已存在或无法原子写入。

@@ -355,6 +355,8 @@ Task 8把这些事实写入仓库内脱敏的当前宿主freeze evidence，并�
 
 一位fresh reviewer做规格与质量集成终审。任何代码问题退回所属Task修复和复审，Task 8不把补救清理或文档解释当作PASS。最终提交：`docs: freeze current-host Windows prequalification`
 
+**状态（2026-08-02，已完成）：** 当前宿主freeze绑定clean runtime commit `0af4359c428006408d8c82171c0a33e74096042a`，凭据位于`.release-validation/evidence/current-host-0af4359c428006408d8c82171c0a33e74096042a.json`，SHA256为`1a5098682f6b5fb46554f0989e196d7dd420072ef28e5a92188fa31a956a297e`。实测宿主为Windows `10.0.19045.0` x64、Node `24.14.1`、libuv `1.51.0`、npm `11.11.0`、.NET Framework release `528372`；helper、observer、observer manifest/protocol/inputs与canonical runtime摘要均逐项匹配。`native:preflight`、`native:verify`、`observer:verify`通过；能力分析精确得到8/8 gate valid、8/8 evidence valid、8/8 current fingerprint stale，普通`verify:capabilities`按预期exit 1。严格freeze parser与fresh集成终审均PASS，无P1/P2/P3。Task 8期间真实模型、活动配置访问、活动插件变更和发布均为0；下一步只按stale-only协议运行新的真实8/8资格。
+
 ## 10. Task 8后的资格与发布
 
 本阶段沿既有用户授权恢复，不属于离线Tasks 2–8：

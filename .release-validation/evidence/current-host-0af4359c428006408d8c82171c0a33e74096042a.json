@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "kind": "current-host-freeze",
+  "runtimeFrozenCommit": "0af4359c428006408d8c82171c0a33e74096042a",
+  "canonicalRuntimeDigestSha256": "06fbdd80e69b0715db13e3970e85dbea0b338f455e35bccf9725bcac8b0126a9",
+  "windowsJobHelperSha256": "c9bc5cddf77e6385c6a9971b7bf4d4cf5bd697f498fa80c2f1c9ec7c706d8dfa",
+  "observerArtifact": {
+    "path": "host-acceptance/win32-x64/codex-host-acceptance-observer.exe",
+    "sha256": "dd20110b1cbcae984ab9f3560ece1bfa8e7b1a0e542b206cec5d9ff5047f5a64",
+    "protocolVersion": 1,
+    "buildManifest": {
+      "path": "host-acceptance/observer-build-inputs.v1.json",
+      "sha256": "f97ec39a710cd448030a8eea8316a3e5c87af4c2ccfcb96b43304394c1219ce0"
+    },
+    "protocol": {
+      "path": "host-acceptance/protocol/observer-protocol.v1.json",
+      "sha256": "7c89855c33b17ab95cc6414dbb86cb74eeebc3f363beb27479118b2585492803"
+    },
+    "inputsDigestSha256": "143abde38da931e552aa2d0b02ed0d436a59aac901381a6447967cdb11e0a136"
+  },
+  "capabilities": [
+    {
+      "llm": "ark-agent-deepseek-v4-flash",
+      "task": "delegate",
+      "currentFingerprintSha256": "373cbb6ff67ac296804660802d3ead04fb5e7f4e157391e915f17000ed2b7d4b"
+    },
+    {
+      "llm": "ark-agent-deepseek-v4-flash",
+      "task": "review",
+      "currentFingerprintSha256": "01f8b0a1fae51e346582f11d430427d00f6d75620d4d6cfeb8ca4fd18f07d6dc"
+    },
+    {
+      "llm": "ark-agent-plan",
+      "task": "delegate",
+      "currentFingerprintSha256": "1c1eae5024e3776d9994ffd6fa32086985ae76025605c1d03c2156dc213a668c"
+    },
+    {
+      "llm": "ark-agent-plan",
+      "task": "review",
+      "currentFingerprintSha256": "7240424a9767138d7d4b54ec553a2d115d5e6a64987a2758a03ddca12b599d97"
+    },
+    {
+      "llm": "ark-coding-plan",
+      "task": "delegate",
+      "currentFingerprintSha256": "e40a16e5716211c178013c3545229c59feaa98286322ddbe4a12bd2c013383d8"
+    },
+    {
+      "llm": "ark-coding-plan",
+      "task": "review",
+      "currentFingerprintSha256": "3f442e95be90b985b741c6c7c0603f2459cfeaabe0375c2d94fd177647ec1955"
+    },
+    {
+      "llm": "kimi-k3",
+      "task": "delegate",
+      "currentFingerprintSha256": "4e529d89aa8bcd61b20f414fde72d5a8c14b88e522a5fcfab02db91ac7910181"
+    },
+    {
+      "llm": "kimi-k3",
+      "task": "review",
+      "currentFingerprintSha256": "72474bf9c67b4327573d802ee4ced678c45958d2c49f19bf2a3783ccb39ea568"
+    }
+  ],
+  "hostObservation": {
+    "platform": "win32",
+    "architecture": "x64",
+    "windowsVersion": "10.0.19045.0",
+    "nodeVersion": "24.14.1",
+    "libuvVersion": "1.51.0",
+    "npmVersion": "11.11.0",
+    "dotNetFrameworkRelease": "528372"
+  },
+  "checks": {
+    "nativePreflight": "passed",
+    "nativeVerify": "passed",
+    "observerVerify": "passed",
+    "capabilityEvidenceValidCount": 8,
+    "prequalificationStaleCount": 8,
+    "realModelCalls": 0,
+    "activeConfigAccesses": 0,
+    "activePluginChanges": 0,
+    "publishes": 0
+  }
+}
