@@ -1,11 +1,16 @@
 param(
-    [ValidateSet("test-managed", "test-kernel")]
+    [ValidateSet("test-managed", "test-kernel", "verify", "update-artifact")]
     [string]$Action = "test-managed"
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-if ($Action -cne "test-managed" -and $Action -cne "test-kernel") {
+if (
+    $Action -cne "test-managed" -and
+    $Action -cne "test-kernel" -and
+    $Action -cne "verify" -and
+    $Action -cne "update-artifact"
+) {
     throw "host-acceptance: action casing must be canonical"
 }
 
@@ -52,6 +57,396 @@ function Assert-NoReparseExistingPath {
         }
     }
     return $resolved
+}
+
+function New-VerifiedDirectoryChild {
+    param(
+        [Parameter(Mandatory = $true)][string]$Parent,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    $resolvedParent = (Assert-NoReparseExistingPath -Path $Parent).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $child = [System.IO.Path]::GetFullPath((Join-Path $resolvedParent $Name))
+    if (
+        [System.IO.Path]::GetDirectoryName($child) -cne $resolvedParent -or
+        [System.IO.Path]::GetFileName($child) -cne $Name
+    ) {
+        throw "host-acceptance: artifact directory escaped its parent"
+    }
+    if (Test-Path -LiteralPath $child) {
+        $item = Get-Item -LiteralPath $child -Force
+        if (-not $item.PSIsContainer) {
+            throw "host-acceptance: artifact directory is invalid"
+        }
+    }
+    else {
+        $item = New-Item -Path $child -ItemType Directory -ErrorAction Stop
+    }
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "host-acceptance: build path contains a reparse point"
+    }
+    return [System.IO.Path]::GetFullPath($item.FullName)
+}
+
+function Test-ExactBytes {
+    param(
+        [Parameter(Mandatory = $true)][byte[]]$Left,
+        [Parameter(Mandatory = $true)][byte[]]$Right
+    )
+
+    if ($Left.Length -ne $Right.Length) {
+        return $false
+    }
+    for ($index = 0; $index -lt $Left.Length; $index += 1) {
+        if ($Left[$index] -ne $Right[$index]) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Get-Sha256Hex {
+    param([Parameter(Mandatory = $true)][byte[]]$Bytes)
+
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ([System.BitConverter]::ToString($sha256.ComputeHash($Bytes))).Replace("-", "").ToLowerInvariant()
+    }
+    finally {
+        $sha256.Dispose()
+    }
+}
+
+function Assert-X64ManagedPe {
+    param([Parameter(Mandatory = $true)][byte[]]$Bytes)
+
+    if ($Bytes.Length -lt 64 -or $Bytes[0] -ne 0x4d -or $Bytes[1] -ne 0x5a) {
+        throw "host-acceptance: canonical observer verification failed"
+    }
+    $peOffset = [System.BitConverter]::ToUInt32($Bytes, 0x3c)
+    if ($peOffset -gt ($Bytes.Length - 24)) {
+        throw "host-acceptance: canonical observer verification failed"
+    }
+    $optionalHeader = [int]$peOffset + 24
+    if (
+        $Bytes[[int]$peOffset] -ne 0x50 -or
+        $Bytes[[int]$peOffset + 1] -ne 0x45 -or
+        $Bytes[[int]$peOffset + 2] -ne 0 -or
+        $Bytes[[int]$peOffset + 3] -ne 0 -or
+        [System.BitConverter]::ToUInt16($Bytes, [int]$peOffset + 4) -ne 0x8664 -or
+        [System.BitConverter]::ToUInt16($Bytes, $optionalHeader) -ne 0x020b
+    ) {
+        throw "host-acceptance: canonical observer verification failed"
+    }
+    $optionalHeaderBytes = [System.BitConverter]::ToUInt16($Bytes, [int]$peOffset + 20)
+    $clrDirectory = $optionalHeader + 112 + (14 * 8)
+    if (
+        $optionalHeaderBytes -lt (112 + (15 * 8)) -or
+        $clrDirectory -gt ($Bytes.Length - 8) -or
+        [System.BitConverter]::ToUInt32($Bytes, $optionalHeader + 108) -lt 15 -or
+        [System.BitConverter]::ToUInt32($Bytes, $clrDirectory) -eq 0 -or
+        [System.BitConverter]::ToUInt32($Bytes, $clrDirectory + 4) -eq 0
+    ) {
+        throw "host-acceptance: canonical observer verification failed"
+    }
+}
+
+function Get-CanonicalObserverArtifactPaths {
+    param([Parameter(Mandatory = $true)][string]$HostRoot)
+
+    $resolvedHostRoot = Assert-NoReparseExistingPath -Path $HostRoot
+    $artifactRoot = Join-Path $resolvedHostRoot "win32-x64"
+    if (-not (Test-Path -LiteralPath $artifactRoot -PathType Container)) {
+        throw "host-acceptance: canonical observer verification failed"
+    }
+    $artifactRoot = Assert-NoReparseExistingPath -Path $artifactRoot
+    return @{
+        HostRoot = $resolvedHostRoot
+        ArtifactRoot = [System.IO.Path]::GetFullPath($artifactRoot)
+        Executable = [System.IO.Path]::GetFullPath((Join-Path $artifactRoot "codex-host-acceptance-observer.exe"))
+        Manifest = [System.IO.Path]::GetFullPath((Join-Path $resolvedHostRoot "observer-build-inputs.v1.json"))
+    }
+}
+
+function Write-AtomicObserverFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$DestinationPath,
+        [Parameter(Mandatory = $true)][byte[]]$Bytes
+    )
+
+    $resolvedDestination = [System.IO.Path]::GetFullPath($DestinationPath)
+    $resolvedParent = (Assert-NoReparseExistingPath -Path ([System.IO.Path]::GetDirectoryName($resolvedDestination))).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $destinationName = [System.IO.Path]::GetFileName($resolvedDestination)
+    $destinationExists = Test-Path -LiteralPath $resolvedDestination
+    if ($destinationExists) {
+        [void](Assert-NoReparseExistingPath -Path $resolvedDestination)
+        $existing = Get-Item -LiteralPath $resolvedDestination -Force
+        if (
+            $existing -isnot [System.IO.FileInfo] -or
+            $existing.PSIsContainer -or
+            ($existing.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+        ) {
+            throw "host-acceptance: canonical observer verification failed"
+        }
+    }
+
+    $temporaryPath = Join-Path $resolvedParent ("." + $destinationName + "." + [System.Guid]::NewGuid().ToString("N") + ".tmp")
+    try {
+        $stream = [System.IO.FileStream]::new(
+            $temporaryPath,
+            [System.IO.FileMode]::CreateNew,
+            [System.IO.FileAccess]::Write,
+            [System.IO.FileShare]::None
+        )
+        try {
+            $stream.Write($Bytes, 0, $Bytes.Length)
+            $stream.Flush($true)
+        }
+        finally {
+            $stream.Dispose()
+        }
+        [void](Assert-NoReparseExistingPath -Path $temporaryPath)
+        if ($destinationExists) {
+            [System.IO.File]::Replace(
+                $temporaryPath,
+                $resolvedDestination,
+                [System.Management.Automation.Language.NullString]::Value
+            )
+        }
+        else {
+            [System.IO.File]::Move($temporaryPath, $resolvedDestination)
+        }
+        [void](Assert-NoReparseExistingPath -Path $resolvedDestination)
+        if (-not (Test-ExactBytes -Left $Bytes -Right ([System.IO.File]::ReadAllBytes($resolvedDestination)))) {
+            throw "host-acceptance: canonical observer verification failed"
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryPath) {
+            [System.IO.File]::Delete($temporaryPath)
+        }
+    }
+}
+
+function Install-CanonicalObserverArtifactPair {
+    param(
+        [Parameter(Mandatory = $true)]$Paths,
+        [Parameter(Mandatory = $true)][byte[]]$ExecutableBytes,
+        [Parameter(Mandatory = $true)][byte[]]$ManifestBytes
+    )
+
+    $resolvedHostRoot = (Assert-NoReparseExistingPath -Path $Paths.HostRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $resolvedArtifactRoot = (Assert-NoReparseExistingPath -Path $Paths.ArtifactRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $expectedArtifactRoot = [System.IO.Path]::GetFullPath((Join-Path $resolvedHostRoot "win32-x64"))
+    if (
+        -not $resolvedArtifactRoot.Equals($expectedArtifactRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+        -not [System.IO.Path]::GetFullPath($Paths.Executable).Equals(
+            [System.IO.Path]::GetFullPath((Join-Path $resolvedArtifactRoot "codex-host-acceptance-observer.exe")),
+            [System.StringComparison]::OrdinalIgnoreCase
+        ) -or
+        -not [System.IO.Path]::GetFullPath($Paths.Manifest).Equals(
+            [System.IO.Path]::GetFullPath((Join-Path $resolvedHostRoot "observer-build-inputs.v1.json")),
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    ) {
+        throw "host-acceptance: canonical observer verification failed"
+    }
+    $artifactEntries = @(Get-ChildItem -LiteralPath $resolvedArtifactRoot -Force)
+    if (
+        $artifactEntries.Count -gt 1 -or
+        ($artifactEntries.Count -eq 1 -and $artifactEntries[0].Name -cne "codex-host-acceptance-observer.exe")
+    ) {
+        throw "host-acceptance: canonical observer verification failed"
+    }
+    $manifestEntries = @(Get-ChildItem -LiteralPath $resolvedHostRoot -Force | Where-Object {
+        $_.Name.Equals("observer-build-inputs.v1.json", [System.StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($manifestEntries.Count -gt 1 -or ($manifestEntries.Count -eq 1 -and $manifestEntries[0].Name -cne "observer-build-inputs.v1.json")) {
+        throw "host-acceptance: canonical observer verification failed"
+    }
+
+    Write-AtomicObserverFile `
+        -DestinationPath $Paths.Executable `
+        -Bytes $ExecutableBytes
+    Write-AtomicObserverFile `
+        -DestinationPath $Paths.Manifest `
+        -Bytes $ManifestBytes
+}
+
+function ConvertFrom-StrictUtf8JsonBytes {
+    param([Parameter(Mandatory = $true)][byte[]]$Bytes)
+
+    if (
+        $Bytes.Length -ge 3 -and
+        $Bytes[0] -eq 0xef -and
+        $Bytes[1] -eq 0xbb -and
+        $Bytes[2] -eq 0xbf
+    ) {
+        throw "host-acceptance: build input JSON must be UTF-8 without BOM"
+    }
+    try {
+        $text = [System.Text.UTF8Encoding]::new($false, $true).GetString($Bytes)
+        return ($text | ConvertFrom-Json)
+    }
+    catch {
+        throw "host-acceptance: build input JSON is invalid"
+    }
+}
+
+function Get-ObserverBuildInputSnapshot {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string[]]$ProductionRelative
+    )
+
+    $inputPaths = [System.Collections.Generic.List[string]]::new()
+    foreach ($relativePath in @(
+        "native/windows-job-helper/toolchain.lock.json",
+        "native/windows-job-helper/build.config.json",
+        "native/windows-job-helper/restore-toolchain.ps1",
+        "host-acceptance/build.config.json",
+        "host-acceptance/build.ps1",
+        "host-acceptance/protocol/observer-protocol.v1.json"
+    )) {
+        [void]$inputPaths.Add($relativePath)
+    }
+    foreach ($relativeSource in $ProductionRelative) {
+        [void]$inputPaths.Add("host-acceptance/" + $relativeSource)
+    }
+    [void]$inputPaths.Sort([System.StringComparer]::Ordinal)
+
+    $inputs = [System.Collections.Generic.List[object]]::new()
+    foreach ($inputPath in $inputPaths) {
+        $resolvedInput = Resolve-RepositoryFile -RepositoryRoot $RepositoryRoot -RelativePath $inputPath
+        $bytes = [System.IO.File]::ReadAllBytes($resolvedInput)
+        [void]$inputs.Add([pscustomobject]@{
+            Path = $inputPath
+            Sha256 = Get-Sha256Hex -Bytes $bytes
+            Bytes = $bytes
+        })
+    }
+    return [pscustomobject]@{ Inputs = [object[]]$inputs.ToArray() }
+}
+
+function Get-ObserverSnapshotEntry {
+    param(
+        [Parameter(Mandatory = $true)]$Snapshot,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $matches = @($Snapshot.Inputs | Where-Object { $_.Path -ceq $Path })
+    if ($matches.Count -ne 1) {
+        throw "host-acceptance: observer build input is unavailable"
+    }
+    return $matches[0]
+}
+
+function Get-ExpectedObserverManifest {
+    param([Parameter(Mandatory = $true)]$Snapshot)
+
+    $inputs = @($Snapshot.Inputs)
+    $compactItems = @($inputs | ForEach-Object {
+        '{"path":"' + $_.Path + '","sha256":"' + $_.Sha256 + '"}'
+    })
+    $digestProjection = '{"schemaVersion":1,"inputs":[' + ($compactItems -join ',') + ']}'
+    $inputsDigest = Get-Sha256Hex -Bytes ([System.Text.UTF8Encoding]::new($false).GetBytes($digestProjection))
+    $protocolPath = "host-acceptance/protocol/observer-protocol.v1.json"
+    $protocolInput = @($inputs | Where-Object { $_.Path -ceq $protocolPath })
+    if ($protocolInput.Count -ne 1) {
+        throw "host-acceptance: observer protocol input is unavailable"
+    }
+
+    $lines = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in @(
+        "{",
+        '  "schemaVersion": 1,',
+        '  "artifactPath": "host-acceptance/win32-x64/codex-host-acceptance-observer.exe",',
+        '  "protocol": {',
+        '    "path": "host-acceptance/protocol/observer-protocol.v1.json",',
+        ('    "sha256": "' + $protocolInput[0].Sha256 + '"'),
+        '  },',
+        '  "inputs": ['
+    )) {
+        [void]$lines.Add($line)
+    }
+    for ($index = 0; $index -lt $inputs.Count; $index += 1) {
+        $suffix = if ($index -eq ($inputs.Count - 1)) { "" } else { "," }
+        [void]$lines.Add("    {")
+        [void]$lines.Add('      "path": "' + $inputs[$index].Path + '",')
+        [void]$lines.Add('      "sha256": "' + $inputs[$index].Sha256 + '"')
+        [void]$lines.Add("    }" + $suffix)
+    }
+    foreach ($line in @(
+        "  ],",
+        ('  "inputsDigestSha256": "' + $inputsDigest + '"'),
+        "}"
+    )) {
+        [void]$lines.Add($line)
+    }
+    $manifestText = ($lines -join "`n") + "`n"
+    return [pscustomobject]@{
+        Bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($manifestText)
+        InputsDigestSha256 = $inputsDigest
+        ProtocolSha256 = $protocolInput[0].Sha256
+    }
+}
+
+function Assert-ObserverBuildInputsUnchanged {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)][string[]]$ProductionRelative,
+        [Parameter(Mandatory = $true)][byte[]]$ExpectedManifestBytes
+    )
+
+    $currentSnapshot = Get-ObserverBuildInputSnapshot `
+        -RepositoryRoot $RepositoryRoot `
+        -ProductionRelative $ProductionRelative
+    $currentManifest = Get-ExpectedObserverManifest -Snapshot $currentSnapshot
+    if (-not (Test-ExactBytes -Left $ExpectedManifestBytes -Right $currentManifest.Bytes)) {
+        throw "host-acceptance: observer build inputs changed during compilation"
+    }
+}
+
+function Assert-CanonicalObserverArtifact {
+    param(
+        [Parameter(Mandatory = $true)]$Paths,
+        [Parameter(Mandatory = $true)][byte[]]$ExpectedExecutableBytes,
+        [Parameter(Mandatory = $true)][byte[]]$ExpectedManifestBytes
+    )
+
+    $artifactEntries = @(Get-ChildItem -LiteralPath $Paths.ArtifactRoot -Force | ForEach-Object { $_.Name } | Sort-Object)
+    if (($artifactEntries -join "`n") -cne "codex-host-acceptance-observer.exe") {
+        throw "host-acceptance: canonical observer verification failed"
+    }
+    [void](Assert-NoReparseExistingPath -Path $Paths.Executable)
+    [void](Assert-NoReparseExistingPath -Path $Paths.Manifest)
+    foreach ($canonicalPath in @($Paths.Executable, $Paths.Manifest)) {
+        $item = Get-Item -LiteralPath $canonicalPath -Force
+        if ($item -isnot [System.IO.FileInfo] -or $item.PSIsContainer) {
+            throw "host-acceptance: canonical observer verification failed"
+        }
+    }
+    $actualExecutableBytes = [System.IO.File]::ReadAllBytes($Paths.Executable)
+    Assert-X64ManagedPe -Bytes $actualExecutableBytes
+    if (
+        -not (Test-ExactBytes -Left $ExpectedExecutableBytes -Right $actualExecutableBytes) -or
+        -not (Test-ExactBytes -Left $ExpectedManifestBytes -Right ([System.IO.File]::ReadAllBytes($Paths.Manifest)))
+    ) {
+        throw "host-acceptance: canonical observer verification failed"
+    }
+    return Get-Sha256Hex -Bytes $actualExecutableBytes
 }
 
 function Assert-ExactKeys {
@@ -285,7 +680,12 @@ function Remove-VerifiedTemporaryBuildRoot {
     $allowed = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($name in $AllowedFileNames) {
         if (
-            ($name -cne "ManagedTests.exe" -and $name -cne "KernelTests.exe" -and $name -cne "ProcessFixture.exe") -or
+            (
+                $name -cne "ManagedTests.exe" -and
+                $name -cne "KernelTests.exe" -and
+                $name -cne "ProcessFixture.exe" -and
+                $name -cne "Observer.exe"
+            ) -or
             -not $allowed.Add($name)
         ) {
             throw "host-acceptance: invalid temporary cleanup allowlist"
@@ -319,8 +719,9 @@ function Remove-VerifiedTemporaryBuildRoot {
 $hostRoot = [System.IO.Path]::GetFullPath($PSScriptRoot)
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $hostRoot ".."))
 [void](Assert-NoReparseExistingPath -Path $repositoryRoot)
-$configurationPath = Join-Path $hostRoot "build.config.json"
-$configuration = Get-Content -LiteralPath $configurationPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$configurationPath = Resolve-RepositoryFile -RepositoryRoot $repositoryRoot -RelativePath "host-acceptance/build.config.json"
+$configurationBytes = [System.IO.File]::ReadAllBytes($configurationPath)
+$configuration = ConvertFrom-StrictUtf8JsonBytes -Bytes $configurationBytes
 Assert-ExactKeys -Record $configuration -Keys @("schemaVersion", "sharedBuildContract", "sourceSets", "artifact")
 Assert-ExactKeys -Record $configuration.sharedBuildContract -Keys @("toolchainLockPath", "buildConfigPath", "restoreToolchainPath")
 Assert-ExactKeys -Record $configuration.sourceSets -Keys @("production")
@@ -336,31 +737,50 @@ if (
 }
 
 $productionRelative = @($configuration.sourceSets.production | ForEach-Object { [string]$_ })
-if ($productionRelative.Count -eq 0 -or ($productionRelative -join "`n") -cne (($productionRelative | Sort-Object -Unique) -join "`n")) {
+if ($productionRelative.Count -eq 0) {
     throw "host-acceptance: production sources must be unique and sorted"
 }
-foreach ($relativePath in $productionRelative) {
+for ($index = 0; $index -lt $productionRelative.Count; $index += 1) {
+    $relativePath = $productionRelative[$index]
     if ($relativePath -cnotmatch '^src/[A-Za-z0-9]+\.cs$') {
         throw "host-acceptance: invalid production source path"
     }
+    if (
+        $index -gt 0 -and
+        [string]::CompareOrdinal($productionRelative[$index - 1], $relativePath) -ge 0
+    ) {
+        throw "host-acceptance: production sources must be unique and sorted"
+    }
 }
 
-$sharedBuildConfigPath = Resolve-RepositoryFile -RepositoryRoot $repositoryRoot -RelativePath ([string]$configuration.sharedBuildContract.buildConfigPath)
-$toolchainLockPath = Resolve-RepositoryFile -RepositoryRoot $repositoryRoot -RelativePath ([string]$configuration.sharedBuildContract.toolchainLockPath)
+$inputSnapshot = Get-ObserverBuildInputSnapshot `
+    -RepositoryRoot $repositoryRoot `
+    -ProductionRelative $productionRelative
+$capturedConfiguration = Get-ObserverSnapshotEntry `
+    -Snapshot $inputSnapshot `
+    -Path "host-acceptance/build.config.json"
+if (-not (Test-ExactBytes -Left $configurationBytes -Right $capturedConfiguration.Bytes)) {
+    throw "host-acceptance: observer build inputs changed during capture"
+}
+$sharedBuildConfigInput = Get-ObserverSnapshotEntry `
+    -Snapshot $inputSnapshot `
+    -Path ([string]$configuration.sharedBuildContract.buildConfigPath)
+$toolchainLockInput = Get-ObserverSnapshotEntry `
+    -Snapshot $inputSnapshot `
+    -Path ([string]$configuration.sharedBuildContract.toolchainLockPath)
+$protocolInput = Get-ObserverSnapshotEntry `
+    -Snapshot $inputSnapshot `
+    -Path "host-acceptance/protocol/observer-protocol.v1.json"
 $restoreToolchainPath = Resolve-RepositoryFile -RepositoryRoot $repositoryRoot -RelativePath ([string]$configuration.sharedBuildContract.restoreToolchainPath)
-$protocolPath = Resolve-RepositoryFile -RepositoryRoot $repositoryRoot -RelativePath "host-acceptance/protocol/observer-protocol.v1.json"
-$sharedBuild = Get-Content -LiteralPath $sharedBuildConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$toolchainLock = Get-Content -LiteralPath $toolchainLockPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$protocol = Get-Content -LiteralPath $protocolPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$sharedBuild = ConvertFrom-StrictUtf8JsonBytes -Bytes $sharedBuildConfigInput.Bytes
+$toolchainLock = ConvertFrom-StrictUtf8JsonBytes -Bytes $toolchainLockInput.Bytes
+$protocol = ConvertFrom-StrictUtf8JsonBytes -Bytes $protocolInput.Bytes
 if ($sharedBuild.schemaVersion -ne 1 -or $toolchainLock.schemaVersion -ne 1) {
     throw "host-acceptance: unsupported shared build contract"
 }
 Assert-SharedBuildConfiguration -Configuration $sharedBuild
 
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $restoreToolchainPath
-if ($LASTEXITCODE -ne 0) {
-    throw "host-acceptance: shared toolchain restore failed"
-}
+& $restoreToolchainPath
 
 $compilerPackage = @($toolchainLock.nugetPackages | Where-Object { [string]$_.id -ceq "Microsoft.Net.Compilers.Toolset" })
 $referencePackage = @($toolchainLock.nugetPackages | Where-Object { [string]$_.id -ceq "Microsoft.NETFramework.ReferenceAssemblies.net48" })
@@ -398,7 +818,13 @@ $kernelTestRelative = @(
 )
 $fixtureRelative = "tests/ProcessFixture.cs"
 $nodePipeCloseFixtureRelative = "tests/node-pipe-close-fixture.mjs"
-$selectedTestRelative = if ($Action -ceq "test-managed") { $managedTestRelative } else { $kernelTestRelative }
+$selectedTestRelative = if ($Action -ceq "test-managed") {
+    $managedTestRelative
+} elseif ($Action -ceq "test-kernel") {
+    $kernelTestRelative
+} else {
+    @()
+}
 $testSources = @($selectedTestRelative | ForEach-Object {
     Resolve-RepositoryFile -RepositoryRoot $hostRoot -RelativePath $_
 })
@@ -415,20 +841,50 @@ $nodeExecutable = if ($Action -ceq "test-kernel") {
     }
     Assert-NoReparseExistingPath -Path $nodeCommand.Source
 } else { $null }
-$temporaryBase = Join-Path ([System.IO.Path]::GetTempPath()) "codex-agent-tools\host-acceptance\build-v1"
-[void][System.IO.Directory]::CreateDirectory($temporaryBase)
-$temporaryBase = Assert-NoReparseExistingPath -Path $temporaryBase
-$temporaryRoot = Join-Path $temporaryBase ([Guid]::NewGuid().ToString("N"))
-[void][System.IO.Directory]::CreateDirectory($temporaryRoot)
+$isArtifactAction = $Action -ceq "verify" -or $Action -ceq "update-artifact"
+$expectedManifestBefore = if ($isArtifactAction) {
+    Get-ExpectedObserverManifest -Snapshot $inputSnapshot
+} else { $null }
+$systemTemporaryRoot = Assert-NoReparseExistingPath -Path ([System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()))
+$temporaryProductRoot = New-VerifiedDirectoryChild -Parent $systemTemporaryRoot -Name "codex-agent-tools"
+$temporaryObserverRoot = New-VerifiedDirectoryChild -Parent $temporaryProductRoot -Name "host-acceptance"
+$temporaryBase = New-VerifiedDirectoryChild -Parent $temporaryObserverRoot -Name "build-v1"
+$temporaryRoot = $null
+for ($attempt = 0; $attempt -lt 16 -and $null -eq $temporaryRoot; $attempt += 1) {
+    $candidate = Join-Path $temporaryBase ([Guid]::NewGuid().ToString("N"))
+    try {
+        $createdRoot = New-Item -Path $candidate -ItemType Directory -ErrorAction Stop
+        if (($createdRoot.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "host-acceptance: build path contains a reparse point"
+        }
+        $temporaryRoot = [System.IO.Path]::GetFullPath($createdRoot.FullName)
+    }
+    catch [System.IO.IOException] {
+        if (-not (Test-Path -LiteralPath $candidate)) {
+            throw
+        }
+    }
+}
+if ($null -eq $temporaryRoot) {
+    throw "host-acceptance: could not create an exclusive build directory"
+}
 $temporaryRoot = Assert-FixedTemporaryBuildRoot -Path $temporaryRoot -Base $temporaryBase
 try {
-    $testExecutableName = if ($Action -ceq "test-managed") { "ManagedTests.exe" } else { "KernelTests.exe" }
-    $testMain = if ($Action -ceq "test-managed") {
-        "CodexAgentTools.HostAcceptance.Tests.ManagedTestRunner"
+    $outputExecutableName = if ($Action -ceq "test-managed") {
+        "ManagedTests.exe"
+    } elseif ($Action -ceq "test-kernel") {
+        "KernelTests.exe"
     } else {
-        "CodexAgentTools.HostAcceptance.Tests.KernelTestRunner"
+        "Observer.exe"
     }
-    $testExecutable = Join-Path $temporaryRoot $testExecutableName
+    $outputMain = if ($Action -ceq "test-managed") {
+        "CodexAgentTools.HostAcceptance.Tests.ManagedTestRunner"
+    } elseif ($Action -ceq "test-kernel") {
+        "CodexAgentTools.HostAcceptance.Tests.KernelTestRunner"
+    } else {
+        "CodexAgentTools.HostAcceptance.Program"
+    }
+    $outputExecutable = Join-Path $temporaryRoot $outputExecutableName
     $fixtureExecutable = if ($Action -ceq "test-kernel") { Join-Path $temporaryRoot "ProcessFixture.exe" } else { $null }
     $generatedProtocolPath = Join-Path $temporaryRoot "ProtocolV1.g.cs"
     $compilerExitCode = 1
@@ -457,8 +913,8 @@ try {
         foreach ($argument in $sharedBuild.compilerArguments) {
             [void]$arguments.Add([string]$argument)
         }
-        [void]$arguments.Add("/out:" + $testExecutable)
-        [void]$arguments.Add("/main:" + $testMain)
+        [void]$arguments.Add("/out:" + $outputExecutable)
+        [void]$arguments.Add("/main:" + $outputMain)
         [void]$arguments.Add("/pathmap:" + $hostRoot + "=/_/host-acceptance," + $temporaryRoot + "=/_/host-acceptance/generated")
         foreach ($reference in $sharedBuild.references) {
             $referencePath = Join-Path $referenceRoot ([string]$reference)
@@ -482,28 +938,90 @@ try {
     if ($compilerExitCode -ne 0) {
         throw "host-acceptance: $Action compilation failed"
     }
-    Push-Location $repositoryRoot
-    try {
-        if ($Action -ceq "test-kernel") {
-            & $testExecutable $fixtureExecutable $nodeExecutable $nodePipeCloseFixture
+    [void](Assert-NoReparseExistingPath -Path $outputExecutable)
+    if ($isArtifactAction) {
+        Assert-ObserverBuildInputsUnchanged `
+            -RepositoryRoot $repositoryRoot `
+            -ProductionRelative $productionRelative `
+            -ExpectedManifestBytes $expectedManifestBefore.Bytes
+        $builtBytes = [System.IO.File]::ReadAllBytes($outputExecutable)
+        Assert-X64ManagedPe -Bytes $builtBytes
+        $mutexIdentity = [System.Text.UTF8Encoding]::new($false).GetBytes($hostRoot.ToLowerInvariant())
+        $mutexDigest = Get-Sha256Hex -Bytes $mutexIdentity
+        $artifactMutex = [System.Threading.Mutex]::new(
+            $false,
+            "Local\CodexAgentTools.HostAcceptance.ObserverArtifactV1." + $mutexDigest.Substring(0, 32)
+        )
+        $ownsArtifactMutex = $false
+        try {
+            try {
+                $ownsArtifactMutex = $artifactMutex.WaitOne()
+            }
+            catch [System.Threading.AbandonedMutexException] {
+                $ownsArtifactMutex = $true
+            }
+            if (-not $ownsArtifactMutex) {
+                throw "host-acceptance: could not acquire observer artifact mutex"
+            }
+            Assert-ObserverBuildInputsUnchanged `
+                -RepositoryRoot $repositoryRoot `
+                -ProductionRelative $productionRelative `
+                -ExpectedManifestBytes $expectedManifestBefore.Bytes
+            $paths = Get-CanonicalObserverArtifactPaths -HostRoot $hostRoot
+            if ($Action -ceq "update-artifact") {
+                Install-CanonicalObserverArtifactPair `
+                    -Paths $paths `
+                    -ExecutableBytes $builtBytes `
+                    -ManifestBytes $expectedManifestBefore.Bytes
+            }
+            $verifiedDigest = Assert-CanonicalObserverArtifact `
+                -Paths $paths `
+                -ExpectedExecutableBytes $builtBytes `
+                -ExpectedManifestBytes $expectedManifestBefore.Bytes
+            Assert-ObserverBuildInputsUnchanged `
+                -RepositoryRoot $repositoryRoot `
+                -ProductionRelative $productionRelative `
+                -ExpectedManifestBytes $expectedManifestBefore.Bytes
+            if ($Action -ceq "update-artifact") {
+                Write-Output "host-acceptance: updated canonical observer sha256=$verifiedDigest"
+            }
+            else {
+                Write-Output "host-acceptance: verified canonical observer sha256=$verifiedDigest"
+            }
         }
-        else {
-            & $testExecutable
-        }
-        if ($LASTEXITCODE -ne 0) {
-            throw "host-acceptance: $Action tests failed"
+        finally {
+            if ($ownsArtifactMutex) {
+                $artifactMutex.ReleaseMutex()
+            }
+            $artifactMutex.Dispose()
         }
     }
-    finally {
-        Pop-Location
+    else {
+        Push-Location $repositoryRoot
+        try {
+            if ($Action -ceq "test-kernel") {
+                & $outputExecutable $fixtureExecutable $nodeExecutable $nodePipeCloseFixture
+            }
+            else {
+                & $outputExecutable
+            }
+            if ($LASTEXITCODE -ne 0) {
+                throw "host-acceptance: $Action tests failed"
+            }
+        }
+        finally {
+            Pop-Location
+        }
     }
 }
 finally {
     if (Test-Path -LiteralPath $temporaryRoot) {
         $cleanupNames = if ($Action -ceq "test-managed") {
             @("ManagedTests.exe")
-        } else {
+        } elseif ($Action -ceq "test-kernel") {
             @("KernelTests.exe", "ProcessFixture.exe")
+        } else {
+            @("Observer.exe")
         }
         Remove-VerifiedTemporaryBuildRoot -Path $temporaryRoot -Base $temporaryBase -AllowedFileNames $cleanupNames
     }

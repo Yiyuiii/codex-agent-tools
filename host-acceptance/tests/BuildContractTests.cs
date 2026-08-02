@@ -24,6 +24,7 @@ namespace CodexAgentTools.HostAcceptance.Tests
             TestAssert.True(script.IndexOf("$name -cne \"ManagedTests.exe\"", StringComparison.Ordinal) >= 0, "Cleanup must allow only fixed test executable names.");
             TestAssert.True(script.IndexOf("$name -cne \"KernelTests.exe\"", StringComparison.Ordinal) >= 0, "Kernel test output must be explicitly allowlisted.");
             TestAssert.True(script.IndexOf("$name -cne \"ProcessFixture.exe\"", StringComparison.Ordinal) >= 0, "Fixture output must be explicitly allowlisted.");
+            TestAssert.True(script.IndexOf("$name -cne \"Observer.exe\"", StringComparison.Ordinal) >= 0, "Observer build output must be explicitly allowlisted.");
         }
 
         private static void SharedCompilerConfigurationIsConsumedWithoutCopyingIt()
@@ -48,8 +49,11 @@ namespace CodexAgentTools.HostAcceptance.Tests
         private static void KernelBuildAndNativeScopeRemainExplicit()
         {
             var script = BuildScript();
-            TestAssert.True(script.IndexOf("[ValidateSet(\"test-managed\", \"test-kernel\")]", StringComparison.Ordinal) >= 0, "The build entry must expose only the two reviewed test actions.");
-            TestAssert.True(script.IndexOf("$Action -cne \"test-managed\" -and $Action -cne \"test-kernel\"", StringComparison.Ordinal) >= 0, "The build entry must reject non-canonical action casing before selecting sources.");
+            TestAssert.True(script.IndexOf("[ValidateSet(\"test-managed\", \"test-kernel\", \"verify\", \"update-artifact\")]", StringComparison.Ordinal) >= 0, "The build entry must expose only the four reviewed actions.");
+            foreach (var action in new[] { "test-managed", "test-kernel", "verify", "update-artifact" })
+            {
+                TestAssert.True(script.IndexOf("$Action -cne \"" + action + "\"", StringComparison.Ordinal) >= 0, "The build entry must reject non-canonical action casing before selecting sources.");
+            }
             TestAssert.True(script.IndexOf("ProcessFixture.exe", StringComparison.Ordinal) >= 0, "The real kernel fixture must be built explicitly.");
 
             var repositoryRoot = Directory.GetCurrentDirectory();

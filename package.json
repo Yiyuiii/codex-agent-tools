@@ -76,6 +76,10 @@
     "native:test:kernel": "node scripts/windows-native-helper.mjs test-kernel",
     "native:verify": "node scripts/windows-native-helper.mjs verify",
     "native:update-artifact": "node scripts/windows-native-helper.mjs update-artifact",
+    "observer:test:managed": "node scripts/host-acceptance-observer.mjs test-managed",
+    "observer:test:kernel": "node scripts/host-acceptance-observer.mjs test-kernel",
+    "observer:verify": "node scripts/host-acceptance-observer.mjs verify",
+    "observer:update-artifact": "node scripts/host-acceptance-observer.mjs update-artifact",
     "prepublishOnly": "npm run gate:offline"
   },
   "dependencies": {
