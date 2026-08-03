@@ -1020,11 +1020,15 @@ describe("MCP stdio owned-process cleanup", () => {
       expect(observation.abortCount).toBe(1);
       expect(observation.result?.status).toBe("cancelled");
       expect(clientResult?.status).toBe("cancelled");
-      expect(clientResult?.executionTelemetry).toMatchObject({
-        adapterClientInvocationCount: 1,
-        ownedProcessCompletion: "session_shutdown",
-        ownedProcessDrained: true,
-      });
+      if (process.platform === "win32") {
+        expect(clientResult?.executionTelemetry).toMatchObject({
+          adapterClientInvocationCount: 1,
+          ownedProcessCompletion: "session_shutdown",
+          ownedProcessDrained: true,
+        });
+      } else {
+        expect(clientResult?.executionTelemetry).toBeNull();
+      }
       expect(clientResult?.diagnostics).toContain("pi_runtime_identity_unknown");
       expect(
         commands.filter((command) => command.type === "prompt"),

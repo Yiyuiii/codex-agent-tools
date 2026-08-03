@@ -806,10 +806,7 @@ describe("Pi RPC client", () => {
         },
       });
       expect(result.status).toBe("cancelled");
-      expect(result.executionTelemetry).not.toBeNull();
-      expect(result.executionTelemetry).not.toHaveProperty(
-        "ownedProcessDrained",
-      );
+      expect(result.executionTelemetry).toBeNull();
       const childPid = Number.parseInt(
         await readFile(childPidPath, "utf8"),
         10,
@@ -844,9 +841,7 @@ describe("Pi RPC client", () => {
         ownedProcessCompletion: "timed_out",
       });
     } else {
-      expect(result.executionTelemetry).not.toHaveProperty(
-        "ownedProcessCompletion",
-      );
+      expect(result.executionTelemetry).toBeNull();
     }
     expect(
       progress.some((message) => message.startsWith("pi heartbeat ")),
