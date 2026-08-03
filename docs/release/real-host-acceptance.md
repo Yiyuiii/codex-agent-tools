@@ -1,14 +1,14 @@
 # 真实 Codex App 宿主验收记录
 
-最近更新：2026-08-01
+最近更新：2026-08-03
 
-状态：**partial — beta.1 已发布并升级；生命周期修复尚未发布，等待 stale 能力资格、下一个公开 beta 与真实 Stop/interrupt**
+状态：**partial — beta.1 已发布并升级；生命周期修复与八项资格已闭合，等待下一个公开 beta 与真实 Stop/interrupt**
 
 ## 当前发布阻断
 
 beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调，但这只是待发布候选的确定性证据。
 
-晋级顺序只有一条：当前宿主离线实现与冻结完成后，只重跑 stale、缺失、新增或证据失效的能力并更新同一索引；verifier 恢复通过后，由 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`；再从公共 npm 安装精确版本、完成官方插件升级、完整 App 重启和真实 Stop/interrupt，确认 owned descendants zero；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`，且不预先指定下一个 beta 的版本号。
+晋级顺序只有一条：八项 verifier 与唯一离线 release gate 通过后，由 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`；再从公共 npm 安装精确版本、完成官方插件升级、完整 App 重启和真实 Stop/interrupt，确认 owned descendants zero；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`，且不预先指定下一个 beta 的版本号。
 
 真实宿主门禁必须使用 App 的普通 Stop 或 dedicated interrupt，确认外层状态为 cancelled/interrupted、完成标记没有写入、SDK abort 到达、owned descendants zero 且不重生。
 
@@ -300,16 +300,15 @@ Codex 只清理这些由当前 App 宿主启动的插件 MCP 进程树，未终�
 
 完整第 4 层仍缺少以下证据：
 
-1. 当前宿主离线实现与冻结完成后，只重跑 stale、缺失、新增或证据失效的能力，更新同一能力索引并使 verifier 恢复通过。
-2. 通过 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`，不预先指定版本号。
-3. 从公共 npm 完成精确版本验收和官方插件升级。
-4. 完整重启宿主，并在新任务确认该精确 beta 缓存与四项脱敏环境变量已经被新
+1. 通过 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`，不预先指定版本号。
+2. 从公共 npm 完成精确版本验收和官方插件升级。
+3. 完整重启宿主，并在新任务确认该精确 beta 缓存与四项脱敏环境变量已经被新
    app-server 加载。
-5. 真实宿主调用：复用既有 Kimi 通过证据，重点完成至少一条 Pi 路线的代表性
+4. 真实宿主调用：复用既有 Kimi 通过证据，重点完成至少一条 Pi 路线的代表性
    review。
-6. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主用普通 Stop 或 dedicated
+5. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主用普通 Stop 或 dedicated
    interrupt 验证取消长任务后的 Kimi/Pi 进程回收、不重生、owned descendants zero 与服务端 handler drain。
-7. 上述门禁全部通过后，只通过 GitHub Actions OIDC 发布 stable。
+6. 上述门禁全部通过后，只通过 GitHub Actions OIDC 发布 stable。
 
 在这些缺口闭合前：
 

@@ -966,8 +966,8 @@ describe("capability qualification evidence source", () => {
   });
 });
 
-describe("current capability index schema-2 migration analysis", () => {
-  it("checks all eight evidence sources before reporting every old fingerprint stale", async () => {
+describe("current capability index qualification", () => {
+  it("verifies all eight current batch cases without a legacy exception", async () => {
     let canonicalCollections = 0;
     const analysis = await analyzeCapabilityIndex(
       { repositoryRoot: process.cwd() },
@@ -986,7 +986,7 @@ describe("current capability index schema-2 migration analysis", () => {
     );
     expect(
       analysis.entries.map((entry) => entry.runtimeFingerprintStatus),
-    ).toEqual(Array.from({ length: 8 }, () => "stale"));
+    ).toEqual(Array.from({ length: 8 }, () => "current"));
     expect(
       analysis.entries.every((entry) =>
         /^[a-f0-9]{64}$/u.test(
@@ -996,6 +996,11 @@ describe("current capability index schema-2 migration analysis", () => {
     ).toBe(true);
     await expect(
       verifyCapabilityIndex({ repositoryRoot: process.cwd() }),
-    ).rejects.toThrow("Capability qualification evidence is invalid");
+    ).resolves.toEqual({
+      verified: true,
+      indexPath: "docs/smoke/evidence/capabilities.json",
+      entryCount: 8,
+      legacyEntryCount: 0,
+    });
   });
 });

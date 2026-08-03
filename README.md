@@ -9,7 +9,7 @@
 - `ark-agent-plan`：隔离 Pi RPC / Ark Agent Plan / `ark-code-latest`，直连；
 - `ark-agent-deepseek-v4-flash`：隔离 Pi RPC / Ark Agent Plan / `deepseek-v4-flash`，直连。
 
-八项 review/delegate 的旧索引仍引用不可变、已通过的真实 case evidence，但当前运行时变更已使八项能力指纹全部 stale。当前宿主实现、原生辅助层与冻结证据已经完成；最新真实批次在首项 `ark-coding-plan/delegate` 因服务报告 `account_quota_exceeded` 首错停止，其余七项未运行。新证据形成前，`capabilities.json` 保持原样，`npm run verify:capabilities` 必须以脱敏错误和退出码 1 fail closed，因此此分支不可发布。
+当前宿主实现、原生辅助层与冻结证据已经完成。最新真实批次在同一冻结候选上完成四个逻辑 LLM 的八项 review/delegate：8/8 passed、每项单次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，且 owned process 全部排空。现行 `capabilities.json` 已统一引用该批次的不可变 case evidence，`npm run verify:capabilities` 验证为 8 项 current、0 项 legacy。
 
 资格单位是一个精确的“逻辑 LLM × 任务”组合；历史 batch manifest 与 case evidence 永久不可变，不以额度恢复、文档更新或注册表旧 `passed` 文案替代当前指纹验证。最新终态、执行边界和恢复条件只在[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)维护，运维与发布状态只在[运维说明](docs/operations.md)维护。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用只作为历史审计证据保留。
 
@@ -64,7 +64,7 @@
 
 - 当前 Kimi 只支持 K3；K2.7 记录仅作为历史证据保留，见 [Kimi 真实能力门禁](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/kimi.md)。
 - Gemini 已退役，不再是当前 provider；旧 Google / `proxy-10808` 路由、额度失败和 blocked 批次只作为历史证据保留，见 [Pi / Gemini 退役历史](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/pi-gemini.md)。
-- 三条 Ark 路线全部固定直连；旧八项索引中的六项 Ark 能力均有历史 passed evidence。当前候选必须等待 stale 能力证据更新后由 verifier 重新确认，叙述与历史见 [Ark / Pi 真实能力门禁](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/ark.md)。
+- 三条 Ark 路线全部固定直连；六项 Ark 能力与两项 Kimi 能力均已由当前候选的新 passed evidence 重新确认，叙述与历史见 [Ark / Pi 真实能力门禁](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/ark.md)。
 
 终端用户不需要手工维护 Pi 模型配置；Pi 使用由本项目在应用缓存下生成的版本化隔离配置，不读取或修改用户日常 `~/.pi/agent`。
 
@@ -102,8 +102,8 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；npm `next` 仍是已发布的 `0.1.1-beta.1`。本轮正在闭合原生执行预算、stdio 取消传播和 owned 进程树清理的当前宿主离线实现与冻结，但八项能力指纹因此 stale，当前分支不可发布。
+当前稳定版本为 `0.1.0`，npm `latest` 仍指向该版本；npm `next` 仍是已发布的 `0.1.1-beta.1`。本轮原生执行预算、stdio 取消传播、owned 进程树清理、八项能力资格与当前宿主离线 release gate 已经闭合；当前候选正在准备下一个 beta 的 GitHub Actions OIDC 发布。
 
-晋级顺序只有一条：当前宿主离线实现与冻结完成后，只重跑 stale、缺失、新增或证据失效的能力并更新同一索引；verifier 恢复通过后，由 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`；再从公共 npm 安装精确版本、完成官方插件升级和完整 App 重启，并用真实 Stop/interrupt 证明 cancelled/interrupted、无完成标记、SDK abort 到达且 owned descendants zero；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`，也不预先指定下一个 beta 的版本号。
+晋级顺序只有一条：八项 verifier 与离线 release gate 通过后，由 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`；再从公共 npm 安装精确版本、完成官方插件升级和完整 App 重启，并用真实 Stop/interrupt 证明 cancelled/interrupted、无完成标记、SDK abort 到达且 owned descendants zero；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`，也不预先指定下一个 beta 的版本号。
 
 beta.1 handoff 只暴露了缺口，不是 stable Stop gate 的唯一证据。旧 `codex_cc_tools` 保持 enabled。

@@ -2,13 +2,13 @@
 
 本文是 `codex_external_agents` 官方插件候选构建、隔离验收、已授权官方升级与回滚的现行运维真值源。活动 Codex 当前安装已发布的 `0.1.1-beta.1`，旧 `codex_cc_tools` 继续共存。当前发布线只保证维护者的 Windows x64 / Node 24 宿主；原生辅助层、Job-owned process、observer、固定启动层和 current-host freeze 已完成，不再运行 Node 矩阵或跨宿主认证。
 
-运行时变更已使能力索引的八项指纹全部 stale。最新真实批次 `2026-08-02T14-17-27.683Z-307be99a-f536-4113-8738-51de40b56634` 绑定 frozen commit `9c40d2440b9ee30defdf92af11156e288785e755`；首项 `ark-coding-plan/delegate` 只调用一次并以 `account_quota_exceeded` 失败，零 retry/fallback、owned process 已排空，其余七项依首错停止合同未运行。终态为 `blocked / case_failed`、`promotionEligible=false`，immutable-evidence verifier 通过，manifest SHA-256 为 `da28beb431619adee599861c9b3cebbeb3d843496243be22ba39140b05d0d157`，证据提交为 `29d8673`。
+最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`；四个逻辑 LLM 的八项 review/delegate 全部 passed。每项均为一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，owned process 全部排空；终态为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
 
-维护者已于 2026-08-03 报告 Ark Coding Plan 额度恢复；这只构成启动新独立批次所需的外部状态变化，不构成能力通过证据。必须在 active long-term goal、clean candidate、空资格锁和 one-cell/one-entry 条件下重新从 ordinal 1 执行；不得复用旧批次、补跑余下七项、retry、fallback 或为绕过资格直接发布。新 8/8 写入前，`capabilities.json` 保持原样，`npm run verify:capabilities` 必须以退出码 1 fail closed。
+现行 `capabilities.json` 已统一绑定该批八个精确 case 与当前运行时指纹，旧的受限 legacy 入口归零；`npm run verify:capabilities` 返回 8 项 current、0 项 legacy。2026-08-02 的额度失败批次与其它历史 manifest/case 继续保持不可变，但不再是当前资格状态。当前宿主唯一完整离线 release gate 已通过；下一步准备 GitHub Actions OIDC beta 发布。
 
 资格执行与恢复的唯一详细合同见[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)；历史 Kimi/Ark case、旧 shell 根因和旧测试计数分别保留在 `docs/smoke/` 与不可变 evidence 中，不在运维入口重复维护。package/release assurance 只证明离线候选，不构成资格、安装或发布。
 
-当前流程没有访问或修改 `~/.codex/config.toml`，没有移除 `codex_cc_tools`，也没有调用或修改 Claude Code。`npm run verify:capabilities` 是当前机器资格与发布权威；registry 旧文案、历史授权页和批次结果页不能越过当前 stale 状态。
+当前流程没有访问或修改 `~/.codex/config.toml`，没有移除 `codex_cc_tools`，也没有调用或修改 Claude Code。`npm run verify:capabilities` 是当前机器资格与发布权威；registry 文案、历史授权页和旧批次结果页不能替代它。
 
 项目代码和维护者都不得直接读取、写入、备份、恢复或手工编辑活动 `~/.codex/config.toml`。Codex 官方插件命令可能由官方机制更新该状态文件，因此真实 add/remove 每次都必须先准备权限包并取得针对该次动作的明确许可。
 
@@ -81,13 +81,13 @@ real-smoke 进程为 0 且资格锁不存在。成功后生成对应版本的
 
 ## 6. 准备真实安装权限包
 
-只有以下条件同时成立，才能准备可供授权的 ready 权限包；当前第一项因八项指纹 stale 而失败：
+只有以下条件同时成立，才能准备可供授权的 ready 权限包；当前第一项已经通过，第二项正在进行：
 
 - `npm run verify:capabilities` 验证四个逻辑 LLM 的八项能力、不可变 evidence、精确 case、注册表 anchor 与当前运行时指纹；
 - 类型检查、测试、构建、release smoke 和隔离官方插件生命周期通过；
 - 权限包明确下一个 beta 的精确版本只在 GitHub Actions OIDC 发布后确定，并给出预计影响、验证与官方回滚。
 
-能力索引允许不同能力复用各自不可变的 passed case，但绝不允许用失败 case、模型别名、不同能力或指纹已变化的旧证据替代。最新 blocked 批次仍是不可改写的批次历史；它不再把其中 passed case 降为 pending。默认实验授权不能越过活动安装门禁。
+能力索引允许不同能力复用各自不可变的 passed case，但绝不允许用失败 case、模型别名、不同能力或指纹已变化的旧证据替代。历史 blocked 批次仍是不可改写的批次历史。默认实验授权不能越过活动安装门禁。
 
 权限包必须列出：
 
@@ -121,7 +121,7 @@ MCP，并把活动插件升级到已发布的 `0.1.1-beta.1`；旧 `codex_cc_too
 beta.1 handoff 暴露了宿主断开没有自动取消服务端在途任务的缺口。本轮源码正在修复该
 生命周期，但在下一个 beta 通过公共 npm 精确版本验收、官方插件升级、完整 App 进程重启和真实宿主普通
 Stop/interrupt 验收全部完成前，不能把确定性测试扩张为真实宿主通过。不得恢复开发
-直连、手工修改配置或跳过 stale 能力门禁。
+直连、手工修改配置或跳过能力门禁。
 
 ## 8. 失败时使用官方回滚
 

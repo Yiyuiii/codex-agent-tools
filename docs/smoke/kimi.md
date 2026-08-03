@@ -2,21 +2,21 @@
 
 ## 当前结论
 
-当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。当前能力索引引用的历史 Kimi review/delegate case 都通过，并按精确 case 哈希与当时运行时指纹记录为 passed。
+当前公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。当前能力索引引用 2026-08-03 新批次中的 Kimi review/delegate passed case，并按精确 case 哈希与当前运行时指纹验证通过。
 
-现行调用省略 `timeoutMs` 时不会向 Kimi Code 设置 deadline，而是保留 Kimi Code 原生执行预算。宿主取消、stdio 断开或进程信号会传播 SDK abort，并等待完整 owned ACP 进程树归零；只有调用方显式设置的单次 `timeoutMs` 到期才报告 timed out。本轮运行时变更已使旧 Kimi 能力指纹 stale；只重跑 stale、缺失、新增或证据失效的能力，Kimi 两项必须由对应新证据重新资格化。
+现行调用省略 `timeoutMs` 时不会向 Kimi Code 设置 deadline，而是保留 Kimi Code 原生执行预算。宿主取消、stdio 断开或进程信号会传播 SDK abort，并等待完整 owned ACP 进程树归零；只有调用方显式设置的单次 `timeoutMs` 到期才报告 timed out。项目没有给 Kimi 设置全局或默认 step、turn、tool、context、token 或执行时长上限。
 
-最新真实批次 `2026-08-02T14-17-27.683Z-307be99a-f536-4113-8738-51de40b56634` 在 ordinal 1 `ark-coding-plan/delegate` 因 `account_quota_exceeded` 首错停止，ordinal 2–8 全部 notRun，因此当前 Kimi review/delegate 没有运行，也没有通过或失败的新结论。该批 manifest SHA-256 为 `da28beb431619adee599861c9b3cebbeb3d843496243be22ba39140b05d0d157`，证据提交为 `29d8673`。维护者随后报告 Ark Coding Plan 额度恢复，但 Kimi 仍必须等待新独立批次实际执行。
+最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 中，ordinal 3 Kimi review 与 ordinal 4 Kimi delegate 均使用 `kimi-code/k3` / direct，单次 client invocation、零 retry/fallback，并全部 passed；owned process 均已排空。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
 
-当前索引来源的历史 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c` 绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`。ordinal 3 Kimi review 与 ordinal 4 Kimi delegate 均固定使用 `kimi-code/k3` / direct，零 retry/fallback，并均 passed；这两项只支持旧实现资格，不能越过本轮 stale 指纹。
+现行索引中的 Kimi review 与 delegate 证据分别是该新批次的 [review JSON](evidence/batches/2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923/cases/2026-08-03T02-13-19.991Z-kimi-k3-review.json) 与 [delegate JSON](evidence/batches/2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923/cases/2026-08-03T02-13-46.511Z-kimi-k3-delegate.json)。2026-07-28 及更早批次保留为历史审计，不再是当前索引来源。
 
-该批次继续到 ordinal 6 `ark-agent-plan/delegate`，因 `account_quota_exceeded` 按首错停止，形成 6 completed / 5 passed、ordinal 7–8 notRun、`blocked / case_failed`、`promotionEligible=false`。该批聚合终态保持不变，但不再撤销其中通过的 Kimi case；其它路线的临时额度不会触发 Kimi 重跑。
+历史 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c` 批次继续到 ordinal 6 `ark-agent-plan/delegate`，因 `account_quota_exceeded` 按首错停止，形成 6 completed / 5 passed、ordinal 7–8 notRun、`blocked / case_failed`、`promotionEligible=false`。该批聚合终态保持不变；其它路线的临时额度不会触发 Kimi 重跑。
 
 该历史批次没有回退到其它 Kimi 模型；标准入口和 `functions.exec` cell 各只有一个，没有 resume、retry、fallback、补跑、第二入口或第二批。其 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，证据提交为 `6b4217d`。
 
 2026-07-26 旧五模型 blocked 批次的终态见 [manifest](evidence/batches/2026-07-26T08-55-33.323Z-9322d00a-709b-475b-8e76-fa94af80ca6f/manifest.json)，SHA-256 `78dd7af3a3ba17a83ba96fed021cd559a49e2641ca9facb89fe932d0d06a06c5`。它只记录 Kimi 两项未运行，是 `five-llm-v1` 历史材料，不构成新的 Kimi 质量结论或当前资格来源。
 
-索引来源的历史四模型 blocked [manifest](evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json) 的 SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`；immutable-evidence verifier 已通过，20 个证据文件由提交 `6b4217d` 保存。Kimi review 与 delegate evidence 分别见该批次的 [review JSON](evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-38-02.020Z-kimi-k3-review.json) 与 [delegate JSON](evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-38-33.375Z-kimi-k3-delegate.json)。
+旧索引曾引用的历史四模型 blocked [manifest](evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/manifest.json) 的 SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`；immutable-evidence verifier 已通过，20 个证据文件由提交 `6b4217d` 保存。Kimi review 与 delegate evidence 分别见该批次的 [review JSON](evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-38-02.020Z-kimi-k3-review.json) 与 [delegate JSON](evidence/batches/2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c/cases/2026-07-28T14-38-33.375Z-kimi-k3-delegate.json)；它们现只作历史审计。
 
 更早四模型 blocked [manifest](evidence/batches/2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678/manifest.json) 的 SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`；它在 ordinal 8 因其它 Ark route 失败而结束，只作历史审计。
 
@@ -38,7 +38,7 @@ Kimi ACP client 现在保留协议允许晚到的 `kind/title/rawInput`，任务
 
 冻结前全量还暴露了 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察。提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试；独立复审 PASS、无 P0–P3。该修复不修改公开任务/MCP 结果、模型/route/credential、资格计划、提示词或 retry/fallback。
 
-Kimi 命令观测加固的离线实现阶段本身没有调用真实模型，也没有修改任何既有 evidence JSON、`four-llm-v1` manifest/checkpoint schema 或公开任务/MCP 结果。后续历史批次已通过 Kimi review/delegate；下一轮 stale 能力资格会用同一能力索引同时验证新 evidence 与 Kimi 运行时指纹。
+Kimi 命令观测加固的离线实现阶段本身没有调用真实模型，也没有修改任何既有 evidence JSON、`four-llm-v1` manifest/checkpoint schema 或公开任务/MCP 结果。2026-08-03 新批次已通过 Kimi review/delegate；现行能力索引同时验证新 evidence 与 Kimi 当前运行时指纹。
 
 ## 方法与通过标准
 

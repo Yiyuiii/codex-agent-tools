@@ -946,6 +946,7 @@ export interface CapabilityIndexAnalysisEntry {
 export interface CapabilityIndexAnalysisResult {
   readonly indexPath: typeof CAPABILITY_INDEX_RELATIVE_PATH;
   readonly entries: readonly CapabilityIndexAnalysisEntry[];
+  readonly legacyEntryCount: number;
 }
 
 export interface CapabilityIndexAnalysisDependencies {
@@ -973,12 +974,13 @@ async function loadCapabilityIndexEntries(
   const actualKeys = entries.map(
     (entry) => `${entry.llm}/${entry.task}`,
   );
+  const legacyEntryCount = entries.filter(
+    (entry) => entry.source.kind === "legacy-standalone",
+  ).length;
   if (
     entries.length !== expectedKeys.length ||
     actualKeys.some((key, index) => key !== expectedKeys[index]) ||
-    entries.filter(
-      (entry) => entry.source.kind === "legacy-standalone",
-    ).length !== 1
+    legacyEntryCount > 1
   ) {
     throw capabilityQualificationError();
   }
@@ -1095,6 +1097,9 @@ export async function analyzeCapabilityIndex(
   return Object.freeze({
     indexPath: CAPABILITY_INDEX_RELATIVE_PATH,
     entries: Object.freeze(analyzed),
+    legacyEntryCount: entries.filter(
+      (entry) => entry.source.kind === "legacy-standalone",
+    ).length,
   });
 }
 
@@ -1122,7 +1127,7 @@ export async function verifyCapabilityIndex(options: {
     verified: true,
     indexPath: CAPABILITY_INDEX_RELATIVE_PATH,
     entryCount: analysis.entries.length,
-    legacyEntryCount: 1,
+    legacyEntryCount: analysis.legacyEntryCount,
   });
 }
 
