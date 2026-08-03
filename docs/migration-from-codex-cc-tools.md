@@ -6,7 +6,7 @@
 
 - 新插件不调用 `codex_cc_tools`，也不调用、修改或卸载本机 Claude Code；
 - 本轮不卸载、禁用或修改旧 `codex_cc_tools`；
-- 活动 Codex 当前已通过官方插件机制安装并启用已发布的 `0.1.1-beta.3`，但完整 App 重启与普通 Stop 的 `cancelled + owned-zero` receipt 尚未完成，真实宿主门禁仍为 partial；
+- 活动 Codex 当前已通过官方插件机制安装并启用已发布的 `0.1.1-beta.3`；从其精确 clean tag 启动宿主验收时，启动层在 observer 前错误要求 Git 未跟踪的生成 runtime，因而 fail closed。`0.1.1-beta.4` 候选修复该证据装载缺口，待发布、官方升级、完整 App 重启与普通 Stop 的 `cancelled + owned-zero` receipt，真实宿主门禁仍为 partial；
 - 项目代码不得直接读取或写入活动 `~/.codex/config.toml`；官方插件命令可能更新该状态文件，因此每次真实 add/remove 都必须先取得针对该动作的明确许可。
 
 “共存”不是“已经替代”。在全部替代门槛通过前，旧工具保持原状，用户已有工作流不在本轮改动范围内。

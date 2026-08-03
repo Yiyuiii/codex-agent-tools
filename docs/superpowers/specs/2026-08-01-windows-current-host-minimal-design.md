@@ -4,7 +4,7 @@
 
 状态：**现行覆盖规格**
 
-> 2026-08-03 实施覆盖：本文中关于“待删除”实现、Markdown release marker、泛化 Kimi/Pi 代表调用及 Stop/interrupt 二选一的描述只保留为设计演进背景。现行实现已经使用严格 JSON marker、8 current / 0 legacy 能力索引和 checked-in observer；beta.3 已完成 OIDC 发布、公共 npm 精确包验收与官方插件升级。剩余宿主门禁固定为完整 App 重启、observer 输出的两次精确 Kimi 宿主调用、`REQUEST_STARTED` 后普通 Stop，以及唯一 `cancelled + owned-zero` receipt。实现与证据真值源见[当前宿主精简实施计划](../plans/2026-08-01-windows-current-host-owned-process.md)与[真实宿主验收记录](../../release/real-host-acceptance.md)。
+> 2026-08-03 实施覆盖：本文中关于“待删除”实现、Markdown release marker、泛化 Kimi/Pi 代表调用及 Stop/interrupt 二选一的描述只保留为设计演进背景。现行实现已经使用严格 JSON marker、8 current / 0 legacy 能力索引和 checked-in observer；beta.3 已完成 OIDC 发布、公共 npm 精确包验收与官方插件升级，但其精确 clean-tag 启动层在 observer 前错误要求 Git 未跟踪的生成 runtime，因而 fail closed。beta.4 候选改为标签只对照 4 个受版本控制制品，同时仍由实际官方缓存的 5 个制品完整计算 marker 摘要。beta.4 发布并安装后，剩余宿主门禁固定为完整 App 重启、observer 输出的两次精确 Kimi 宿主调用、`REQUEST_STARTED` 后普通 Stop，以及唯一 `cancelled + owned-zero` receipt。实现与证据真值源见[当前宿主精简实施计划](../plans/2026-08-01-windows-current-host-owned-process.md)与[真实宿主验收记录](../../release/real-host-acceptance.md)。
 
 授权来源：维护者已明确要求不再为了良好发布版本测试三个 Node 版本，目标改为让维护者自己的当前环境鲁棒可用，并要求同步删除其它冗余设计。该要求是用户原始要求；本文中的具体技术取舍是 Codex 根据已保存证据和三路独立审计形成的可复核实现决策，不应反向表述成维护者逐条指定的技术方案。
 

@@ -1,10 +1,10 @@
 # 官方插件运维流程
 
-本文是 `codex_external_agents` 官方插件候选构建、隔离验收、已授权官方升级与回滚的现行运维真值源。活动 Codex 当前已安装并启用已发布的 `0.1.1-beta.3`，旧 `codex_cc_tools` 继续共存；当前 app-server 在升级前已启动，必须完整退出并重开 App 后才能进入真实宿主验收。当前发布线只保证维护者的 Windows x64 / Node 24 宿主；原生辅助层、Job-owned process、observer、固定启动层和 current-host freeze 已完成，不再运行 Node 矩阵或跨宿主认证。
+本文是 `codex_external_agents` 官方插件候选构建、隔离验收、已授权官方升级与回滚的现行运维真值源。活动 Codex 当前已安装并启用已发布的 `0.1.1-beta.3`，旧 `codex_cc_tools` 继续共存；从 beta.3 精确 clean tag 启动真实宿主验收时，启动层在 observer 前错误要求 Git 未跟踪的生成 runtime，因而 fail closed。`0.1.1-beta.4` 候选只修复该证据装载缺口并已通过当前宿主完整离线门禁；它完成 PR/CI、OIDC 发布、公共验收和官方升级后，才完整退出并重开 App 进入正式宿主验收。当前发布线只保证维护者的 Windows x64 / Node 24 宿主；不运行 Node 矩阵或跨宿主认证。
 
 最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`；四个逻辑 LLM 的八项 review/delegate 全部 passed。每项均为一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，owned process 全部排空；终态为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
 
-现行 `capabilities.json` 已统一绑定该批八个精确 case 与当前运行时指纹，旧的受限 legacy 入口归零；`npm run verify:capabilities` 返回 8 项 current、0 项 legacy。2026-08-02 的额度失败批次与其它历史 manifest/case 继续保持不可变，但不再是当前资格状态。维护者再次报告 Ark Coding Plan 额度恢复只表示当前可调用性，不触发资格重跑。`0.1.1-beta.3` 已由 GitHub Actions OIDC 发布到 npm `next`，通过当前宿主的公共精确包隔离验收，并完成活动官方插件升级；下一步只执行完整 App 重启，并在 observer 发布 `REQUEST_STARTED` 后使用普通 Stop 取得 `cancelled + owned-zero` receipt。
+现行 `capabilities.json` 已统一绑定该批八个精确 case 与当前运行时指纹，旧的受限 legacy 入口归零；`npm run verify:capabilities` 返回 8 项 current、0 项 legacy。2026-08-02 的额度失败批次与其它历史 manifest/case 继续保持不可变，但不再是当前资格状态。维护者再次报告 Ark Coding Plan 额度恢复只表示当前可调用性，不触发资格重跑。`0.1.1-beta.3` 已由 GitHub Actions OIDC 发布到 npm `next`，通过当前宿主的公共精确包隔离验收，并完成活动官方插件升级；但其 clean-tag 启动层无法从仓库读取被 ignore 的生成 runtime。下一步完成 `0.1.1-beta.4` 的 PR/双重 CI、精确标签、OIDC 发布、公共精确包验收与官方升级；之后才执行完整 App 重启，并在 observer 发布 `REQUEST_STARTED` 后使用普通 Stop 取得 `cancelled + owned-zero` receipt。
 
 资格执行与恢复的唯一详细合同见[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)；历史 Kimi/Ark case、旧 shell 根因和旧测试计数分别保留在 `docs/smoke/` 与不可变 evidence 中，不在运维入口重复维护。package/release assurance 只证明离线候选，不构成资格、安装或发布。
 
@@ -127,9 +127,11 @@ MCP 进程数为 0。没有直接读取或修改活动配置，也没有停止 A
 Node 进程。
 
 beta.1 handoff 暴露了宿主断开没有自动取消服务端在途任务的缺口；beta.3 已携带对应
-生命周期修复，但当前 app-server 在升级前已加载旧工具定义，不能把官方安装成功扩张为
-真实宿主通过。下一步必须完整退出并重开 App，再按 checked-in observer 完成真实
-普通 Stop 与精确 `cancelled + owned-zero` receipt。不得恢复开发直连、手工修改配置或跳过能力门禁。
+生命周期修复，但其 clean-tag 验收启动层在 observer 前 fail closed，不能把官方安装成功
+扩张为真实宿主通过。下一步先完成 beta.4 PR/双重 CI、精确标签、OIDC 发布、公共 npm
+验收与官方升级；只有这些自动阶段全部通过后，才完整退出并重开 App，从 beta.4 clean tag
+按 checked-in observer 完成真实普通 Stop 与精确 `cancelled + owned-zero` receipt。不得恢复
+开发直连、手工修改配置或跳过能力门禁。
 
 ## 8. 失败时使用官方回滚
 
@@ -149,4 +151,4 @@ if ($LASTEXITCODE -ne 0) { throw "Codex marketplace remove 失败，停止回滚
 - 每次真实安装、升级或独立卸载都是新的外部状态变更，必须重新逐动作授权。
 - 永远不以手工编辑活动 `config.toml` 代替官方插件机制。
 - 本轮不移除旧 `codex_cc_tools`，不调用或修改 Claude Code；禁止本地 `npm publish`。只允许 GitHub Actions OIDC 发布 beta 与 stable。
-- 只有确定性检查、隔离生命周期、当前能力资格、beta.3 公共 npm 精确版本验收与官方升级、完整 App 重启，以及在 observer 发布 `REQUEST_STARTED` 后由普通 Stop 取得 `cancelled + owned-zero` receipt 全部通过后，才可说新插件具备替代旧工具的条件；stable 也只由 GitHub Actions OIDC 发布。
+- 只有确定性检查、隔离生命周期、当前能力资格、beta.4 公共 npm 精确版本验收与官方升级、完整 App 重启，以及从 beta.4 clean tag 启动的 observer 在发布 `REQUEST_STARTED` 后由普通 Stop 取得 `cancelled + owned-zero` receipt 全部通过后，才可说新插件具备替代旧工具的条件；stable 也只由 GitHub Actions OIDC 发布。

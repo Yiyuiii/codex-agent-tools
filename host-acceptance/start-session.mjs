@@ -57,6 +57,13 @@ export const HOST_ACCEPTANCE_PLUGIN_PATHS = Object.freeze([
   "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
 ]);
 
+export const HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS = Object.freeze([
+  "plugins/codex-external-agents/.codex-plugin/plugin.json",
+  "plugins/codex-external-agents/.mcp.json",
+  "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+  "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
+]);
+
 function fixedDelegatePrompt(completionMarkerPath) {
   const quotedMarkerPath = completionMarkerPath.replaceAll("'", "''");
   return [
@@ -383,27 +390,39 @@ function cacheRelativePluginPath(repositoryPath) {
   );
 }
 
-function verifyInstalledPluginFiles(tagFiles, installedFiles, version) {
+function verifyInstalledPluginFiles(repositoryFiles, installedFiles, version) {
   if (
+    !Array.isArray(repositoryFiles) ||
+    repositoryFiles.length !== HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS.length ||
     !Array.isArray(installedFiles) ||
     installedFiles.length !== HOST_ACCEPTANCE_PLUGIN_PATHS.length
   ) fail();
+  const installedByPath = new Map();
   for (let index = 0; index < HOST_ACCEPTANCE_PLUGIN_PATHS.length; index += 1) {
-    const tagEntry = record(tagFiles[index]);
     const installedEntry = record(installedFiles[index]);
     const expectedPath = HOST_ACCEPTANCE_PLUGIN_PATHS[index];
-    exactString(tagEntry.path, expectedPath);
     exactString(installedEntry.path, expectedPath);
+    if (!Buffer.isBuffer(installedEntry.content)) fail();
+    installedByPath.set(expectedPath, installedEntry.content);
+  }
+  for (
+    let index = 0;
+    index < HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS.length;
+    index += 1
+  ) {
+    const repositoryEntry = record(repositoryFiles[index]);
+    const expectedPath = HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS[index];
+    exactString(repositoryEntry.path, expectedPath);
+    const installedContent = installedByPath.get(expectedPath);
     if (
-      !Buffer.isBuffer(tagEntry.content) ||
-      !Buffer.isBuffer(installedEntry.content) ||
-      !tagEntry.content.equals(installedEntry.content)
+      !Buffer.isBuffer(repositoryEntry.content) ||
+      !Buffer.isBuffer(installedContent) ||
+      !repositoryEntry.content.equals(installedContent)
     ) fail();
   }
   const pluginManifest = record(parseJsonBytes(installedFiles[0].content));
   exactString(pluginManifest.name, PLUGIN_NAME);
   exactString(pluginManifest.version, version);
-  exactString(pluginTreeDigest(installedFiles), pluginTreeDigest(tagFiles));
 }
 
 function fieldDigest(domain, value) {
@@ -440,10 +459,10 @@ export function buildHostAcceptanceSession(input) {
     exactString(observer.inputsDigestSha256, manifest.inputsDigestSha256);
     exactString(
       marker.pluginArtifactTreeDigestSha256,
-      pluginTreeDigest(input.pluginFiles),
+      pluginTreeDigest(input.installedPluginFiles),
     );
     verifyInstalledPluginFiles(
-      input.pluginFiles,
+      input.repositoryPluginFiles,
       input.installedPluginFiles,
       version,
     );
@@ -645,6 +664,42 @@ async function requireExactRegularFile(filePath) {
   if (resolved.toLowerCase() !== filePath.toLowerCase()) fail();
 }
 
+export async function loadHostAcceptancePluginFiles(
+  repositoryRoot,
+  installedRoot,
+) {
+  try {
+    const repositoryPluginFiles = [];
+    for (const pluginPath of HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS) {
+      repositoryPluginFiles.push({
+        path: pluginPath,
+        content: await requireTrustedFile(
+          repositoryRoot,
+          pluginPath,
+          MAX_BINARY_BYTES,
+        ),
+      });
+    }
+    const installedPluginFiles = [];
+    for (const pluginPath of HOST_ACCEPTANCE_PLUGIN_PATHS) {
+      installedPluginFiles.push({
+        path: pluginPath,
+        content: await requireTrustedFile(
+          installedRoot,
+          cacheRelativePluginPath(pluginPath),
+          MAX_BINARY_BYTES,
+        ),
+      });
+    }
+    return Object.freeze({
+      repositoryPluginFiles: Object.freeze(repositoryPluginFiles),
+      installedPluginFiles: Object.freeze(installedPluginFiles),
+    });
+  } catch {
+    return fail();
+  }
+}
+
 async function prepareFromRepository(repositoryRoot, localAppData, userProfile) {
   const packageBytes = await requireTrustedFile(
     repositoryRoot,
@@ -701,25 +756,9 @@ async function prepareFromRepository(repositoryRoot, localAppData, userProfile) 
     OBSERVER_PATH,
     MAX_BINARY_BYTES,
   );
-  const pluginFiles = [];
-  for (const pluginPath of HOST_ACCEPTANCE_PLUGIN_PATHS) {
-    pluginFiles.push({
-      path: pluginPath,
-      content: await requireTrustedFile(repositoryRoot, pluginPath, MAX_BINARY_BYTES),
-    });
-  }
   const cacheRoot = installedPluginRoot(userProfile, version);
-  const installedPluginFiles = [];
-  for (const pluginPath of HOST_ACCEPTANCE_PLUGIN_PATHS) {
-    installedPluginFiles.push({
-      path: pluginPath,
-      content: await requireTrustedFile(
-        cacheRoot,
-        cacheRelativePluginPath(pluginPath),
-        MAX_BINARY_BYTES,
-      ),
-    });
-  }
+  const { repositoryPluginFiles, installedPluginFiles } =
+    await loadHostAcceptancePluginFiles(repositoryRoot, cacheRoot);
   const npmInvocation = buildNpmViewInvocation(process.execPath, version);
   await requireExactRegularFile(npmInvocation.npmCliPath);
   const npmOutput = await run(
@@ -744,7 +783,7 @@ async function prepareFromRepository(repositoryRoot, localAppData, userProfile) 
     observerBytes,
     protocolBytes,
     inputFiles,
-    pluginFiles,
+    repositoryPluginFiles,
     installedPluginFiles,
     gitHead,
     tagCommit,
