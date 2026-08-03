@@ -8,7 +8,7 @@
 
 候选包版本：`0.1.1-beta.3`
 
-当前结论：**当前宿主离线实现、原生辅助层、observer、固定启动层、freeze、四模型八项真实资格与离线 release gate 均已完成；现行能力索引为 8 current / 0 legacy。下一个 beta 的 OIDC 发布、公共包精确安装以及完整 App 重启后的普通 Stop/interrupt 真实宿主验收完成前，stable 继续阻断。已发布的 `0.1.1-beta.1` 与活动插件保持原状，旧 `codex_cc_tools` 仍 enabled。**
+当前结论：**当前宿主离线实现、原生辅助层、observer、固定启动层、freeze、四模型八项真实资格与离线 release gate 均已完成；现行能力索引为 8 current / 0 legacy。`0.1.1-beta.3` 已由 GitHub Actions OIDC 发布到 npm `next` 并通过公共精确包隔离验收。活动插件仍为 `0.1.1-beta.1`，旧 `codex_cc_tools` 仍 enabled；官方升级、完整 App 重启后的普通 Stop/interrupt 与 owned-zero 真实宿主验收完成前，stable 继续阻断。**
 
 最新真实批次绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`，批次 ID 为 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`；标准入口和 execution cell 各只有一个，八项全部 passed，没有 resume、retry、fallback 或补跑。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，immutable-evidence 与 frozen-candidate verifier 均通过，owned process 全部 drained、锁为空；不可变证据由提交 `c09ce74` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。
 
@@ -20,16 +20,16 @@
 
 beta.1 handoff 只证明旧宿主断开会留下服务端任务，不是 stable Stop gate 的唯一证据。
 
-晋级顺序只有一条：由 GitHub Actions OIDC 把已确认尚未占用的 `0.1.1-beta.3` 发布到 npm `next`；从公共 npm 安装该精确版本、完成官方插件升级、完整 App 重启与真实 Stop/interrupt 门禁，并证明 owned descendants zero；最后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`；未来候选版本仍须先查询 registry，不得猜测或复用已发布版本。`v0.1.1-beta.2` 标签在 npm publish 前因 plugin tree 原始字节与 GitHub checkout 不一致而 fail closed，版本未进入 npm，标签不移动、不复用。
+晋级顺序只有一条：`0.1.1-beta.3` 的 OIDC 发布与公共 npm 精确版本验收已经完成；下一步完成官方插件升级、完整 App 重启与真实 Stop/interrupt 门禁，并证明 owned descendants zero；最后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`；未来候选版本仍须先查询 registry，不得猜测或复用已发布版本。`v0.1.1-beta.2` 标签在 npm publish 前因 plugin tree 原始字节与 GitHub checkout 不一致而 fail closed，版本未进入 npm，标签不移动、不复用。
 
 ## 状态总览
 
 | 层级 | 验收对象                                  | 当前状态                                                                    | 通过证据路径                                                                                                                                                                                                               |
 | ---- | ----------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | 确定性单测、类型检查、构建、release smoke | passed：69 files / 1226 passed / 5 platform skips，release smoke passed    | 2026-08-03 beta.3 `gate:offline`；当前 Node 24 宿主与精确 23-file pack                                                                                                                                                        |
+| 1    | 确定性单测、类型检查、构建、release smoke | passed：69 files / 1227 passed / 5 platform skips，release smoke passed    | 2026-08-03 beta.3 `gate:offline`；当前 Node 24 宿主与精确 23-file pack                                                                                                                                                        |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
 | 3    | 四个逻辑 LLM 的八项真实模型门禁           | passed：8 current / 0 stale / 0 legacy                                      | 2026-08-03 passed batch、不可变 case evidence 与现行能力索引                                                                                                                                                                 |
-| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta.1 已安装；等待下一个公共 beta、完整重启与 Stop/interrupt      | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 [real-host-acceptance.md](real-host-acceptance.md)                                                                                |
+| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：公共 beta.3 已验收；活动 beta.1 待官方升级、完整重启与 Stop       | 公共包证据为 [0.1.1-beta.3-npm-acceptance.md](0.1.1-beta.3-npm-acceptance.md)；权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；宿主结果为 [real-host-acceptance.md](real-host-acceptance.md) |
 
 ## 第 1 层：确定性单测与构建
 

@@ -4,7 +4,7 @@
 
 最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`；四个逻辑 LLM 的八项 review/delegate 全部 passed。每项均为一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，owned process 全部排空；终态为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
 
-现行 `capabilities.json` 已统一绑定该批八个精确 case 与当前运行时指纹，旧的受限 legacy 入口归零；`npm run verify:capabilities` 返回 8 项 current、0 项 legacy。2026-08-02 的额度失败批次与其它历史 manifest/case 继续保持不可变，但不再是当前资格状态。当前宿主唯一完整离线 release gate 已通过；下一步准备 GitHub Actions OIDC beta 发布。
+现行 `capabilities.json` 已统一绑定该批八个精确 case 与当前运行时指纹，旧的受限 legacy 入口归零；`npm run verify:capabilities` 返回 8 项 current、0 项 legacy。2026-08-02 的额度失败批次与其它历史 manifest/case 继续保持不可变，但不再是当前资格状态。`0.1.1-beta.3` 已由 GitHub Actions OIDC 发布到 npm `next`，并通过当前宿主的公共精确包隔离验收；活动插件仍是 `0.1.1-beta.1`。下一步只执行已授权的官方升级、完整 App 重启与真实 Stop/owned-zero 门禁。
 
 资格执行与恢复的唯一详细合同见[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)；历史 Kimi/Ark case、旧 shell 根因和旧测试计数分别保留在 `docs/smoke/` 与不可变 evidence 中，不在运维入口重复维护。package/release assurance 只证明离线候选，不构成资格、安装或发布。
 
