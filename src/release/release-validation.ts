@@ -1730,25 +1730,9 @@ export async function verifyReleaseValidation(
     if (betaMarker.kind !== "beta" || !sameJson(betaMarker.core, marker.core)) {
       fail();
     }
-    const betaPluginEntries = await Promise.all(
-      RELEASE_PLUGIN_ARTIFACT_PATHS.map(async (artifactPath) =>
-        Object.freeze({
-          path: artifactPath,
-          content: await readGitFile(
-            options.repositoryRoot,
-            marker.publicBeta.taggedCommit,
-            artifactPath,
-          ),
-        }),
-      ),
-    );
-    const betaPluginTreeDigest = digestReleasePluginArtifactTree(
-      betaPluginEntries,
-    );
     if (
-      betaPluginTreeDigest !==
-        marker.publicBeta.pluginArtifactTreeDigestSha256 ||
-      betaPluginTreeDigest !== betaMarker.pluginArtifactTree.digestSha256
+      marker.publicBeta.pluginArtifactTreeDigestSha256 !==
+      betaMarker.pluginArtifactTree.digestSha256
     ) {
       fail();
     }

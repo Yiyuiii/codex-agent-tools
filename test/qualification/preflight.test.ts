@@ -56,7 +56,7 @@ async function tempRepository(): Promise<string> {
   roots.push(root);
   await writeFile(
     path.join(root, "package.json"),
-    `${JSON.stringify({ name: "codex-agent-tools", version: "0.1.1-beta.2" })}\n`,
+    `${JSON.stringify({ name: "codex-agent-tools", version: "0.1.1-beta.3" })}\n`,
   );
   await writeFile(path.join(root, "package-lock.json"), "lock-v1\n");
   for (const [
@@ -375,7 +375,7 @@ describe("qualification preflight", () => {
       repositoryCommit: commit,
       repositoryBranch: "codex/ark-cutover",
       repositoryDirty: false,
-      packageVersion: "0.1.1-beta.2",
+      packageVersion: "0.1.1-beta.3",
       packageLockSha256: createHash("sha256").update("lock-v1\n").digest("hex"),
       runtimeVersions: {
         node: "v24.0.0",
@@ -896,7 +896,7 @@ describe("frozen candidate integration helpers", () => {
 
     expect(snapshot).toMatchObject({
       repositoryCommit: commit,
-      packageVersion: "0.1.1-beta.2",
+      packageVersion: "0.1.1-beta.3",
       runtimeVersions: {
         node: "v24.0.0",
         codex: "codex-cli 0.135.0",

@@ -4,7 +4,7 @@
 
 状态：已获维护者授权，执行中。
 
-> 2026-08-03 当前覆盖：发布实施以[Windows 当前宿主精简计划](2026-08-01-windows-current-host-owned-process.md)为准。下文 Node 20/22/24 矩阵、跨宿主兼容与旧 Markdown marker 只记录已发布版本的历史流程，不是下一版本门禁；下一版本只使用当前 Windows x64 / Node 24 宿主、严格 JSON marker、GitHub Actions OIDC、公共 npm 与官方插件完整重启/真实 Stop 验收。维护者已报告 Ark Coding Plan 额度恢复；新的四模型八项资格已经全部通过并晋级为 8 current / 0 legacy，`0.1.1-beta.2` 精确候选、严格 marker 与最终离线门禁均已完成，尚未推送或发布。
+> 2026-08-03 当前覆盖：发布实施以[Windows 当前宿主精简计划](2026-08-01-windows-current-host-owned-process.md)为准。下文 Node 20/22/24 矩阵、跨宿主兼容与旧 Markdown marker 只记录已发布版本的历史流程，不是下一版本门禁；下一版本只使用当前 Windows x64 / Node 24 宿主、严格 JSON marker、GitHub Actions OIDC、公共 npm 与官方插件完整重启/真实 Stop 验收。维护者已报告 Ark Coding Plan 额度恢复；新的四模型八项资格已经全部通过并晋级为 8 current / 0 legacy。`v0.1.1-beta.2` 通过 PR 与双重 CI，但 release workflow 在 npm publish 前因 Windows 旧工作树 CRLF marker 与 GitHub LF checkout 的 raw plugin-tree digest 不一致而 fail closed；标签保持不可变且 npm 版本不存在。未占用的 `0.1.1-beta.3` 已加入 LF-only 与 current-marker/fresh-build 双回归门禁，最终当前宿主 `gate:offline` 为 69 files / 1226 passed / 5 skipped，独立审计无 P1/P2/P3，待重新走 PR/双重 CI/OIDC。
 
 ## 用户目标
 

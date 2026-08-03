@@ -699,6 +699,10 @@ describe("release receipts", () => {
     const cases = [
       {
         ...receipt,
+        pluginArtifactTreeDigestSha256: H64,
+      },
+      {
+        ...receipt,
         session: {
           ...receipt.session,
           descriptorSha256: H64,
@@ -892,7 +896,10 @@ describe("release validation verifier", () => {
         ([inputPath, bytes]) =>
           [`${BETA_COMMIT}:${inputPath}`, bytes] as const,
       ),
-      ...artifacts.map((entry) => [`${BETA_COMMIT}:${entry.path}`, entry.content] as const),
+      // The generated plugin runtime is intentionally not committed. Stable
+      // promotion uses the immutable beta marker and live npm dist identity;
+      // host acceptance proves byte equality between tag-built and installed
+      // plugin files instead of reconstructing that tree from Git.
     ]);
     const dependencies = {
       readRepositoryFile: async (_root: string, file: string) => files.get(file)!,
@@ -919,6 +926,31 @@ describe("release validation verifier", () => {
         dependencies,
       ),
     ).resolves.toMatchObject({ kind: "stable" });
+    const mismatchedStable = {
+      ...stable,
+      publicBeta: {
+        ...stable.publicBeta,
+        pluginArtifactTreeDigestSha256: H64,
+      },
+    };
+    await expect(
+      verifyReleaseValidation(
+        {
+          repositoryRoot: "virtual",
+          packageVersion: "0.1.1",
+          tag: "v0.1.1",
+          taggedCommit: TAG_COMMIT,
+          npmChannel: "latest",
+        },
+        {
+          ...dependencies,
+          readRepositoryFile: async (root, file) =>
+            file === ".release-validation/v0.1.1.json"
+              ? Buffer.from(JSON.stringify(mismatchedStable))
+              : dependencies.readRepositoryFile(root, file),
+        },
+      ),
+    ).rejects.toThrow("Release validation evidence is invalid");
     await expect(
       verifyReleaseValidation(
         {
