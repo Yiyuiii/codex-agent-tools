@@ -1,5 +1,7 @@
 import os from "node:os";
 import { createHash } from "node:crypto";
+import { mkdir, realpath, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 import {
   assertReleasePackageMetadata,
@@ -21,6 +23,11 @@ const VERSION_PATTERN =
   /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/u;
 export interface NpmPackageAcceptanceArguments {
   readonly version: string;
+}
+
+export interface NpmAcceptanceFakeRuntimes {
+  readonly kimi: string;
+  readonly pi: string;
 }
 
 export interface RegistryPackageMetadata {
@@ -97,6 +104,58 @@ const SYSTEM_ENVIRONMENT_ALLOWLIST = new Set([
   "PROGRAMFILES",
   "PROGRAMFILES(X86)",
 ]);
+
+export async function createNpmAcceptanceFakeRuntimes(
+  temporaryRoot: string,
+): Promise<NpmAcceptanceFakeRuntimes> {
+  if (process.platform !== "win32" || !path.isAbsolute(temporaryRoot)) {
+    throw new Error("Npm package acceptance fake runtimes require Windows");
+  }
+
+  const root = await realpath(path.resolve(temporaryRoot));
+  const kimiRoot = path.join(root, "fake-kimi");
+  const kimi = path.join(kimiRoot, "kimi.exe");
+  const piRoot = path.join(root, "fake-pi-npm");
+  const pi = path.join(piRoot, "pi.cmd");
+  const piPackageRoot = path.join(
+    piRoot,
+    "node_modules",
+    "@earendil-works",
+    "pi-coding-agent",
+  );
+  const piCli = path.join(piPackageRoot, "dist", "cli.js");
+  const piManifest = {
+    name: "@earendil-works/pi-coding-agent",
+    version: "0.0.0",
+    bin: { pi: "dist/cli.js" },
+    engines: { node: ">=24.0.0" },
+  } as const;
+
+  await Promise.all([
+    mkdir(kimiRoot, { recursive: true }),
+    mkdir(path.dirname(piCli), { recursive: true }),
+  ]);
+  await Promise.all([
+    writeFile(kimi, "", "utf8"),
+    writeFile(
+      pi,
+      "@echo this verified package anchor is intentionally never executed\r\n",
+      "utf8",
+    ),
+    writeFile(
+      path.join(piPackageRoot, "package.json"),
+      `${JSON.stringify(piManifest, undefined, 2)}\n`,
+      "utf8",
+    ),
+    writeFile(
+      piCli,
+      'throw new Error("npm acceptance fake Pi target must not execute");\n',
+      "utf8",
+    ),
+  ]);
+
+  return Object.freeze({ kimi, pi });
+}
 
 function assertInstalledToolContract(
   tools: readonly InstalledToolContract[],

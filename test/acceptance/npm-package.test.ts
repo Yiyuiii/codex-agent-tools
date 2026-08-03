@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import { describe, expect, it, vi } from "vitest";
-import { resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import {
   assertDoctorAcceptance,
@@ -11,16 +12,20 @@ import {
   assertInstalledCapabilityProjection,
   assertNpmRegistryMetadata,
   buildIsolatedNpmEnvironment,
+  createNpmAcceptanceFakeRuntimes,
   establishInstalledMcpSession,
   npmAcceptanceReportRelativePath,
   parseNpmPackageAcceptanceArguments,
   PUBLIC_NPM_REGISTRY,
   renderNpmPackageAcceptanceReport,
 } from "../../src/acceptance/npm-package.js";
+import { locateKimi } from "../../src/adapters/kimi/locator.js";
+import { locatePiInvocation } from "../../src/adapters/pi/locator.js";
 import { DOCTOR_CHECK_NAMES } from "../../src/cli/doctor.js";
 
 const repositoryUrl =
   "git+https://github.com/Yiyuiii/codex-agent-tools.git";
+const windowsIt = it.runIf(process.platform === "win32");
 
 function acceptedDoctorChecks() {
   return DOCTOR_CHECK_NAMES.map((name) => ({
@@ -60,6 +65,47 @@ function packageManifest(version = "0.1.0-beta.1") {
 }
 
 describe("npm-installed package acceptance contract", () => {
+  windowsIt("creates fake runtimes that satisfy the strict Windows locator contracts", async () => {
+    const temporaryRoot = await mkdtemp(
+      join(os.tmpdir(), "codex-agent-npm-fake-runtimes-"),
+    );
+    try {
+      const fakeRuntimes = await createNpmAcceptanceFakeRuntimes(
+        temporaryRoot,
+      );
+
+      expect(basename(fakeRuntimes.kimi).toLowerCase()).toBe("kimi.exe");
+      await expect(
+        locateKimi({
+          environment: { KIMI_COMMAND: fakeRuntimes.kimi },
+          platform: "win32",
+        }),
+      ).resolves.toBe(fakeRuntimes.kimi);
+
+      const pi = await locatePiInvocation({
+        environment: { PI_COMMAND: fakeRuntimes.pi },
+        platform: "win32",
+      });
+      expect(pi.identity).toEqual({
+        packageName: "@earendil-works/pi-coding-agent",
+        packageVersion: "0.0.0",
+        nodeEngine: ">=24.0.0",
+      });
+      expect(pi.argvPrefix).toEqual([
+        join(
+          resolve(fakeRuntimes.pi, ".."),
+          "node_modules",
+          "@earendil-works",
+          "pi-coding-agent",
+          "dist",
+          "cli.js",
+        ),
+      ]);
+    } finally {
+      await rm(temporaryRoot, { force: true, recursive: true });
+    }
+  });
+
   it("builds an npm environment that cannot inherit active homes, config, cache, or credentials", () => {
     const environment = buildIsolatedNpmEnvironment({
       sourceEnvironment: {
