@@ -1,7 +1,6 @@
 import path from "node:path";
 import {
   access,
-  chmod,
   lstat,
   mkdir,
   mkdtemp,
@@ -24,6 +23,7 @@ import {
   assertInstalledPackageContract,
   assertNpmRegistryMetadata,
   buildIsolatedNpmEnvironment,
+  createNpmAcceptanceFakeRuntimes,
   establishInstalledMcpSession,
   npmAcceptanceReportRelativePath,
   parseNpmPackageAcceptanceArguments,
@@ -58,7 +58,6 @@ const isolatedAppData = path.join(temporaryRoot, "roaming-app-data");
 const npmUserConfig = path.join(temporaryRoot, "npm-userconfig");
 const npmGlobalConfig = path.join(temporaryRoot, "npm-globalconfig");
 const npmCache = path.join(temporaryRoot, "npm-cache");
-const fakeRuntimeScript = path.join(temporaryRoot, "fake-runtime.mjs");
 const qualificationLockRoot = path.join(
   os.tmpdir(),
   "codex-agent-tools-qualification-locks",
@@ -153,88 +152,6 @@ async function run(command, args, options = {}) {
     );
   }
   return result.stdout;
-}
-
-function quoteWindowsArgument(value) {
-  if (value.includes('"') || /[\r\n]/u.test(value)) {
-    throw new Error("Unsafe fake runtime path");
-  }
-  return `"${value}"`;
-}
-
-function quotePosixArgument(value) {
-  if (value.includes("'") || /[\r\n]/u.test(value)) {
-    throw new Error("Unsafe fake runtime path");
-  }
-  return `'${value}'`;
-}
-
-async function createFakeRuntimes() {
-  const source = `#!/usr/bin/env node
-const [runtime, ...args] = process.argv.slice(2);
-if (runtime === "kimi" && args.length === 1 && args[0] === "--version") {
-  process.stdout.write("0.0.0-npm-acceptance-fixture\\n");
-  process.exit(0);
-}
-if (runtime === "kimi" && args.length === 1 && args[0] === "doctor") {
-  process.stdout.write("npm acceptance fixture: configuration valid\\n");
-  process.exit(0);
-}
-if (runtime === "pi" && args.length === 1 && args[0] === "--version") {
-  process.stdout.write("0.0.0-npm-acceptance-fixture\\n");
-  process.exit(0);
-}
-if (
-  runtime === "pi" &&
-  JSON.stringify(args) === JSON.stringify(["--offline", "--list-models", "ark"])
-) {
-  process.stdout.write(
-    "ark-agent-plan ark-code-latest\\n" +
-    "ark-agent-plan deepseek-v4-flash\\n" +
-    "ark-coding-plan ark-code-latest\\n",
-  );
-  process.exit(0);
-}
-process.stderr.write("unexpected fake runtime invocation\\n");
-process.exit(64);
-`;
-  await writeFile(fakeRuntimeScript, source, "utf8");
-  await chmod(fakeRuntimeScript, 0o755).catch(() => undefined);
-
-  if (process.platform === "win32") {
-    const kimi = path.join(temporaryRoot, "fake-kimi.cmd");
-    const pi = path.join(temporaryRoot, "fake-pi.cmd");
-    await Promise.all([
-      writeFile(
-        kimi,
-        `@echo off\r\n${quoteWindowsArgument(process.execPath)} ${quoteWindowsArgument(fakeRuntimeScript)} kimi %*\r\n`,
-        "utf8",
-      ),
-      writeFile(
-        pi,
-        `@echo off\r\n${quoteWindowsArgument(process.execPath)} ${quoteWindowsArgument(fakeRuntimeScript)} pi %*\r\n`,
-        "utf8",
-      ),
-    ]);
-    return { kimi, pi };
-  }
-
-  const kimi = path.join(temporaryRoot, "fake-kimi");
-  const pi = path.join(temporaryRoot, "fake-pi");
-  await Promise.all([
-    writeFile(
-      kimi,
-      `#!/bin/sh\nexec ${quotePosixArgument(process.execPath)} ${quotePosixArgument(fakeRuntimeScript)} kimi "$@"\n`,
-      "utf8",
-    ),
-    writeFile(
-      pi,
-      `#!/bin/sh\nexec ${quotePosixArgument(process.execPath)} ${quotePosixArgument(fakeRuntimeScript)} pi "$@"\n`,
-      "utf8",
-    ),
-  ]);
-  await Promise.all([chmod(kimi, 0o755), chmod(pi, 0o755)]);
-  return { kimi, pi };
 }
 
 async function assertNoQualificationLocks() {
@@ -607,7 +524,7 @@ try {
     await access(path.join(packageRoot, ...relative.split("/")));
   }
 
-  const fakeRuntimes = await createFakeRuntimes();
+  const fakeRuntimes = await createNpmAcceptanceFakeRuntimes(temporaryRoot);
   const isolatedEnvironment = {
     ...npmEnvironment,
     KIMI_COMMAND: fakeRuntimes.kimi,
