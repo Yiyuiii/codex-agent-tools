@@ -6,7 +6,7 @@
 
 目标发布分支：`next`；当前证据分支：`codex/stdio-lifecycle-and-native-budget`
 
-包版本：`0.1.1-beta.1`
+候选包版本：`0.1.1-beta.2`
 
 当前结论：**当前宿主离线实现、原生辅助层、observer、固定启动层、freeze、四模型八项真实资格与离线 release gate 均已完成；现行能力索引为 8 current / 0 legacy。下一个 beta 的 OIDC 发布、公共包精确安装以及完整 App 重启后的普通 Stop/interrupt 真实宿主验收完成前，stable 继续阻断。已发布的 `0.1.1-beta.1` 与活动插件保持原状，旧 `codex_cc_tools` 仍 enabled。**
 
@@ -20,7 +20,7 @@
 
 beta.1 handoff 只证明旧宿主断开会留下服务端任务，不是 stable Stop gate 的唯一证据。
 
-晋级顺序只有一条：由 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`；从公共 npm 安装精确版本、完成官方插件升级、完整 App 重启与真实 Stop/interrupt 门禁，并证明 owned descendants zero；最后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`，且不预先指定下一个 beta 的版本号。
+晋级顺序只有一条：由 GitHub Actions OIDC 把已确认尚未占用的 `0.1.1-beta.2` 发布到 npm `next`；从公共 npm 安装该精确版本、完成官方插件升级、完整 App 重启与真实 Stop/interrupt 门禁，并证明 owned descendants zero；最后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`；未来候选版本仍须先查询 registry，不得猜测或复用已发布版本。
 
 ## 状态总览
 
@@ -176,7 +176,7 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 ### 前置权限
 
-2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。维护者后来真正终止旧宿主进程并重开，新任务发现新旧四项工具共存；真实 Kimi review 通过，Ark Coding review 因 MCP 没有收到父 App 已存在的 Coding Plan 凭据而在启动 Pi 前失败。根因是 `.mcp.json` 缺少官方 stdio MCP `env_vars` 白名单。0.1.1-beta.1 候选已增加精确四项变量名并禁止静态 `env`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。当前自动节点是完成 beta.1 离线门禁、PR/CI、OIDC 发布、公共 npm 验收和官方升级；下一人工节点是升级后完整重启宿主。
+2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。维护者后来真正终止旧宿主进程并重开，新任务发现新旧四项工具共存；真实 Kimi review 通过，Ark Coding review 因 MCP 没有收到父 App 已存在的 Coding Plan 凭据而在启动 Pi 前失败。根因是 `.mcp.json` 缺少官方 stdio MCP `env_vars` 白名单。历史 `0.1.1-beta.1` 随后增加精确四项变量名并禁止静态 `env`，已通过 OIDC 发布、公共 npm 验收和官方升级；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。当前自动节点是完成 `0.1.1-beta.2` 精确候选门禁、PR/CI、OIDC 发布、公共 npm 验收和官方升级；下一人工节点仍是升级后完整重启宿主。
 
 ### 通过标准
 
