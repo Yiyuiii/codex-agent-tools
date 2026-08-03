@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 3,
+  "qualificationPlanId": "four-llm-v1",
+  "sequence": 11,
+  "kind": "case_running",
+  "batchId": "2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923",
+  "recordedAt": "2026-08-03T02:14:01.446Z",
+  "repositoryCommit": "9054cbc45aaf1c91c2c62817244be5288032ede8",
+  "buildIdentitySha256": "843b91b84dd2a6836402e1396a47b8cd3f805eec9d786c462905c738f59105de",
+  "preflightSha256": "4a097182036403fa3ca4b43cc55c347a9b476ceedfa7fd071a98fa78dfa3c51a",
+  "ordinal": 6,
+  "llm": "ark-agent-plan",
+  "task": "delegate"
+}

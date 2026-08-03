@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 4,
+  "qualification": {
+    "qualificationPlanId": "four-llm-v1",
+    "batchId": "2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923",
+    "ordinal": 1,
+    "llm": "ark-coding-plan",
+    "task": "delegate",
+    "frozenCommit": "9054cbc45aaf1c91c2c62817244be5288032ede8",
+    "frozenBuildIdentity": "843b91b84dd2a6836402e1396a47b8cd3f805eec9d786c462905c738f59105de",
+    "authorizationReferenceSha256": "e470bb0f9668c499eea4948f58a8a8a717c7015e710c1133dbefc709d52f73cf",
+    "orchestratorFallbackUsed": false
+  },
+  "timestamp": "2026-08-03T02:12:42.581Z",
+  "llm": "ark-coding-plan",
+  "actualModel": "ark-code-latest",
+  "expectedModel": "ark-code-latest",
+  "runtime": "pi-rpc",
+  "provider": "ark-coding-plan",
+  "endpointHost": "ark.cn-beijing.volces.com",
+  "route": "direct",
+  "credentialEnv": "CODEX_AGENT_ARK_CODING_KEY",
+  "configSha256": "3b1e8827e21207d0d41d3189a7409d0f722ce7fece8aa41049046a14bc04349e",
+  "task": "delegate",
+  "status": "completed",
+  "passed": true,
+  "failureReason": null,
+  "elapsedMs": 15376,
+  "outputSha256": "1cbe8bf6e8e0181a71ae8db59e1784899ceb4872ec90a24692725e5272d68fee",
+  "filesChanged": [
+    "ark-coding-plan-smoke.txt"
+  ],
+  "commandCount": 2,
+  "diagnosticCount": 0,
+  "adapterClientInvocationCount": 1,
+  "adapterRetryCount": 0,
+  "runtimeReportedAutoRetryCount": 0,
+  "adapterReportedFallbackUsed": false,
+  "ownedProcessDrained": true,
+  "orchestratorFallbackUsed": false,
+  "executionTelemetrySource": "pi-rpc-observable",
+  "checks": {
+    "actualModelMatches": true,
+    "environmentIsolated": true,
+    "ownedProcessDrained": true,
+    "resultFileValid": true,
+    "resultFileObserved": true,
+    "onlyExpectedFileChanged": true,
+    "requiredCommandObserved": true,
+    "executionTelemetryValid": true
+  },
+  "resultFileReadStatus": "read",
+  "expectedResultNormalizedSha256": "4cf493d60030fed3f4936d1ad56df60e0352025fd992aaf789ae15bc4f40d32c",
+  "resultFileByteLength": 29,
+  "resultFileRawSha256": "7b82d87530083f53c07b5b34d5ab4cc8c6bc031c96c70b0be28920262c20fb59",
+  "resultFileNormalizedSha256": "4cf493d60030fed3f4936d1ad56df60e0352025fd992aaf789ae15bc4f40d32c",
+  "resultFileNormalizedLineCount": 1,
+  "resultFileContainsExpectedLine": true,
+  "writeCommandObservations": [
+    {
+      "source": "raw_input",
+      "match": "exact",
+      "outcome": "success"
+    },
+    {
+      "source": "raw_input",
+      "match": "status_exact",
+      "outcome": "success"
+    }
+  ]
+}
