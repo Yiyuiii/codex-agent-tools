@@ -4,6 +4,8 @@
 
 状态：**现行覆盖规格**
 
+> 2026-08-03 实施覆盖：本文中关于“待删除”实现、Markdown release marker、泛化 Kimi/Pi 代表调用及 Stop/interrupt 二选一的描述只保留为设计演进背景。现行实现已经使用严格 JSON marker、8 current / 0 legacy 能力索引和 checked-in observer；beta.3 已完成 OIDC 发布、公共 npm 精确包验收与官方插件升级。剩余宿主门禁固定为完整 App 重启、observer 输出的两次精确 Kimi 宿主调用、`REQUEST_STARTED` 后普通 Stop，以及唯一 `cancelled + owned-zero` receipt。实现与证据真值源见[当前宿主精简实施计划](../plans/2026-08-01-windows-current-host-owned-process.md)与[真实宿主验收记录](../../release/real-host-acceptance.md)。
+
 授权来源：维护者已明确要求不再为了良好发布版本测试三个 Node 版本，目标改为让维护者自己的当前环境鲁棒可用，并要求同步删除其它冗余设计。该要求是用户原始要求；本文中的具体技术取舍是 Codex 根据已保存证据和三路独立审计形成的可复核实现决策，不应反向表述成维护者逐条指定的技术方案。
 
 关联基线：
@@ -187,16 +189,16 @@ GitHub CI改为单一Node 24 Ubuntu job，只证明TypeScript、package、插件
 
 删除远端composite不等于允许任意tag立即发布。release workflow保留轻量、版本化、本地证据绑定：
 
-- beta tag必须存在同版本`.release-validation/v<version>.md`，精确声明`Current-Host-Prequalification: pass`、`Capability-Index: pass`、runtime frozen commit、helper实际SHA和canonical runtime-input digest；workflow在tagged tree用同一manifest实现重算并精确比较，同时核对tag/package版本与仓库helper/SHA；
-- stable marker除既有release门禁外，必须精确声明`Public-Beta-Exact-Install: pass`、`Codex-App-Full-Restart: pass`、`Real-App-Stop: pass`、`Owned-Descendants-Zero: pass`、同一helper SHA和同一canonical runtime-input digest，并用`RC:`绑定已公开beta；
-- marker是可审计发布授权记录，不恢复Windows三shard、remote fetcher、selfDigest或跨OS package digest。
+- beta tag必须存在同版本`.release-validation/v<version>.json`，由可执行 verifier 精确绑定current-host freeze、8项能力投影、observer与build inputs、helper/canonical runtime-input digest及beta plugin tree；workflow在tagged tree重算并精确比较，同时核对tag/package版本；
+- stable JSON marker除既有release门禁外，还必须绑定已公开beta的精确npm identity、完整App重启身份，以及observer唯一写入的`cancelled + owned-zero` receipt；
+- marker是可审计发布授权记录，不恢复Windows三shard、remote fetcher、selfDigest、人工PASS文件或跨OS package digest。
 
 Tasks 2–8完成前不调用真实模型、不修改活动配置/插件、不发布。clean freeze后，沿既有授权执行：
 
 1. 只为stale/缺失能力运行新的真实8/8资格并更新同一能力索引，历史batch/manifest/evidence保持不可变；
 2. 推送`next`并由GitHub Actions Trusted Publishing/OIDC发布beta；
 3. 从公共npm本机隔离安装，官方升级插件，完整退出并重开Codex App；
-4. 真实验证Kimi、Pi、delegate以及Stop/interrupt后owned descendants归零；
+4. 从精确beta tag的clean checkout启动checked-in observer，只执行它输出的旧宿主Kimi review握手与新宿主隔离Kimi delegate；在`REQUEST_STARTED`后点击App普通Stop，并取得唯一`cancelled + owned-zero` receipt；
 5. beta所有门禁通过后，stable仍只由`main`上的GitHub Actions OIDC发布。
 
 禁止本地`npm publish`，禁止跳过失败门禁，禁止直接读写活动`~/.codex/config.toml`。官方插件变更只在既有逐次授权与回滚协议下进行。

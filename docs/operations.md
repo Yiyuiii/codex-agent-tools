@@ -1,10 +1,10 @@
 # 官方插件运维流程
 
-本文是 `codex_external_agents` 官方插件候选构建、隔离验收、已授权官方升级与回滚的现行运维真值源。活动 Codex 当前安装已发布的 `0.1.1-beta.1`，旧 `codex_cc_tools` 继续共存。当前发布线只保证维护者的 Windows x64 / Node 24 宿主；原生辅助层、Job-owned process、observer、固定启动层和 current-host freeze 已完成，不再运行 Node 矩阵或跨宿主认证。
+本文是 `codex_external_agents` 官方插件候选构建、隔离验收、已授权官方升级与回滚的现行运维真值源。活动 Codex 当前已安装并启用已发布的 `0.1.1-beta.3`，旧 `codex_cc_tools` 继续共存；当前 app-server 在升级前已启动，必须完整退出并重开 App 后才能进入真实宿主验收。当前发布线只保证维护者的 Windows x64 / Node 24 宿主；原生辅助层、Job-owned process、observer、固定启动层和 current-host freeze 已完成，不再运行 Node 矩阵或跨宿主认证。
 
 最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`；四个逻辑 LLM 的八项 review/delegate 全部 passed。每项均为一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，owned process 全部排空；终态为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
 
-现行 `capabilities.json` 已统一绑定该批八个精确 case 与当前运行时指纹，旧的受限 legacy 入口归零；`npm run verify:capabilities` 返回 8 项 current、0 项 legacy。2026-08-02 的额度失败批次与其它历史 manifest/case 继续保持不可变，但不再是当前资格状态。`0.1.1-beta.3` 已由 GitHub Actions OIDC 发布到 npm `next`，并通过当前宿主的公共精确包隔离验收；活动插件仍是 `0.1.1-beta.1`。下一步只执行已授权的官方升级、完整 App 重启与真实 Stop/owned-zero 门禁。
+现行 `capabilities.json` 已统一绑定该批八个精确 case 与当前运行时指纹，旧的受限 legacy 入口归零；`npm run verify:capabilities` 返回 8 项 current、0 项 legacy。2026-08-02 的额度失败批次与其它历史 manifest/case 继续保持不可变，但不再是当前资格状态。维护者再次报告 Ark Coding Plan 额度恢复只表示当前可调用性，不触发资格重跑。`0.1.1-beta.3` 已由 GitHub Actions OIDC 发布到 npm `next`，通过当前宿主的公共精确包隔离验收，并完成活动官方插件升级；下一步只执行完整 App 重启，并在 observer 发布 `REQUEST_STARTED` 后使用普通 Stop 取得 `cancelled + owned-zero` receipt。
 
 资格执行与恢复的唯一详细合同见[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)；历史 Kimi/Ark case、旧 shell 根因和旧测试计数分别保留在 `docs/smoke/` 与不可变 evidence 中，不在运维入口重复维护。package/release assurance 只证明离线候选，不构成资格、安装或发布。
 
@@ -75,13 +75,13 @@ npm run acceptance:npm-package -- --version 0.1.0
 临时目录且禁用 lifecycle scripts。随后用伪 Kimi/Pi 检查 CLI/doctor，从已
 安装 package 与官方插件缓存副本分别启动 stdio MCP，并在临时 `CODEX_HOME`
 中完成 marketplace/plugin add/list/remove。它不调用真实模型，不继承活动
-插件状态，不读取或修改活动 Codex home；结束前还要求 Kimi ACP、Pi RPC、
-real-smoke 进程为 0 且资格锁不存在。成功后生成对应版本的
-`docs/release/<version>-npm-acceptance.md`，供稳定版发布证据引用。
+插件状态，不读取或修改活动 Codex home；结束前只验证本次 owned MCP transport
+已清理、资格锁不存在且隔离根可回收，不扫描或要求全机 Kimi/Pi 进程归零。成功后
+生成对应版本的 `docs/release/<version>-npm-acceptance.md`，供稳定版发布证据引用。
 
 ## 6. 准备真实安装权限包
 
-只有以下条件同时成立，才能准备可供授权的 ready 权限包；当前第一项已经通过，第二项正在进行：
+只有以下条件同时成立，才能准备可供授权的 ready 权限包；beta.3 的权限包已满足并消费，以下保留为未来版本模板：
 
 - `npm run verify:capabilities` 验证四个逻辑 LLM 的八项能力、不可变 evidence、精确 case、注册表 anchor 与当前运行时指纹；
 - 类型检查、测试、构建、release smoke 和隔离官方插件生命周期通过；
@@ -117,11 +117,19 @@ if ($LASTEXITCODE -ne 0) { throw "Codex plugin add 失败，停止安装。" }
 执行后必须使用官方列表和真实 Codex App 完成工具发现、代表性调用、取消与进程清理门禁。不得直接打开、比较或修改活动 `config.toml`。命令结果若与权限包或隔离证据不一致，立即停止，不追加自定义配置修复。
 
 维护者本机已于 2026-07-30 消费首次 add 许可，后续又通过官方命令移除同名开发期
-MCP，并把活动插件升级到已发布的 `0.1.1-beta.1`；旧 `codex_cc_tools` 保持 enabled。
-beta.1 handoff 暴露了宿主断开没有自动取消服务端在途任务的缺口。本轮源码正在修复该
-生命周期，但在下一个 beta 通过公共 npm 精确版本验收、官方插件升级、完整 App 进程重启和真实宿主普通
-Stop/interrupt 验收全部完成前，不能把确定性测试扩张为真实宿主通过。不得恢复开发
-直连、手工修改配置或跳过能力门禁。
+MCP，并把活动插件升级到 `0.1.1-beta.1`。本轮在 `0.1.1-beta.3` 通过公共 npm
+精确验收后再次执行官方升级：首次 remove 因 Windows 缓存占用失败，只精准终止 19 个
+由当前 app-server 启动、命令行精确匹配插件 runtime 且无子进程的旧插件 MCP Node
+进程；随后官方 remove、旧 marketplace remove、当前 worktree marketplace add 与
+plugin add 全部成功。官方列表确认 `0.1.1-beta.3` installed/enabled，MCP cwd 解析到
+beta.3 版本化缓存，四项凭据名只显示掩码，旧 `codex_cc_tools` 仍 enabled，精确插件
+MCP 进程数为 0。没有直接读取或修改活动配置，也没有停止 App、Kimi/Pi、旧工具或其它
+Node 进程。
+
+beta.1 handoff 暴露了宿主断开没有自动取消服务端在途任务的缺口；beta.3 已携带对应
+生命周期修复，但当前 app-server 在升级前已加载旧工具定义，不能把官方安装成功扩张为
+真实宿主通过。下一步必须完整退出并重开 App，再按 checked-in observer 完成真实
+普通 Stop 与精确 `cancelled + owned-zero` receipt。不得恢复开发直连、手工修改配置或跳过能力门禁。
 
 ## 8. 失败时使用官方回滚
 
@@ -136,9 +144,9 @@ if ($LASTEXITCODE -ne 0) { throw "Codex marketplace remove 失败，停止回滚
 
 随后使用官方列表确认目标插件与 marketplace 已移除。若官方回滚也异常，停止并报告；不得手工恢复、重写或修补活动 `config.toml`。
 
-## 8. 长期维护边界
+## 9. 长期维护边界
 
 - 每次真实安装、升级或独立卸载都是新的外部状态变更，必须重新逐动作授权。
 - 永远不以手工编辑活动 `config.toml` 代替官方插件机制。
 - 本轮不移除旧 `codex_cc_tools`，不调用或修改 Claude Code；禁止本地 `npm publish`。只允许 GitHub Actions OIDC 发布 beta 与 stable。
-- 只有确定性检查、隔离生命周期、当前能力资格、下一个 beta 的公共 npm 精确版本验收与官方升级、完整 App 重启和真实 Stop/interrupt（包括 owned descendants zero）宿主门禁全部通过后，才可说新插件具备替代旧工具的条件；stable 也只由 GitHub Actions OIDC 发布。
+- 只有确定性检查、隔离生命周期、当前能力资格、beta.3 公共 npm 精确版本验收与官方升级、完整 App 重启，以及在 observer 发布 `REQUEST_STARTED` 后由普通 Stop 取得 `cancelled + owned-zero` receipt 全部通过后，才可说新插件具备替代旧工具的条件；stable 也只由 GitHub Actions OIDC 发布。

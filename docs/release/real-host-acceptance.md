@@ -2,17 +2,17 @@
 
 最近更新：2026-08-03
 
-状态：**partial — beta.1 已发布并升级；生命周期修复与八项资格已闭合，等待下一个公开 beta 与真实 Stop/interrupt**
+状态：**partial — beta.3 已公开发布、公共验收并完成官方升级；等待完整 App 重启与普通 Stop 的 `cancelled + owned-zero` receipt**
 
 ## 当前发布阻断
 
-beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调，但这只是待发布候选的确定性证据。
+beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调，并已随 beta.3 公开发布和安装；在完整 App 重启与真实 Stop 证据产生前，这仍只构成确定性与安装证据。
 
-晋级顺序只有一条：八项 verifier 与唯一离线 release gate 通过后，由 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`；再从公共 npm 安装精确版本、完成官方插件升级、完整 App 重启和真实 Stop/interrupt，确认 owned descendants zero；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`，且不预先指定下一个 beta 的版本号。
+晋级顺序只有一条：八项 verifier、唯一离线 release gate、beta.3 GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级均已完成；现在完整退出并重开 App，再在 observer 发布 `REQUEST_STARTED` 后使用普通 Stop，取得精确 `cancelled + owned-zero` receipt；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`。
 
-真实宿主门禁必须使用 App 的普通 Stop 或 dedicated interrupt，确认外层状态为 cancelled/interrupted、完成标记没有写入、SDK abort 到达、owned descendants zero 且不重生。
+真实宿主门禁只接受 App 的普通 Stop：必须在 observer 发布 `REQUEST_STARTED` 后点击，并确认外层状态为 `cancelled`、完成标记没有写入、SDK abort 到达、owned descendants zero 且不重生。
 
-## 授权与边界
+## 历史：早期安装授权与边界
 
 维护者已明确授权本次真实 `marketplace add`、`plugin add`，以及失败时使用官方
 `remove` 回滚。执行始终遵守以下边界：
@@ -20,7 +20,7 @@ beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺
 - 不直接读取、备份、编辑或恢复活动 `~/.codex/config.toml`；
 - 不移除或修改旧 `codex_cc_tools`；
 - 不调用或修改 Claude Code；
-- 本轮不调用真实 Kimi 或 Pi 模型；
+- 首次安装阶段未调用真实 Kimi 或 Pi 模型；
 - 安装成功，因此没有执行回滚。
 
 维护者随后明确授权移除同名开发期 MCP、创建一个新 Codex 任务，并在插件加载后
@@ -296,19 +296,53 @@ Codex 只清理这些由当前 App 宿主启动的插件 MCP 进程树，未终�
 前已加载插件配置，既有实测表明版本更新不能热刷新，所以真实 Pi/delegate/取消调用
 必须等完整 App 重启后在新任务执行。
 
+## beta.3 发布、公共验收与活动升级
+
+`0.1.1-beta.3` 已由 release run `30783495490` 通过 GitHub Actions OIDC 发布到
+npm `next`，registry 为 `next=0.1.1-beta.3`、`latest=0.1.0`。精确公共包验收于
+`2026-08-03T05:13:45.456Z` 通过 doctor、local npm、direct MCP、隔离官方插件、
+8/8 能力索引与 owned MCP cleanup；真实模型调用为 0，详见
+[0.1.1-beta.3 公共 npm 隔离验收](0.1.1-beta.3-npm-acceptance.md)。
+
+活动升级前，官方列表显示插件 installed/enabled `0.1.1-beta.1`，marketplace 指向
+旧仓库根，旧 `codex_cc_tools` enabled。首次官方 plugin remove 因 Windows 正在占用
+beta.1 缓存而失败；该命令移除了 MCP 注册，但没有完成插件删除。只读 WMI 核对找到
+19 个命令行精确为 `node ./runtime/codex-external-agents-mcp.mjs`、父进程精确为当前
+`codex.exe app-server` 且没有子进程的旧插件 MCP Node 进程。Codex 只终止这 19 项，
+没有停止 App、Kimi/Pi、旧 `codex_cc_tools` 或其它 Node 进程。
+
+目标归零后，官方 plugin remove、旧 marketplace remove、当前 worktree marketplace add
+与 plugin add 依次成功。升级后只读状态为：
+
+- `codex-external-agents@codex-external-agents-local` installed/enabled `0.1.1-beta.3`；
+- marketplace 根为当前 worktree；
+- `codex_external_agents` 的 cwd 解析到 beta.3 版本化缓存；
+- 四个允许转发的凭据名只显示为 `*****`；
+- beta.1 缓存不存在，beta.3 缓存存在且只有五个预期插件文件；
+- 旧 `codex_cc_tools` 仍 enabled，工具仍为 `cc_review` / `cc_delegate`；
+- 命令行精确匹配的插件 MCP 进程数为 0。
+
+全过程没有直接读取或修改活动 `config.toml`，也没有手工删除缓存。当前 app-server
+早于本次升级且实测不能可靠热刷新插件，因此上述事实只证明官方升级成功；下一节点仍是
+完整退出并重开 App 后，由 checked-in observer 在普通 Stop 后产生精确
+`cancelled + owned-zero` receipt。
+
 ## 尚未通过的门禁
 
 完整第 4 层仍缺少以下证据：
 
-1. 通过 GitHub Actions OIDC 把下一个 beta 发布到 npm `next`，不预先指定版本号。
-2. 从公共 npm 完成精确版本验收和官方插件升级。
-3. 完整重启宿主，并在新任务确认该精确 beta 缓存与四项脱敏环境变量已经被新
+1. 完整重启宿主，并在新任务确认 beta.3 缓存与四项脱敏环境变量已经被新
    app-server 加载。
-4. 真实宿主调用：复用既有 Kimi 通过证据，重点完成至少一条 Pi 路线的代表性
-   review。
-5. 可写与取消：在隔离临时仓库完成 delegate，并从真实宿主用普通 Stop 或 dedicated
-   interrupt 验证取消长任务后的 Kimi/Pi 进程回收、不重生、owned descendants zero 与服务端 handler drain。
-6. 上述门禁全部通过后，只通过 GitHub Actions OIDC 发布 stable。
+2. 从精确 beta.3 tag 的 clean checkout 启动 checked-in observer，只执行它输出的
+   旧宿主 `kimi-k3` `external_review` 握手；随后由 observer 确认真正的旧宿主退出和
+   新宿主身份，不额外重跑任何能力资格。
+3. 在 observer 创建的 nonce 隔离仓库中，逐字使用它输出的 `kimi-k3`
+   `external_delegate` 参数；只有 observer 发布 `REQUEST_STARTED` 后才在 App 中
+   点击普通 Stop。
+4. observer 作为唯一 writer 原子写入 PASS receipt；receipt 必须精确证明请求
+   cancelled、completion marker absent、handler cancelled、in-flight removed、
+   owned descendants zero 且不重生。
+5. 上述门禁全部通过后，只通过 GitHub Actions OIDC 发布 stable。
 
 在这些缺口闭合前：
 
@@ -321,8 +355,10 @@ Codex 只清理这些由当前 App 宿主启动的插件 MCP 进程树，未终�
 
 ## 下一人工节点
 
-下一人工节点只会在下一个 beta 已由 GitHub Actions OIDC 发布到 npm `next` 并完成官方插件升级后到达：维护者再做
-一次完整重启，随后 Codex 在新任务验证 Pi review、隔离 delegate 与取消清理。
+下一人工节点已经到达：维护者需要完整退出并重开 Codex App；随后 Codex 在新任务
+核对 beta.3 已由新 app-server 加载，并启动 checked-in observer，按它输出的精确
+Kimi review 握手与隔离 delegate 参数完成普通 Stop 和 `cancelled + owned-zero` receipt；
+不额外进行泛化模型复跑。
 
 若修复版升级并刷新后的新任务仍报告缺少 Ark 凭据，应单独审计 App 对 `env_vars`
 的实际解析，不恢复开发直连。只有确认新插件安装本身失败时，才对本次新插件使用已
