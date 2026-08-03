@@ -1,6 +1,6 @@
 import os from "node:os";
 import { createHash } from "node:crypto";
-import { mkdir, realpath, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -104,6 +104,15 @@ const SYSTEM_ENVIRONMENT_ALLOWLIST = new Set([
   "PROGRAMFILES",
   "PROGRAMFILES(X86)",
 ]);
+
+export async function createNpmAcceptanceTemporaryRoot(): Promise<string> {
+  if (process.platform !== "win32") {
+    throw new Error("Npm package acceptance requires Windows");
+  }
+  return realpath(
+    await mkdtemp(path.join(os.tmpdir(), "codex-agent-npm-acceptance-")),
+  );
+}
 
 export async function createNpmAcceptanceFakeRuntimes(
   temporaryRoot: string,
@@ -387,10 +396,11 @@ export async function assertInstalledCapabilityProjection(
 }
 
 export function assertDoctorAcceptance(value: unknown): void {
+  let failureReason = "invalid report";
   try {
     const report = recordOf(value);
-    if (report.ok !== true || !Array.isArray(report.checks)) {
-      throw new Error("doctor failed");
+    if (!Array.isArray(report.checks)) {
+      throw new Error("invalid checks");
     }
     const checks = report.checks.map((value) => recordOf(value));
     const names = checks.map(({ name }) => name);
@@ -400,11 +410,14 @@ export function assertDoctorAcceptance(value: unknown): void {
       JSON.stringify([...names].sort()) !==
         JSON.stringify([...DOCTOR_CHECK_NAMES].sort())
     ) {
+      failureReason = "check set drifted";
       throw new Error("doctor check set drifted");
     }
+    const failedChecks: string[] = [];
     for (const check of checks) {
       if (typeof check.detail !== "string") {
-        throw new Error("doctor check failed");
+        failedChecks.push(String(check.name));
+        continue;
       }
       if (check.name === "Windows native helper") {
         const validNativeCheck =
@@ -413,14 +426,22 @@ export function assertDoctorAcceptance(value: unknown): void {
             : check.ok === true &&
               check.level === "warn" &&
               check.detail === `not applicable on ${process.platform}`;
-        if (!validNativeCheck) throw new Error("doctor check failed");
+        if (!validNativeCheck) failedChecks.push(String(check.name));
       } else if (check.ok !== true || check.level !== "ok") {
-        throw new Error("doctor check failed");
+        failedChecks.push(String(check.name));
       }
+    }
+    if (failedChecks.length > 0 || report.ok !== true) {
+      failureReason =
+        failedChecks.length > 0
+          ? `failed checks=${failedChecks.join(", ")}`
+          : "report.ok is not true";
+      throw new Error("doctor failed");
     }
     const hostRuntime = checks.find(({ name }) => name === "Host runtime");
     const expectedHostRuntime = `platform=${process.platform}; arch=${process.arch}; os=${os.release()}; node=${process.versions.node}; libuv=${process.versions.uv}`;
     if (hostRuntime?.detail !== expectedHostRuntime) {
+      failureReason = "host runtime drifted";
       throw new Error("doctor host runtime drifted");
     }
     assertPublicExternalToolDefinitions();
@@ -431,6 +452,7 @@ export function assertDoctorAcceptance(value: unknown): void {
       publicTools?.detail !==
       PUBLIC_EXTERNAL_TOOL_DEFINITIONS.map(({ name }) => name).join(", ")
     ) {
+      failureReason = "public tool surface drifted";
       throw new Error("public tool surface drifted");
     }
     for (const llm of DOCTOR_QUALIFIED_LLM_IDS) {
@@ -439,11 +461,14 @@ export function assertDoctorAcceptance(value: unknown): void {
         typeof check?.detail !== "string" ||
         !/route=direct; review=passed; delegate=passed$/u.test(check.detail)
       ) {
+        failureReason = `qualified llm drifted=${llm}`;
         throw new Error("qualified llm surface drifted");
       }
     }
   } catch {
-    throw new Error("Installed doctor acceptance is invalid");
+    throw new Error(
+      `Installed doctor acceptance is invalid: ${failureReason}`,
+    );
   }
 }
 

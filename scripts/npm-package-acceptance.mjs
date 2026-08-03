@@ -3,7 +3,6 @@ import {
   access,
   lstat,
   mkdir,
-  mkdtemp,
   readFile,
   readdir,
   rename,
@@ -24,6 +23,7 @@ import {
   assertNpmRegistryMetadata,
   buildIsolatedNpmEnvironment,
   createNpmAcceptanceFakeRuntimes,
+  createNpmAcceptanceTemporaryRoot,
   establishInstalledMcpSession,
   npmAcceptanceReportRelativePath,
   parseNpmPackageAcceptanceArguments,
@@ -42,9 +42,7 @@ const { version } = parseNpmPackageAcceptanceArguments(
   process.argv.slice(2),
 );
 const packageSpec = `codex-agent-tools@${version}`;
-const temporaryRoot = await mkdtemp(
-  path.join(os.tmpdir(), "codex-agent-npm-acceptance-"),
-);
+const temporaryRoot = await createNpmAcceptanceTemporaryRoot();
 const installRoot = path.join(temporaryRoot, "install");
 const packageRoot = path.join(
   installRoot,

@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { realpath, rm } from "node:fs/promises";
 import os from "node:os";
 import { describe, expect, it, vi } from "vitest";
 import { basename, join, resolve } from "node:path";
@@ -13,6 +13,7 @@ import {
   assertNpmRegistryMetadata,
   buildIsolatedNpmEnvironment,
   createNpmAcceptanceFakeRuntimes,
+  createNpmAcceptanceTemporaryRoot,
   establishInstalledMcpSession,
   npmAcceptanceReportRelativePath,
   parseNpmPackageAcceptanceArguments,
@@ -66,10 +67,9 @@ function packageManifest(version = "0.1.0-beta.1") {
 
 describe("npm-installed package acceptance contract", () => {
   windowsIt("creates fake runtimes that satisfy the strict Windows locator contracts", async () => {
-    const temporaryRoot = await mkdtemp(
-      join(os.tmpdir(), "codex-agent-npm-fake-runtimes-"),
-    );
+    const temporaryRoot = await createNpmAcceptanceTemporaryRoot();
     try {
+      await expect(realpath(temporaryRoot)).resolves.toBe(temporaryRoot);
       const fakeRuntimes = await createNpmAcceptanceFakeRuntimes(
         temporaryRoot,
       );
@@ -276,11 +276,18 @@ describe("npm-installed package acceptance contract", () => {
         ok: false,
         checks: checks.map((check) =>
           check.name === "Ark Pi models"
-            ? { ...check, ok: false, level: "error" }
+            ? {
+                ...check,
+                ok: false,
+                level: "error",
+                detail: "secret detail must not escape",
+              }
             : check,
         ),
       }),
-    ).toThrow(/doctor acceptance/iu);
+    ).toThrow(
+      "Installed doctor acceptance is invalid: failed checks=Ark Pi models",
+    );
 
     const mismatchedPlatform = process.platform === "linux" ? "darwin" : "linux";
     expect(() =>
