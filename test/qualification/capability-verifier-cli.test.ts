@@ -64,7 +64,7 @@ describe("capability verifier maintainer CLI", () => {
             verified: true,
             indexPath: "docs/smoke/evidence/capabilities.json",
             entryCount: 8,
-            legacyEntryCount: 1,
+            legacyEntryCount: 0,
           };
         },
         writeStdout: (text) => {
@@ -80,7 +80,7 @@ describe("capability verifier maintainer CLI", () => {
       verified: true,
       indexPath: "docs/smoke/evidence/capabilities.json",
       entryCount: 8,
-      legacyEntryCount: 1,
+      legacyEntryCount: 0,
     });
     expect(stderr).toBe("");
   });

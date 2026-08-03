@@ -12,7 +12,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import os from "node:os";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -20,10 +20,10 @@ import { execa } from "execa";
 
 import {
   assertDoctorAcceptance,
+  assertInstalledCapabilityProjection,
   assertInstalledPackageContract,
   assertNpmRegistryMetadata,
   buildIsolatedNpmEnvironment,
-  classifyAgentProcesses,
   establishInstalledMcpSession,
   npmAcceptanceReportRelativePath,
   parseNpmPackageAcceptanceArguments,
@@ -32,6 +32,7 @@ import {
 } from "../dist/npm-package-acceptance.js";
 import { cleanupOwnedMcpTransport } from "../dist/plugin-mcp-cleanup.js";
 import { verifyCapabilityIndex } from "../dist/capability-qualification.js";
+import { isSafeRelativeLaunchPath } from "./lib/npm-launch-path.mjs";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -117,14 +118,6 @@ function samePath(left, right) {
     path.resolve(left).localeCompare(path.resolve(right), undefined, {
       sensitivity: process.platform === "win32" ? "accent" : "variant",
     }) === 0
-  );
-}
-
-function isAbsoluteOnAnyPlatform(value) {
-  return (
-    path.isAbsolute(value) ||
-    path.win32.isAbsolute(value) ||
-    path.posix.isAbsolute(value)
   );
 }
 
@@ -262,17 +255,6 @@ async function assertNoQualificationLocks() {
   }
 }
 
-async function assertNoAgentProcesses() {
-  const counts = await classifyAgentProcesses();
-  if (
-    counts.kimi.count !== 0 ||
-    counts.piRpc.count !== 0 ||
-    counts.realSmoke.count !== 0
-  ) {
-    throw new Error("Target external-agent processes are not idle");
-  }
-}
-
 async function listInstalledMcpTools(
   command,
   args,
@@ -326,14 +308,9 @@ async function installedPluginServer(installedPluginRoot) {
     "codex_external_agents",
   );
   if (
-    typeof server.command !== "string" ||
-    server.command.trim() === "" ||
-    isAbsoluteOnAnyPlatform(server.command) ||
+    !isSafeRelativeLaunchPath(server.command) ||
     !Array.isArray(server.args) ||
-    !server.args.every(
-      (argument) =>
-        typeof argument === "string" && !isAbsoluteOnAnyPlatform(argument),
-    )
+    !server.args.every(isSafeRelativeLaunchPath)
   ) {
     throw new Error("Installed plugin MCP launch contract is invalid");
   }
@@ -533,7 +510,6 @@ try {
     npmCache,
   });
   await assertNoQualificationLocks();
-  await assertNoAgentProcesses();
   await verifyCapabilityIndex({ repositoryRoot });
 
   const registryOutput = await run(
@@ -592,21 +568,31 @@ try {
     "plugins",
     "codex-external-agents",
   );
-  const [packageManifest, pluginManifest, runtime] = await Promise.all([
+  const [packageManifest, pluginManifest] = await Promise.all([
     readFile(path.join(packageRoot, "package.json"), "utf8").then(JSON.parse),
     readFile(
       path.join(pluginRoot, ".codex-plugin", "plugin.json"),
       "utf8",
     ).then(JSON.parse),
-    import(
-      `${pathToFileURL(path.join(packageRoot, "dist", "index.js")).href}?acceptance=${encodeURIComponent(version)}`
-    ),
   ]);
   assertInstalledPackageContract({
     packageManifest,
     pluginManifest,
-    runtimeVersion: runtime.VERSION,
     expectedVersion: version,
+  });
+  const capabilityIndexPath = path.join(
+    "docs",
+    "smoke",
+    "evidence",
+    "capabilities.json",
+  );
+  await assertInstalledCapabilityProjection({
+    repositoryIndex: await readFile(
+      path.join(repositoryRoot, capabilityIndexPath),
+    ),
+    installedIndex: await readFile(path.join(packageRoot, capabilityIndexPath)),
+    readInstalledFile: (relativePath) =>
+      readFile(path.join(packageRoot, ...relativePath.split("/"))),
   });
   for (const relative of [
     ".agents/plugins/marketplace.json",
@@ -614,6 +600,8 @@ try {
     "dist/mcp.js",
     "docs/smoke/evidence/capabilities.json",
     "plugins/codex-external-agents/.mcp.json",
+    "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+    "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
     "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
   ]) {
     await access(path.join(packageRoot, ...relative.split("/")));
@@ -671,7 +659,6 @@ try {
 
   await officialPluginLifecycle(isolatedEnvironment);
   await assertNoQualificationLocks();
-  await assertNoAgentProcesses();
   const npmVersion = (
     await run(npmCommand(), ["--version"], {
       cwd: installRoot,

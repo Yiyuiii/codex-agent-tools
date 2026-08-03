@@ -10,6 +10,7 @@ import type {
   ExternalAgentAdapter,
 } from "../../src/adapters/adapter.js";
 import { createLlmRegistry, resolveLlm } from "../../src/llms/registry.js";
+import { validateCurrentEvidenceContract } from "../../src/qualification/evidence-contract.js";
 import {
   parseKimiSmokeArguments,
   runKimiSmoke,
@@ -46,6 +47,7 @@ const validKimiTelemetry: AdapterExecutionTelemetry = {
   runtimeReportedAutoRetryCount: 0,
   adapterReportedFallbackUsed: false,
   source: "kimi-acp-observable",
+  ownedProcessDrained: true,
 };
 
 const qualificationContext = {
@@ -81,6 +83,47 @@ describe("Kimi real-smoke harness", () => {
     ).toThrow(/Kimi ACP profile/u);
   });
 
+  it.each([
+    ["review", "an omitted", undefined],
+    ["delegate", "an omitted", undefined],
+    ["review", "an explicit", 1_800_000],
+    ["delegate", "an explicit", 1_800_000],
+  ] as const)(
+    "forwards %s service input with %s per-run timeout",
+    async (task, _timeoutKind, timeoutMs) => {
+      const root = await tempRoot();
+      let capturedInput: unknown;
+      const service: KimiSmokeService = {
+        review: async (input) => {
+          capturedInput = input;
+          throw new Error("captured review input");
+        },
+        delegate: async (input) => {
+          capturedInput = input;
+          throw new Error("captured delegate input");
+        },
+      };
+      const options = {
+        llm: "kimi-k3",
+        task,
+        tempRoot: root,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      };
+
+      await expect(
+        runKimiSmoke(options, {
+          service,
+        }),
+      ).rejects.toBeInstanceOf(SmokeInfrastructureError);
+
+      if (timeoutMs === undefined) {
+        expect(capturedInput).not.toHaveProperty("timeoutMs");
+      } else {
+        expect(capturedInput).toHaveProperty("timeoutMs", timeoutMs);
+      }
+    },
+  );
+
   it("rejects a qualification identity for a different active case", async () => {
     await expect(
       runKimiSmoke({
@@ -95,7 +138,7 @@ describe("Kimi real-smoke harness", () => {
     ).rejects.toThrow("Smoke qualification identity mismatch");
   });
 
-  it("validates a read-only review against the known empty-array defect", async () => {
+  it("validates a read-only review from case-owned drain evidence without target probes or machine scans", async () => {
     const root = await tempRoot();
     const secretCommand = "echo secret-review-command";
     const service: KimiSmokeService = {
@@ -125,23 +168,33 @@ describe("Kimi real-smoke harness", () => {
     };
 
     const evidence = await runKimiSmoke(
-      { llm: "kimi-k3", task: "review", tempRoot: root },
+      {
+        llm: "kimi-k3",
+        task: "review",
+        tempRoot: root,
+        qualificationContext: {
+          ...qualificationContext,
+          ordinal: 3,
+          task: "review",
+        },
+      },
       {
         service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => [100],
         now: () => new Date("2026-07-18T00:00:00.000Z"),
       },
     );
 
     expect(evidence).toMatchObject({
-      schemaVersion: 2,
-      qualification: null,
+      schemaVersion: 4,
+      qualification: {
+        ...qualificationContext,
+        ordinal: 3,
+        task: "review",
+      },
       llm: "kimi-k3",
       task: "review",
       actualModel: "kimi-code/k3",
       route: "direct",
-      kimiVersion: "0.27.0",
       status: "completed",
       passed: true,
       failureReason: null,
@@ -149,16 +202,26 @@ describe("Kimi real-smoke harness", () => {
       adapterRetryCount: 0,
       runtimeReportedAutoRetryCount: 0,
       adapterReportedFallbackUsed: false,
+      ownedProcessDrained: true,
       executionTelemetrySource: "kimi-acp-observable",
       checks: {
         workspaceUnchanged: true,
         knownDefectFound: true,
-        noNewKimiProcesses: true,
+        ownedProcessDrained: true,
       },
     });
     expect(evidence.outputSha256).toMatch(/^[a-f0-9]{64}$/u);
+    expect(evidence).not.toHaveProperty("kimiVersion");
     expect(evidence).not.toHaveProperty("commandObservations");
     expect(evidence).not.toHaveProperty("writeCommandObservations");
+    expect(evidence).not.toHaveProperty("commandCount");
+    expect(() =>
+      validateCurrentEvidenceContract(evidence, {
+        llm: "kimi-k3",
+        task: "review",
+        runtime: "kimi-acp",
+      }),
+    ).not.toThrow();
     expect(JSON.stringify(evidence)).not.toContain(secretCommand);
     expect(await readdir(root)).toEqual([]);
   });
@@ -205,13 +268,11 @@ describe("Kimi real-smoke harness", () => {
       },
       {
         service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => [100],
       },
     );
 
     expect(evidence).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       qualification: qualificationContext,
       passed: true,
       adapterClientInvocationCount: 1,
@@ -231,13 +292,21 @@ describe("Kimi real-smoke harness", () => {
         resultFileValid: true,
         resultFileObserved: true,
         requiredCommandObserved: true,
-        noNewKimiProcesses: true,
+        ownedProcessDrained: true,
       },
       filesChanged: ["result.txt"],
       commandCount: 1,
       commandObservations: [{ source: "late_update", match: "exact" }],
     });
     expect(evidence).not.toHaveProperty("writeCommandObservations");
+    expect(evidence).toHaveProperty("commandCount", 1);
+    expect(() =>
+      validateCurrentEvidenceContract(evidence, {
+        llm: "kimi-k3",
+        task: "delegate",
+        runtime: "kimi-acp",
+      }),
+    ).not.toThrow();
     expect(JSON.stringify(evidence)).not.toContain(observedCommand);
     expect(await readdir(root)).toEqual([]);
   });
@@ -276,8 +345,6 @@ describe("Kimi real-smoke harness", () => {
       { llm: "kimi-k3", task: "delegate", tempRoot: root },
       {
         service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => [100],
       },
     ).catch((error: unknown) => error);
 
@@ -324,8 +391,6 @@ describe("Kimi real-smoke harness", () => {
       { llm: "kimi-k3", task: "delegate", tempRoot: root },
       {
         service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => [100],
       },
     );
 
@@ -388,8 +453,6 @@ describe("Kimi real-smoke harness", () => {
       { llm: "kimi-k3", task: "delegate", tempRoot: root },
       {
         service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => [100],
       },
     ).catch((error: unknown) => error);
 
@@ -447,8 +510,6 @@ describe("Kimi real-smoke harness", () => {
       { llm: "kimi-k3", task: "delegate", tempRoot: root },
       {
         service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => [100],
       },
     );
 
@@ -507,8 +568,6 @@ describe("Kimi real-smoke harness", () => {
       { llm: "kimi-k3", task: "delegate", tempRoot: root },
       {
         service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => [100],
       },
     );
 
@@ -659,8 +718,6 @@ describe("Kimi real-smoke harness", () => {
         { llm: "kimi-k3", task: "delegate", tempRoot: root },
         {
           service,
-          readKimiVersion: async () => "0.27.0",
-          listKimiProcessIds: async () => [100],
         },
       );
 
@@ -675,35 +732,40 @@ describe("Kimi real-smoke harness", () => {
     },
   );
 
-  it("fails the gate when a new Kimi process remains after the task", async () => {
+  it("fails closed when otherwise valid telemetry lacks case-owned drain proof", async () => {
     const root = await tempRoot();
-    let call = 0;
     const service: KimiSmokeService = {
-      review: async () => ({
-        ok: true,
-        status: "completed",
-        llm: "kimi-k3",
-        actualModel: "kimi-code/k3",
-        elapsedMs: 12,
-        diagnostics: [],
-        filesChanged: [],
-        review: "Empty input has length zero and produces NaN.",
-      }),
+      review: async (_input, context) => {
+        context?.onExecutionTelemetry?.({
+          adapterClientInvocationCount: 1,
+          adapterRetryCount: 0,
+          runtimeReportedAutoRetryCount: 0,
+          adapterReportedFallbackUsed: false,
+          source: "kimi-acp-observable",
+        });
+        return {
+          ok: true,
+          status: "completed",
+          llm: "kimi-k3",
+          actualModel: "kimi-code/k3",
+          elapsedMs: 12,
+          diagnostics: [],
+          filesChanged: [],
+          review: "Empty input has length zero and produces NaN.",
+        };
+      },
       delegate: async () => {
         throw new Error("not used");
       },
     };
     const evidence = await runKimiSmoke(
       { llm: "kimi-k3", task: "review", tempRoot: root },
-      {
-        service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => (call++ === 0 ? [100] : [100, 200]),
-      },
+      { service },
     );
     expect(evidence.passed).toBe(false);
-    expect(evidence.checks.noNewKimiProcesses).toBe(false);
-    expect(evidence.failureReason).toBe("process_residual");
+    expect(evidence.checks.ownedProcessDrained).toBe(false);
+    expect(evidence.ownedProcessDrained).toBeNull();
+    expect(evidence.failureReason).toBe("acceptance_failed");
   });
 
   it("fails when the Kimi ACP observer reports null telemetry", async () => {
@@ -731,8 +793,6 @@ describe("Kimi real-smoke harness", () => {
       { llm: "kimi-k3", task: "review", tempRoot: root },
       {
         service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => [100],
       },
     );
 
@@ -744,16 +804,19 @@ describe("Kimi real-smoke harness", () => {
     const root = await tempRoot();
     const secret = "KIMI_AUTH_SECRET_SENTINEL";
     const service: KimiSmokeService = {
-      review: async () => ({
-        ok: false,
-        status: "failed",
-        llm: "kimi-k3",
-        actualModel: "kimi-code/k3",
-        elapsedMs: 12,
-        diagnostics: [`authentication failed for ${secret}`],
-        filesChanged: [],
-        review: "",
-      }),
+      review: async (_input, context) => {
+        context?.onExecutionTelemetry?.(validKimiTelemetry);
+        return {
+          ok: false,
+          status: "failed",
+          llm: "kimi-k3",
+          actualModel: "kimi-code/k3",
+          elapsedMs: 12,
+          diagnostics: [`authentication failed for ${secret}`],
+          filesChanged: [],
+          review: "",
+        };
+      },
       delegate: async () => {
         throw new Error("not used");
       },
@@ -763,14 +826,14 @@ describe("Kimi real-smoke harness", () => {
       { llm: "kimi-k3", task: "review", tempRoot: root },
       {
         service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => [100],
       },
     );
 
     expect(evidence.failureReason).toBe(
       "adapter_auth_or_model_unavailable",
     );
+    expect(evidence.passed).toBe(false);
+    expect(evidence.ownedProcessDrained).toBe(true);
     expect(evidence.diagnosticCount).toBe(1);
     expect(JSON.stringify(evidence)).not.toContain(secret);
   });
@@ -797,77 +860,11 @@ describe("Kimi real-smoke harness", () => {
       { llm: "kimi-k3", task: "review", tempRoot: root },
       {
         service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => [100],
       },
     );
 
     expect(evidence.passed).toBe(false);
     expect(evidence.failureReason).toBe("acceptance_failed");
-  });
-
-  it("labels a version-probe exception without exposing its original message", async () => {
-    const root = await tempRoot();
-    const secret = "KIMI_VERSION_SECRET_SENTINEL";
-
-    const failure = await runKimiSmoke(
-      { llm: "kimi-k3", task: "review", tempRoot: root },
-      {
-        readKimiVersion: async () => {
-          throw new Error(secret);
-        },
-      },
-    ).catch((error: unknown) => error);
-
-    expect(failure).toBeInstanceOf(SmokeInfrastructureError);
-    expect(failure).toMatchObject({
-      message: "Smoke infrastructure failure",
-      stage: "version_probe",
-    });
-    expect(String(failure)).not.toContain(secret);
-    expect(await readdir(root)).toEqual([]);
-  });
-
-  it("labels a missing post-task process snapshot and records the baseline count", async () => {
-    const root = await tempRoot();
-    const secret = "KIMI_POST_SNAPSHOT_SECRET_SENTINEL";
-    let calls = 0;
-    const service: KimiSmokeService = {
-      review: async () => ({
-        ok: true,
-        status: "completed",
-        llm: "kimi-k3",
-        actualModel: "kimi-code/k3",
-        elapsedMs: 12,
-        diagnostics: [],
-        filesChanged: [],
-        review: "Empty input has length zero and produces NaN.",
-      }),
-      delegate: async () => {
-        throw new Error("not used");
-      },
-    };
-
-    const failure = await runKimiSmoke(
-      { llm: "kimi-k3", task: "review", tempRoot: root },
-      {
-        service,
-        readKimiVersion: async () => "0.27.0",
-        listKimiProcessIds: async () => {
-          if (calls++ === 0) return [100, 101];
-          throw new Error(secret);
-        },
-      },
-    ).catch((error: unknown) => error);
-
-    expect(failure).toBeInstanceOf(SmokeInfrastructureError);
-    expect(failure).toMatchObject({
-      message: "Smoke infrastructure failure",
-      stage: "post_process_snapshot",
-      counts: { processIdsBefore: 2 },
-    });
-    expect(String(failure)).not.toContain(secret);
-    expect(await readdir(root)).toEqual([]);
   });
 
   it("rejects non-Kimi logical IDs before creating a workspace", async () => {

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "targetFramework": "net48",
+  "configuration": "Release",
+  "platform": "x64",
+  "compilerArguments": [
+    "/noconfig",
+    "/nostdlib+",
+    "/target:exe",
+    "/platform:x64",
+    "/optimize+",
+    "/debug-",
+    "/deterministic+",
+    "/checked+",
+    "/unsafe-",
+    "/langversion:latest",
+    "/utf8output",
+    "/filealign:512"
+  ],
+  "references": ["mscorlib.dll", "System.dll", "System.Core.dll"],
+  "pathMap": {
+    "sourceRoot": "native/windows-job-helper",
+    "virtualRoot": "/_/native/windows-job-helper"
+  },
+  "sourceSets": {
+    "preflight": ["src/Fd3Preflight.cs"],
+    "production": [
+      "src/ControlChannel.cs",
+      "src/ControlProtocol.cs",
+      "src/JobSession.cs",
+      "src/LifecycleMachine.cs",
+      "src/NativeMethods.cs",
+      "src/Program.cs",
+      "src/SafeNativeHandles.cs",
+      "src/SessionCoordinator.cs",
+      "src/WindowsCommandLine.cs"
+    ],
+    "managedTests": [
+      "tests/CommandLineTests.cs",
+      "tests/ControlChannelTests.cs",
+      "tests/LifecycleMachineTests.cs",
+      "tests/ProtocolTests.cs",
+      "tests/SessionCoordinatorTests.cs",
+      "tests/TestAssert.cs",
+      "tests/TestRunner.cs"
+    ],
+    "kernelTests": [
+      "tests/CrashRecoveryTests.cs",
+      "tests/KernelTestRunner.cs",
+      "tests/KernelTests.cs",
+      "tests/TestAssert.cs"
+    ],
+    "fixtures": ["fixtures/KernelFixture.cs"]
+  },
+  "output": {
+    "root": "system-temp",
+    "repositoryOutputsForbidden": true
+  },
+  "generatedProtocolConstants": {
+    "relativePath": "generated/ProtocolV1.g.cs",
+    "sha256": "0611bac55aeb67c5aa0bad23bd23e4cd6503fd56495d0d5d9b13f6d61a357d04"
+  }
+}

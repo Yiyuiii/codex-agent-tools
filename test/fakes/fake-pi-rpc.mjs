@@ -1,18 +1,44 @@
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 
 const scenario = process.env.FAKE_PI_SCENARIO ?? "normal";
 const logPath = process.env.FAKE_PI_LOG;
+const rootPidPath = process.env.FAKE_PI_ROOT_PID_FILE;
 const childPidPath = process.env.FAKE_PI_CHILD_PID_FILE;
 const argv = process.argv.slice(2);
 let buffer = Buffer.alloc(0);
 let grandchild;
+let pidFileSequence = 0;
 let selectedModel = "ark-code-latest";
 let selectedProvider = "ark-agent-plan";
 const providerApis = {
   "ark-coding-plan": "anthropic-messages",
   "ark-agent-plan": "anthropic-messages",
 };
+
+function publishPid(filePath, pid) {
+  if (!filePath) return;
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
+    throw new Error(`Cannot publish invalid fixture PID: ${String(pid)}`);
+  }
+  const temporaryPath = `${filePath}.tmp-${process.pid}-${++pidFileSequence}`;
+  try {
+    writeFileSync(temporaryPath, String(pid), {
+      encoding: "utf8",
+      flag: "wx",
+    });
+    renameSync(temporaryPath, filePath);
+  } catch (error) {
+    try {
+      unlinkSync(temporaryPath);
+    } catch {
+      // The temporary file may not have been created or may already be renamed.
+    }
+    throw error;
+  }
+}
+
+publishPid(rootPidPath, process.pid);
 
 function log(value) {
   if (logPath) appendFileSync(logPath, `${JSON.stringify(value)}\n`, "utf8");
@@ -28,10 +54,13 @@ function emit(value) {
 function spawnGrandchild() {
   grandchild = spawn(
     process.execPath,
-    ["-e", "setInterval(() => {}, 1000)"],
-    { stdio: "ignore", windowsHide: true },
+    [
+      "-e",
+      "process.stdin.resume(); const keepalive = setInterval(() => {}, 1000); process.stdin.once('end', () => clearInterval(keepalive));",
+    ],
+    { stdio: ["pipe", "ignore", "ignore"], windowsHide: true },
   );
-  if (childPidPath) writeFileSync(childPidPath, String(grandchild.pid), "utf8");
+  publishPid(childPidPath, grandchild.pid);
 }
 
 function handle(command) {
@@ -39,8 +68,20 @@ function handle(command) {
   if (command.type === "set_model") {
     selectedModel = command.modelId;
     selectedProvider = command.provider;
+    if (scenario === "command-error") {
+      emit({
+        id: command.id,
+        type: "response",
+        command: "set_model",
+        success: false,
+        error: "synthetic set_model failure fake-secret",
+      });
+      return;
+    }
     const responseProvider =
-      scenario === "provider-mismatch" ? "unexpected-provider" : command.provider;
+      scenario === "provider-mismatch"
+        ? "unexpected-provider"
+        : command.provider;
     emit({
       id: command.id,
       type: "response",
@@ -86,9 +127,16 @@ function handle(command) {
       setTimeout(() => process.exit(7), 5);
       return;
     }
-    if (scenario === "hold") {
+    if (scenario === "hold" || scenario === "abort-root-exit") {
       spawnGrandchild();
       return;
+    }
+    if (scenario === "invalid-json") {
+      process.stdout.write("{not-json}\n");
+      return;
+    }
+    if (scenario === "normal-descendant") {
+      spawnGrandchild();
     }
     if (scenario === "api-error") {
       setTimeout(() => {
@@ -292,7 +340,9 @@ function handle(command) {
             role: "assistant",
             model: selectedModel,
             provider: selectedProvider,
-            content: [{ type: "text", text: "Signal followed explicit retry." }],
+            content: [
+              { type: "text", text: "Signal followed explicit retry." },
+            ],
             stopReason: "stop",
           },
         });
@@ -476,6 +526,9 @@ function handle(command) {
       );
       if (stderrBytes > 0) process.stderr.write("x".repeat(stderrBytes));
       emit({ type: "agent_settled" });
+      if (scenario === "settled-incomplete-tail") {
+        process.stdout.write('{"type":"dangling"');
+      }
       process.stderr.write("Authorization: Bearer fake-secret\n");
     }, 5);
     return;
@@ -487,6 +540,11 @@ function handle(command) {
       command: "abort",
       success: true,
     });
+    if (scenario === "abort-root-exit") {
+      clearInterval(keepalive);
+      grandchild?.stdin?.end();
+      process.stdin.destroy();
+    }
   }
 }
 
@@ -503,4 +561,8 @@ process.stdin.on("data", (chunk) => {
   }
 });
 
-setInterval(() => {}, 1000);
+const keepalive = setInterval(() => {}, 1000);
+process.stdin.once("end", () => {
+  clearInterval(keepalive);
+  grandchild?.stdin?.end();
+});

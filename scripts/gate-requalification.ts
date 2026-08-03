@@ -171,13 +171,12 @@ async function runProductionQualification(options: {
   authorizationReference: string;
   writeStderr: (text: string) => void;
 }): Promise<QualificationTerminalManifest> {
-  const [coordinator, lock, manifest, preflight, processes] = await Promise.all(
+  const [coordinator, lock, manifest, preflight] = await Promise.all(
     [
       import("../src/qualification/coordinator.js"),
       import("../src/qualification/lock.js"),
       import("../src/qualification/manifest.js"),
       import("../src/qualification/preflight.js"),
-      import("../src/runtime/agent-processes.js"),
     ],
   );
   const preflightModule = preflight as typeof preflight & {
@@ -231,7 +230,6 @@ async function runProductionQualification(options: {
         assertActiveQualificationPlan(input.qualificationPlanId);
         return preflightModule.assertQualificationCandidateUnchanged(input);
       },
-      inspectTargetProcesses: () => processes.classifyAgentProcesses(),
       runCase: ({ identity, qualificationContext, evidenceDirectory }) =>
         runSmokeCase({
           repositoryRoot: options.repositoryRoot,
@@ -248,15 +246,13 @@ async function recoverProductionQualification(options: {
   repositoryRoot: string;
   batchId: string;
 }): Promise<void> {
-  const [lock, manifest, processes] = await Promise.all([
+  const [lock, manifest] = await Promise.all([
     import("../src/qualification/lock.js"),
     import("../src/qualification/manifest.js"),
-    import("../src/runtime/agent-processes.js"),
   ]);
   await lock.recoverQualificationLock({
     repositoryRoot: options.repositoryRoot,
     batchId: options.batchId,
-    inspectTargetProcesses: () => processes.classifyAgentProcesses(),
     inspectTerminalManifest: (candidateBatchId) =>
       manifest.inspectQualificationTerminal({
         repositoryRoot: options.repositoryRoot,

@@ -214,6 +214,120 @@ describe("qualification evidence identity", () => {
 });
 
 describe("real smoke evidence entrypoint", () => {
+  it("publishes current v4 success only with completed single-attempt telemetry and case-owned drain", async () => {
+    const root = await tempRoot();
+    const evidenceDirectory = path.join(root, "evidence");
+    let stdout = "";
+
+    const exitCode = await runSmokeEntrypoint({
+      kind: "kimi",
+      args: ["--llm", "kimi-k3", "--task", "review"],
+      parseArguments: parseKimiSmokeArguments,
+      runSmoke: async () => ({
+        schemaVersion: 4,
+        qualification: null,
+        timestamp: "2026-07-25T01:02:03.000Z",
+        llm: "kimi-k3",
+        task: "review",
+        status: "completed",
+        passed: true,
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        ownedProcessDrained: true,
+        orchestratorFallbackUsed: null,
+        checks: {
+          actualModelMatches: true,
+          knownDefectFound: true,
+          workspaceUnchanged: true,
+          executionTelemetryValid: true,
+          ownedProcessDrained: true,
+        },
+      }),
+      evidenceDirectory,
+      writeStdout: (text) => {
+        stdout += text;
+      },
+      writeStderr: () => {},
+    });
+
+    expect(exitCode).toBe(0);
+    const fileName =
+      "2026-07-25T01-02-03.000Z-kimi-k3-review.json";
+    expect(
+      JSON.parse(
+        await readFile(path.join(evidenceDirectory, fileName), "utf8"),
+      ),
+    ).toMatchObject({
+      schemaVersion: 4,
+      qualification: null,
+      passed: true,
+      ownedProcessDrained: true,
+    });
+    expect(stdout).toContain(`docs/smoke/evidence/${fileName}`);
+  });
+
+  it.each([
+    ["missing llm identity", { llm: undefined, task: "review", business: true, omitWorkspace: false }],
+    ["mismatched task identity", { llm: "kimi-k3", task: "delegate", business: true, omitWorkspace: false }],
+    ["failed business check", { llm: "kimi-k3", task: "review", business: false, omitWorkspace: false }],
+    ["missing required business check", { llm: "kimi-k3", task: "review", business: true, omitWorkspace: true }],
+  ] as const)("fails a claimed success closed for %s", async (_label, variant) => {
+    const root = await tempRoot();
+    const evidenceDirectory = path.join(root, "evidence");
+
+    const exitCode = await runSmokeEntrypoint({
+      kind: "kimi",
+      args: ["--llm", "kimi-k3", "--task", "review"],
+      parseArguments: parseKimiSmokeArguments,
+      runSmoke: async () => ({
+        schemaVersion: 4,
+        qualification: null,
+        timestamp: "2026-07-25T01:02:03.000Z",
+        ...(variant.llm === undefined ? {} : { llm: variant.llm }),
+        task: variant.task,
+        status: "completed",
+        passed: true,
+        adapterClientInvocationCount: 1,
+        adapterRetryCount: 0,
+        runtimeReportedAutoRetryCount: 0,
+        adapterReportedFallbackUsed: false,
+        ownedProcessDrained: true,
+        orchestratorFallbackUsed: null,
+        checks: {
+          actualModelMatches: variant.business,
+          knownDefectFound: true,
+          ...(variant.omitWorkspace ? {} : { workspaceUnchanged: true }),
+          executionTelemetryValid: true,
+          ownedProcessDrained: true,
+        },
+      }),
+      evidenceDirectory,
+      now: () => new Date("2026-07-25T01:02:03.000Z"),
+      writeStdout: () => {},
+      writeStderr: () => {},
+    });
+
+    expect(exitCode).toBe(1);
+    const evidence = JSON.parse(
+      await readFile(
+        path.join(
+          evidenceDirectory,
+          "2026-07-25T01-02-03.000Z-kimi-k3-review.json",
+        ),
+        "utf8",
+      ),
+    ) as Record<string, unknown>;
+    expect(evidence).toMatchObject({
+      schemaVersion: 4,
+      llm: "kimi-k3",
+      task: "review",
+      passed: false,
+      failureReason: "infrastructure_failure",
+    });
+  });
+
   it("writes sanitized Kimi infrastructure evidence after arguments parse", async () => {
     const root = await tempRoot();
     const evidenceDirectory = path.join(root, "evidence");
@@ -229,8 +343,7 @@ describe("real smoke evidence entrypoint", () => {
         options.onProgress(secret);
         options.onProgress("kimi heartbeat 15000ms");
         throw new SmokeInfrastructureError(
-          "version_probe",
-          {},
+          "runtime_setup",
           new Error(secret),
         );
       },
@@ -256,7 +369,7 @@ describe("real smoke evidence entrypoint", () => {
       "utf8",
     );
     expect(JSON.parse(json)).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 4,
       qualification: null,
       llm: "kimi-k3",
       task: "review",
@@ -272,7 +385,7 @@ describe("real smoke evidence entrypoint", () => {
       failureReason: "infrastructure_failure",
       failure: {
         category: "infrastructure",
-        stage: "version_probe",
+        stage: "runtime_setup",
         count: 1,
       },
     });
@@ -336,7 +449,7 @@ describe("real smoke evidence entrypoint", () => {
       await readFile(path.join(evidenceDirectory, fileName), "utf8"),
     ) as Record<string, unknown>;
     expect(evidence).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       qualification: qualificationContext,
       adapterClientInvocationCount: null,
       adapterRetryCount: null,
@@ -608,7 +721,7 @@ describe("real smoke evidence entrypoint", () => {
       parseArguments: parseKimiSmokeArguments,
       runSmoke: async () =>
         ({
-          schemaVersion: 3,
+          schemaVersion: 4,
           timestamp: "2026-07-25T01:02:03.000Z",
           passed: true,
           orchestratorFallbackUsed: false,
@@ -634,7 +747,7 @@ describe("real smoke evidence entrypoint", () => {
       await readFile(path.join(caseDirectory, files[0]!), "utf8"),
     ) as Record<string, unknown>;
     expect(evidence).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       qualification: qualificationContext,
       passed: false,
       failureReason: "infrastructure_failure",
@@ -652,7 +765,7 @@ describe("real smoke evidence entrypoint", () => {
       parseArguments: parseKimiSmokeArguments,
       runSmoke: async () =>
         ({
-          schemaVersion: 2,
+          schemaVersion: 4,
           qualification: null,
           timestamp: "2026-07-25T01:02:03.000Z",
           passed: true,
@@ -727,7 +840,7 @@ describe("real smoke evidence entrypoint", () => {
       ),
     ) as Record<string, unknown>;
     expect(evidence).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       qualification: qualificationContext,
       passed: false,
       failureReason: "infrastructure_failure",
@@ -785,7 +898,7 @@ describe("real smoke evidence entrypoint", () => {
       ),
     ) as Record<string, unknown>;
     expect(evidence).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       qualification: qualificationContext,
       passed: false,
       failureReason: "infrastructure_failure",
@@ -825,7 +938,7 @@ describe("real smoke evidence entrypoint", () => {
       ),
     ) as Record<string, unknown>;
     expect(evidence).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 4,
       qualification: null,
       passed: false,
       failureReason: "infrastructure_failure",
@@ -983,10 +1096,13 @@ describe("real smoke evidence entrypoint", () => {
       args: ["--llm", "kimi-k3", "--task", "review"],
       parseArguments: parseKimiSmokeArguments,
       runSmoke: async () => ({
-        schemaVersion: 2,
+        schemaVersion: 4,
         qualification: null,
         timestamp: "../../../ESCAPE_SENTINEL",
+        llm: "kimi-k3",
+        task: "review",
         passed: false,
+        ownedProcessDrained: null,
         orchestratorFallbackUsed: null,
       }),
       evidenceDirectory,
@@ -1192,13 +1308,14 @@ describe("real smoke evidence entrypoint", () => {
       args: ["--llm", "kimi-k3", "--task", "review"],
       parseArguments: parseKimiSmokeArguments,
       runSmoke: async () => ({
-        schemaVersion: 2,
+        schemaVersion: 4,
         qualification: null,
         timestamp: "2026-07-25T01:02:03.000Z",
         llm: "kimi-k3",
         task: "review",
         status: "failed",
         passed: false,
+        ownedProcessDrained: null,
         orchestratorFallbackUsed: null,
         failureReason: "adapter_auth_or_model_unavailable",
         diagnosticCount: 1,
@@ -1280,8 +1397,7 @@ describe("real smoke evidence entrypoint", () => {
         parseArguments,
         runSmoke: async () => {
           throw new SmokeInfrastructureError(
-            "post_process_snapshot",
-            { processIdsBefore: 2 },
+            "task_execution",
             new Error(secret),
           );
         },
@@ -1308,14 +1424,11 @@ describe("real smoke evidence entrypoint", () => {
         failureReason: "infrastructure_failure",
         failure: {
           category: "infrastructure",
-          stage: "post_process_snapshot",
+          stage: "task_execution",
           count: 1,
         },
-        counts: { processIdsBefore: 2 },
-        checks: {
-          postProcessSnapshot: "unknown",
-          processCleanup: "unknown",
-        },
+        ownedProcessDrained: null,
+        checks: { ownedProcessDrained: "unknown" },
       });
       expect(json).not.toContain(secret);
       expect(stdout).not.toContain(secret);

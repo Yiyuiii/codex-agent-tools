@@ -9,6 +9,10 @@ import {
   QualificationLedgerError,
 } from "./manifest.js";
 import {
+  currentEvidenceCheckKeys,
+  validateCurrentEvidenceContract,
+} from "./evidence-contract.js";
+import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
@@ -71,8 +75,8 @@ export interface QualificationVerificationResult {
 
 interface VerifierProtocol {
   readonly planId: QualificationPlanId;
-  readonly manifestSchemaVersion: 1 | 2;
-  readonly evidenceSchemaVersion: 2 | 3;
+  readonly manifestSchemaVersion: 1 | 2 | 3;
+  readonly evidenceSchemaVersion: 2 | 3 | 4;
   readonly schedule: readonly Readonly<QualificationCaseIdentity>[];
 }
 
@@ -83,17 +87,35 @@ const LEGACY_VERIFIER_PROTOCOL: VerifierProtocol = Object.freeze({
   schedule: LEGACY_QUALIFICATION_CASES,
 });
 
-const CURRENT_VERIFIER_PROTOCOL: VerifierProtocol = Object.freeze({
+const HISTORICAL_CURRENT_VERIFIER_PROTOCOL: VerifierProtocol = Object.freeze({
   planId: ACTIVE_QUALIFICATION_PLAN_ID,
   manifestSchemaVersion: 2,
   evidenceSchemaVersion: 3,
   schedule: ACTIVE_QUALIFICATION_CASES,
 });
 
-function verifierProtocol(planId: QualificationPlanId): VerifierProtocol {
-  return planId === LEGACY_QUALIFICATION_PLAN_ID
-    ? LEGACY_VERIFIER_PROTOCOL
-    : CURRENT_VERIFIER_PROTOCOL;
+const CURRENT_VERIFIER_PROTOCOL: VerifierProtocol = Object.freeze({
+  planId: ACTIVE_QUALIFICATION_PLAN_ID,
+  manifestSchemaVersion: 3,
+  evidenceSchemaVersion: 4,
+  schedule: ACTIVE_QUALIFICATION_CASES,
+});
+
+function verifierProtocolForEnvelope(value: unknown): VerifierProtocol {
+  const envelope = plainRecord(value);
+  if (
+    envelope.schemaVersion === 1 &&
+    !Object.hasOwn(envelope, "qualificationPlanId")
+  ) {
+    return LEGACY_VERIFIER_PROTOCOL;
+  }
+  if (envelope.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID) {
+    if (envelope.schemaVersion === 2) {
+      return HISTORICAL_CURRENT_VERIFIER_PROTOCOL;
+    }
+    if (envelope.schemaVersion === 3) return CURRENT_VERIFIER_PROTOCOL;
+  }
+  throw new QualificationVerificationError();
 }
 
 export class QualificationVerificationError extends Error {
@@ -284,10 +306,14 @@ function validateTerminalManifest(
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 
 function expectedChecks(
+  protocol: VerifierProtocol,
   identity: Readonly<QualificationCaseIdentity>,
   runtime: FrozenLogicalLlmIdentity["runtime"],
 ): readonly string[] {
-  const processCheck =
+  if (protocol === CURRENT_VERIFIER_PROTOCOL) {
+    return currentEvidenceCheckKeys(runtime, identity.task);
+  }
+  const ownershipCheck =
     runtime === "kimi-acp" ? "noNewKimiProcesses" : "noNewPiRpcProcesses";
   const environmentCheck = runtime === "pi-rpc" ? ["environmentIsolated"] : [];
   return identity.task === "review"
@@ -296,14 +322,14 @@ function expectedChecks(
         ...environmentCheck,
         "executionTelemetryValid",
         "knownDefectFound",
-        processCheck,
+        ownershipCheck,
         "workspaceUnchanged",
       ].sort()
     : [
         "actualModelMatches",
         ...environmentCheck,
         "executionTelemetryValid",
-        processCheck,
+        ownershipCheck,
         "onlyExpectedFileChanged",
         "requiredCommandObserved",
         "resultFileObserved",
@@ -327,12 +353,13 @@ function expectedResultLine(
 
 function validateTaskCheckShape(
   evidence: Record<string, unknown>,
+  protocol: VerifierProtocol,
   identity: Readonly<QualificationCaseIdentity>,
   runtime: FrozenLogicalLlmIdentity["runtime"],
 ): Record<string, unknown> {
   const checks = plainRecord(evidence.checks);
   const actualKeys = Object.keys(checks).sort();
-  const requiredKeys = expectedChecks(identity, runtime);
+  const requiredKeys = expectedChecks(protocol, identity, runtime);
   if (
     actualKeys.length !== requiredKeys.length ||
     actualKeys.some((key, index) => key !== requiredKeys[index]) ||
@@ -349,7 +376,7 @@ function validatePassedTaskAcceptance(
   identity: Readonly<QualificationCaseIdentity>,
   runtime: FrozenLogicalLlmIdentity["runtime"],
 ): void {
-  const checks = validateTaskCheckShape(evidence, identity, runtime);
+  const checks = validateTaskCheckShape(evidence, protocol, identity, runtime);
   if (Object.values(checks).some((value) => value !== true)) {
     throw new QualificationVerificationError();
   }
@@ -529,8 +556,8 @@ function validatePiWriteCommandDiagnostics(
     return;
   }
   if (
-    protocol !== CURRENT_VERIFIER_PROTOCOL ||
-    evidence.schemaVersion !== 3 ||
+    protocol === LEGACY_VERIFIER_PROTOCOL ||
+    evidence.schemaVersion !== protocol.evidenceSchemaVersion ||
     identity.task !== "delegate" ||
     runtime !== "pi-rpc"
   ) {
@@ -729,7 +756,7 @@ function validateEvidenceIdentityAndAcceptance(
     manifestEntry.result === "passed";
   const isPassed = manifestEntry.result === "passed";
   const isCurrentInfrastructureFailure =
-    protocol === CURRENT_VERIFIER_PROTOCOL &&
+    protocol !== LEGACY_VERIFIER_PROTOCOL &&
     !isPassed &&
     evidence.failureReason === "infrastructure_failure";
   const statusMatchesProtocol =
@@ -756,6 +783,16 @@ function validateEvidenceIdentityAndAcceptance(
         evidence.adapterReportedFallbackUsed !== false ||
         evidence.orchestratorFallbackUsed !== false ||
         evidence.executionTelemetrySource !== expectedTelemetrySource))
+  ) {
+    throw new QualificationVerificationError();
+  }
+  if (
+    protocol === CURRENT_VERIFIER_PROTOCOL
+      ? !Object.hasOwn(evidence, "ownedProcessDrained") ||
+        (evidence.ownedProcessDrained !== true &&
+          evidence.ownedProcessDrained !== null) ||
+        (isPassed && evidence.ownedProcessDrained !== true)
+      : Object.hasOwn(evidence, "ownedProcessDrained")
   ) {
     throw new QualificationVerificationError();
   }
@@ -787,7 +824,13 @@ function validateEvidenceIdentityAndAcceptance(
   ) {
     throw new QualificationVerificationError();
   }
-  if (isPassed || protocol === LEGACY_VERIFIER_PROTOCOL) {
+  if (protocol === CURRENT_VERIFIER_PROTOCOL) {
+    validateCurrentEvidenceContract(evidence, {
+      llm: identity.llm,
+      task: identity.task,
+      runtime: logicalIdentity.runtime,
+    });
+  } else if (isPassed || protocol === LEGACY_VERIFIER_PROTOCOL) {
     validatePassedTaskAcceptance(
       evidence,
       protocol,
@@ -797,25 +840,28 @@ function validateEvidenceIdentityAndAcceptance(
   } else {
     validateCurrentFailedSemantics(
       evidence,
+      protocol,
       identity,
       logicalIdentity.runtime,
     );
   }
-  validateCommandObservationDiagnostics(
-    evidence,
-    identity,
-    logicalIdentity.runtime,
-  );
-  validatePiWriteCommandDiagnostics(
-    evidence,
-    protocol,
-    identity,
-    logicalIdentity.runtime,
-    protocol === CURRENT_VERIFIER_PROTOCOL &&
-      terminalPassed &&
-      identity.task === "delegate" &&
-      logicalIdentity.runtime === "pi-rpc",
-  );
+  if (protocol !== CURRENT_VERIFIER_PROTOCOL) {
+    validateCommandObservationDiagnostics(
+      evidence,
+      identity,
+      logicalIdentity.runtime,
+    );
+    validatePiWriteCommandDiagnostics(
+      evidence,
+      protocol,
+      identity,
+      logicalIdentity.runtime,
+      protocol !== LEGACY_VERIFIER_PROTOCOL &&
+        terminalPassed &&
+        identity.task === "delegate" &&
+        logicalIdentity.runtime === "pi-rpc",
+    );
+  }
 }
 
 const COMMON_EVIDENCE_STATUSES = new Set([
@@ -828,9 +874,21 @@ const COMMON_EVIDENCE_STATUSES = new Set([
 
 function validateInfrastructureChecks(
   evidence: Record<string, unknown>,
+  protocol: VerifierProtocol,
 ): void {
   const checks = plainRecord(evidence.checks);
   const keys = Object.keys(checks).sort();
+  if (protocol === CURRENT_VERIFIER_PROTOCOL) {
+    if (
+      keys.length !== 1 ||
+      keys[0] !== "ownedProcessDrained" ||
+      checks.ownedProcessDrained !== "unknown" ||
+      evidence.ownedProcessDrained !== null
+    ) {
+      throw new QualificationVerificationError();
+    }
+    return;
+  }
   if (
     keys.length !== 2 ||
     keys[0] !== "postProcessSnapshot" ||
@@ -845,6 +903,7 @@ function validateInfrastructureChecks(
 
 function validateCurrentFailedSemantics(
   evidence: Record<string, unknown>,
+  protocol: VerifierProtocol,
   identity: Readonly<QualificationCaseIdentity>,
   runtime: FrozenLogicalLlmIdentity["runtime"],
 ): void {
@@ -853,13 +912,19 @@ function validateCurrentFailedSemantics(
     if (evidence.status !== "failed") {
       throw new QualificationVerificationError();
     }
-    validateInfrastructureChecks(evidence);
+    validateInfrastructureChecks(evidence, protocol);
     return;
   }
   if (!COMMON_EVIDENCE_STATUSES.has(String(evidence.status))) {
     throw new QualificationVerificationError();
   }
-  const checks = validateTaskCheckShape(evidence, identity, runtime);
+  const checks = validateTaskCheckShape(evidence, protocol, identity, runtime);
+  if (
+    protocol === CURRENT_VERIFIER_PROTOCOL &&
+    checks.ownedProcessDrained !== (evidence.ownedProcessDrained === true)
+  ) {
+    throw new QualificationVerificationError();
+  }
   if (failureReason === "acceptance_failed") {
     if (
       evidence.status !== "completed" ||
@@ -871,6 +936,7 @@ function validateCurrentFailedSemantics(
   }
   if (failureReason === "process_residual") {
     if (
+      protocol !== HISTORICAL_CURRENT_VERIFIER_PROTOCOL ||
       runtime !== "kimi-acp" ||
       checks.noNewKimiProcesses !== false
     ) {
@@ -899,10 +965,13 @@ async function validateManifestEvidence(
 ): Promise<void> {
   const preflight = freezePreflightRecord(manifest.preflight);
   if (
-    (protocol === LEGACY_VERIFIER_PROTOCOL
-      ? preflight.schemaVersion !== 1
-      : preflight.schemaVersion !== 2 ||
-        preflight.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID)
+    (protocol === LEGACY_VERIFIER_PROTOCOL && preflight.schemaVersion !== 1) ||
+    (protocol === HISTORICAL_CURRENT_VERIFIER_PROTOCOL &&
+      preflight.schemaVersion !== 2) ||
+    (protocol === CURRENT_VERIFIER_PROTOCOL && preflight.schemaVersion !== 3) ||
+    (protocol !== LEGACY_VERIFIER_PROTOCOL &&
+      (!("qualificationPlanId" in preflight) ||
+        preflight.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID))
   ) {
     throw new QualificationVerificationError();
   }
@@ -1119,8 +1188,11 @@ export async function verifyQualification(
     if (firstInspection.state !== "valid") {
       throw new QualificationVerificationError();
     }
-    const protocol = verifierProtocol(firstInspection.qualificationPlanId);
     const manifestFile = await readImmutableJson(location.manifestPath);
+    const protocol = verifierProtocolForEnvelope(manifestFile.value);
+    if (protocol.planId !== firstInspection.qualificationPlanId) {
+      throw new QualificationVerificationError();
+    }
     const manifest = validateTerminalManifest(
       manifestFile.value,
       location.batchId,

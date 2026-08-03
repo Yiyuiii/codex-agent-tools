@@ -7,7 +7,6 @@ import { execa } from "execa";
 
 import type { AdapterExecutionTelemetry } from "../adapters/adapter.js";
 import { KimiAdapter } from "../adapters/kimi/adapter.js";
-import { locateKimi } from "../adapters/kimi/locator.js";
 import type { RuntimeKind } from "../domain/types.js";
 import { createLlmRegistry, resolveLlm } from "../llms/registry.js";
 import { ExternalAgentService, type TaskExecutionContext } from "../tasks/service.js";
@@ -28,7 +27,7 @@ import {
   assertSmokeQualificationIdentity,
   inSmokeInfrastructureStage,
   normalizeSmokeQualificationContext,
-  type SmokeEvidenceEnvelope,
+  type CurrentSmokeEvidenceEnvelope,
   type SmokeQualificationContext,
 } from "./evidence.js";
 import {
@@ -50,7 +49,7 @@ export interface KimiSmokeOptions {
 
 export interface KimiSmokeChecks {
   actualModelMatches: boolean;
-  noNewKimiProcesses: boolean;
+  ownedProcessDrained: boolean;
   workspaceUnchanged?: boolean;
   knownDefectFound?: boolean;
   resultFileValid?: boolean;
@@ -62,7 +61,6 @@ export interface KimiSmokeChecks {
 
 interface KimiSmokeEvidencePayload {
   timestamp: string;
-  kimiVersion: string;
   llm: string;
   actualModel: string | null;
   expectedModel: string;
@@ -74,18 +72,18 @@ interface KimiSmokeEvidencePayload {
   failureReason:
     | "adapter_auth_or_model_unavailable"
     | "acceptance_failed"
-    | "process_residual"
     | "infrastructure_failure"
     | null;
   elapsedMs: number;
   outputSha256: string;
   filesChanged: string[];
-  commandCount: number;
+  commandCount?: number;
   diagnosticCount: number;
   adapterClientInvocationCount: number | null;
   adapterRetryCount: number | null;
   runtimeReportedAutoRetryCount: number | null;
   adapterReportedFallbackUsed: boolean | null;
+  ownedProcessDrained: true | null;
   orchestratorFallbackUsed: boolean | null;
   executionTelemetrySource: AdapterExecutionTelemetry["source"] | null;
   checks: KimiSmokeChecks;
@@ -100,7 +98,7 @@ interface KimiSmokeEvidencePayload {
 }
 
 export type KimiSmokeEvidence =
-  SmokeEvidenceEnvelope<KimiSmokeEvidencePayload>;
+  CurrentSmokeEvidenceEnvelope<KimiSmokeEvidencePayload>;
 
 export interface KimiSmokeService {
   review(
@@ -115,8 +113,6 @@ export interface KimiSmokeService {
 
 export interface KimiSmokeDependencies {
   service?: KimiSmokeService;
-  readKimiVersion?: () => Promise<string>;
-  listKimiProcessIds?: () => Promise<number[]>;
   now?: () => Date;
 }
 
@@ -173,56 +169,6 @@ function smokeService(llm: string, task: KimiSmokeTask): KimiSmokeService {
     registry,
     adapters: new Map<RuntimeKind, KimiAdapter>([[kimi.runtime, kimi]]),
   });
-}
-
-async function defaultReadKimiVersion(): Promise<string> {
-  const executable = await locateKimi();
-  const result = await execa(executable, ["--version"], {
-    reject: false,
-    timeout: 30_000,
-    windowsHide: true,
-  });
-  if (result.exitCode !== 0) {
-    throw new Error("Unable to read Kimi Code version");
-  }
-  return result.stdout.trim();
-}
-
-async function defaultListKimiProcessIds(): Promise<number[]> {
-  if (process.platform === "win32") {
-    const result = await execa(
-      "tasklist.exe",
-      ["/FI", "IMAGENAME eq kimi.exe", "/FO", "CSV", "/NH"],
-      { reject: false, timeout: 30_000, windowsHide: true },
-    );
-    if (result.exitCode !== 0) {
-      throw new Error("Unable to list Kimi processes with tasklist");
-    }
-    return result.stdout
-      .split(/\r?\n/u)
-      .map((line) => /^"[^"]+","(\d+)"/u.exec(line)?.[1])
-      .filter((value): value is string => value !== undefined)
-      .map(Number)
-      .sort((left, right) => left - right);
-  }
-
-  const result = await execa("pgrep", ["-f", "kimi.*acp"], {
-    reject: false,
-    timeout: 30_000,
-  });
-  if (result.exitCode !== 0 && result.exitCode !== 1) {
-    throw new Error("Unable to list Kimi ACP processes with pgrep");
-  }
-  return result.stdout
-    .split(/\s+/u)
-    .filter((value) => /^\d+$/u.test(value))
-    .map(Number)
-    .sort((left, right) => left - right);
-}
-
-function hasNoNewProcesses(before: readonly number[], after: readonly number[]): boolean {
-  const baseline = new Set(before);
-  return after.every((pid) => baseline.has(pid));
 }
 
 async function runGit(cwd: string, args: readonly string[]): Promise<string> {
@@ -339,7 +285,6 @@ function commonEvidence(
   options: KimiSmokeOptions,
   result: ExternalReviewResult | ExternalDelegateResult,
   expectedModel: string,
-  kimiVersion: string,
   now: Date,
   checks: KimiSmokeChecks,
   passed: boolean,
@@ -349,7 +294,6 @@ function commonEvidence(
   const output = "review" in result ? result.review : result.summary;
   const payload: KimiSmokeEvidencePayload = {
     timestamp: now.toISOString(),
-    kimiVersion,
     llm: options.llm,
     actualModel: result.actualModel ?? null,
     expectedModel,
@@ -359,17 +303,20 @@ function commonEvidence(
     status: result.status,
     passed,
     failureReason:
-      !passed && checks.noNewKimiProcesses === false
-        ? "process_residual"
-        : !passed && result.status !== "completed"
-          ? "adapter_auth_or_model_unavailable"
-          : !passed
-            ? "acceptance_failed"
-            : null,
+      !passed && result.status !== "completed"
+        ? "adapter_auth_or_model_unavailable"
+        : !passed
+          ? "acceptance_failed"
+          : null,
     elapsedMs: result.elapsedMs,
     outputSha256: sha256(output),
     filesChanged: [...result.filesChanged].sort(),
-    commandCount: "commandsRun" in result ? result.commandsRun.length : 0,
+    ...(options.task === "delegate"
+      ? {
+          commandCount:
+            "commandsRun" in result ? result.commandsRun.length : 0,
+        }
+      : {}),
     diagnosticCount: result.diagnostics.length,
     adapterClientInvocationCount:
       telemetry?.adapterClientInvocationCount ?? null,
@@ -378,22 +325,14 @@ function commonEvidence(
       telemetry?.runtimeReportedAutoRetryCount ?? null,
     adapterReportedFallbackUsed:
       telemetry?.adapterReportedFallbackUsed ?? null,
+    ownedProcessDrained:
+      telemetry?.ownedProcessDrained === true ? true : null,
     orchestratorFallbackUsed:
       qualification?.orchestratorFallbackUsed ?? null,
     executionTelemetrySource: telemetry?.source ?? null,
     checks,
   };
-  return qualification === null
-    ? {
-        schemaVersion: 2,
-        qualification: null,
-        ...payload,
-      }
-    : {
-        schemaVersion: 3,
-        qualification,
-        ...payload,
-      };
+  return { schemaVersion: 4, qualification, ...payload };
 }
 
 export async function runKimiSmoke(
@@ -413,9 +352,6 @@ export async function runKimiSmoke(
     throw new Error(`Logical llm ${options.llm} is not a direct Kimi profile`);
   }
   const service = dependencies.service ?? smokeService(options.llm, options.task);
-  const readKimiVersion = dependencies.readKimiVersion ?? defaultReadKimiVersion;
-  const listKimiProcessIds =
-    dependencies.listKimiProcessIds ?? defaultListKimiProcessIds;
   const now = dependencies.now ?? (() => new Date());
   const root = options.tempRoot ?? os.tmpdir();
   const cwd = await inSmokeInfrastructureStage(
@@ -427,14 +363,6 @@ export async function runKimiSmoke(
     await inSmokeInfrastructureStage(
       "fixture_setup",
       () => initializeFixture(cwd, options.task),
-    );
-    const kimiVersion = await inSmokeInfrastructureStage(
-      "version_probe",
-      readKimiVersion,
-    );
-    const processIdsBefore = await inSmokeInfrastructureStage(
-      "pre_process_snapshot",
-      listKimiProcessIds,
     );
     let executionTelemetry: AdapterExecutionTelemetry | null | undefined;
     let executionTelemetryReportCount = 0;
@@ -453,8 +381,6 @@ export async function runKimiSmoke(
         commandObservations = observations;
       };
     }
-    const timeoutMs = options.timeoutMs ?? profile.timeoutMs;
-
     if (options.task === "review") {
       const result = await inSmokeInfrastructureStage(
         "task_execution",
@@ -467,7 +393,9 @@ export async function runKimiSmoke(
                 "Read average.js and average.test.js. Identify the concrete correctness defect that makes the test fail. Cite the relevant expression. Do not modify files and do not execute commands.",
               cwd,
               includeGitDiff: true,
-              timeoutMs,
+              ...(options.timeoutMs === undefined
+                ? {}
+                : { timeoutMs: options.timeoutMs }),
             },
             context,
           ),
@@ -477,17 +405,9 @@ export async function runKimiSmoke(
         async () =>
           (await runGit(cwd, ["status", "--porcelain"])).trim() === "",
       );
-      const processIdsAfter = await inSmokeInfrastructureStage(
-        "post_process_snapshot",
-        listKimiProcessIds,
-        { processIdsBefore: processIdsBefore.length },
-      );
       const checks: KimiSmokeChecks = {
         actualModelMatches: result.actualModel === profile.model,
-        noNewKimiProcesses: hasNoNewProcesses(
-          processIdsBefore,
-          processIdsAfter,
-        ),
+        ownedProcessDrained: executionTelemetry?.ownedProcessDrained === true,
         workspaceUnchanged: result.filesChanged.length === 0 && gitClean,
         knownDefectFound: reviewFoundKnownDefect(result.review),
         executionTelemetryValid: telemetryIsValid(
@@ -498,7 +418,7 @@ export async function runKimiSmoke(
       const passed =
         result.status === "completed" &&
         checks.actualModelMatches &&
-        checks.noNewKimiProcesses &&
+        checks.ownedProcessDrained &&
         checks.workspaceUnchanged === true &&
         checks.knownDefectFound === true &&
         checks.executionTelemetryValid === true;
@@ -506,7 +426,6 @@ export async function runKimiSmoke(
         options,
         result,
         profile.model,
-        kimiVersion,
         now(),
         checks,
         passed,
@@ -531,7 +450,9 @@ export async function runKimiSmoke(
                   "Do not modify any other file. Report the file creation and the command result.",
                 ].join("\n\n"),
               cwd,
-              timeoutMs,
+              ...(options.timeoutMs === undefined
+                ? {}
+                : { timeoutMs: options.timeoutMs }),
             },
             context,
           );
@@ -555,17 +476,9 @@ export async function runKimiSmoke(
       maximumBytes: 65_536,
     });
     const normalizedFiles = result.filesChanged.map((name) => name.replaceAll("\\", "/"));
-    const processIdsAfter = await inSmokeInfrastructureStage(
-      "post_process_snapshot",
-      listKimiProcessIds,
-      { processIdsBefore: processIdsBefore.length },
-    );
     const checks: KimiSmokeChecks = {
       actualModelMatches: result.actualModel === profile.model,
-      noNewKimiProcesses: hasNoNewProcesses(
-        processIdsBefore,
-        processIdsAfter,
-      ),
+      ownedProcessDrained: executionTelemetry?.ownedProcessDrained === true,
       resultFileValid: resultFile.valid,
       resultFileObserved: normalizedFiles.includes("result.txt"),
       onlyExpectedFileChanged:
@@ -581,7 +494,7 @@ export async function runKimiSmoke(
     const passed =
       result.status === "completed" &&
       checks.actualModelMatches &&
-      checks.noNewKimiProcesses &&
+      checks.ownedProcessDrained &&
       checks.resultFileValid === true &&
       checks.resultFileObserved === true &&
       checks.onlyExpectedFileChanged === true &&
@@ -592,7 +505,6 @@ export async function runKimiSmoke(
         options,
         result,
         profile.model,
-        kimiVersion,
         now(),
         checks,
         passed,

@@ -55,6 +55,7 @@ export interface ExternalAgentServiceDependencies {
 
 export interface TaskExecutionContext {
   signal?: AbortSignal;
+  shutdownSignal?: AbortSignal;
   onProgress?: (message: string) => void;
   commandObservationPolicy?: CommandObservationPolicy;
   onExecutionTelemetry?: (
@@ -395,6 +396,9 @@ export class ExternalAgentService {
       request.sessionId = input.sessionId;
     }
     if (context.signal !== undefined) request.signal = context.signal;
+    if (context.shutdownSignal !== undefined) {
+      request.shutdownSignal = context.shutdownSignal;
+    }
     if (context.onProgress !== undefined) request.onProgress = context.onProgress;
     return request;
   }

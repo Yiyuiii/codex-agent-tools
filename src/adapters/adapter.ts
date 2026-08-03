@@ -1,4 +1,5 @@
 import type { LlmProfile, TaskKind } from "../domain/types.js";
+import type { OwnedCompletion } from "../runtime/owned-agent-process.js";
 
 export interface AdapterExecutionTelemetry {
   /**
@@ -11,6 +12,18 @@ export interface AdapterExecutionTelemetry {
   runtimeReportedAutoRetryCount: number;
   adapterReportedFallbackUsed: boolean;
   source: "kimi-acp-observable" | "pi-rpc-observable";
+  /**
+   * Present only after this Windows invocation's case-owned Job reports a
+   * terminal state and confirms that its complete ownership set is drained.
+   * This is not inferred from a PID or system-wide process scan.
+   */
+  readonly ownedProcessDrained?: true;
+  /**
+   * Exact terminal completion reported by the Windows owned-process helper.
+   * Adapters expose it only together with `ownedProcessDrained: true` after
+   * the same `closed` result proves that the complete ownership set drained.
+   */
+  readonly ownedProcessCompletion?: OwnedCompletion;
 }
 
 export interface AdapterRunRequest {
@@ -21,6 +34,7 @@ export interface AdapterRunRequest {
   timeoutMs?: number;
   sessionId?: string;
   signal?: AbortSignal;
+  shutdownSignal?: AbortSignal;
   onProgress?: (message: string) => void;
   parentEnvironment: NodeJS.ProcessEnv;
 }

@@ -98,6 +98,39 @@ function createPiService(
 
 describe("ExternalAgentService", () => {
   it.each(["review", "delegate"] as const)(
+    "passes independent request and session shutdown signals to the %s adapter",
+    async (task) => {
+      const requestSignal = new AbortController().signal;
+      const shutdownSignal = new AbortController().signal;
+      let observed: AdapterRunRequest | undefined;
+      const service = createService(async (request) => {
+        observed = request;
+        return completed();
+      });
+
+      if (task === "review") {
+        await service.review(
+          {
+            llm: "kimi-k3",
+            task: "review_diff",
+            prompt: "Review",
+            cwd,
+          },
+          { signal: requestSignal, shutdownSignal },
+        );
+      } else {
+        await service.delegate(
+          { llm: "kimi-k3", prompt: "Delegate", cwd },
+          { signal: requestSignal, shutdownSignal },
+        );
+      }
+
+      expect(observed?.signal).toBe(requestSignal);
+      expect(observed?.shutdownSignal).toBe(shutdownSignal);
+    },
+  );
+
+  it.each(["review", "delegate"] as const)(
     "reports %s adapter telemetry only through the internal observer",
     async (task) => {
       const telemetry: AdapterExecutionTelemetry = {
@@ -1061,5 +1094,43 @@ describe("ExternalAgentService", () => {
     expect(receivedPrompt).toContain("Windows lifecycle");
     expect(receivedPrompt).toContain("No orphan process");
     expect(receivedPrompt).toContain("working change");
+  });
+
+  it("passes uncapped prompt, context, and acceptance criteria through to adapters", async () => {
+    const promptTail = "<prompt-tail-sentinel>";
+    const contextTail = "<context-tail-sentinel>";
+    const criterionTail = "<criterion-tail-sentinel>";
+    const prompt = `${"p".repeat(200_001 - promptTail.length)}${promptTail}`;
+    const context = `${"c".repeat(100_001 - contextTail.length)}${contextTail}`;
+    const longCriterion = `${"a".repeat(10_001 - criterionTail.length)}${criterionTail}`;
+    const acceptanceCriteria = [
+      ...Array.from({ length: 100 }, (_, index) => `criterion-${index}`),
+      longCriterion,
+    ];
+    const receivedPrompts: string[] = [];
+    const service = createService(async (request) => {
+      receivedPrompts.push(request.prompt);
+      return completed();
+    });
+
+    await service.review({
+      llm: "kimi-k3",
+      task: "review_diff",
+      prompt,
+      cwd,
+      context,
+      acceptanceCriteria,
+    });
+    await service.delegate({
+      llm: "kimi-k3",
+      prompt,
+      cwd,
+    });
+
+    expect(receivedPrompts).toHaveLength(2);
+    expect(receivedPrompts[0]).toContain(prompt);
+    expect(receivedPrompts[0]).toContain(context);
+    expect(receivedPrompts[0]).toContain(longCriterion);
+    expect(receivedPrompts[1]).toBe(prompt);
   });
 });

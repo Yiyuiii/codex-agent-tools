@@ -4,7 +4,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { execa } from "execa";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { QualificationTerminalManifest } from "../../src/qualification/types.js";
 
 type SmokeTask = "review" | "delegate";
 
@@ -135,7 +137,7 @@ describe("production real-smoke script entrypoints", () => {
       scripts?: Record<string, string>;
     };
 
-    expect(packageJson.scripts?.pretest).toBe("npm run build:library");
+    expect(packageJson.scripts?.pretest).toBe("npm run build");
   });
 
   it("does not expose a standalone Pi smoke script or build entry", async () => {
@@ -359,7 +361,7 @@ describe("production real-smoke script entrypoints", () => {
         await readFile(path.join(caseDirectory, expectedFile), "utf8"),
       ) as Record<string, unknown>;
       expect(evidence).toMatchObject({
-        schemaVersion: 3,
+        schemaVersion: 4,
         qualification: qualificationContext,
         adapterClientInvocationCount: null,
         adapterRetryCount: null,
@@ -635,22 +637,108 @@ describe("qualification maintainer script entrypoints", () => {
     );
   });
 
-  it("routes active qualification cases only through Kimi and Ark smoke entrypoints", async () => {
-    const source = await readFile("scripts/gate-requalification.ts", "utf8");
+  it("passes only the fixed qualification command contract to its injected coordinator", async () => {
+    const { main } = await import("../../scripts/gate-requalification.js");
+    const authorizationReference = "6ce61ce4-02ed-4e95-9813-f30e74ce9af5";
+    const repositoryRoot = path.resolve(await tempRoot(), "repository");
+    const manifest: QualificationTerminalManifest = {
+      schemaVersion: 3,
+      qualificationPlanId: "four-llm-v1",
+      batchId: "batch-fixed-contract",
+      status: "blocked",
+      authorizationReferenceSha256: "a".repeat(64),
+      repositoryCommit: null,
+      buildIdentitySha256: null,
+      preflightSha256: null,
+      preflight: null,
+      cases: [],
+      uncommittedEvidence: null,
+      checkpoints: [],
+      stopReason: "infrastructure_failure",
+      notRun: [],
+      promotionEligible: false,
+      completedAt: "2026-07-26T12:00:00.000Z",
+    };
+    const qualify = vi.fn(
+      async (_options: {
+        repositoryRoot: string;
+        authorizationReference: string;
+        writeStderr: (text: string) => void;
+      }) => manifest,
+    );
+    let stdout = "";
+    let stderr = "";
 
-    for (const script of ["./real-kimi-smoke.mjs", "./real-ark-smoke.mjs"]) {
-      expect(source).toContain(`import("${script}")`);
-    }
-    expect(source).not.toContain('import("./real-pi-smoke.mjs")');
-    expect(source).not.toContain('identity.llm === "gemini-3.5-flash"');
-    expect(source).not.toMatch(/runKimiSmoke|runPiSmoke|runArkSmoke/u);
+    const exitCode = await main({
+      args: ["--authorization-ref", authorizationReference],
+      repositoryRoot,
+      qualify,
+      recover: async () => {
+        throw new Error("recovery must not run");
+      },
+      writeStdout: (text) => {
+        stdout += text;
+      },
+      writeStderr: (text) => {
+        stderr += text;
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(qualify).toHaveBeenCalledOnce();
+    expect(qualify).toHaveBeenCalledWith({
+      repositoryRoot,
+      authorizationReference,
+      writeStderr: expect.any(Function),
+    });
+    expect(Object.keys(qualify.mock.calls[0]![0]).sort()).toEqual([
+      "authorizationReference",
+      "repositoryRoot",
+      "writeStderr",
+    ]);
+    expect(JSON.parse(stdout)).toEqual({
+      batchId: "batch-fixed-contract",
+      status: "blocked",
+      completedCases: 0,
+      promotionEligible: false,
+    });
+    expect(stderr).toBe("");
   });
 
-  it("forwards the recovered lock plan into interrupted manifest recovery", async () => {
-    const source = await readFile("scripts/gate-requalification.ts", "utf8");
-
-    expect(source).toMatch(
-      /recoverInterruptedQualificationBatch\(\{[\s\S]*?qualificationPlanId:\s*reference\.qualificationPlanId/u,
+  it("passes only a repository and batch identity to injected recovery", async () => {
+    const { main } = await import("../../scripts/gate-requalification.js");
+    const repositoryRoot = path.resolve(await tempRoot(), "repository");
+    const recover = vi.fn(
+      async (_options: { repositoryRoot: string; batchId: string }) => {},
     );
+    let stdout = "";
+
+    const exitCode = await main({
+      args: ["--recover-interrupted", "batch-2026-07-26"],
+      repositoryRoot,
+      qualify: async () => {
+        throw new Error("qualification must not run");
+      },
+      recover,
+      writeStdout: (text) => {
+        stdout += text;
+      },
+      writeStderr: () => {},
+    });
+
+    expect(exitCode).toBe(0);
+    expect(recover).toHaveBeenCalledOnce();
+    expect(recover).toHaveBeenCalledWith({
+      repositoryRoot,
+      batchId: "batch-2026-07-26",
+    });
+    expect(Object.keys(recover.mock.calls[0]![0]).sort()).toEqual([
+      "batchId",
+      "repositoryRoot",
+    ]);
+    expect(JSON.parse(stdout)).toEqual({
+      recovered: true,
+      batchId: "batch-2026-07-26",
+    });
   });
 });

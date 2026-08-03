@@ -23,8 +23,8 @@ export async function main(args: readonly string[] = process.argv.slice(2)): Pro
 }
 
 if (isMainModule(import.meta.url)) {
-  main().catch((error: unknown) => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  main().catch(() => {
+    process.stderr.write("codex_external_agents MCP server failed.\n");
     process.exitCode = 1;
   });
 }

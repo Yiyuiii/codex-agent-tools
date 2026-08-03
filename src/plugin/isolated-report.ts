@@ -20,6 +20,24 @@ const errorMessages: Readonly<Record<IsolatedReportErrorCode, string>> =
     update_failed: "Isolated plugin report update failed",
   });
 
+const codexArg0ShimPath =
+  /^tmp\/arg0\/codex-arg0[^/]+\/(?:\.lock|apply_patch\.bat|applypatch\.bat)$/u;
+const codexArg0Directory = /^tmp\/arg0\/codex-arg0[^/]+\//u;
+
+export function canonicalizeIsolatedReportPaths(
+  paths: readonly string[],
+): string[] {
+  return [
+    ...new Set(
+      paths
+        .filter((entry) => !codexArg0ShimPath.test(entry))
+        .map((entry) =>
+          entry.replace(codexArg0Directory, "tmp/arg0/<ephemeral>/"),
+        ),
+    ),
+  ].sort((left, right) => left.localeCompare(right));
+}
+
 export class IsolatedReportError extends Error {
   readonly code: IsolatedReportErrorCode;
 

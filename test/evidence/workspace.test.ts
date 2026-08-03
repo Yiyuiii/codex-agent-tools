@@ -51,6 +51,21 @@ describe("workspace evidence", () => {
     expect(before.fingerprint).not.toBe(after.fingerprint);
   });
 
+  it("returns a complete git diff beyond the historical evidence threshold", async () => {
+    const tailSentinel = "<git-diff-tail-sentinel>";
+    const changedContent = `${"x".repeat(200_100)}${tailSentinel}\n`;
+    await writeFile(path.join(cwd, "tracked.txt"), changedContent, "utf8");
+
+    const snapshot = await captureWorkspace(cwd, { includeGitDiff: true });
+    const snapshotWithoutDiff = await captureWorkspace(cwd);
+
+    expect(snapshot.gitDiff.length).toBeGreaterThan(200_000);
+    expect(snapshot.gitDiff).toContain(tailSentinel);
+    expect(snapshot.gitDiff).not.toContain("[TRUNCATED]");
+    expect(snapshotWithoutDiff.gitDiff).toBe("");
+    expect(snapshotWithoutDiff.fingerprint).toBe(snapshot.fingerprint);
+  });
+
   it("ignores .git, node_modules, and dist implementation noise", async () => {
     const before = await captureWorkspace(cwd);
     await writeFile(path.join(cwd, ".git", "bridge-noise"), "x", "utf8");

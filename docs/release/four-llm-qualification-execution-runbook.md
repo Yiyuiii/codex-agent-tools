@@ -6,7 +6,15 @@
 
 ## 当前状态
 
-standing authorization 下的最新真实 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c` 绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，已由一个 `functions.exec` cell 和一个四小时预算的前台 shell 从 ordinal 1 承载到可信首错终态。ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的模型、provider、direct route、凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` failed；ordinal 7–8 notRun。终态为 `blocked / case_failed`、6 completed / 5 passed 且 `promotionEligible=false`；manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，证据提交为 `6b4217d`。该批整体仍为 blocked；当前活动注册表则由能力索引验证为 8 passed / 0 pending。
+现行 `capabilities.json` 已用最新真实 passed case 更新，八项能力指纹全部 current，legacy 为 0；`npm run verify:capabilities` 通过。未来仍只为 stale、缺失、新增或证据失效的精确能力运行新 case。历史 batch manifest 与 case evidence 永久不可变，registry 文案不能替代 verifier。
+
+standing authorization 下最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`。唯一标准入口和单一前台承载正常取得可信终态；八项 case 全部 passed，每项为一次 client invocation、零 retry/fallback，owned process 全部 drain。终态 `passed`、`promotionEligible=true`，immutable-evidence 与 frozen-candidate verifier 通过，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，资格锁为空，不可变证据提交为 `c09ce74`。
+
+2026-08-02 的额度失败批次仍作为不可变历史保留；额度恢复只构成重入条件，真正的通过结论来自上述新批次。新批没有补跑、改变顺序、retry、fallback 或恢复 Node 版本矩阵。资格门禁现已闭合，后续进入离线发布门禁。
+
+以下较早批次事实与哈希继续保持原样。
+
+standing authorization 下较早的真实 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c` 绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，已由一个 `functions.exec` cell 和一个四小时预算的前台 shell 从 ordinal 1 承载到可信首错终态。ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的模型、provider、direct route、凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` failed；ordinal 7–8 notRun。终态为 `blocked / case_failed`、6 completed / 5 passed 且 `promotionEligible=false`；manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，证据提交为 `6b4217d`。该批整体仍为 blocked，现只作历史审计。
 
 本轮没有发生 cell 丢失或 recovery，也没有 resume、retry、fallback、补跑、第二入口或第二批。immutable-evidence verifier 通过，批次后 Kimi ACP / Pi RPC / real-smoke 为 0/0/0，资格锁不存在。ordinal 1 与 ordinal 6 的精确写入和精确状态命令均各一次 success，结果文件与文件范围都通过；这把上批的 Windows shell 与资格假阳性缺口真实闭合。`account_quota_exceeded` 作为当时 Agent Plan 可用性事实保留；它不再要求全量重跑，也不撤销其它能力资格。
 
@@ -22,7 +30,7 @@ standing authorization 下的最新真实 `four-llm-v1` 批次 `2026-07-28T14-33
 
 - 已有精确且 clean 的 frozen candidate，候选内容、构建身份和资格协议已经独立复核；
 - 确定性测试、隔离插件生命周期、package 闭包、不可变证据校验和必要的视觉检查均针对同一候选通过；
-- 最新真实资格状态仍按证据如实标记为 blocked/interrupted 或其它实际不可晋级终态，注册表和安装状态没有被单项结果越过；
+- 当前真实资格状态按证据如实记录；只有能力因指纹变化、缺失、新增或证据失效而需要新批时，现行索引才保持 fail closed，注册表和安装状态不能越过该状态；
 - 当前 standing authorization 仍有效，本批属于项目内真实资格实验，而不是活动安装、发布或其它未授权的外部状态动作；
 - 历史授权页只作为已消费审计记录，没有被当作本次授权；
 - 已创建并确认 active long-term goal；没有 active goal 时不得生成内部执行引用；

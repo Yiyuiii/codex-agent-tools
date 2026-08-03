@@ -2,37 +2,41 @@
 
 建立日期：2026-07-25
 
-最近复核：2026-07-30
+最近复核：2026-08-03
 
-目标发布分支：`next`；当前证据分支：`codex/beta-0.1.1-host-evidence`
+目标发布分支：`next`；当前证据分支：`codex/stdio-lifecycle-and-native-budget`
 
-包版本：`0.1.1-beta.1`
+候选包版本：`0.1.1-beta.2`
 
-当前结论：**第 3 层已经按能力粒度通过：四个逻辑 LLM 的八项 review/delegate 都由固定索引引用不可变 passed case，并且注册表 anchor、精确 evidence 与当前运行时指纹可由 `npm run verify:capabilities` 重新验证。`0.1.0` 继续是 npm `latest`；`0.1.1-beta.1` 已由 GitHub Actions OIDC 发布到 `next`，Node 20/22/24 CI 和公共 npm 精确版本隔离验收通过。活动插件也已通过官方 remove/add 升级到 installed/enabled beta.1，CLI 显示正确缓存 cwd、四项脱敏环境变量，旧 `codex_cc_tools` 仍 enabled。第 4 层等待再次完整宿主重启后的 Pi review、隔离 delegate 和取消门禁；发布前 Kimi 外审还证明外层超时不会自动取消 MCP 服务端请求，因此取消传播与子进程不重生是明确的 stable 阻断项，状态保持 partial。**
+当前结论：**当前宿主离线实现、原生辅助层、observer、固定启动层、freeze、四模型八项真实资格与离线 release gate 均已完成；现行能力索引为 8 current / 0 legacy。下一个 beta 的 OIDC 发布、公共包精确安装以及完整 App 重启后的普通 Stop/interrupt 真实宿主验收完成前，stable 继续阻断。已发布的 `0.1.1-beta.1` 与活动插件保持原状，旧 `codex_cc_tools` 仍 enabled。**
 
-最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`；标准入口和 execution cell 各只有一个，没有 resume、retry、fallback、补跑或第二批。最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，immutable-evidence verifier 通过，进程 0/0/0、锁 absent；20 个证据文件由提交 `6b4217d` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。未来只有相关能力的运行时指纹或证据失效时才重跑该能力；额度恢复本身不触发全量重认证。
+最新真实批次绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`，批次 ID 为 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`；标准入口和 execution cell 各只有一个，八项全部 passed，没有 resume、retry、fallback 或补跑。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，immutable-evidence 与 frozen-candidate verifier 均通过，owned process 全部 drained、锁为空；不可变证据由提交 `c09ce74` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。
 
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
+
+## 当前资格闭合
+
+`capabilities.json` 已用新批次的八个 passed case 更新，当前八项运行时指纹全部 current，legacy 条目为 0。历史 batch manifest 与 case evidence 永久不可变；registry 文案仍不能替代唯一机器发布权威 `npm run verify:capabilities`。
+
+beta.1 handoff 只证明旧宿主断开会留下服务端任务，不是 stable Stop gate 的唯一证据。
+
+晋级顺序只有一条：由 GitHub Actions OIDC 把已确认尚未占用的 `0.1.1-beta.2` 发布到 npm `next`；从公共 npm 安装该精确版本、完成官方插件升级、完整 App 重启与真实 Stop/interrupt 门禁，并证明 owned descendants zero；最后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`；未来候选版本仍须先查询 registry，不得猜测或复用已发布版本。
 
 ## 状态总览
 
 | 层级 | 验收对象                                  | 当前状态                                                                    | 通过证据路径                                                                                                                                                                                                               |
 | ---- | ----------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | 确定性单测、类型检查、构建、release smoke | passed                                                                      | typecheck、测试、build、能力索引验证、release smoke 与隔离 `--check-report`                                                                                                                                                |
+| 1    | 确定性单测、类型检查、构建、release smoke | passed：69 files / 1224 passed / 5 platform skips，release smoke passed    | 2026-08-03 `gate:offline`；当前 Node 24 宿主与精确 23-file pack                                                                                                                                                               |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
-| 3    | 四个逻辑 LLM 的八项真实模型门禁           | passed：8 capabilities / 0 stale                                            | [能力资格索引](../smoke/evidence/capabilities.json)、[Kimi](../smoke/kimi.md)、[Ark](../smoke/ark.md)                                                                                                                      |
-| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta 已发布并升级；窗口重启未结束后台宿主，等待完整进程重启后真实调用 | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 `docs/release/real-host-acceptance.md`                                                                                         |
+| 3    | 四个逻辑 LLM 的八项真实模型门禁           | passed：8 current / 0 stale / 0 legacy                                      | 2026-08-03 passed batch、不可变 case evidence 与现行能力索引                                                                                                                                                                 |
+| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta.1 已安装；等待下一个公共 beta、完整重启与 Stop/interrupt      | 权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；仓库内脱敏结果为 [real-host-acceptance.md](real-host-acceptance.md)                                                                                |
 
 ## 第 1 层：确定性单测与构建
 
 ### 通过标准
 
 ```powershell
-npm run typecheck
-npm test
-npm run build
-npm run verify:capabilities
-npm run smoke:release
+npm run gate:offline
 git diff --check
 ```
 
@@ -63,10 +67,10 @@ git diff --check
 ### 通过标准
 
 ```powershell
-npm run acceptance:plugin:isolated
+npm run acceptance:plugin:isolated:built
 ```
 
-脚本必须在唯一临时 `CODEX_HOME` 中完成官方 marketplace add/list、plugin add/list、从官方缓存副本启动 MCP、plugin remove/list 与 marketplace remove/list。调用门禁先证明已退役的 `gemini-3.5-flash` 以 unknown logical LLM 被明确拒绝、错误精确列出四项活动 LLM 且没有启动 Pi，再用 qualified 的 `ark-agent-deepseek-v4-flash` 验证从官方缓存副本恰好调用 fake Pi 一次、direct 路由、父代理清除、只注入目标 Agent 凭据和进程清理。脚本还必须验证 MCP 契约和官方列表语义回滚。
+该入口复用第1层已经构建的候选。脚本必须在唯一临时 `CODEX_HOME` 中完成官方 marketplace add/list、plugin add/list、从官方缓存副本启动 MCP、plugin remove/list 与 marketplace remove/list。调用门禁先证明已退役的 `gemini-3.5-flash` 以 unknown logical LLM 被明确拒绝、错误精确列出四项活动 LLM 且没有启动 Pi，再用 qualified 的 `ark-agent-deepseek-v4-flash` 验证从官方缓存副本恰好调用 fake Pi 一次、direct 路由、父代理清除、只注入目标 Agent 凭据和进程清理。脚本还必须验证 MCP 契约和官方列表语义回滚。单独运行第2层时改用`npm run acceptance:plugin:isolated`先构建一次。
 
 ### 当前证据
 
@@ -91,28 +95,36 @@ npm run acceptance:plugin:isolated
 
 - 固定 `capabilities.json` 必须恰有四个逻辑 LLM × 两个任务共八项，且排序、schema 与 registry anchor 精确一致；
 - 每项 evidence 必须是该精确能力的 passed case，实际模型、provider、路由、凭据来源、验收检查与 single-attempt 语义均符合合同；
-- batch source 必须同时通过 immutable-evidence verifier、manifest/evidence SHA 校验；唯一 legacy source 只允许既有 `ark-agent-deepseek-v4-flash/delegate` 精确证据，不能泛化；
+- batch source 必须同时通过 immutable-evidence verifier、manifest/evidence SHA 校验；现行索引必须保持 0 legacy，读取兼容若遇到 legacy 也只能接受既有唯一受限证据，不能泛化；
 - 当前代码拥有的能力输入必须重算为索引记录的运行时指纹；相关代码、模型绑定、路由、凭据来源或验收语义变化会使对应能力 stale；
 - `npm run verify:capabilities` 必须通过；release smoke 必须再次调用相同 verifier；
 - 只有 stale、缺失、新增或证据失效的能力才需要定向重跑。临时额度/服务不可用单独报告，不撤销未受影响能力。
 
 ### 当前证据
 
-移除 Gemini 后，当前活动产品面为四个逻辑 LLM、八项能力，注册表为 8 passed / 0 pending。唯一机器资格入口是 [`docs/smoke/evidence/capabilities.json`](../smoke/evidence/capabilities.json)：Coding Plan 与 Kimi 使用最新批次中的 passed case；Agent Plan 两项和 DeepSeek review 使用更早批次中的 passed case；DeepSeek delegate 使用设计中固定且受限的既有 standalone passed evidence。复用发生在精确能力与精确运行时指纹之间，不是把多个批次的聚合状态拼成一个虚构的 passed batch。
+移除 Gemini 后，当前活动产品面仍是四个逻辑 LLM、八项能力。现行 [`docs/smoke/evidence/capabilities.json`](../smoke/evidence/capabilities.json) 的八项全部引用 2026-08-03 新批次 passed case；执行预算、stdio 生命周期、精确模型/路由/凭据与验收输入均已进入当前指纹，verifier 返回 8 current / 0 legacy。
 
-### 最新四模型 blocked 批次
+### 最新四模型 passed 批次
+
+2026-08-03 在 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8` 上只调用一次标准入口，批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 完成八项并全部 passed。每项均为一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，owned process 全部 drained；`promotionEligible=true`。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
+
+### 历史四模型 blocked 批次（Coding Plan 额度）
+
+2026-08-02 在 frozen commit `9c40d2440b9ee30defdf92af11156e288785e755` 上只调用一次标准入口，启动批次 `2026-08-02T14-17-27.683Z-307be99a-f536-4113-8738-51de40b56634`。ordinal 1 `ark-coding-plan/delegate` 只调用一次并以 `account_quota_exceeded` failed，零 retry/fallback、owned process drained；ordinal 2–8 notRun。manifest SHA-256 为 `da28beb431619adee599861c9b3cebbeb3d843496243be22ba39140b05d0d157`，immutable-evidence verifier 通过，证据提交为 `29d8673`。维护者随后报告额度恢复，当时这只允许新独立批次重入；随后 2026-08-03 新批已完成八项资格闭合，旧批本身仍不可改写。
+
+### 曾作为旧索引来源的历史四模型 blocked 批次
 
 2026-07-28 在冻结 commit `0113da97a6b1fef35cc4c45025caa9e36a002176` 上只调用一次标准入口，启动 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`。同一 execution cell 从 ordinal 1 执行到首个失败项，6 completed、5 passed，ordinal 7–8 notRun；没有 cell 丢失、recovery、resume、retry、fallback、跳项、补跑、第二入口或第二批。
 
 ordinal 1–5 passed。ordinal 6 `ark-agent-plan/delegate` 的 provider `ark-agent-plan`、模型 `ark-code-latest`、direct route、Agent Plan 凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` failed。ordinal 1 与 ordinal 6 的规定写入和规定 `git status --short` 均各观察到一次 success，变更范围只含预期结果文件；上批暴露的 shell 与旧门禁假阳性缺口已经得到真实闭环。所有六个已执行项均为一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback。
 
-最新 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`；终态为 `blocked / case_failed`、`promotionEligible=false`，immutable-evidence verifier、锁 absent 与目标进程 0/0/0 均已通过，20 个证据文件由独立提交 `6b4217d` 保存。旧“整批原子晋级”没有发生；新策略只复用其中已通过且与当前指纹一致的精确 case，绝不改写该 manifest。
+该历史 manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`；终态为 `blocked / case_failed`、`promotionEligible=false`，immutable-evidence verifier、锁 absent 与目标进程 0/0/0 均已通过，20 个证据文件由独立提交 `6b4217d` 保存。旧“整批原子晋级”没有发生；其中 passed case 曾按能力粒度由旧索引复用，现已由 2026-08-03 新批次取代，且该 manifest 绝不改写。
 
-提交 `2a815c7` 与 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 的本地修复已经由上述真实命令成功证据验证；当前没有新的仓库内缺陷可修。`account_quota_exceeded` 只表示 Agent Plan 当时不可用；产品在真正调用该路线时仍可能失败，但这不要求用户为了 Coding Plan 或其它既有能力资格立即补充额度。
+提交 `2a815c7` 与 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 的本地修复已经由该历史批次的真实命令成功证据验证。该批 `account_quota_exceeded` 只表示 Agent Plan 当时不可用；它与 2026-08-02 Coding Plan 的独立额度终态分别保留，二者都不能改写为代码缺陷或通过证据。
 
 ### 更早四模型 blocked 批次（结果文件缺失）
 
-frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上的批次 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678` 完成八项并形成 7 passed，因 ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 结果文件缺失而 `acceptance_failed`。manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`，证据提交为 `1d5d2c4`。该轮不能被改写为 passed batch；其中 Agent Plan delegate 与 DeepSeek review 的精确 passed case 现由能力索引按原始哈希和当前指纹复用。
+frozen commit `07fd0d79e6885ee1e0af4a021e12170ef6c9f470` 上的批次 `2026-07-28T01-52-35.087Z-cb1be2f4-62ab-4af1-b3f1-9f36cba83678` 完成八项并形成 7 passed，因 ordinal 8 `ark-agent-deepseek-v4-flash/delegate` 结果文件缺失而 `acceptance_failed`。manifest SHA-256 为 `eb3d2fd7827e4c14b35ffa97eb5d55bcfd2f0b8f6557eca04dab30241cb80556`，证据提交为 `1d5d2c4`。该轮不能被改写为 passed batch；其 case 现只作历史审计，不再是当前能力索引来源。
 
 ### 更早四模型 blocked 批次（Kimi 命令观测）
 
@@ -148,7 +160,7 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 实现与审阅提交链为 `8261736`、`652b13d` / `5e209e1` / `16cdad5`、`293e745`、`969e546` / `0852691` / `d9eb28a`、`4bd2439`。逐任务规格/质量审阅与整体规格/安全审阅均 PASS；本轮两次 Kimi 外部复核均无结论：设计级跨多实现面审阅约 604.5 秒 `timed_out`，只返回读取进度；实现后两个内嵌摘录的单一不变量审阅约 181.8 秒 `timed_out`，review 正文为空。二者不计 PASS、不阻断，也未重试同形任务。该阶段验证为 48 files / 837 passed / 1 skipped / 0 failed；这个数字只属于当时的历史候选。
 
-当前未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward。注册表为 8 passed / 0 pending；真实 App 安装仍未运行并需要逐动作许可。
+该历史阶段当时未安装活动插件，未访问或修改 `~/.codex/config.toml`，未移除 `codex_cc_tools`，未调用或修改 Claude Code，也未发布、推送、合并或 fast-forward；当时注册表为 8 passed / 0 pending，真实 App 安装尚未运行。此段只描述方案 B 阶段，不覆盖本文顶部的当前状态。
 
 ### 历史五模型证据
 
@@ -164,7 +176,7 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 ### 前置权限
 
-2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。维护者后来真正终止旧宿主进程并重开，新任务发现新旧四项工具共存；真实 Kimi review 通过，Ark Coding review 因 MCP 没有收到父 App 已存在的 Coding Plan 凭据而在启动 Pi 前失败。根因是 `.mcp.json` 缺少官方 stdio MCP `env_vars` 白名单。0.1.1-beta.1 候选已增加精确四项变量名并禁止静态 `env`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。当前自动节点是完成 beta.1 离线门禁、PR/CI、OIDC 发布、公共 npm 验收和官方升级；下一人工节点是升级后完整重启宿主。
+2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。维护者后来真正终止旧宿主进程并重开，新任务发现新旧四项工具共存；真实 Kimi review 通过，Ark Coding review 因 MCP 没有收到父 App 已存在的 Coding Plan 凭据而在启动 Pi 前失败。根因是 `.mcp.json` 缺少官方 stdio MCP `env_vars` 白名单。历史 `0.1.1-beta.1` 随后增加精确四项变量名并禁止静态 `env`，已通过 OIDC 发布、公共 npm 验收和官方升级；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。当前自动节点是完成 `0.1.1-beta.2` 精确候选门禁、PR/CI、OIDC 发布、公共 npm 验收和官方升级；下一人工节点仍是升级后完整重启宿主。
 
 ### 通过标准
 

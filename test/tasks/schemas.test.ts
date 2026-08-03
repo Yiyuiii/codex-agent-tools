@@ -76,23 +76,90 @@ describe("public input schemas", () => {
     ).toBe(false);
   });
 
-  it("accepts an optional delegate session id and enforces the global timeout range", () => {
+  it("does not impose historical prompt, context, or acceptance-criteria caps", () => {
+    const promptTail = "<prompt-tail-sentinel>";
+    const contextTail = "<context-tail-sentinel>";
+    const criterionTail = "<criterion-tail-sentinel>";
+    const prompt = `${"p".repeat(200_001 - promptTail.length)}${promptTail}`;
+    const context = `${"c".repeat(100_001 - contextTail.length)}${contextTail}`;
+    const longCriterion = `${"a".repeat(10_001 - criterionTail.length)}${criterionTail}`;
+    const acceptanceCriteria = [
+      ...Array.from({ length: 100 }, (_, index) => `criterion-${index}`),
+      longCriterion,
+    ];
+
+    const review = externalReviewInputSchema.parse({
+      llm: "kimi-k3",
+      task: "review_diff",
+      prompt,
+      cwd: process.cwd(),
+      context,
+      acceptanceCriteria,
+    });
+    const delegate = externalDelegateInputSchema.parse({
+      llm: "kimi-k3",
+      prompt,
+      cwd: process.cwd(),
+    });
+
+    expect(review.prompt).toBe(prompt);
+    expect(review.context).toBe(context);
+    expect(review.acceptanceCriteria).toEqual(acceptanceCriteria);
+    expect(delegate.prompt).toBe(prompt);
+  });
+
+  it("accepts an optional delegate session id", () => {
     expect(
       externalDelegateInputSchema.safeParse({
         llm: "kimi-k3",
         prompt: "Continue",
         cwd: process.cwd(),
         sessionId: "session-1",
-        timeoutMs: 900_000,
       }).success,
     ).toBe(true);
-    expect(
-      externalDelegateInputSchema.safeParse({
+  });
+
+  it.each([
+    [
+      "review",
+      externalReviewInputSchema,
+      {
+        llm: "kimi-k3",
+        task: "review_diff",
+        prompt: "Review",
+        cwd: process.cwd(),
+      },
+    ],
+    [
+      "delegate",
+      externalDelegateInputSchema,
+      {
         llm: "kimi-k3",
         prompt: "Continue",
         cwd: process.cwd(),
-        timeoutMs: 999,
-      }).success,
-    ).toBe(false);
-  });
+      },
+    ],
+  ] as const)(
+    "accepts an optional per-call safe integer timeout for %s",
+    (_task, schema, input) => {
+      expect(schema.safeParse(input).success).toBe(true);
+
+      for (const timeoutMs of [
+        1_000,
+        900_001,
+        Number.MAX_SAFE_INTEGER,
+      ]) {
+        expect(schema.safeParse({ ...input, timeoutMs }).success).toBe(true);
+      }
+
+      for (const timeoutMs of [
+        999,
+        1_000.5,
+        Number.POSITIVE_INFINITY,
+        Number.MAX_SAFE_INTEGER + 1,
+      ]) {
+        expect(schema.safeParse({ ...input, timeoutMs }).success).toBe(false);
+      }
+    },
+  );
 });

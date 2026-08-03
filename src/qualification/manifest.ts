@@ -16,6 +16,7 @@ import {
   publishImmutableJson,
 } from "../smoke/evidence.js";
 import { readQualificationLockOwner } from "./lock.js";
+import { validateCurrentEvidenceContract } from "./evidence-contract.js";
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
@@ -25,11 +26,12 @@ import {
 } from "./protocol.js";
 import type {
   BuildArtifactIdentity,
-  CurrentFrozenPreflightRecord,
+  CurrentV3FrozenPreflightRecord,
   FrozenCredentialMatch,
   FrozenLogicalLlmIdentity,
   FrozenPreflightRecord,
   LegacyFrozenPreflightRecord,
+  HistoricalCurrentFrozenPreflightRecord,
   QualificationCaseIdentity,
   QualificationCaseManifestEntry,
   QualificationCaseResult,
@@ -75,12 +77,18 @@ const COMMON_PREFLIGHT_KEYS = [
   "repositoryCommit",
   "repositoryDirty",
   "runtimeVersions",
-  "targetProcesses",
 ] as const;
 const LEGACY_PREFLIGHT_KEYS = [
   ...COMMON_PREFLIGHT_KEYS,
   "proxy10808",
   "schemaVersion",
+  "targetProcesses",
+] as const;
+const HISTORICAL_CURRENT_PREFLIGHT_KEYS = [
+  ...COMMON_PREFLIGHT_KEYS,
+  "qualificationPlanId",
+  "schemaVersion",
+  "targetProcesses",
 ] as const;
 const CURRENT_PREFLIGHT_KEYS = [
   ...COMMON_PREFLIGHT_KEYS,
@@ -203,9 +211,9 @@ const CURRENT_CREDENTIAL_ENVIRONMENT_NAMES = Object.freeze([
 
 interface QualificationProtocol {
   readonly planId: QualificationPlanId;
-  readonly manifestSchemaVersion: 1 | 2;
-  readonly checkpointSchemaVersion: 1 | 2;
-  readonly evidenceSchemaVersion: 2 | 3;
+  readonly manifestSchemaVersion: 1 | 2 | 3;
+  readonly checkpointSchemaVersion: 1 | 2 | 3;
+  readonly evidenceSchemaVersion: 2 | 3 | 4;
   readonly schedule: readonly QualificationCaseIdentity[];
   readonly allowGoogleFreeTierQuota: boolean;
   readonly freezePreflight: (value: unknown) => FrozenPreflightRecord;
@@ -221,11 +229,21 @@ const LEGACY_PROTOCOL: QualificationProtocol = Object.freeze({
   freezePreflight: freezeLegacyPreflightRecord,
 });
 
-const CURRENT_PROTOCOL: QualificationProtocol = Object.freeze({
+const HISTORICAL_CURRENT_PROTOCOL: QualificationProtocol = Object.freeze({
   planId: ACTIVE_QUALIFICATION_PLAN_ID,
   manifestSchemaVersion: 2,
   checkpointSchemaVersion: 2,
   evidenceSchemaVersion: 3,
+  schedule: ACTIVE_QUALIFICATION_CASES,
+  allowGoogleFreeTierQuota: false,
+  freezePreflight: freezeHistoricalCurrentPreflightRecord,
+});
+
+const CURRENT_PROTOCOL: QualificationProtocol = Object.freeze({
+  planId: ACTIVE_QUALIFICATION_PLAN_ID,
+  manifestSchemaVersion: 3,
+  checkpointSchemaVersion: 3,
+  evidenceSchemaVersion: 4,
   schedule: ACTIVE_QUALIFICATION_CASES,
   allowGoogleFreeTierQuota: false,
   freezePreflight: freezeCurrentPreflightRecord,
@@ -319,6 +337,12 @@ function protocolForEnvelope(value: unknown): QualificationProtocol {
     envelope.schemaVersion === 2 &&
     envelope.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID
   ) {
+    return HISTORICAL_CURRENT_PROTOCOL;
+  }
+  if (
+    envelope.schemaVersion === 3 &&
+    envelope.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID
+  ) {
     return CURRENT_PROTOCOL;
   }
   throw new QualificationLedgerError();
@@ -335,13 +359,15 @@ function protocolEnvelope(
 ): Readonly<
   | { schemaVersion: 1 }
   | { schemaVersion: 2; qualificationPlanId: "four-llm-v1" }
+  | { schemaVersion: 3; qualificationPlanId: "four-llm-v1" }
 > {
-  return protocol === LEGACY_PROTOCOL
-    ? Object.freeze({ schemaVersion: 1 as const })
-    : Object.freeze({
-        schemaVersion: 2 as const,
-        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
-      });
+  if (protocol === LEGACY_PROTOCOL) {
+    return Object.freeze({ schemaVersion: 1 as const });
+  }
+  return Object.freeze({
+    schemaVersion: protocol.manifestSchemaVersion as 2 | 3,
+    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+  });
 }
 
 function assertProtocol(
@@ -508,6 +534,7 @@ function freezePreflightCommon(
     readonly llm: string;
     readonly environmentVariableNames: readonly (string | null)[];
   }[],
+  historicalHostProbes: boolean,
 ) {
   if (
     typeof record.repositoryCommit !== "string" ||
@@ -538,17 +565,18 @@ function freezePreflightCommon(
   ) {
     throw new QualificationLedgerError();
   }
-  const runtimeVersions = plainRecord(record.runtimeVersions, [
-    "codex",
-    "kimi",
-    "node",
-    "pi",
-  ]);
+  const runtimeVersions = plainRecord(
+    record.runtimeVersions,
+    historicalHostProbes
+      ? ["codex", "kimi", "node", "pi"]
+      : ["codex", "node"],
+  );
   if (
     !safeText(runtimeVersions.node, 128) ||
     !safeText(runtimeVersions.codex, 128) ||
-    !safeText(runtimeVersions.kimi, 128) ||
-    !safeText(runtimeVersions.pi, 128)
+    (historicalHostProbes &&
+      (!safeText(runtimeVersions.kimi, 128) ||
+        !safeText(runtimeVersions.pi, 128)))
   ) {
     throw new QualificationLedgerError();
   }
@@ -569,7 +597,7 @@ function freezePreflightCommon(
       expectedCredentialMatches[index]!,
     ),
   );
-  return Object.freeze({
+  const common = {
     repositoryCommit: record.repositoryCommit,
     repositoryBranch: record.repositoryBranch,
     repositoryDirty: false as const,
@@ -577,17 +605,22 @@ function freezePreflightCommon(
     packageLockSha256: record.packageLockSha256,
     buildArtifacts: Object.freeze(buildArtifacts),
     buildIdentitySha256: record.buildIdentitySha256,
-    runtimeVersions: Object.freeze({
-      node: runtimeVersions.node,
-      codex: runtimeVersions.codex,
-      kimi: runtimeVersions.kimi,
-      pi: runtimeVersions.pi,
-    }),
+    runtimeVersions: historicalHostProbes
+      ? Object.freeze({
+          node: runtimeVersions.node as string,
+          codex: runtimeVersions.codex as string,
+          kimi: runtimeVersions.kimi as string,
+          pi: runtimeVersions.pi as string,
+        })
+      : Object.freeze({
+          node: runtimeVersions.node as string,
+          codex: runtimeVersions.codex as string,
+        }),
     piConfigSha256: record.piConfigSha256,
     logicalLlms: Object.freeze(logicalLlms),
     credentialMatches: Object.freeze(credentialMatches),
-    targetProcesses: normalizeTargetProcesses(record.targetProcesses),
-  });
+  };
+  return Object.freeze(common);
 }
 
 function freezeLegacyPreflightRecord(
@@ -603,12 +636,16 @@ function freezeLegacyPreflightRecord(
   ) {
     throw new QualificationLedgerError();
   }
-  const { targetProcesses, ...common } = freezePreflightCommon(
+  const common = freezePreflightCommon(
     record,
     LEGACY_REQUIRED_BUILD_ARTIFACTS,
     LEGACY_LOGICAL_LLMS,
     LEGACY_CREDENTIAL_ENVIRONMENT_NAMES,
-  );
+    true,
+  ) as Omit<
+    LegacyFrozenPreflightRecord,
+    "schemaVersion" | "proxy10808" | "targetProcesses"
+  >;
   return Object.freeze({
     schemaVersion: 1,
     ...common,
@@ -617,14 +654,14 @@ function freezeLegacyPreflightRecord(
       port: 10808,
       listening: true,
     }),
-    targetProcesses,
+    targetProcesses: normalizeTargetProcesses(record.targetProcesses),
   });
 }
 
-function freezeCurrentPreflightRecord(
+function freezeHistoricalCurrentPreflightRecord(
   value: unknown,
-): CurrentFrozenPreflightRecord {
-  const record = plainRecord(value, CURRENT_PREFLIGHT_KEYS);
+): HistoricalCurrentFrozenPreflightRecord {
+  const record = plainRecord(value, HISTORICAL_CURRENT_PREFLIGHT_KEYS);
   if (
     record.schemaVersion !== 2 ||
     record.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID
@@ -634,13 +671,41 @@ function freezeCurrentPreflightRecord(
   return Object.freeze({
     schemaVersion: 2,
     qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+    ...(freezePreflightCommon(
+      record,
+      CURRENT_REQUIRED_BUILD_ARTIFACTS,
+      CURRENT_LOGICAL_LLMS,
+      CURRENT_CREDENTIAL_ENVIRONMENT_NAMES,
+      true,
+    ) as Omit<
+      HistoricalCurrentFrozenPreflightRecord,
+      "schemaVersion" | "qualificationPlanId" | "targetProcesses"
+    >),
+    targetProcesses: normalizeTargetProcesses(record.targetProcesses),
+  }) as HistoricalCurrentFrozenPreflightRecord;
+}
+
+function freezeCurrentPreflightRecord(
+  value: unknown,
+): CurrentV3FrozenPreflightRecord {
+  const record = plainRecord(value, CURRENT_PREFLIGHT_KEYS);
+  if (
+    record.schemaVersion !== 3 ||
+    record.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID
+  ) {
+    throw new QualificationLedgerError();
+  }
+  return Object.freeze({
+    schemaVersion: 3,
+    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     ...freezePreflightCommon(
       record,
       CURRENT_REQUIRED_BUILD_ARTIFACTS,
       CURRENT_LOGICAL_LLMS,
       CURRENT_CREDENTIAL_ENVIRONMENT_NAMES,
+      false,
     ),
-  });
+  }) as CurrentV3FrozenPreflightRecord;
 }
 
 export function freezePreflightRecord(value: unknown): FrozenPreflightRecord {
@@ -963,7 +1028,7 @@ function identitiesEqual(
 }
 
 interface BatchStartedCheckpoint {
-  schemaVersion: 1 | 2;
+  schemaVersion: 1 | 2 | 3;
   qualificationPlanId?: "four-llm-v1";
   sequence: 0;
   kind: "batch_started";
@@ -975,7 +1040,7 @@ interface BatchStartedCheckpoint {
 }
 
 interface CaseRunningCheckpoint extends QualificationCaseIdentity {
-  schemaVersion: 1 | 2;
+  schemaVersion: 1 | 2 | 3;
   qualificationPlanId?: "four-llm-v1";
   sequence: number;
   kind: "case_running";
@@ -987,7 +1052,7 @@ interface CaseRunningCheckpoint extends QualificationCaseIdentity {
 }
 
 interface CaseCompletedCheckpoint extends QualificationCaseIdentity {
-  schemaVersion: 1 | 2;
+  schemaVersion: 1 | 2 | 3;
   qualificationPlanId?: "four-llm-v1";
   sequence: number;
   kind: "case_completed";
@@ -1004,6 +1069,7 @@ interface CaseCompletedCheckpoint extends QualificationCaseIdentity {
   adapterReportedFallbackUsed: boolean | null;
   orchestratorFallbackUsed: false;
   executionTelemetrySource: "kimi-acp-observable" | "pi-rpc-observable" | null;
+  ownedProcessDrained?: true | null;
   failureReason: QualificationFailureReason;
 }
 
@@ -1040,10 +1106,13 @@ interface NormalizedExecutionTelemetry {
   adapterReportedFallbackUsed: boolean | null;
   orchestratorFallbackUsed: false;
   executionTelemetrySource: "kimi-acp-observable" | "pi-rpc-observable" | null;
+  ownedProcessDrained?: true | null;
 }
 
 function normalizeExecutionTelemetry(
   record: Record<string, unknown>,
+  protocol: QualificationProtocol,
+  passed: boolean | null,
 ): NormalizedExecutionTelemetry {
   const normalizeCount = (value: unknown): number | null => {
     if (value === null) return null;
@@ -1068,7 +1137,7 @@ function normalizeExecutionTelemetry(
   ) {
     throw new QualificationLedgerError();
   }
-  const normalized = Object.freeze({
+  const common = {
     adapterClientInvocationCount: normalizeCount(
       record.adapterClientInvocationCount,
     ),
@@ -1081,7 +1150,26 @@ function normalizeExecutionTelemetry(
     ),
     orchestratorFallbackUsed: false,
     executionTelemetrySource: record.executionTelemetrySource,
-  });
+  } as const;
+  let ownedProcessDrained: true | null | undefined;
+  if (protocol === CURRENT_PROTOCOL) {
+    if (
+      !Object.hasOwn(record, "ownedProcessDrained") ||
+      (record.ownedProcessDrained !== true &&
+        record.ownedProcessDrained !== null) ||
+      (passed === true && record.ownedProcessDrained !== true)
+    ) {
+      throw new QualificationLedgerError();
+    }
+    ownedProcessDrained = record.ownedProcessDrained;
+  } else if (Object.hasOwn(record, "ownedProcessDrained")) {
+    throw new QualificationLedgerError();
+  }
+  const normalized = Object.freeze(
+    protocol === CURRENT_PROTOCOL
+      ? { ...common, ownedProcessDrained: ownedProcessDrained! }
+      : common,
+  );
   const values = [
     normalized.adapterClientInvocationCount,
     normalized.adapterRetryCount,
@@ -1197,7 +1285,11 @@ function normalizeCheckpoint(
     if (base.result !== "passed" && base.result !== "failed") {
       throw new QualificationLedgerError();
     }
-    const telemetry = normalizeExecutionTelemetry(base);
+    const telemetry = normalizeExecutionTelemetry(
+      base,
+      protocol,
+      base.result === "passed",
+    );
     plainRecord(
       value,
       keysForProtocol(protocol, [
@@ -1211,6 +1303,7 @@ function normalizeCheckpoint(
         "orchestratorFallbackUsed",
         "result",
         "runtimeReportedAutoRetryCount",
+        ...(protocol === CURRENT_PROTOCOL ? ["ownedProcessDrained"] : []),
       ]),
     );
     return Object.freeze({
@@ -1282,6 +1375,9 @@ function normalizeFailureReason(
     value === "google_free_tier_quota" &&
     !protocol.allowGoogleFreeTierQuota
   ) {
+    throw new QualificationLedgerError();
+  }
+  if (value === "process_residual" && protocol === CURRENT_PROTOCOL) {
     throw new QualificationLedgerError();
   }
   return value as Exclude<QualificationFailureReason, null>;
@@ -1375,7 +1471,11 @@ function validateEvidenceForIdentity(
   ) {
     throw new QualificationLedgerError();
   }
-  const telemetry = normalizeExecutionTelemetry(evidence);
+  const telemetry = normalizeExecutionTelemetry(
+    evidence,
+    protocol,
+    evidence.passed as boolean,
+  );
   const failureReason = normalizeFailureReason(
     evidence.failureReason,
     evidence.passed,
@@ -1439,6 +1539,13 @@ function validateEvidenceForIdentity(
         telemetry.executionTelemetrySource !== expectedTelemetrySource))
   ) {
     throw new QualificationLedgerError();
+  }
+  if (protocol === CURRENT_PROTOCOL) {
+    validateCurrentEvidenceContract(evidence, {
+      llm: identity.llm,
+      task: identity.task,
+      runtime: frozenIdentity.runtime,
+    });
   }
   return Object.freeze({
     reference: Object.freeze({
@@ -1597,6 +1704,9 @@ async function loadLedgerState(
             adapterReportedFallbackUsed: checkpoint.adapterReportedFallbackUsed,
             orchestratorFallbackUsed: false,
             executionTelemetrySource: checkpoint.executionTelemetrySource,
+            ...(protocol === CURRENT_PROTOCOL
+              ? { ownedProcessDrained: checkpoint.ownedProcessDrained! }
+              : {}),
           })
       ) {
         throw new QualificationLedgerError();
@@ -1675,6 +1785,9 @@ function caseEntry(
     adapterReportedFallbackUsed: checkpoint.adapterReportedFallbackUsed,
     orchestratorFallbackUsed: false,
     executionTelemetrySource: checkpoint.executionTelemetrySource,
+    ...(Object.hasOwn(checkpoint, "ownedProcessDrained")
+      ? { ownedProcessDrained: checkpoint.ownedProcessDrained! }
+      : {}),
   });
 }
 
@@ -2056,6 +2169,7 @@ function normalizeCaseEntry(
     "result",
     "runtimeReportedAutoRetryCount",
     "task",
+    ...(protocol === CURRENT_PROTOCOL ? ["ownedProcessDrained"] : []),
   ]);
   const identity = normalizeCaseIdentity(
     {
@@ -2077,7 +2191,11 @@ function normalizeCaseEntry(
       record.result === "passed",
       protocol,
     ),
-    ...normalizeExecutionTelemetry(record),
+    ...normalizeExecutionTelemetry(
+      record,
+      protocol,
+      record.result === "passed",
+    ),
   });
 }
 
@@ -2100,6 +2218,7 @@ function normalizeUncommittedEvidence(
     "runtimeReportedAutoRetryCount",
     "task",
     "validationStatus",
+    ...(protocol === CURRENT_PROTOCOL ? ["ownedProcessDrained"] : []),
   ] as const;
   if (base.validationStatus === "valid") {
     const record = plainRecord(value, commonKeys);
@@ -2123,7 +2242,11 @@ function normalizeUncommittedEvidence(
         record.observedPassed,
         protocol,
       ),
-      ...normalizeExecutionTelemetry(record),
+      ...normalizeExecutionTelemetry(
+        record,
+        protocol,
+        record.observedPassed,
+      ),
     });
   }
   const record = plainRecord(value, commonKeys);
@@ -2136,7 +2259,8 @@ function normalizeUncommittedEvidence(
     record.runtimeReportedAutoRetryCount !== null ||
     record.adapterReportedFallbackUsed !== null ||
     record.orchestratorFallbackUsed !== null ||
-    record.executionTelemetrySource !== null
+    record.executionTelemetrySource !== null ||
+    (protocol === CURRENT_PROTOCOL && record.ownedProcessDrained !== null)
   ) {
     throw new QualificationLedgerError();
   }
@@ -2159,6 +2283,7 @@ function normalizeUncommittedEvidence(
     adapterReportedFallbackUsed: null,
     orchestratorFallbackUsed: null,
     executionTelemetrySource: null,
+    ...(protocol === CURRENT_PROTOCOL ? { ownedProcessDrained: null } : {}),
   });
 }
 
@@ -2410,6 +2535,7 @@ async function findUncommittedEvidence(
       adapterReportedFallbackUsed: null,
       orchestratorFallbackUsed: null,
       executionTelemetrySource: null,
+      ...(protocol === CURRENT_PROTOCOL ? { ownedProcessDrained: null } : {}),
     });
   }
 }
@@ -2432,14 +2558,14 @@ export async function recoverInterruptedQualificationBatch(options: {
     if (options.qualificationPlanId === undefined) {
       throw new QualificationLedgerError();
     }
-    const expectedProtocol = protocolForPlanId(options.qualificationPlanId);
+    const defaultProtocol = protocolForPlanId(options.qualificationPlanId);
     const terminal = await inspectQualificationTerminal(options);
     if (terminal.state === "valid") {
       if (
         terminal.batchId !== options.batchId ||
         terminal.authorizationReferenceSha256 !==
           options.authorizationReferenceSha256 ||
-        terminal.qualificationPlanId !== expectedProtocol.planId
+        terminal.qualificationPlanId !== options.qualificationPlanId
       ) {
         throw new QualificationLedgerError();
       }
@@ -2448,16 +2574,13 @@ export async function recoverInterruptedQualificationBatch(options: {
         options.batchId,
       );
     }
-    const state = await loadLedgerState(
-      options.repositoryRoot,
-      options.batchId,
-      expectedProtocol,
-    );
-    const protocol = state.protocol ?? expectedProtocol;
+    const state = await loadLedgerState(options.repositoryRoot, options.batchId);
+    const protocol = state.protocol ?? defaultProtocol;
     if (
-      state.started !== null &&
-      state.started.authorizationReferenceSha256 !==
-        options.authorizationReferenceSha256
+      protocol.planId !== options.qualificationPlanId ||
+      (state.started !== null &&
+        state.started.authorizationReferenceSha256 !==
+          options.authorizationReferenceSha256)
     ) {
       throw new QualificationLedgerError();
     }

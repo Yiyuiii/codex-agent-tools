@@ -18,9 +18,14 @@ const cwdSchema = z
 
 const commonShape = {
   llm: z.string().trim().min(1),
-  prompt: z.string().trim().min(1).max(200_000),
+  prompt: z.string().trim().min(1),
   cwd: cwdSchema,
-  timeoutMs: z.number().int().min(1_000).max(900_000).optional(),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(1_000)
+    .max(Number.MAX_SAFE_INTEGER)
+    .optional(),
 } as const;
 
 export const externalReviewInputSchema = z
@@ -34,8 +39,8 @@ export const externalReviewInputSchema = z
     ]),
     includeGitDiff: z.boolean().optional(),
     includeUntracked: z.boolean().optional(),
-    context: z.string().max(100_000).optional(),
-    acceptanceCriteria: z.array(z.string().trim().min(1).max(10_000)).max(100).optional(),
+    context: z.string().optional(),
+    acceptanceCriteria: z.array(z.string().trim().min(1)).optional(),
   })
   .strict();
 

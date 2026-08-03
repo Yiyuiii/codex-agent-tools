@@ -77,7 +77,7 @@ export function qualificationPlanForEnvelope(
     return LEGACY_QUALIFICATION_PLAN_ID;
   }
   if (
-    schemaVersion === 2 &&
+    (schemaVersion === 2 || schemaVersion === 3) &&
     recordedPlanId === ACTIVE_QUALIFICATION_PLAN_ID
   ) {
     return ACTIVE_QUALIFICATION_PLAN_ID;
