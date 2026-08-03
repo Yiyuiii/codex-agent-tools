@@ -1,20 +1,14 @@
 # 官方插件运维流程
 
-本文只描述 `codex_external_agents` 的官方插件候选构建、隔离验收、已授权官方升级与官方回滚。活动 Codex 当前安装的是已发布的 `0.1.1-beta.1`，旧 `codex_cc_tools` 继续共存。本轮源码已改变执行预算和 stdio 生命周期，因而旧能力索引的八项运行时指纹全部 stale；当前 `npm run verify:capabilities` 必须以脱敏错误和退出码 1 fail closed，分支不可发布。当前宿主离线实现与冻结完成后，只重跑 stale、缺失、新增或证据失效的能力并更新同一索引；verifier 恢复通过之前不得发布下一个 beta。
+本文是 `codex_external_agents` 官方插件候选构建、隔离验收、已授权官方升级与回滚的现行运维真值源。活动 Codex 当前安装已发布的 `0.1.1-beta.1`，旧 `codex_cc_tools` 继续共存。当前发布线只保证维护者的 Windows x64 / Node 24 宿主；原生辅助层、Job-owned process、observer、固定启动层和 current-host freeze 已完成，不再运行 Node 矩阵或跨宿主认证。
 
-standing authorization 下的最新真实批次绑定 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176`，批次 ID 为 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`。标准入口和 `functions.exec` cell 各只有一个；批次按首错停为 6 completed / 5 passed、`blocked / case_failed`、`promotionEligible=false`，ordinal 7–8 notRun。没有 resume、retry、fallback、补跑、第二入口或第二批。manifest SHA-256 为 `f1afd69ff78e63beca3e2a18995f0e181f099001e457632201d38601a1b274b7`，证据提交为 `6b4217d`。
+运行时变更已使能力索引的八项指纹全部 stale。最新真实批次 `2026-08-02T14-17-27.683Z-307be99a-f536-4113-8738-51de40b56634` 绑定 frozen commit `9c40d2440b9ee30defdf92af11156e288785e755`；首项 `ark-coding-plan/delegate` 只调用一次并以 `account_quota_exceeded` 失败，零 retry/fallback、owned process 已排空，其余七项依首错停止合同未运行。终态为 `blocked / case_failed`、`promotionEligible=false`，immutable-evidence verifier 通过，manifest SHA-256 为 `da28beb431619adee599861c9b3cebbeb3d843496243be22ba39140b05d0d157`，证据提交为 `29d8673`。
 
-ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider、model、direct route、凭据来源和 telemetry 正确，结果文件精确通过，但以 `account_quota_exceeded` 失败。ordinal 1 与 6 的精确写入和状态命令均各一次 success，文件范围只含预期结果；此前 Pi Windows shell 与资格假阳性缺口已经真实闭合。该错误记录的是当时 Agent Plan 的账户可用性，不再撤销其它已通过能力，也不要求为产品资格重跑完整八项；实际调用该路线时仍可能受当前额度影响。
+维护者已于 2026-08-03 报告 Ark Coding Plan 额度恢复；这只构成启动新独立批次所需的外部状态变化，不构成能力通过证据。必须在 active long-term goal、clean candidate、空资格锁和 one-cell/one-entry 条件下重新从 ordinal 1 执行；不得复用旧批次、补跑余下七项、retry、fallback 或为绕过资格直接发布。新 8/8 写入前，`capabilities.json` 保持原样，`npm run verify:capabilities` 必须以退出码 1 fail closed。
 
-离线调查确认 Pi Windows 子进程环境遗漏 `ProgramFiles` 与 `ProgramFiles(x86)`，导致 Git Bash resolver 失败；提交 `2a815c7` 修复后，真实 resolver 与精确 Node spawn 探针离线成功，代理和凭据边界保持不变。资格合同提交 `e750052`、`b5a691f`、`3d85315`、`ceb8e9c` 要求未来资格 Pi delegate 的精确写入与精确 `git status --short` 生命周期各恰好一次且均为 success，并由未来整批 passed verifier 重算；历史 blocked/interrupted 继续兼容。schema/plan、公开 MCP、provider/model/route/credential、提示词、结果 validator、retry/fallback 均未改变；独立质量复审为 PASS、无 P0–P3。
+资格执行与恢复的唯一详细合同见[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)；历史 Kimi/Ark case、旧 shell 根因和旧测试计数分别保留在 `docs/smoke/` 与不可变 evidence 中，不在运维入口重复维护。package/release assurance 只证明离线候选，不构成资格、安装或发布。
 
-48 个测试文件、837 passed / 1 skipped / 0 failed 与 171 files / 15 Markdown/HTML / 3 plugin files 是旧候选历史数字。`v0.1.0` tagged candidate 的 fresh 矩阵已经通过：53 个测试文件、890 passed / 1 skipped / 0 failed，类型检查、构建、8/8 能力索引、release smoke 与生产依赖审计均通过；tagged artifact 的 pack dry-run 为 228 个文件，且不得保留 `.tgz`。
-
-全量测试曾暴露 Kimi ACP client 早于 child close 返回的既有竞态，98/100 时序探针可观察；提交 `4af8b34` 加入 close 等待、1000ms 有界失败、stdio 销毁与两个确定性回归测试，独立复审 PASS、无 P0–P3，最终全量已经包含。状态文档提交与最终 clean frozen SHA 仍由主线程完成。
-
-当前活动插件仍为已发布的 `0.1.1-beta.1`；本轮没有访问或修改 `~/.codex/config.toml`，没有移除 `codex_cc_tools`，也没有调用或修改 Claude Code。standing authorization 继续有效，本轮源码已使八项能力指纹失效，因此离线候选冻结后将定向运行这些 stale 能力，不因临时额度或无关能力重复运行整套资格。`npm run verify:capabilities` 是当前机器资格与发布权威；registry 的旧 passed 文案、历史授权页和批次结果页只作审计，不能越过当前 stale 状态。
-
-2026-07-27 的 105 秒演练只构成离线基础设施证据；后续真实批次证明同一 cell 可以承载到协调器正常终态，但不证明四小时存活。standing authorization 下的唯一承载和 fail-closed 边界见[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)，演练原始结论见[承载演练报告](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/qualification-carrier-rehearsal.md)。package/release assurance 只证明离线候选，不构成资格、安装或发布。
+当前流程没有访问或修改 `~/.codex/config.toml`，没有移除 `codex_cc_tools`，也没有调用或修改 Claude Code。`npm run verify:capabilities` 是当前机器资格与发布权威；registry 旧文案、历史授权页和批次结果页不能越过当前 stale 状态。
 
 项目代码和维护者都不得直接读取、写入、备份、恢复或手工编辑活动 `~/.codex/config.toml`。Codex 官方插件命令可能由官方机制更新该状态文件，因此真实 add/remove 每次都必须先准备权限包并取得针对该次动作的明确许可。
 

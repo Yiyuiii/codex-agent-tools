@@ -10,7 +10,7 @@
 
 standing authorization 下最新真实批次 `2026-08-02T14-17-27.683Z-307be99a-f536-4113-8738-51de40b56634` 绑定 frozen commit `9c40d2440b9ee30defdf92af11156e288785e755`。唯一标准入口和单一前台承载正常取得可信终态；ordinal 1 `ark-coding-plan/delegate` 只调用一次，模型、provider、direct route、凭据隔离、single-attempt、零 retry/fallback 与 owned process drain 均符合合同，但服务以 `account_quota_exceeded` 拒绝，结果文件未产生。批次随即首错停止，ordinal 2–8 全部 `notRun`，终态为 `blocked / case_failed`、`promotionEligible=false`。immutable-evidence verifier 通过，manifest SHA-256 为 `da28beb431619adee599861c9b3cebbeb3d843496243be22ba39140b05d0d157`，资格锁为空，证据提交为 `29d8673`。
 
-这次失败属于外部账户额度事实，不是仓库内 Windows 生命周期、执行预算或模型步数限制缺陷。额度外部状态实际变化前，不得启动另一真实批次；新增诊断价值只允许只读取证，不授权模型调用。不得为绕过该失败补跑其它七项、改变顺序、fallback 或恢复 Node 版本矩阵。当前宿主离线冻结仍有效，发布继续被 8/8 stale 能力门禁阻断。
+这次失败属于外部账户额度事实，不是仓库内 Windows 生命周期、执行预算或模型步数限制缺陷。维护者已于 2026-08-03 报告额度恢复，这满足“外部状态实际变化”的重入条件，但不构成能力通过证据；新的真实批次仍必须先满足 active long-term goal、clean candidate、空资格锁及本手册其余全部前置。不得为绕过该失败补跑其它七项、改变顺序、fallback 或恢复 Node 版本矩阵。当前宿主离线冻结仍有效，发布继续被 8/8 stale 能力门禁阻断。
 
 以下较早批次事实与哈希继续保持原样。
 
