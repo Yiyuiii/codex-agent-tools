@@ -9,6 +9,6 @@ describe("package identity", () => {
   });
 
   it("uses the current prerelease version", () => {
-    expect(VERSION).toBe("0.1.1-beta.3");
+    expect(VERSION).toBe("0.1.1-beta.4");
   });
 });

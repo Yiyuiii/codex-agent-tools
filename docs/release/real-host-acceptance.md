@@ -2,13 +2,13 @@
 
 最近更新：2026-08-03
 
-状态：**partial — beta.3 已公开发布、公共验收并完成官方升级；等待完整 App 重启与普通 Stop 的 `cancelled + owned-zero` receipt**
+状态：**partial — beta.3 clean-tag 启动层已确定阻断；beta.4 候选离线门禁通过，待 PR/双重 CI、OIDC 发布、公共验收与官方升级后，才进入完整 App 重启和普通 Stop receipt**
 
 ## 当前发布阻断
 
-beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调，并已随 beta.3 公开发布和安装；在完整 App 重启与真实 Stop 证据产生前，这仍只构成确定性与安装证据。
+beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调，并已随 beta.3 公开发布和安装；但 beta.3 的正式验收启动层无法从 clean tag 进入 observer。beta.4 只修复这一证据装载缺口；在其发布、安装、完整 App 重启与真实 Stop 证据产生前，当前结果仍只构成确定性、公共包与历史安装证据。
 
-晋级顺序只有一条：八项 verifier、唯一离线 release gate、beta.3 GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级均已完成；现在完整退出并重开 App，再在 observer 发布 `REQUEST_STARTED` 后使用普通 Stop，取得精确 `cancelled + owned-zero` receipt；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`。
+晋级顺序只有一条：八项 verifier 与 beta.4 唯一离线 release gate 已完成；接下来完成 beta.4 PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级。只有这些自动阶段全部通过后，才完整退出并重开 App，从 beta.4 clean tag 启动 observer，在其发布 `REQUEST_STARTED` 后使用普通 Stop，取得精确 `cancelled + owned-zero` receipt；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`。
 
 真实宿主门禁只接受 App 的普通 Stop：必须在 observer 发布 `REQUEST_STARTED` 后点击，并确认外层状态为 `cancelled`、完成标记没有写入、SDK abort 到达、owned descendants zero 且不重生。
 
@@ -296,7 +296,7 @@ Codex 只清理这些由当前 App 宿主启动的插件 MCP 进程树，未终�
 前已加载插件配置，既有实测表明版本更新不能热刷新，所以真实 Pi/delegate/取消调用
 必须等完整 App 重启后在新任务执行。
 
-## beta.3 发布、公共验收与活动升级
+## beta.3 发布、公共验收、活动升级与启动阻断
 
 `0.1.1-beta.3` 已由 release run `30783495490` 通过 GitHub Actions OIDC 发布到
 npm `next`，registry 为 `next=0.1.1-beta.3`、`latest=0.1.0`。精确公共包验收于
@@ -322,27 +322,35 @@ beta.1 缓存而失败；该命令移除了 MCP 注册，但没有完成插件�
 - 旧 `codex_cc_tools` 仍 enabled，工具仍为 `cc_review` / `cc_delegate`；
 - 命令行精确匹配的插件 MCP 进程数为 0。
 
-全过程没有直接读取或修改活动 `config.toml`，也没有手工删除缓存。当前 app-server
-早于本次升级且实测不能可靠热刷新插件，因此上述事实只证明官方升级成功；下一节点仍是
-完整退出并重开 App 后，由 checked-in observer 在普通 Stop 后产生精确
-`cancelled + owned-zero` receipt。
+全过程没有直接读取或修改活动 `config.toml`，也没有手工删除缓存。随后从不可变
+`v0.1.1-beta.3` 的精确 clean checkout 运行正式启动层时，脚本在 observer 启动前
+要求读取仓库中被 `.gitignore` 排除的生成 runtime，因而确定性 fail closed。活动插件
+并未因此运行失败，但 beta.3 无法作为同一不可变发布身份下的宿主 receipt 生产者；不得
+手工复制 runtime、外置替换脚本或移动旧标签。
+
+`0.1.1-beta.4` 候选按 TDD 修复这一缺口：clean tag 只读取 4 个受版本控制插件制品；
+活动官方 cache 的 5 个安装制品仍全部通过固定路径、realpath、普通文件和 reparse 检查，
+共同计算 beta marker 已绑定的完整摘要；4 个共同文件再逐字节对照。生成 runtime 只来自
+活动 cache。该修复不改变 canonical runtime、helper、observer或八项能力指纹，故不重跑
+任何真实模型。
 
 ## 尚未通过的门禁
 
 完整第 4 层仍缺少以下证据：
 
-1. 完整重启宿主，并在新任务确认 beta.3 缓存与四项脱敏环境变量已经被新
+1. beta.4 已完成离线门禁；继续完成 PR/CI、GitHub Actions OIDC 发布、公共精确包验收和官方插件升级。
+2. 完整重启宿主，并在新任务确认 beta.4 缓存与四项脱敏环境变量已经被新
    app-server 加载。
-2. 从精确 beta.3 tag 的 clean checkout 启动 checked-in observer，只执行它输出的
+3. 从精确 beta.4 tag 的 clean checkout 启动 checked-in observer，只执行它输出的
    旧宿主 `kimi-k3` `external_review` 握手；随后由 observer 确认真正的旧宿主退出和
    新宿主身份，不额外重跑任何能力资格。
-3. 在 observer 创建的 nonce 隔离仓库中，逐字使用它输出的 `kimi-k3`
+4. 在 observer 创建的 nonce 隔离仓库中，逐字使用它输出的 `kimi-k3`
    `external_delegate` 参数；只有 observer 发布 `REQUEST_STARTED` 后才在 App 中
    点击普通 Stop。
-4. observer 作为唯一 writer 原子写入 PASS receipt；receipt 必须精确证明请求
+5. observer 作为唯一 writer 原子写入 PASS receipt；receipt 必须精确证明请求
    cancelled、completion marker absent、handler cancelled、in-flight removed、
    owned descendants zero 且不重生。
-5. 上述门禁全部通过后，只通过 GitHub Actions OIDC 发布 stable。
+6. 上述门禁全部通过后，只通过 GitHub Actions OIDC 发布 stable。
 
 在这些缺口闭合前：
 
@@ -355,8 +363,9 @@ beta.1 缓存而失败；该命令移除了 MCP 注册，但没有完成插件�
 
 ## 下一人工节点
 
-下一人工节点已经到达：维护者需要完整退出并重开 Codex App；随后 Codex 在新任务
-核对 beta.3 已由新 app-server 加载，并启动 checked-in observer，按它输出的精确
+尚未到达新的人工节点。Codex 先自主完成 beta.4 的离线门禁、PR/CI、OIDC 发布、
+公共精确包验收与官方插件升级；只有 beta.4 安装完成后，才请维护者完整退出并重开
+Codex App。随后从 beta.4 精确 clean tag 启动 checked-in observer，按它输出的精确
 Kimi review 握手与隔离 delegate 参数完成普通 Stop 和 `cancelled + owned-zero` receipt；
 不额外进行泛化模型复跑。
 

@@ -3,9 +3,11 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readFile,
   realpath,
   rm,
   symlink,
+  writeFile,
 } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -14,9 +16,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   HOST_ACCEPTANCE_PLUGIN_PATHS,
+  HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS,
   buildHostAcceptanceSession,
   buildNpmViewInvocation,
   consumeObserverLifecycle,
+  loadHostAcceptancePluginFiles,
   prepareHostAcceptanceDirectories,
 } from "../../host-acceptance/start-session.mjs";
 
@@ -175,22 +179,27 @@ function fixture() {
   };
   const manifestBytes = bytes(manifest);
   const observerBytes = bytes("observer-binary");
-  const pluginFiles = HOST_ACCEPTANCE_PLUGIN_PATHS.map((path, index) => ({
+  const installedPluginFiles = HOST_ACCEPTANCE_PLUGIN_PATHS.map((path, index) => ({
     path,
     content: bytes(`plugin-${index}`),
   }));
-  pluginFiles[0]!.content = bytes({
+  installedPluginFiles[0]!.content = bytes({
     name: "codex-external-agents",
     version: VERSION,
   });
-  const installedPluginFiles = pluginFiles.map(({ path, content }) => ({
-    path,
-    content: Buffer.from(content),
-  }));
+  const repositoryPluginFiles = HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS.map(
+    (repositoryPath) => {
+      const installed = installedPluginFiles.find(
+        ({ path }) => path === repositoryPath,
+      );
+      if (installed === undefined) throw new Error("invalid fixture");
+      return { path: repositoryPath, content: Buffer.from(installed.content) };
+    },
+  );
   const pluginDigest = sha256(
     JSON.stringify({
       schemaVersion: 1,
-      files: pluginFiles.map(({ path, content }) => ({
+      files: installedPluginFiles.map(({ path, content }) => ({
         path,
         sha256: sha256(content),
       })),
@@ -228,7 +237,7 @@ function fixture() {
     observerBytes,
     protocolBytes,
     inputFiles,
-    pluginFiles,
+    repositoryPluginFiles,
     installedPluginFiles,
     gitHead: H40,
     tagCommit: H40,
@@ -249,7 +258,44 @@ function fixture() {
   };
 }
 
+function refreshPluginMarker(value: ReturnType<typeof fixture>): void {
+  const marker = JSON.parse(value.markerBytes.toString("utf8"));
+  marker.pluginArtifactTree.digestSha256 = sha256(
+    JSON.stringify({
+      schemaVersion: 1,
+      files: value.installedPluginFiles.map(({ path, content }) => ({
+        path,
+        sha256: sha256(content),
+      })),
+    }),
+  );
+  value.markerBytes = bytes(marker);
+}
+
+function replacePluginManifest(
+  value: ReturnType<typeof fixture>,
+  manifest: unknown,
+): void {
+  const content = bytes(manifest);
+  value.installedPluginFiles[0]!.content = content;
+  value.repositoryPluginFiles[0]!.content = Buffer.from(content);
+  refreshPluginMarker(value);
+}
+
 describe("current-host acceptance session preparation", () => {
+  it("uses only tracked plugin files from the tag and binds generated runtime from the installed cache", () => {
+    expect(HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS).toEqual([
+      "plugins/codex-external-agents/.codex-plugin/plugin.json",
+      "plugins/codex-external-agents/.mcp.json",
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
+    ]);
+    expect(HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS).not.toContain(
+      "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+    );
+    expect(() => buildHostAcceptanceSession(fixture())).not.toThrow();
+  });
+
   it("binds the exact beta tag, public npm, observer provenance and fixed delegate input", () => {
     const plan = buildHostAcceptanceSession(fixture());
     const descriptor = JSON.parse(plan.descriptorBytes.toString("utf8"));
@@ -340,14 +386,115 @@ describe("current-host acceptance session preparation", () => {
     ["npm version mismatch", (value: ReturnType<typeof fixture>) => (value.npmView.version = "0.1.1-beta.3")],
     ["observer drift", (value: ReturnType<typeof fixture>) => (value.observerBytes = bytes("drift"))],
     ["manifest input drift", (value: ReturnType<typeof fixture>) => value.inputFiles.set("host-acceptance/build.ps1", bytes("drift"))],
-    ["plugin drift", (value: ReturnType<typeof fixture>) => (value.pluginFiles[0]!.content = bytes("drift"))],
-    ["installed cache drift", (value: ReturnType<typeof fixture>) => value.installedPluginFiles[2]!.content.fill(0xff, 0, 1)],
+    ["tracked plugin drift", (value: ReturnType<typeof fixture>) => value.repositoryPluginFiles[0]!.content.fill(0x44, 0, 1)],
+    ["installed cache runtime drift", (value: ReturnType<typeof fixture>) => value.installedPluginFiles[2]!.content.fill(0xff, 0, 1)],
+    ["installed cache tracked-file drift", (value: ReturnType<typeof fixture>) => value.installedPluginFiles[0]!.content.fill(0xff, 0, 1)],
+    ["installed cache missing file", (value: ReturnType<typeof fixture>) => value.installedPluginFiles.pop()],
+    ["installed cache reordered files", (value: ReturnType<typeof fixture>) => value.installedPluginFiles.reverse()],
+    ["marker plugin digest drift", (value: ReturnType<typeof fixture>) => {
+      const marker = JSON.parse(value.markerBytes.toString("utf8"));
+      marker.pluginArtifactTree.digestSha256 = "f".repeat(64);
+      value.markerBytes = bytes(marker);
+    }],
+    ["installed plugin name mismatch", (value: ReturnType<typeof fixture>) => replacePluginManifest(value, {
+      name: "codex-external-agentz",
+      version: VERSION,
+    })],
+    ["installed plugin version mismatch", (value: ReturnType<typeof fixture>) => replacePluginManifest(value, {
+      name: "codex-external-agents",
+      version: "0.1.1-beta.9",
+    })],
   ])("fails closed on %s", (_label, mutate) => {
     const value = fixture();
     mutate(value);
     expect(() => buildHostAcceptanceSession(value)).toThrow(
       "Host acceptance session is invalid.",
     );
+  });
+});
+
+describe("host-acceptance plugin file loading", () => {
+  it("does not require the generated runtime to exist in the clean tag checkout", async () => {
+    const temporary = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), "host-acceptance-plugin-files-")),
+    );
+    const repositoryRoot = path.join(temporary, "repository");
+    const installedRoot = path.join(temporary, "installed");
+    try {
+      await mkdir(repositoryRoot);
+      await mkdir(installedRoot);
+      for (const [index, pluginPath] of HOST_ACCEPTANCE_PLUGIN_PATHS.entries()) {
+        const relative = pluginPath.replace(
+          "plugins/codex-external-agents/",
+          "",
+        );
+        const installedPath = path.join(installedRoot, ...relative.split("/"));
+        await mkdir(path.dirname(installedPath), { recursive: true });
+        await writeFile(installedPath, bytes(`installed-${index}`));
+      }
+      for (const pluginPath of HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS) {
+        const relative = pluginPath.replace(
+          "plugins/codex-external-agents/",
+          "",
+        );
+        const sourcePath = path.join(repositoryRoot, ...pluginPath.split("/"));
+        const installedPath = path.join(installedRoot, ...relative.split("/"));
+        await mkdir(path.dirname(sourcePath), { recursive: true });
+        await writeFile(sourcePath, await readFile(installedPath));
+      }
+
+      const loaded = await loadHostAcceptancePluginFiles(
+        repositoryRoot,
+        installedRoot,
+      );
+      expect(loaded.repositoryPluginFiles.map(({ path }) => path)).toEqual(
+        HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS,
+      );
+      expect(loaded.installedPluginFiles.map(({ path }) => path)).toEqual(
+        HOST_ACCEPTANCE_PLUGIN_PATHS,
+      );
+      await expect(
+        lstat(
+          path.join(
+            repositoryRoot,
+            "plugins",
+            "codex-external-agents",
+            "runtime",
+            "codex-external-agents-mcp.mjs",
+          ),
+        ),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+
+      const runtimeRelative = path.join(
+        "runtime",
+        "codex-external-agents-mcp.mjs",
+      );
+      await rm(path.join(installedRoot, runtimeRelative));
+      await expect(
+        loadHostAcceptancePluginFiles(repositoryRoot, installedRoot),
+      ).rejects.toThrow("Host acceptance session is invalid.");
+
+      const outsideRuntime = path.join(temporary, "outside-runtime");
+      await mkdir(outsideRuntime);
+      await writeFile(
+        path.join(outsideRuntime, "codex-external-agents-mcp.mjs"),
+        bytes("outside-runtime"),
+      );
+      await rm(path.join(installedRoot, "runtime"), {
+        recursive: true,
+        force: true,
+      });
+      await symlink(
+        outsideRuntime,
+        path.join(installedRoot, "runtime"),
+        process.platform === "win32" ? "junction" : "dir",
+      );
+      await expect(
+        loadHostAcceptancePluginFiles(repositoryRoot, installedRoot),
+      ).rejects.toThrow("Host acceptance session is invalid.");
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
   });
 });
 

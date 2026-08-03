@@ -1,4 +1,10 @@
 export const HOST_ACCEPTANCE_PLUGIN_PATHS: readonly string[];
+export const HOST_ACCEPTANCE_REPOSITORY_PLUGIN_PATHS: readonly string[];
+
+export interface HostAcceptancePluginFile {
+  readonly path: string;
+  readonly content: Buffer;
+}
 
 export interface HostAcceptanceSessionPlan {
   readonly nonce: string;
@@ -21,6 +27,14 @@ export interface HostAcceptanceSessionPlan {
 }
 
 export function buildHostAcceptanceSession(input: any): HostAcceptanceSessionPlan;
+
+export function loadHostAcceptancePluginFiles(
+  repositoryRoot: string,
+  installedRoot: string,
+): Promise<Readonly<{
+  repositoryPluginFiles: readonly HostAcceptancePluginFile[];
+  installedPluginFiles: readonly HostAcceptancePluginFile[];
+}>>;
 
 export function buildNpmViewInvocation(
   nodeExecutable: string,

@@ -4,7 +4,7 @@
 
 状态：已获维护者授权，执行中。
 
-> 2026-08-03 当前覆盖：发布实施以[Windows 当前宿主精简计划](2026-08-01-windows-current-host-owned-process.md)为准。下文 Node 20/22/24 矩阵、跨宿主兼容与旧 Markdown marker 只记录已发布版本的历史流程，不是下一版本门禁；下一版本只使用当前 Windows x64 / Node 24 宿主、严格 JSON marker、GitHub Actions OIDC、公共 npm 与官方插件完整重启/真实 Stop 验收。维护者再次报告 Ark Coding Plan 额度恢复；这只改变当前可调用性，新的四模型八项资格已经全部通过并晋级为 8 current / 0 legacy，不重复运行模型。`v0.1.1-beta.2` 通过 PR 与双重 CI，但 release workflow 在 npm publish 前因 Windows 旧工作树 CRLF marker 与 GitHub LF checkout 的 raw plugin-tree digest 不一致而 fail closed；标签保持不可变且 npm 版本不存在。`0.1.1-beta.3` 已完成 LF-only/current-marker-fresh-build 回归、PR/双重 CI、严格 marker、GitHub Actions OIDC 发布、公共 npm 精确包隔离验收与活动官方插件升级；当前宿主 `gate:offline` 为 69 files / 1227 passed / 5 skipped，独立审计无 P1/P2/P3。官方状态为beta.3 installed/enabled、旧`codex_cc_tools` enabled、精确插件MCP进程0；下一步只做完整 App 退出重开，并在observer发布`REQUEST_STARTED`后使用普通Stop取得`cancelled + owned-zero` receipt，随后才准备stable。
+> 2026-08-03 当前覆盖：发布实施以[Windows 当前宿主精简计划](2026-08-01-windows-current-host-owned-process.md)为准。下文 Node 20/22/24 矩阵、跨宿主兼容与旧 Markdown marker 只记录历史流程，不是下一版本门禁；下一版本只使用当前 Windows x64 / Node 24 宿主、严格 JSON marker、GitHub Actions OIDC、公共 npm 与官方插件完整重启/真实 Stop 验收。维护者再次报告 Ark Coding Plan 额度恢复；这只改变当前可调用性，四模型八项资格已经全部通过并晋级为 8 current / 0 legacy，不重复运行模型。`v0.1.1-beta.2` 在发布前被严格 marker 阻断且标签不可复用。`0.1.1-beta.3` 已完成 OIDC 发布、公共精确包验收与活动官方插件升级，但其精确 clean-tag 启动层在 observer 前错误要求 Git 未跟踪的生成 runtime，因而 fail closed。当前 `0.1.1-beta.4` 候选只修复该证据装载缺口：tag 对照4个受版本控制制品，活动缓存5个实际制品仍全部进入 marker 摘要；当前 Node 24 宿主完整离线门禁已通过69 files / 1235 passed / 5 skipped、类型、构建、release smoke与精确包闭包。待 PR/双重CI、OIDC发布、公共包验收与官方升级后，才完整重启 App，并在observer发布`REQUEST_STARTED`后使用普通Stop取得`cancelled + owned-zero` receipt，随后准备stable。
 
 ## 用户目标
 
