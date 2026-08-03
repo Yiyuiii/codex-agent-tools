@@ -6,7 +6,7 @@
 
 - 新插件不调用 `codex_cc_tools`，也不调用、修改或卸载本机 Claude Code；
 - 本轮不卸载、禁用或修改旧 `codex_cc_tools`；
-- 活动 Codex 当前已通过官方插件机制安装已发布的 `0.1.1-beta.1`，但真实宿主门禁仍为 partial；
+- 活动 Codex 当前已通过官方插件机制安装并启用已发布的 `0.1.1-beta.3`，但完整 App 重启与普通 Stop 的 `cancelled + owned-zero` receipt 尚未完成，真实宿主门禁仍为 partial；
 - 项目代码不得直接读取或写入活动 `~/.codex/config.toml`；官方插件命令可能更新该状态文件，因此每次真实 add/remove 都必须先取得针对该动作的明确许可。
 
 “共存”不是“已经替代”。在全部替代门槛通过前，旧工具保持原状，用户已有工作流不在本轮改动范围内。
@@ -15,14 +15,14 @@
 
 | 外部来源或用途 | 新逻辑 LLM | 固定路由 | 当前门禁 |
 | --- | --- | --- | --- |
-| Kimi Code 审阅/委派 | `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | 旧 review/delegate evidence passed；当前指纹 stale |
-| Ark Coding Plan | `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | 旧 review/delegate evidence passed；当前指纹 stale |
-| Ark Agent Plan 主档 | `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | 旧 review/delegate evidence passed；当前指纹 stale |
-| Ark Agent Plan 经济档 | `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | 旧 review/delegate evidence passed；当前指纹 stale |
+| Kimi Code 审阅/委派 | `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | review/delegate current passed |
+| Ark Coding Plan | `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | review/delegate current passed |
+| Ark Agent Plan 主档 | `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | review/delegate current passed |
+| Ark Agent Plan 经济档 | `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | review/delegate current passed |
 | Anthropic Claude / Claude Code 后端 | 无 | 不进入新产品面 | 不迁移 |
 | OpenAI/Codex 模型家族 | 无 | 顶层已经是 Codex | 不作为外部来源 |
 
-当前 Kimi 只公开 K3；旧 Kimi、旧 Agent Plan 模型和 Gemini 记录只作为历史证据保留，不属于当前注册表。Gemini 的历史 Google / `proxy-10808` 路由与额度失败见 [退役历史页](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/pi-gemini.md)，不构成当前 provider 或待晋级能力。发布资格以能力索引和 verifier 为准：当前八项均因运行时指纹变化而 stale；候选只重跑 stale、缺失、新增或证据失效的精确能力，不静默切换到其它 LLM，也不改写历史 evidence。
+当前 Kimi 只公开 K3；旧 Kimi、旧 Agent Plan 模型和 Gemini 记录只作为历史证据保留，不属于当前注册表。Gemini 的历史 Google / `proxy-10808` 路由与额度失败见 [退役历史页](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/pi-gemini.md)，不构成当前 provider 或待晋级能力。发布资格以能力索引和 verifier 为准：2026-08-03 新批次已使八项全部 current passed，现行索引为 8 current / 0 legacy。只有未来发生 stale、缺失、新增或证据失效时才定向运行对应精确能力；不因临时额度恢复重复运行，不静默切换到其它 LLM，也不改写历史 evidence。
 
 ## 具备替代条件的门槛
 
@@ -33,7 +33,7 @@
 3. 四个当前逻辑 LLM 的 review/delegate 均由当前能力索引绑定有效的 passed evidence 与运行时指纹；不同能力可以来自不同不可变批次，不要求同一批 8/8；
 4. 从公共 npm 安装已由 GitHub Actions OIDC 发布的精确 beta，并通过官方插件机制升级；
 5. 真实 Codex App 只发现两个批准工具，且二者 `llm` 必填；
-6. 完整 App 重启后的真实宿主代表性 review/delegate、普通 Stop 或 dedicated interrupt 和 Windows owned descendants zero 通过；
+6. 完整 App 重启后，只按 checked-in observer 输出完成旧宿主 Kimi review 握手与新宿主隔离 Kimi delegate；observer 发布 `REQUEST_STARTED` 后点击 App 普通 Stop，并取得精确 `cancelled + owned-zero` receipt；
 7. 新旧工具共存状态经过验证，旧工具未被意外修改。
 
 隔离 CLI 生命周期只能证明官方安装器和缓存副本可用，不能替代真实 Codex App 宿主门禁。四层状态和停止条件见 [发布验收清单](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/checklist.md)。

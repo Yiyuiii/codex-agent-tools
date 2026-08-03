@@ -2,7 +2,9 @@
 
 日期：2026-08-02
 
-状态：**已收敛设计，分批实现中；尚未形成发布PASS**
+状态：**实现与 beta.3 安装已完成；等待真实宿主 receipt**
+
+> 2026-08-03 当前覆盖：observer、固定artifact/build manifest、启动层、current-host freeze、8/8能力恢复、beta.3 OIDC发布、公共npm精确验收与官方插件升级均已完成。下文按日期记录的“只剩freeze/stale资格/发布”等句子是当时的实施进度，不是当前待办。当前唯一缺口是完整退出并重开App，按启动层输出完成旧宿主Kimi review握手与新宿主隔离Kimi delegate，并在observer发布`REQUEST_STARTED`后点击普通Stop；只有observer唯一写入的`cancelled + owned-zero` receipt可满足stable marker。
 
 适用范围：维护者当前 Windows 10 x64、Node v24.14.1、.NET Framework 4.8 宿主上的公共 beta → 真实 Codex App 验收 → stable 发布链。本文不建立跨 Node、跨 Windows 或跨机器兼容承诺。
 
