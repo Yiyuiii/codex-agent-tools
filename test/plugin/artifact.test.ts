@@ -17,6 +17,10 @@ import {
   capabilitySourcePathsFromIndex,
   packageFilePathsFromManifest,
 } from "../../src/release/assurance.js";
+import {
+  digestReleasePluginArtifactTree,
+  RELEASE_PLUGIN_ARTIFACT_PATHS,
+} from "../../src/release/release-validation.js";
 import { resolveWindowsJobHelperForModule } from "../../src/runtime/windows-job-helper.js";
 
 const repositoryRoot = resolve(
@@ -112,6 +116,47 @@ describe("Codex plugin artifact", () => {
       expect(prompt.trim().length).toBeGreaterThan(0);
       expect(prompt.length).toBeLessThanOrEqual(128);
     }
+  });
+
+  it("keeps release plugin text artifacts LF-only for byte-stable OIDC builds", () => {
+    for (const relativePath of [
+      "plugins/codex-external-agents/.codex-plugin/plugin.json",
+      "plugins/codex-external-agents/.mcp.json",
+      "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
+    ]) {
+      expect(
+        readFileSync(resolve(repositoryRoot, relativePath)).includes(0x0d),
+        relativePath,
+      ).toBe(false);
+    }
+  });
+
+  it("binds the current prerelease marker to the freshly built plugin tree", () => {
+    const packageManifest = readJson("package.json");
+    const version = packageManifest.version;
+    expect(typeof version).toBe("string");
+    if (typeof version !== "string" || !version.includes("-")) return;
+
+    const marker = readJson(`.release-validation/v${version}.json`);
+    expect(marker).toMatchObject({
+      kind: "beta",
+      package: {
+        name: "codex-agent-tools",
+        version,
+        tag: `v${version}`,
+        npmChannel: "next",
+      },
+    });
+    const tree = marker.pluginArtifactTree as Record<string, unknown>;
+    expect(
+      digestReleasePluginArtifactTree(
+        RELEASE_PLUGIN_ARTIFACT_PATHS.map((relativePath) => ({
+          path: relativePath,
+          content: readFileSync(resolve(repositoryRoot, relativePath)),
+        })),
+      ),
+    ).toBe(tree.digestSha256);
   });
 
   it("starts exactly one MCP server through the bundled relative path", () => {
