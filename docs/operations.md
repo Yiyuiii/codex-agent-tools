@@ -1,6 +1,6 @@
 # 官方插件运维流程
 
-本文是 `codex_external_agents` 官方插件候选构建、隔离验收、已授权官方升级与回滚的现行运维真值源。`0.1.1-beta.4` 已完成 PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共精确包验收和活动官方插件升级；活动 Codex 现为 installed/enabled beta.4，旧 `codex_cc_tools` 继续共存。`0.1.1` stable 候选精确复用该运行时，普通 Stop 由维护者决定跳过并保持 unverified。当前发布线只保证维护者的 Windows x64 / Node 24 宿主；不运行 Node 矩阵或跨宿主认证。
+本文是 `codex_external_agents` 官方插件构建、隔离验收、已授权官方升级与回滚的现行运维真值源。`0.1.1` 已通过 GitHub Actions OIDC 发布到 npm `latest`、完成公共精确包验收，并作为 installed/enabled 活动插件在完整重启后的新任务中发现两个公开工具。普通 Stop 由维护者决定跳过并保持 unverified。旧 `codex_cc_tools` 已于 2026-08-07 经独立授权使用官方 `codex mcp remove` 退役；当前发布线只保证维护者的 Windows x64 / Node 24 宿主，不运行 Node 矩阵或跨宿主认证。
 
 最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`；四个逻辑 LLM 的八项 review/delegate 全部 passed。每项均为一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，owned process 全部排空；终态为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
 
@@ -8,7 +8,7 @@
 
 资格执行与恢复的唯一详细合同见[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)；历史 Kimi/Ark case、旧 shell 根因和旧测试计数分别保留在 `docs/smoke/` 与不可变 evidence 中，不在运维入口重复维护。package/release assurance 只证明离线候选，不构成资格、安装或发布。
 
-当前流程没有访问或修改 `~/.codex/config.toml`，没有移除 `codex_cc_tools`，也没有调用或修改 Claude Code。`npm run verify:capabilities` 是当前机器资格与发布权威；registry 文案、历史授权页和旧批次结果页不能替代它。
+项目代码没有访问或修改 `~/.codex/config.toml`，也没有调用或修改 Claude Code。旧 `codex_cc_tools` 的移除只通过维护者明确授权的官方 Codex MCP 命令完成，没有手工读取或编辑配置。`npm run verify:capabilities` 是当前机器资格与发布权威；registry 文案、历史授权页和旧批次结果页不能替代它。
 
 项目代码和维护者都不得直接读取、写入、备份、恢复或手工编辑活动 `~/.codex/config.toml`。Codex 官方插件命令可能由官方机制更新该状态文件，因此真实 add/remove 每次都必须先准备权限包并取得针对该次动作的明确许可。
 
@@ -97,7 +97,7 @@ npm run acceptance:npm-package -- --version 0.1.0
 - 官方安装后的验证步骤；
 - 官方 remove 回滚步骤；
 - 失败时不手工恢复或编辑活动 `config.toml`；
-- 旧 `codex_cc_tools` 保持原状，本轮不移除；
+- 说明旧 `codex_cc_tools` 已在独立授权中退役，本次插件升级不重新注册或修改它；
 - 禁止本地 `npm publish`；只允许 GitHub Actions OIDC 发布下一个 beta；本权限包不执行公共 marketplace 发布。
 
 权限包必须先交给用户审阅。过去关于采用官方插件机制的同意不能推定为本次 add/remove 的许可。
@@ -160,5 +160,5 @@ if ($LASTEXITCODE -ne 0) { throw "Codex marketplace remove 失败，停止回滚
 
 - 每次真实安装、升级或独立卸载都是新的外部状态变更，必须重新逐动作授权。
 - 永远不以手工编辑活动 `config.toml` 代替官方插件机制。
-- 本轮不移除旧 `codex_cc_tools`，不调用或修改 Claude Code；禁止本地 `npm publish`。只允许 GitHub Actions OIDC 发布 beta 与 stable。
-- `0.1.1` stable 只表示确定性检查、隔离生命周期、当前能力资格、beta.4 公共 npm 精确版本验收与官方升级通过；真实 App 普通 Stop 明确为 skipped / unverified，因此仍不得宣称新插件已证明可替代旧工具。stable 只由 GitHub Actions OIDC 发布。
+- 旧 `codex_cc_tools` 已经独立授权退役；未来不得把普通插件升级默认为重新注册、修改或再次移除旧工具。项目仍不调用或修改 Claude Code；禁止本地 `npm publish`，只允许 GitHub Actions OIDC 发布 beta 与 stable。
+- `0.1.1` stable 表示确定性检查、隔离生命周期、当前能力资格、beta.4 公共 npm 精确版本验收、官方升级和发布后真实 Kimi 窄任务通过。真实 App 普通 Stop 仍明确为 skipped / unverified；旧工具退役不能改写该风险事实。stable 只由 GitHub Actions OIDC 发布。
