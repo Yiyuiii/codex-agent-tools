@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 4,
+  "qualification": {
+    "qualificationPlanId": "four-llm-v1",
+    "batchId": "2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923",
+    "ordinal": 4,
+    "llm": "kimi-k3",
+    "task": "delegate",
+    "frozenCommit": "9054cbc45aaf1c91c2c62817244be5288032ede8",
+    "frozenBuildIdentity": "843b91b84dd2a6836402e1396a47b8cd3f805eec9d786c462905c738f59105de",
+    "authorizationReferenceSha256": "e470bb0f9668c499eea4948f58a8a8a717c7015e710c1133dbefc709d52f73cf",
+    "orchestratorFallbackUsed": false
+  },
+  "timestamp": "2026-08-03T02:13:46.511Z",
+  "llm": "kimi-k3",
+  "actualModel": "kimi-code/k3",
+  "expectedModel": "kimi-code/k3",
+  "runtime": "kimi-acp",
+  "route": "direct",
+  "task": "delegate",
+  "status": "completed",
+  "passed": true,
+  "failureReason": null,
+  "elapsedMs": 24427,
+  "outputSha256": "57afff927acf63a915489a62f76f6d5e5e6b6520289ce3ac477799808bf13552",
+  "filesChanged": [
+    "result.txt"
+  ],
+  "commandCount": 1,
+  "diagnosticCount": 0,
+  "adapterClientInvocationCount": 1,
+  "adapterRetryCount": 0,
+  "runtimeReportedAutoRetryCount": 0,
+  "adapterReportedFallbackUsed": false,
+  "ownedProcessDrained": true,
+  "orchestratorFallbackUsed": false,
+  "executionTelemetrySource": "kimi-acp-observable",
+  "checks": {
+    "actualModelMatches": true,
+    "ownedProcessDrained": true,
+    "resultFileValid": true,
+    "resultFileObserved": true,
+    "onlyExpectedFileChanged": true,
+    "requiredCommandObserved": true,
+    "executionTelemetryValid": true
+  },
+  "commandObservations": [
+    {
+      "source": "late_update",
+      "match": "exact"
+    }
+  ],
+  "resultFileReadStatus": "read",
+  "expectedResultNormalizedSha256": "04298ec5e8a57284fdd41f2eb8e59aee13b499871edc0d1934e3c2b3c0890a9e",
+  "resultFileByteLength": 14,
+  "resultFileRawSha256": "ebe1b1d60e7f7cf0daf70beca33a0c75f93ce117e15b73d17a4b1e91b7a23145",
+  "resultFileNormalizedSha256": "04298ec5e8a57284fdd41f2eb8e59aee13b499871edc0d1934e3c2b3c0890a9e",
+  "resultFileNormalizedLineCount": 1,
+  "resultFileContainsExpectedLine": true
+}

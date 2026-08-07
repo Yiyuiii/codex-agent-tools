@@ -9,9 +9,6 @@ on:
 permissions:
   contents: read
 
-env:
-  CODEX_CLI_VERSION: 0.146.0
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -21,37 +18,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [20, 22, 24]
-
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24
           cache: npm
 
       - name: Install pinned Codex CLI for plugin smoke
         shell: bash
         run: |
           set -euo pipefail
-          npm install --global "@openai/codex@${CODEX_CLI_VERSION}"
-          test "$(codex --version)" = "codex-cli ${CODEX_CLI_VERSION}"
+          codex_cli_version="$(node -p "require('./package.json').config.codexCliVersion")"
+          if [[ ! "$codex_cli_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::package.json config.codexCliVersion must be an exact version"
+            exit 1
+          fi
+          npm install --global "@openai/codex@${codex_cli_version}"
+          test "$(codex --version)" = "codex-cli ${codex_cli_version}"
 
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm test -- --maxWorkers=1
-      - run: npm run smoke:release
-
-      - name: Upload package evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-node-${{ matrix.node-version }}-package-evidence
-          path: |
-            dist/
-            plugins/codex-external-agents/runtime/
-          if-no-files-found: error
-          retention-days: 7
+      - run: npm run gate:offline

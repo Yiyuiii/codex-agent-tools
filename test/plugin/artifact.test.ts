@@ -8,10 +8,20 @@ import { fileURLToPath } from "node:url";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { build, type Options } from "tsup";
 import { describe, expect, it } from "vitest";
-
-import pluginBuildConfig from "../../tsup.plugin.config.js";
+import {
+  isAbsoluteOnAnyPlatform,
+  isSafeRelativeLaunchPath,
+} from "../../scripts/lib/npm-launch-path.mjs";
+import {
+  capabilitySourcePathsFromIndex,
+  packageFilePathsFromManifest,
+} from "../../src/release/assurance.js";
+import {
+  digestReleasePluginArtifactTree,
+  RELEASE_PLUGIN_ARTIFACT_PATHS,
+} from "../../src/release/release-validation.js";
+import { resolveWindowsJobHelperForModule } from "../../src/runtime/windows-job-helper.js";
 
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -108,6 +118,47 @@ describe("Codex plugin artifact", () => {
     }
   });
 
+  it("keeps release plugin text artifacts LF-only for byte-stable OIDC builds", () => {
+    for (const relativePath of [
+      "plugins/codex-external-agents/.codex-plugin/plugin.json",
+      "plugins/codex-external-agents/.mcp.json",
+      "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
+    ]) {
+      expect(
+        readFileSync(resolve(repositoryRoot, relativePath)).includes(0x0d),
+        relativePath,
+      ).toBe(false);
+    }
+  });
+
+  it("binds the current prerelease marker to the freshly built plugin tree", () => {
+    const packageManifest = readJson("package.json");
+    const version = packageManifest.version;
+    expect(typeof version).toBe("string");
+    if (typeof version !== "string" || !version.includes("-")) return;
+
+    const marker = readJson(`.release-validation/v${version}.json`);
+    expect(marker).toMatchObject({
+      kind: "beta",
+      package: {
+        name: "codex-agent-tools",
+        version,
+        tag: `v${version}`,
+        npmChannel: "next",
+      },
+    });
+    const tree = marker.pluginArtifactTree as Record<string, unknown>;
+    expect(
+      digestReleasePluginArtifactTree(
+        RELEASE_PLUGIN_ARTIFACT_PATHS.map((relativePath) => ({
+          path: relativePath,
+          content: readFileSync(resolve(repositoryRoot, relativePath)),
+        })),
+      ),
+    ).toBe(tree.digestSha256);
+  });
+
   it("starts exactly one MCP server through the bundled relative path", () => {
     const mcpManifest = readJson(
       "plugins/codex-external-agents/.mcp.json",
@@ -117,49 +168,70 @@ describe("Codex plugin artifact", () => {
       codex_external_agents: {
         command: "node",
         args: ["./runtime/codex-external-agents-mcp.mjs"],
+        cwd: ".",
+        env_vars: [
+          "ARK_API_KEY",
+          "VOLCENGINE_API_KEY",
+          "API_KEY_DOUBAO_CODING",
+          "OPENAI_API_KEY_DOUBAO",
+        ],
       },
     });
-    expect(JSON.stringify(mcpManifest)).not.toMatch(
-      /(?:\benv\b|[A-Za-z]:[\\/]|(?:api[_-]?key|secret|token))/iu,
-    );
+    expect(mcpManifest.codex_external_agents).not.toHaveProperty("env");
+    expect(JSON.stringify(mcpManifest)).not.toMatch(/[A-Za-z]:[\\/]/u);
   });
 
-  it("builds the MCP entry as a self-contained plugin runtime", () => {
-    const buildConfig = readFileSync(
-      resolve(repositoryRoot, "tsup.plugin.config.ts"),
-      "utf8",
-    );
+  it("accepts only safe relative npm launch paths on either platform", () => {
+    for (const absolutePath of [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "\\\\server\\share\\node.exe",
+      "/usr/local/bin/node",
+    ]) {
+      expect(isAbsoluteOnAnyPlatform(absolutePath)).toBe(true);
+      expect(isSafeRelativeLaunchPath(absolutePath)).toBe(false);
+    }
 
-    expect(buildConfig).toMatch(
-      /entry:\s*\{\s*"codex-external-agents-mcp":\s*"src\/mcp\/main\.ts",?\s*\}/u,
-    );
-    expect(buildConfig).toContain(
-      'outDir: "plugins/codex-external-agents/runtime"',
-    );
-    expect(buildConfig).toContain('format: ["esm"]');
-    expect(buildConfig).toContain(
-      'outExtension: () => ({ js: ".mjs" })',
-    );
-    expect(buildConfig).toContain('platform: "node"');
-    expect(buildConfig).toContain('target: "node20"');
-    expect(buildConfig).toContain("bundle: true");
-    expect(buildConfig).toContain("noExternal: [/.*/u]");
-    expect(buildConfig).toContain("splitting: false");
-    expect(buildConfig).toContain("dts: false");
-    expect(buildConfig).toContain("sourcemap: false");
-    expect(buildConfig).toContain("clean: true");
+    for (const relativePath of [
+      "node",
+      "./runtime/codex-external-agents-mcp.mjs",
+      "runtime\\codex-external-agents-mcp.mjs",
+    ]) {
+      expect(isAbsoluteOnAnyPlatform(relativePath)).toBe(false);
+      expect(isSafeRelativeLaunchPath(relativePath)).toBe(true);
+    }
+
+    expect(isSafeRelativeLaunchPath("")).toBe(false);
+    expect(isSafeRelativeLaunchPath("   ")).toBe(false);
+    for (const unsafeRelativePath of [
+      "../escape",
+      "..\\escape",
+      "C:escape",
+      "node\0suffix",
+      "node\rsuffix",
+      "node\nsuffix",
+      " node",
+      "node ",
+    ]) {
+      expect(isSafeRelativeLaunchPath(unsafeRelativePath)).toBe(false);
+    }
   });
 
-  it("runs library then plugin builds and ignores only the runtime directory", () => {
+  it("publishes one Node 24 runtime baseline", () => {
+    const packageManifest = readJson("package.json");
+    const packageLock = readJson("package-lock.json");
+    const packageLockPackages = packageLock.packages as Record<
+      string,
+      { engines?: unknown }
+    >;
+
+    expect(packageManifest.engines).toEqual({ node: ">=24" });
+    expect(packageLockPackages[""]?.engines).toEqual({ node: ">=24" });
+  });
+
+  it("uses one build pipeline and publishes the exact package file surface", () => {
     const packageManifest = readJson("package.json");
     const scripts = packageManifest.scripts as Record<string, string>;
     const packageFiles = packageManifest.files as string[];
-    const gitignoreLines = readFileSync(
-      resolve(repositoryRoot, ".gitignore"),
-      "utf8",
-    )
-      .split(/\r?\n/u)
-      .filter(Boolean);
 
     expect(scripts["build:library"]).toBe("tsup");
     expect(scripts["build:plugin"]).toBe(
@@ -168,45 +240,77 @@ describe("Codex plugin artifact", () => {
     expect(scripts.build).toBe(
       "npm run build:library && npm run build:plugin",
     );
-    expect(scripts).not.toHaveProperty("smoke:pi");
-    expect(packageFiles).toEqual(
-      expect.arrayContaining([
-        "docs/smoke/pi-gemini.md",
-        "docs/smoke/evidence",
-      ]),
+    expect(scripts["acceptance:plugin:isolated"]).toBe(
+      "npm run build && npm run acceptance:plugin:isolated:built",
     );
-    expect(gitignoreLines).toContain(
-      "plugins/codex-external-agents/runtime/",
+    expect(scripts["acceptance:plugin:isolated:built"]).toBe(
+      "node scripts/plugin-isolated-acceptance.mjs",
+    );
+    expect(scripts).not.toHaveProperty("smoke:pi");
+    const capabilityIndex = readJson(
+      "docs/smoke/evidence/capabilities.json",
+    );
+    expect(packageFiles).toEqual([
+      "dist/cli.js",
+      "dist/mcp.js",
+      "README.md",
+      "LICENSE",
+      "docs/operations.md",
+      "docs/migration-from-codex-cc-tools.md",
+      ".agents/plugins/marketplace.json",
+      "plugins/codex-external-agents/.codex-plugin/plugin.json",
+      "plugins/codex-external-agents/.mcp.json",
+      "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
+      "docs/smoke/evidence/capabilities.json",
+      ...capabilitySourcePathsFromIndex(capabilityIndex),
+    ]);
+    expect(packageFilePathsFromManifest(packageManifest)).toEqual(
+      packageFiles,
     );
     expect(dirname(pluginRoot)).toBe(
       resolve(repositoryRoot, "plugins"),
     );
   });
 
-  it("pins release smoke to the exact four active logical LLMs and retained history", () => {
-    const releaseSmoke = readFileSync(
-      resolve(repositoryRoot, "scripts/release-smoke.mjs"),
-      "utf8",
-    );
+  it("packages exactly the verified Windows x64 managed job helper pair", async () => {
+    const packageManifest = readJson("package.json");
+    const packageFiles = packageManifest.files as string[];
+    const helperFiles = [
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+      "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
+    ];
 
-    expect(releaseSmoke).toContain('"ark-agent-deepseek-v4-flash"');
-    expect(releaseSmoke).toContain('"ark-agent-plan"');
-    expect(releaseSmoke).toContain('"ark-coding-plan"');
-    expect(releaseSmoke).toContain('"kimi-k3"');
-    expect(releaseSmoke).toContain('"docs/smoke/pi-gemini.md"');
-    expect(releaseSmoke).toContain('"docs/smoke/evidence"');
-    expect(releaseSmoke).not.toContain("expected 5");
+    expect(
+      packageFiles.filter((entry) =>
+        entry.startsWith("plugins/codex-external-agents/native/"),
+      ),
+    ).toEqual(helperFiles);
+
+    const resolved = await resolveWindowsJobHelperForModule(
+      new URL("../../dist/cli.js", import.meta.url).href,
+      "win32",
+      "x64",
+    );
+    expect(resolved.executablePath).toBe(
+      resolve(repositoryRoot, helperFiles[0]!),
+    );
+    expect(resolved.sha256).toMatch(/^[0-9a-f]{64}$/u);
   });
 
-  it("builds and runs the bundled MCP entry without repository dependencies", async () => {
+  it("copies and runs the already-built MCP entry without repository dependencies", async () => {
     const temporaryRoot = await mkdtemp(
       resolve(tmpdir(), "codex-plugin-artifact-"),
     );
-    const buildRoot = resolve(temporaryRoot, "build");
     const isolatedRoot = resolve(temporaryRoot, "isolated");
     const isolatedBundle = resolve(
       isolatedRoot,
       "codex-external-agents-mcp.mjs",
+    );
+    const builtBundle = resolve(
+      pluginRoot,
+      "runtime/codex-external-agents-mcp.mjs",
     );
     const client = new Client({
       name: "plugin-artifact-test",
@@ -220,22 +324,7 @@ describe("Codex plugin artifact", () => {
     });
 
     try {
-      const config = pluginBuildConfig;
-      if (typeof config === "function" || Array.isArray(config)) {
-        throw new TypeError(
-          "Expected a single static plugin build configuration.",
-        );
-      }
-      await build({
-        ...(config as Options),
-        outDir: buildRoot,
-        config: false,
-      });
-
-      const builtBundle = resolve(
-        buildRoot,
-        "codex-external-agents-mcp.mjs",
-      );
+      expect(existsSync(builtBundle)).toBe(true);
       await mkdir(isolatedRoot, { recursive: true });
       await copyFile(builtBundle, isolatedBundle);
       expect(existsSync(resolve(temporaryRoot, "node_modules"))).toBe(false);

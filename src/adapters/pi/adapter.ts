@@ -1,22 +1,85 @@
+import path from "node:path";
+
 import type {
   AdapterRunRequest,
   AdapterRunResult,
   ExternalAgentAdapter,
 } from "../adapter.js";
 import { VERSION } from "../../version.js";
-import { buildChildEnvironment } from "../../runtime/environment.js";
+import { buildPiChildEnvironment } from "../../runtime/environment.js";
 import {
   buildIsolatedPiConfig,
   type IsolatedPiConfig,
 } from "./config.js";
 import { runPiRpc, type PiRpcRunRequest } from "./client.js";
-import { locatePi } from "./locator.js";
+import {
+  locatePi,
+  locatePiInvocation,
+  type PiInvocation,
+} from "./locator.js";
 
 export interface PiAdapterDependencies {
-  locateExecutable?: (environment: NodeJS.ProcessEnv) => Promise<string>;
-  buildConfig?: () => Promise<IsolatedPiConfig>;
-  runClient?: (request: PiRpcRunRequest) => Promise<AdapterRunResult>;
-  retryMode?: "default" | "qualification-single-attempt";
+  readonly locateExecutable?: (
+    environment: NodeJS.ProcessEnv,
+  ) => Promise<string>;
+  readonly locateInvocation?: (
+    environment: NodeJS.ProcessEnv,
+  ) => Promise<PiInvocation>;
+  readonly buildConfig?: () => Promise<IsolatedPiConfig>;
+  readonly runClient?: (
+    request: PiRpcRunRequest,
+  ) => Promise<AdapterRunResult>;
+  readonly retryMode?: "default" | "qualification-single-attempt";
+}
+
+interface PiClientLaunch {
+  readonly executable: string;
+  readonly executableArgs?: readonly string[];
+}
+
+const PI_PACKAGE_NAME = "@earendil-works/pi-coding-agent";
+const INVALID_PI_INVOCATION = "Pi Windows invocation is invalid";
+
+function validatedWindowsLaunch(invocation: PiInvocation): PiClientLaunch {
+  const argvPrefix = invocation?.argvPrefix;
+  const identity = invocation?.identity;
+  const cli = Array.isArray(argvPrefix) ? argvPrefix[0] : undefined;
+  if (
+    invocation?.executable !== process.execPath ||
+    !Array.isArray(argvPrefix) ||
+    argvPrefix.length !== 1 ||
+    typeof cli !== "string" ||
+    cli.trim() === "" ||
+    cli.includes("\0") ||
+    !path.isAbsolute(cli) ||
+    identity?.packageName !== PI_PACKAGE_NAME ||
+    typeof identity.packageVersion !== "string" ||
+    identity.packageVersion.trim() === "" ||
+    typeof identity.nodeEngine !== "string" ||
+    identity.nodeEngine.trim() === ""
+  ) {
+    throw new Error(INVALID_PI_INVOCATION);
+  }
+  return { executable: process.execPath, executableArgs: [cli] };
+}
+
+function collectChildCredentialSecrets(
+  profile: AdapterRunRequest["profile"],
+  environment: NodeJS.ProcessEnv,
+): string[] {
+  const names =
+    profile.credentialTargetEnv === undefined
+      ? profile.credentialEnv
+      : [profile.credentialTargetEnv];
+  return [
+    ...new Set(
+      names
+        .map((name) => environment[name])
+        .filter(
+          (value): value is string => value !== undefined && value !== "",
+        ),
+    ),
+  ];
 }
 
 function mapToolEvent(event: unknown): unknown {
@@ -68,6 +131,9 @@ export class PiAdapter implements ExternalAgentAdapter {
   readonly #locateExecutable: (
     environment: NodeJS.ProcessEnv,
   ) => Promise<string>;
+  readonly #locateInvocation: (
+    environment: NodeJS.ProcessEnv,
+  ) => Promise<PiInvocation>;
   readonly #buildConfig: () => Promise<IsolatedPiConfig>;
   readonly #runClient: (
     request: PiRpcRunRequest,
@@ -78,6 +144,9 @@ export class PiAdapter implements ExternalAgentAdapter {
     this.#locateExecutable =
       dependencies.locateExecutable ??
       ((environment) => locatePi({ environment }));
+    this.#locateInvocation =
+      dependencies.locateInvocation ??
+      ((environment) => locatePiInvocation({ environment }));
     this.#buildConfig =
       dependencies.buildConfig ??
       (() =>
@@ -96,19 +165,29 @@ export class PiAdapter implements ExternalAgentAdapter {
     if (request.profile.provider === undefined) {
       throw new Error(`Pi profile ${request.profile.id} has no fixed provider`);
     }
-    const [executable, config] = await Promise.all([
-      this.#locateExecutable(request.parentEnvironment),
+    const launchPromise: Promise<PiClientLaunch> = process.platform === "win32"
+      ? this.#locateInvocation(request.parentEnvironment).then(
+          validatedWindowsLaunch,
+        )
+      : this.#locateExecutable(request.parentEnvironment).then(
+          (executable) => ({ executable }),
+        );
+    const [launch, config] = await Promise.all([
+      launchPromise,
       this.#buildConfig(),
     ]);
-    const environment = {
-      ...buildChildEnvironment(request.profile, request.parentEnvironment),
-      ...config.environment,
-    };
-    const secretValues = request.profile.credentialEnv
-      .map((name) => request.parentEnvironment[name])
-      .filter((value): value is string => value !== undefined && value !== "");
+    const environment = buildPiChildEnvironment(
+      request.profile,
+      config.environment.PI_CODING_AGENT_DIR,
+      request.parentEnvironment,
+      process.platform,
+    );
+    const secretValues = collectChildCredentialSecrets(
+      request.profile,
+      environment,
+    );
     const clientRequest: PiRpcRunRequest = {
-      executable,
+      executable: launch.executable,
       cwd: request.cwd,
       environment,
       provider: request.profile.provider,
@@ -116,13 +195,18 @@ export class PiAdapter implements ExternalAgentAdapter {
       thinkingLevel: "medium",
       task: request.task,
       prompt: request.prompt,
-      timeoutMs: Math.min(
-        request.timeoutMs ?? request.profile.timeoutMs,
-        request.profile.timeoutMs,
-      ),
       secretValues,
     };
+    if (launch.executableArgs !== undefined) {
+      clientRequest.executableArgs = launch.executableArgs;
+    }
+    if (request.timeoutMs !== undefined) {
+      clientRequest.timeoutMs = request.timeoutMs;
+    }
     if (request.signal !== undefined) clientRequest.signal = request.signal;
+    if (request.shutdownSignal !== undefined) {
+      clientRequest.shutdownSignal = request.shutdownSignal;
+    }
     if (request.onProgress !== undefined) {
       clientRequest.onProgress = request.onProgress;
     }

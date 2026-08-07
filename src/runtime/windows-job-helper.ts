@@ -1,0 +1,206 @@
+import { createHash } from "node:crypto";
+import { lstat, readFile, readdir, realpath } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const EXECUTABLE_NAME = "codex-agent-job-helper.exe";
+const MANIFEST_NAME = `${EXECUTABLE_NAME}.sha256`;
+const FAILURE_MESSAGE = "Windows job helper artifact validation failed.";
+const PLUGIN_NAME = "codex-external-agents";
+const EXACT_SEMVER_PATTERN =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
+
+export interface ResolvedWindowsJobHelper {
+  readonly executablePath: string;
+  readonly sha256: string;
+}
+
+function fail(): never {
+  throw new Error(FAILURE_MESSAGE);
+}
+
+function samePath(left: string, right: string): boolean {
+  return (
+    path.resolve(left).localeCompare(path.resolve(right), "en-US", {
+      sensitivity: "accent",
+    }) === 0
+  );
+}
+
+async function assertNoReparseExistingPath(candidate: string): Promise<void> {
+  const absolute = path.resolve(candidate);
+  const parsed = path.parse(absolute);
+  let current = parsed.root;
+  for (const segment of absolute.slice(parsed.root.length).split(path.sep)) {
+    if (segment === "") continue;
+    current = path.join(current, segment);
+    const entry = await lstat(current);
+    if (entry.isSymbolicLink()) fail();
+  }
+  const canonical = await realpath(absolute);
+  if (!samePath(canonical, absolute)) fail();
+}
+
+function hasExactName(candidate: string, expected: string): boolean {
+  return path.basename(candidate).toLowerCase() === expected;
+}
+
+async function verifyCachedPluginRoot(
+  modulePath: string,
+  pluginRoot: string,
+): Promise<string> {
+  const version = path.basename(pluginRoot);
+  const pluginDirectory = path.dirname(pluginRoot);
+  const marketplaceDirectory = path.dirname(pluginDirectory);
+  const marketplace = path.basename(marketplaceDirectory);
+  const cacheDirectory = path.dirname(marketplaceDirectory);
+  const pluginsDirectory = path.dirname(cacheDirectory);
+  const moduleName = path.basename(modulePath);
+  if (
+    moduleName.length <= ".mjs".length ||
+    path.extname(moduleName).toLowerCase() !== ".mjs" ||
+    !EXACT_SEMVER_PATTERN.test(version) ||
+    !hasExactName(pluginDirectory, PLUGIN_NAME) ||
+    marketplace === "" ||
+    marketplace === "." ||
+    marketplace === ".." ||
+    !hasExactName(cacheDirectory, "cache") ||
+    !hasExactName(pluginsDirectory, "plugins")
+  ) {
+    fail();
+  }
+
+  const manifestPath = path.join(
+    pluginRoot,
+    ".codex-plugin",
+    "plugin.json",
+  );
+  await assertNoReparseExistingPath(modulePath);
+  await assertNoReparseExistingPath(pluginRoot);
+  await assertNoReparseExistingPath(manifestPath);
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as unknown;
+  if (
+    typeof manifest !== "object" ||
+    manifest === null ||
+    Array.isArray(manifest) ||
+    !("name" in manifest) ||
+    !("version" in manifest) ||
+    manifest.name !== PLUGIN_NAME ||
+    manifest.version !== version
+  ) {
+    fail();
+  }
+  return pluginRoot;
+}
+
+async function resolvePluginRoot(modulePath: string): Promise<string> {
+  const moduleDirectory = path.dirname(modulePath);
+  if (path.basename(moduleDirectory).toLowerCase() === "dist") {
+    return path.join(
+      path.dirname(moduleDirectory),
+      "plugins",
+      "codex-external-agents",
+    );
+  }
+
+  const pluginRoot = path.dirname(moduleDirectory);
+  if (
+    path.basename(moduleDirectory).toLowerCase() === "runtime" &&
+    path.basename(pluginRoot).toLowerCase() === PLUGIN_NAME &&
+    path.basename(path.dirname(pluginRoot)).toLowerCase() === "plugins"
+  ) {
+    return pluginRoot;
+  }
+  if (path.basename(moduleDirectory).toLowerCase() === "runtime") {
+    return await verifyCachedPluginRoot(modulePath, pluginRoot);
+  }
+  return fail();
+}
+
+function assertX64ManagedPe(bytes: Buffer): void {
+  if (bytes.length < 0x40 || bytes.toString("ascii", 0, 2) !== "MZ") fail();
+  const peOffset = bytes.readUInt32LE(0x3c);
+  const optionalHeader = peOffset + 24;
+  if (
+    peOffset > bytes.length - 24 ||
+    bytes.toString("binary", peOffset, peOffset + 4) !== "PE\0\0" ||
+    bytes.readUInt16LE(peOffset + 4) !== 0x8664 ||
+    bytes.readUInt16LE(optionalHeader) !== 0x20b
+  ) {
+    fail();
+  }
+
+  const optionalHeaderBytes = bytes.readUInt16LE(peOffset + 20);
+  const dataDirectories = optionalHeader + 112;
+  const clrDirectory = dataDirectories + 14 * 8;
+  if (
+    optionalHeaderBytes < 112 + 15 * 8 ||
+    clrDirectory > bytes.length - 8 ||
+    bytes.readUInt32LE(optionalHeader + 108) < 15 ||
+    bytes.readUInt32LE(clrDirectory) === 0 ||
+    bytes.readUInt32LE(clrDirectory + 4) === 0
+  ) {
+    fail();
+  }
+}
+
+/**
+ * Verifies the packaged helper bytes and their exact sidecar without executing
+ * the artifact. This intentionally has no host-platform gate so release and
+ * qualification code can inspect the Windows artifact on any build host.
+ */
+export async function inspectWindowsJobHelperArtifact(
+  artifactRoot: string,
+): Promise<ResolvedWindowsJobHelper> {
+  try {
+    const executablePath = path.join(artifactRoot, EXECUTABLE_NAME);
+    const manifestPath = path.join(artifactRoot, MANIFEST_NAME);
+
+    await assertNoReparseExistingPath(artifactRoot);
+    await assertNoReparseExistingPath(executablePath);
+    await assertNoReparseExistingPath(manifestPath);
+
+    const entries = (await readdir(artifactRoot)).sort();
+    if (
+      entries.length !== 2 ||
+      entries[0] !== EXECUTABLE_NAME ||
+      entries[1] !== MANIFEST_NAME
+    ) {
+      fail();
+    }
+
+    const [bytes, manifest] = await Promise.all([
+      readFile(executablePath),
+      readFile(manifestPath, "utf8"),
+    ]);
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    if (manifest !== `${digest}  ${EXECUTABLE_NAME}\n`) fail();
+    assertX64ManagedPe(bytes);
+    return Object.freeze({ executablePath, sha256: digest });
+  } catch {
+    return fail();
+  }
+}
+
+/** @internal Tests inject only the loaded module identity, never an artifact path. */
+export async function resolveWindowsJobHelperForModule(
+  moduleUrl: string,
+  platform: NodeJS.Platform = process.platform,
+  architecture: string = process.arch,
+): Promise<ResolvedWindowsJobHelper> {
+  try {
+    if (platform !== "win32" || architecture !== "x64") fail();
+    const modulePath = fileURLToPath(moduleUrl);
+    const pluginRoot = await resolvePluginRoot(modulePath);
+    const artifactRoot = path.join(pluginRoot, "native", "win32-x64");
+
+    await assertNoReparseExistingPath(pluginRoot);
+    return await inspectWindowsJobHelperArtifact(artifactRoot);
+  } catch {
+    return fail();
+  }
+}
+
+export async function resolveWindowsJobHelper(): Promise<ResolvedWindowsJobHelper> {
+  return resolveWindowsJobHelperForModule(import.meta.url);
+}

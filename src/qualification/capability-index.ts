@@ -16,6 +16,15 @@ import {
   verifyQualification,
   type QualificationVerificationResult,
 } from "./verifier.js";
+import {
+  currentEvidenceCheckKeys,
+  validateCurrentEvidenceContract,
+} from "./evidence-contract.js";
+import {
+  CANONICAL_RUNTIME_TYPESCRIPT_WRAPPER_PATHS,
+  collectCanonicalRuntimeInputIdentity,
+  type CanonicalRuntimeInputIdentity,
+} from "../release/canonical-runtime-inputs.js";
 
 const MAX_RUNTIME_INPUT_BYTES = 4 * 1024 * 1024;
 
@@ -30,6 +39,7 @@ const QUALIFICATION_RUNTIME_INPUT_ROOTS = Object.freeze([
 ] as const);
 
 const SHARED_RUNTIME_INPUT_ROOTS = Object.freeze([
+  "host-acceptance/protocol/observer-protocol.v1.json",
   "src/adapters/adapter.ts",
   "src/mcp",
   "src/runtime",
@@ -78,7 +88,6 @@ export interface CapabilityFingerprintProfile {
   readonly network: "direct";
   readonly credentialEnv: readonly string[];
   readonly credentialTargetEnv?: string;
-  readonly timeoutMs: number;
   readonly maxConcurrency: number;
   readonly concurrencyKey?: string;
 }
@@ -87,6 +96,7 @@ export interface CapabilityFingerprintSnapshot {
   readonly llm: string;
   readonly task: TaskKind;
   readonly profile: CapabilityFingerprintProfile;
+  readonly canonicalRuntimeInputDigestSha256: string;
   readonly inputs: readonly CapabilityRuntimeInput[];
 }
 
@@ -333,8 +343,10 @@ async function collectPath(
   repositoryRoot: string,
   relativePath: string,
   collected: Map<string, CapabilityRuntimeInput>,
+  excluded: ReadonlySet<string>,
 ): Promise<void> {
   const normalized = normalizedRelativePath(relativePath);
+  if (excluded.has(normalized)) return;
   const absolute = resolvedRepositoryPath(repositoryRoot, normalized);
   let metadata;
   try {
@@ -356,6 +368,7 @@ async function collectPath(
         repositoryRoot,
         `${normalized}/${name}`,
         collected,
+        excluded,
       );
     }
     return;
@@ -390,13 +403,24 @@ export function capabilityRuntimeInputRoots(
     : KIMI_RUNTIME_INPUT_ROOTS;
 }
 
+export function capabilityRuntimeInputExclusions(): readonly string[] {
+  return CANONICAL_RUNTIME_TYPESCRIPT_WRAPPER_PATHS;
+}
+
 export async function collectCapabilityRuntimeInputs(options: {
   repositoryRoot: string;
   roots: readonly string[];
+  excludePaths?: readonly string[];
 }): Promise<readonly CapabilityRuntimeInput[]> {
   const collected = new Map<string, CapabilityRuntimeInput>();
+  const excluded = new Set(
+    (options.excludePaths ?? []).map(normalizedRelativePath),
+  );
+  if (excluded.size !== (options.excludePaths ?? []).length) {
+    throw capabilityInputError();
+  }
   for (const root of options.roots) {
-    await collectPath(options.repositoryRoot, root, collected);
+    await collectPath(options.repositoryRoot, root, collected, excluded);
   }
   return Object.freeze(
     [...collected.values()].sort((left, right) =>
@@ -513,9 +537,14 @@ function exactTrueChecks(
 function expectedBatchCheckKeys(
   profile: LlmProfile,
   task: TaskKind,
+  currentOwnedEvidence: boolean,
 ): readonly string[] {
-  const processCheck =
-    profile.runtime === "pi-rpc"
+  if (currentOwnedEvidence) {
+    return currentEvidenceCheckKeys(profile.runtime, task);
+  }
+  const ownershipCheck = currentOwnedEvidence
+    ? "ownedProcessDrained"
+    : profile.runtime === "pi-rpc"
       ? "noNewPiRpcProcesses"
       : "noNewKimiProcesses";
   const environmentChecks =
@@ -526,14 +555,14 @@ function expectedBatchCheckKeys(
         ...environmentChecks,
         "executionTelemetryValid",
         "knownDefectFound",
-        processCheck,
+        ownershipCheck,
         "workspaceUnchanged",
       ]
     : [
         "actualModelMatches",
         ...environmentChecks,
         "executionTelemetryValid",
-        processCheck,
+        ownershipCheck,
         "onlyExpectedFileChanged",
         "requiredCommandObserved",
         "resultFileObserved",
@@ -564,11 +593,12 @@ function validateBatchEvidence(
   profile: LlmProfile,
   source: BatchCaseCapabilitySource,
   batchId: string,
+  currentOwnedEvidence: boolean,
 ): void {
   const evidence = plainRecord(evidenceValue);
   const qualification = plainRecord(evidence.qualification);
   if (
-    evidence.schemaVersion !== 3 ||
+    evidence.schemaVersion !== (currentOwnedEvidence ? 4 : 3) ||
     evidence.llm !== entry.llm ||
     evidence.task !== entry.task ||
     evidence.runtime !== profile.runtime ||
@@ -587,6 +617,9 @@ function validateBatchEvidence(
       (profile.runtime === "pi-rpc"
         ? "pi-rpc-observable"
         : "kimi-acp-observable") ||
+    (currentOwnedEvidence
+      ? evidence.ownedProcessDrained !== true
+      : Object.hasOwn(evidence, "ownedProcessDrained")) ||
     qualification.qualificationPlanId !== "four-llm-v1" ||
     qualification.batchId !== batchId ||
     qualification.llm !== entry.llm ||
@@ -604,9 +637,20 @@ function validateBatchEvidence(
   ) {
     throw capabilityQualificationError();
   }
+  if (currentOwnedEvidence) {
+    try {
+      validateCurrentEvidenceContract(evidence, {
+        llm: entry.llm,
+        task: entry.task,
+        runtime: profile.runtime,
+      });
+    } catch {
+      throw capabilityQualificationError();
+    }
+  }
   exactTrueChecks(
     evidence.checks,
-    expectedBatchCheckKeys(profile, entry.task),
+    expectedBatchCheckKeys(profile, entry.task, currentOwnedEvidence),
   );
 }
 
@@ -673,7 +717,10 @@ async function verifyBatchCapabilityEvidence(
     throw capabilityQualificationError();
   }
   const manifest = plainRecord(manifestFile.value);
+  const currentOwnedEvidence = manifest.schemaVersion === 3;
   if (
+    (manifest.schemaVersion !== 2 && manifest.schemaVersion !== 3) ||
+    manifest.qualificationPlanId !== "four-llm-v1" ||
     manifest.batchId !== batchId ||
     manifest.repositoryCommit !== source.frozenCommit ||
     manifest.buildIdentitySha256 !== source.buildIdentitySha256 ||
@@ -704,6 +751,7 @@ async function verifyBatchCapabilityEvidence(
     options.profile,
     source,
     batchId,
+    currentOwnedEvidence,
   );
   return Object.freeze({ sourceKind: "batch-case" });
 }
@@ -886,11 +934,32 @@ function capabilityEvidenceAnchor(llm: string, task: TaskKind): string {
   return `${CAPABILITY_INDEX_RELATIVE_PATH}#${llm}-${task}`;
 }
 
-export async function verifyCapabilityIndex(options: {
-  repositoryRoot: string;
-}): Promise<CapabilityIndexVerificationResult> {
+export interface CapabilityIndexAnalysisEntry {
+  readonly llm: string;
+  readonly task: TaskKind;
+  readonly gateStatus: "valid" | "invalid";
+  readonly evidenceStatus: "valid" | "invalid";
+  readonly runtimeFingerprintStatus: "current" | "stale" | "invalid";
+  readonly currentRuntimeFingerprintSha256: string | null;
+}
+
+export interface CapabilityIndexAnalysisResult {
+  readonly indexPath: typeof CAPABILITY_INDEX_RELATIVE_PATH;
+  readonly entries: readonly CapabilityIndexAnalysisEntry[];
+  readonly legacyEntryCount: number;
+}
+
+export interface CapabilityIndexAnalysisDependencies {
+  collectCanonicalRuntimeInputIdentity?: (
+    repositoryRoot: string,
+  ) => Promise<CanonicalRuntimeInputIdentity>;
+}
+
+async function loadCapabilityIndexEntries(
+  repositoryRoot: string,
+): Promise<readonly CapabilityQualificationEntry[]> {
   const indexFile = await readQualificationJson(
-    options.repositoryRoot,
+    repositoryRoot,
     CAPABILITY_INDEX_RELATIVE_PATH,
   );
   const index = plainRecord(indexFile.value);
@@ -905,16 +974,30 @@ export async function verifyCapabilityIndex(options: {
   const actualKeys = entries.map(
     (entry) => `${entry.llm}/${entry.task}`,
   );
+  const legacyEntryCount = entries.filter(
+    (entry) => entry.source.kind === "legacy-standalone",
+  ).length;
   if (
     entries.length !== expectedKeys.length ||
     actualKeys.some((key, index) => key !== expectedKeys[index]) ||
-    entries.filter(
-      (entry) => entry.source.kind === "legacy-standalone",
-    ).length !== 1
+    legacyEntryCount > 1
   ) {
     throw capabilityQualificationError();
   }
+  return Object.freeze(entries);
+}
 
+export async function analyzeCapabilityIndex(
+  options: {
+    repositoryRoot: string;
+  },
+  dependencies: CapabilityIndexAnalysisDependencies = {},
+): Promise<CapabilityIndexAnalysisResult> {
+  const entries = await loadCapabilityIndexEntries(options.repositoryRoot);
+  const canonicalIdentity = await (
+    dependencies.collectCanonicalRuntimeInputIdentity ??
+    collectCanonicalRuntimeInputIdentity
+  )(options.repositoryRoot);
   const manifestVerificationCache = new Map<
     string,
     Promise<QualificationVerificationResult>
@@ -933,39 +1016,118 @@ export async function verifyCapabilityIndex(options: {
     }
     return pending;
   };
-
-  for (const entry of entries) {
-    const profile = resolveLlm(entry.llm);
-    const gate = profile.qualityGates[entry.task];
-    if (
-      gate.status !== "passed" ||
-      gate.evidence !== capabilityEvidenceAnchor(entry.llm, entry.task)
-    ) {
-      throw capabilityQualificationError();
-    }
-    const currentFingerprint = await computeCapabilityRuntimeFingerprint({
-      repositoryRoot: options.repositoryRoot,
-      llm: entry.llm,
-      task: entry.task,
-    });
-    if (currentFingerprint !== entry.runtimeFingerprintSha256) {
-      throw capabilityQualificationError();
-    }
-    await verifyCapabilityEvidenceSource(
-      {
+  const runtimeInputCache = new Map<
+    RuntimeKind,
+    Promise<readonly CapabilityRuntimeInput[]>
+  >();
+  const runtimeInputs = (
+    runtime: RuntimeKind,
+  ): Promise<readonly CapabilityRuntimeInput[]> => {
+    let pending = runtimeInputCache.get(runtime);
+    if (pending === undefined) {
+      pending = collectCapabilityFingerprintInputs({
         repositoryRoot: options.repositoryRoot,
-        entry,
-        profile,
-      },
-      { verifyBatchManifest },
-    );
+        runtime,
+      });
+      runtimeInputCache.set(runtime, pending);
+    }
+    return pending;
+  };
+
+  const analyzed = await Promise.all(
+    entries.map(async (entry): Promise<CapabilityIndexAnalysisEntry> => {
+      const profile = resolveLlm(entry.llm);
+      const gate = profile.qualityGates[entry.task];
+      const gateStatus =
+        gate.status === "passed" &&
+        gate.evidence === capabilityEvidenceAnchor(entry.llm, entry.task)
+          ? "valid"
+          : "invalid";
+      const fingerprintResult = runtimeInputs(profile.runtime)
+        .then((inputs) =>
+          computeCapabilityRuntimeFingerprintWithIdentity(
+            {
+              repositoryRoot: options.repositoryRoot,
+              llm: entry.llm,
+              task: entry.task,
+            },
+            canonicalIdentity,
+            inputs,
+          ),
+        )
+        .then((currentFingerprint) =>
+          Object.freeze({
+            status:
+              currentFingerprint === entry.runtimeFingerprintSha256
+                ? ("current" as const)
+                : ("stale" as const),
+            currentFingerprint,
+          }),
+        )
+        .catch(() =>
+          Object.freeze({
+            status: "invalid" as const,
+            currentFingerprint: null,
+          }),
+        );
+      const evidenceResult = verifyCapabilityEvidenceSource(
+        {
+          repositoryRoot: options.repositoryRoot,
+          entry,
+          profile,
+        },
+        { verifyBatchManifest },
+      )
+        .then(() => "valid" as const)
+        .catch(() => "invalid" as const);
+      const [fingerprint, evidenceStatus] = await Promise.all([
+        fingerprintResult,
+        evidenceResult,
+      ]);
+      return Object.freeze({
+        llm: entry.llm,
+        task: entry.task,
+        gateStatus,
+        evidenceStatus,
+        runtimeFingerprintStatus: fingerprint.status,
+        currentRuntimeFingerprintSha256: fingerprint.currentFingerprint,
+      });
+    }),
+  );
+  return Object.freeze({
+    indexPath: CAPABILITY_INDEX_RELATIVE_PATH,
+    entries: Object.freeze(analyzed),
+    legacyEntryCount: entries.filter(
+      (entry) => entry.source.kind === "legacy-standalone",
+    ).length,
+  });
+}
+
+export async function verifyCapabilityIndex(options: {
+  repositoryRoot: string;
+}): Promise<CapabilityIndexVerificationResult> {
+  let analysis: CapabilityIndexAnalysisResult;
+  try {
+    analysis = await analyzeCapabilityIndex(options);
+  } catch {
+    throw capabilityQualificationError();
+  }
+  if (
+    analysis.entries.some(
+      (entry) =>
+        entry.gateStatus !== "valid" ||
+        entry.evidenceStatus !== "valid" ||
+        entry.runtimeFingerprintStatus !== "current",
+    )
+  ) {
+      throw capabilityQualificationError();
   }
 
   return Object.freeze({
     verified: true,
     indexPath: CAPABILITY_INDEX_RELATIVE_PATH,
-    entryCount: entries.length,
-    legacyEntryCount: 1,
+    entryCount: analysis.entries.length,
+    legacyEntryCount: analysis.legacyEntryCount,
   });
 }
 
@@ -980,7 +1142,6 @@ function normalizedFingerprintProfile(
     network: profile.network,
     credentialEnv: [...profile.credentialEnv],
     credentialTargetEnv: profile.credentialTargetEnv ?? null,
-    timeoutMs: profile.timeoutMs,
     maxConcurrency: profile.maxConcurrency,
     concurrencyKey: profile.concurrencyKey ?? null,
   };
@@ -989,6 +1150,9 @@ function normalizedFingerprintProfile(
 export function fingerprintCapabilitySnapshot(
   snapshot: CapabilityFingerprintSnapshot,
 ): string {
+  if (!SHA256_PATTERN.test(snapshot.canonicalRuntimeInputDigestSha256)) {
+    throw capabilityInputError();
+  }
   const inputs = [...snapshot.inputs]
     .map((input) => ({
       path: normalizedRelativePath(input.path),
@@ -1005,10 +1169,12 @@ export function fingerprintCapabilitySnapshot(
   }
   return sha256(
     JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       llm: snapshot.llm,
       task: snapshot.task,
       profile: normalizedFingerprintProfile(snapshot.profile),
+      canonicalRuntimeInputDigestSha256:
+        snapshot.canonicalRuntimeInputDigestSha256,
       inputs,
     }),
   );
@@ -1027,7 +1193,6 @@ function fingerprintProfile(profile: LlmProfile): CapabilityFingerprintProfile {
     ...(profile.credentialTargetEnv === undefined
       ? {}
       : { credentialTargetEnv: profile.credentialTargetEnv }),
-    timeoutMs: profile.timeoutMs,
     maxConcurrency: profile.maxConcurrency,
     ...(profile.concurrencyKey === undefined
       ? {}
@@ -1040,11 +1205,23 @@ export async function computeCapabilityRuntimeFingerprint(options: {
   llm: string;
   task: TaskKind;
 }): Promise<string> {
-  const profile = resolveLlm(options.llm);
-  if (!profile.capabilities[options.task]) throw capabilityInputError();
+  const canonicalIdentity = await collectCanonicalRuntimeInputIdentity(
+    options.repositoryRoot,
+  );
+  return computeCapabilityRuntimeFingerprintWithIdentity(
+    options,
+    canonicalIdentity,
+  );
+}
+
+async function collectCapabilityFingerprintInputs(options: {
+  repositoryRoot: string;
+  runtime: RuntimeKind;
+}): Promise<readonly CapabilityRuntimeInput[]> {
   const inputs = await collectCapabilityRuntimeInputs({
     repositoryRoot: options.repositoryRoot,
-    roots: capabilityRuntimeInputRoots(profile.runtime),
+    roots: capabilityRuntimeInputRoots(options.runtime),
+    excludePaths: capabilityRuntimeInputExclusions(),
   });
   const [packageLockInput] = await collectCapabilityRuntimeInputs({
     repositoryRoot: options.repositoryRoot,
@@ -1059,12 +1236,33 @@ export async function computeCapabilityRuntimeFingerprint(options: {
   }
   const dependencyInput = capabilityDependencyInputFromPackageLock(
     packageLock,
-    profile.runtime,
+    options.runtime,
   );
+  return Object.freeze([...inputs, dependencyInput]);
+}
+
+async function computeCapabilityRuntimeFingerprintWithIdentity(
+  options: {
+    repositoryRoot: string;
+    llm: string;
+    task: TaskKind;
+  },
+  canonicalIdentity: CanonicalRuntimeInputIdentity,
+  runtimeInputs?: readonly CapabilityRuntimeInput[],
+): Promise<string> {
+  const profile = resolveLlm(options.llm);
+  if (!profile.capabilities[options.task]) throw capabilityInputError();
+  const inputs =
+    runtimeInputs ??
+    (await collectCapabilityFingerprintInputs({
+      repositoryRoot: options.repositoryRoot,
+      runtime: profile.runtime,
+    }));
   return fingerprintCapabilitySnapshot({
     llm: options.llm,
     task: options.task,
     profile: fingerprintProfile(profile),
-    inputs: Object.freeze([...inputs, dependencyInput]),
+    canonicalRuntimeInputDigestSha256: canonicalIdentity.digestSha256,
+    inputs,
   });
 }

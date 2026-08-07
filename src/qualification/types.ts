@@ -1,4 +1,3 @@
-import type { AgentProcessCounts } from "../runtime/agent-processes.js";
 import type { QualificationPlanId } from "./protocol.js";
 
 interface QualificationLockOwnerCommon {
@@ -42,8 +41,6 @@ export type QualificationTerminalInspection =
       authorizationReferenceSha256: string;
       qualificationPlanId: QualificationPlanId;
     }>;
-
-export type TargetAgentProcessCounts = AgentProcessCounts;
 
 export interface BuildArtifactIdentity {
   readonly path: string;
@@ -96,10 +93,26 @@ export interface LegacyFrozenPreflightRecord extends FrozenPreflightRecordCommon
   }>;
 }
 
-export interface CurrentFrozenPreflightRecord extends FrozenPreflightRecordCommon {
+export interface HistoricalCurrentFrozenPreflightRecord
+  extends FrozenPreflightRecordCommon {
   readonly schemaVersion: 2;
   readonly qualificationPlanId: "four-llm-v1";
 }
+
+export type CurrentV3FrozenPreflightRecord = Readonly<
+  Omit<FrozenPreflightRecordCommon, "runtimeVersions" | "targetProcesses"> & {
+    readonly schemaVersion: 3;
+    readonly qualificationPlanId: "four-llm-v1";
+    readonly runtimeVersions: Readonly<{
+      readonly node: string;
+      readonly codex: string;
+    }>;
+  }
+>;
+
+export type CurrentFrozenPreflightRecord =
+  | HistoricalCurrentFrozenPreflightRecord
+  | CurrentV3FrozenPreflightRecord;
 
 export type FrozenPreflightRecord =
   LegacyFrozenPreflightRecord | CurrentFrozenPreflightRecord;
@@ -113,12 +126,19 @@ export interface LegacyQualificationProtocolIdentity {
 }
 
 export interface CurrentQualificationProtocolIdentity {
+  readonly schemaVersion: 3;
+  readonly qualificationPlanId: "four-llm-v1";
+}
+
+export interface HistoricalCurrentQualificationProtocolIdentity {
   readonly schemaVersion: 2;
   readonly qualificationPlanId: "four-llm-v1";
 }
 
 export type QualificationProtocolIdentity =
-  LegacyQualificationProtocolIdentity | CurrentQualificationProtocolIdentity;
+  | LegacyQualificationProtocolIdentity
+  | HistoricalCurrentQualificationProtocolIdentity
+  | CurrentQualificationProtocolIdentity;
 
 export interface QualificationEvidenceReference {
   path: string;
@@ -145,6 +165,7 @@ export interface QualificationExecutionTelemetry {
   adapterReportedFallbackUsed: boolean | null;
   orchestratorFallbackUsed: false;
   executionTelemetrySource: "kimi-acp-observable" | "pi-rpc-observable" | null;
+  ownedProcessDrained?: true | null;
 }
 
 export type CurrentQualificationFailureReason =
@@ -219,12 +240,21 @@ export type LegacyQualificationTerminalManifest =
       schemaVersion: 1;
     }>;
 
-export type CurrentQualificationTerminalManifest =
+export type HistoricalCurrentQualificationTerminalManifest =
   QualificationTerminalManifestCommon &
     Readonly<{
       schemaVersion: 2;
       qualificationPlanId: "four-llm-v1";
     }>;
 
+export type CurrentQualificationTerminalManifest =
+  QualificationTerminalManifestCommon &
+    Readonly<{
+      schemaVersion: 3;
+      qualificationPlanId: "four-llm-v1";
+    }>;
+
 export type QualificationTerminalManifest =
-  LegacyQualificationTerminalManifest | CurrentQualificationTerminalManifest;
+  | LegacyQualificationTerminalManifest
+  | HistoricalCurrentQualificationTerminalManifest
+  | CurrentQualificationTerminalManifest;

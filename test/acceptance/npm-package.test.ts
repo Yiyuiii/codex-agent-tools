@@ -1,21 +1,53 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { realpath, rm } from "node:fs/promises";
+import os from "node:os";
 import { describe, expect, it, vi } from "vitest";
-import { resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import {
   assertDoctorAcceptance,
   assertInstalledPackageContract,
+  assertInstalledCapabilityProjection,
   assertNpmRegistryMetadata,
   buildIsolatedNpmEnvironment,
+  createNpmAcceptanceFakeRuntimes,
+  createNpmAcceptanceTemporaryRoot,
   establishInstalledMcpSession,
   npmAcceptanceReportRelativePath,
   parseNpmPackageAcceptanceArguments,
   PUBLIC_NPM_REGISTRY,
   renderNpmPackageAcceptanceReport,
 } from "../../src/acceptance/npm-package.js";
+import { locateKimi } from "../../src/adapters/kimi/locator.js";
+import { locatePiInvocation } from "../../src/adapters/pi/locator.js";
+import { DOCTOR_CHECK_NAMES } from "../../src/cli/doctor.js";
 
 const repositoryUrl =
   "git+https://github.com/Yiyuiii/codex-agent-tools.git";
+const windowsIt = it.runIf(process.platform === "win32");
+
+function acceptedDoctorChecks() {
+  return DOCTOR_CHECK_NAMES.map((name) => ({
+    name,
+    ok: true,
+    level:
+      name === "Windows native helper" && process.platform !== "win32"
+        ? "warn"
+        : "ok",
+    detail:
+      name === "Host runtime"
+        ? `platform=${process.platform}; arch=${process.arch}; os=${os.release()}; node=${process.versions.node}; libuv=${process.versions.uv}`
+        : name === "Windows native helper" && process.platform !== "win32"
+          ? `not applicable on ${process.platform}`
+          : name === "Public MCP tools"
+            ? "external_review, external_delegate"
+            : name.startsWith("LLM ")
+              ? "route=direct; review=passed; delegate=passed"
+              : "fixture",
+  }));
+}
 
 function packageManifest(version = "0.1.0-beta.1") {
   return {
@@ -34,6 +66,46 @@ function packageManifest(version = "0.1.0-beta.1") {
 }
 
 describe("npm-installed package acceptance contract", () => {
+  windowsIt("creates fake runtimes that satisfy the strict Windows locator contracts", async () => {
+    const temporaryRoot = await createNpmAcceptanceTemporaryRoot();
+    try {
+      await expect(realpath(temporaryRoot)).resolves.toBe(temporaryRoot);
+      const fakeRuntimes = await createNpmAcceptanceFakeRuntimes(
+        temporaryRoot,
+      );
+
+      expect(basename(fakeRuntimes.kimi).toLowerCase()).toBe("kimi.exe");
+      await expect(
+        locateKimi({
+          environment: { KIMI_COMMAND: fakeRuntimes.kimi },
+          platform: "win32",
+        }),
+      ).resolves.toBe(fakeRuntimes.kimi);
+
+      const pi = await locatePiInvocation({
+        environment: { PI_COMMAND: fakeRuntimes.pi },
+        platform: "win32",
+      });
+      expect(pi.identity).toEqual({
+        packageName: "@earendil-works/pi-coding-agent",
+        packageVersion: "0.0.0",
+        nodeEngine: ">=24.0.0",
+      });
+      expect(pi.argvPrefix).toEqual([
+        join(
+          resolve(fakeRuntimes.pi, ".."),
+          "node_modules",
+          "@earendil-works",
+          "pi-coding-agent",
+          "dist",
+          "cli.js",
+        ),
+      ]);
+    } finally {
+      await rm(temporaryRoot, { force: true, recursive: true });
+    }
+  });
+
   it("builds an npm environment that cannot inherit active homes, config, cache, or credentials", () => {
     const environment = buildIsolatedNpmEnvironment({
       sourceEnvironment: {
@@ -171,7 +243,6 @@ describe("npm-installed package acceptance contract", () => {
           name: "codex-external-agents",
           version: "0.1.0-beta.1",
         },
-        runtimeVersion: "0.1.0-beta.1",
         expectedVersion: "0.1.0-beta.1",
       }),
     ).not.toThrow();
@@ -183,61 +254,13 @@ describe("npm-installed package acceptance contract", () => {
           name: "codex-external-agents",
           version: "0.1.0-beta.0",
         },
-        runtimeVersion: "0.1.0-beta.1",
         expectedVersion: "0.1.0-beta.1",
       }),
     ).toThrow(/installed package contract/iu);
   });
 
   it("accepts only an all-green doctor report with the four qualified llms", () => {
-    const checks = [
-      { name: "Kimi executable", ok: true, level: "ok", detail: "fake" },
-      { name: "Kimi version", ok: true, level: "ok", detail: "fixture" },
-      {
-        name: "Kimi authentication",
-        ok: true,
-        level: "ok",
-        detail: "fixture",
-      },
-      { name: "Pi executable", ok: true, level: "ok", detail: "fake" },
-      { name: "Pi version", ok: true, level: "ok", detail: "fixture" },
-      {
-        name: "Pi isolated config",
-        ok: true,
-        level: "ok",
-        detail: "temp",
-      },
-      { name: "Ark Pi models", ok: true, level: "ok", detail: "models=3" },
-      {
-        name: "Ark Coding authentication",
-        ok: true,
-        level: "ok",
-        detail: "fixture",
-      },
-      {
-        name: "Ark Agent authentication",
-        ok: true,
-        level: "ok",
-        detail: "fixture",
-      },
-      {
-        name: "Public MCP tools",
-        ok: true,
-        level: "ok",
-        detail: "external_review, external_delegate",
-      },
-      ...[
-        "ark-agent-deepseek-v4-flash",
-        "ark-agent-plan",
-        "ark-coding-plan",
-        "kimi-k3",
-      ].map((llm) => ({
-        name: `LLM ${llm}`,
-        ok: true,
-        level: "ok",
-        detail: "route=direct; review=passed; delegate=passed",
-      })),
-    ];
+    const checks = acceptedDoctorChecks();
 
     expect(() =>
       assertDoctorAcceptance({ ok: true, checks }),
@@ -253,11 +276,169 @@ describe("npm-installed package acceptance contract", () => {
         ok: false,
         checks: checks.map((check) =>
           check.name === "Ark Pi models"
-            ? { ...check, ok: false, level: "error" }
+            ? {
+                ...check,
+                ok: false,
+                level: "error",
+                detail: "secret detail must not escape",
+              }
+            : check,
+        ),
+      }),
+    ).toThrow(
+      "Installed doctor acceptance is invalid: failed checks=Ark Pi models",
+    );
+
+    const mismatchedPlatform = process.platform === "linux" ? "darwin" : "linux";
+    expect(() =>
+      assertDoctorAcceptance({
+        ok: true,
+        checks: checks.map((check) =>
+          check.name === "Host runtime"
+            ? {
+                ...check,
+                detail: `platform=${mismatchedPlatform}; arch=${process.arch}; os=${os.release()}; node=${process.versions.node}; libuv=${process.versions.uv}`,
+              }
+            : check.name === "Windows native helper"
+              ? {
+                  ...check,
+                  level: "warn",
+                  detail: `not applicable on ${mismatchedPlatform}`,
+                }
             : check,
         ),
       }),
     ).toThrow(/doctor acceptance/iu);
+
+    if (process.platform === "win32") {
+      expect(() =>
+        assertDoctorAcceptance({
+          ok: true,
+          checks: checks.map((check) =>
+            check.name === "Windows native helper"
+              ? {
+                  ...check,
+                  level: "warn",
+                  detail: "not applicable on linux",
+                }
+              : check,
+          ),
+        }),
+      ).toThrow(/doctor acceptance/iu);
+    } else {
+      expect(
+        checks.find(({ name }) => name === "Windows native helper"),
+      ).toMatchObject({
+        ok: true,
+        level: "warn",
+        detail: `not applicable on ${process.platform}`,
+      });
+    }
+  });
+
+  it("verifies the installed capability index and its exact evidence projection", async () => {
+    const digest = (content: Buffer) =>
+      createHash("sha256").update(content).digest("hex");
+    const batchEvidencePath =
+      "docs/smoke/evidence/batches/current/cases/review.json";
+    const manifestPath =
+      "docs/smoke/evidence/batches/current/manifest.json";
+    const legacyPath = "docs/smoke/evidence/legacy.json";
+    const batchEvidence = Buffer.from('{"passed":true}\n');
+    const legacyEvidence = Buffer.from('{"passed":true}\n');
+    const manifest = Buffer.from(
+      `${JSON.stringify({
+        cases: [
+          {
+            llm: "ark-coding-plan",
+            task: "review",
+            result: "passed",
+            evidence: {
+              path: batchEvidencePath,
+              sha256: digest(batchEvidence),
+            },
+          },
+        ],
+      })}\n`,
+    );
+    const index = Buffer.from(
+      `${JSON.stringify({
+        schemaVersion: 1,
+        entries: [
+          {
+            llm: "ark-coding-plan",
+            task: "review",
+            source: {
+              kind: "batch-case",
+              manifestPath,
+              manifestSha256: digest(manifest),
+              evidencePath: batchEvidencePath,
+              evidenceSha256: digest(batchEvidence),
+            },
+          },
+          {
+            llm: "ark-agent-deepseek-v4-flash",
+            task: "delegate",
+            source: {
+              kind: "legacy-standalone",
+              evidencePath: legacyPath,
+              evidenceSha256: digest(legacyEvidence),
+            },
+          },
+        ],
+      })}\n`,
+    );
+    const files = new Map<string, Buffer>([
+      [manifestPath, manifest],
+      [batchEvidencePath, batchEvidence],
+      [legacyPath, legacyEvidence],
+    ]);
+    const readInstalledFile = async (relativePath: string) => {
+      const content = files.get(relativePath);
+      if (content === undefined) throw new Error("missing fixture");
+      return content;
+    };
+
+    await expect(
+      assertInstalledCapabilityProjection({
+        repositoryIndex: index,
+        installedIndex: index,
+        readInstalledFile,
+      }),
+    ).resolves.toEqual({
+      sourcePaths: [legacyPath, manifestPath, batchEvidencePath].sort(),
+    });
+    await expect(
+      assertInstalledCapabilityProjection({
+        repositoryIndex: index,
+        installedIndex: Buffer.from(index.toString("utf8") + " "),
+        readInstalledFile,
+      }),
+    ).rejects.toThrow(/Installed capability projection is invalid/u);
+
+    files.set(batchEvidencePath, Buffer.from('{"passed":false}\n'));
+    await expect(
+      assertInstalledCapabilityProjection({
+        repositoryIndex: index,
+        installedIndex: index,
+        readInstalledFile,
+      }),
+    ).rejects.toThrow(/Installed capability projection is invalid/u);
+  });
+
+  it("proves only owned cleanup and ships the current-host native helper", () => {
+    const entrypoint = readFileSync(
+      resolve("scripts", "npm-package-acceptance.mjs"),
+      "utf8",
+    );
+
+    expect(entrypoint).not.toMatch(
+      /classifyAgentProcesses|assertNoAgentProcesses|tasklist|Get-CimInstance|Win32_Process|\bpgrep\b/u,
+    );
+    expect(entrypoint).toContain("cleanupOwnedMcpTransport");
+    expect(entrypoint).toContain("assertNoQualificationLocks");
+    expect(entrypoint).toContain("codex-agent-job-helper.exe");
+    expect(entrypoint).toContain("codex-agent-job-helper.exe.sha256");
   });
 
   it("cleans up an owned MCP transport when connect or tool validation fails", async () => {
@@ -293,6 +474,41 @@ describe("npm-installed package acceptance contract", () => {
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
+  it("accepts exactly the installed public tools and safety annotations", async () => {
+    const transport = { id: "owned" };
+    const client = {
+      connect: vi.fn(async () => undefined),
+      listTools: vi.fn(async () => ({
+        tools: [
+          {
+            name: "external_review",
+            inputSchema: { required: ["llm", "prompt", "cwd", "task"] },
+            annotations: {
+              readOnlyHint: true,
+              destructiveHint: false,
+            },
+          },
+          {
+            name: "external_delegate",
+            inputSchema: { required: ["llm", "prompt", "cwd"] },
+            annotations: {
+              readOnlyHint: false,
+              destructiveHint: true,
+            },
+          },
+        ],
+      })),
+    };
+
+    await expect(
+      establishInstalledMcpSession({
+        client,
+        transport,
+        cleanup: vi.fn(async () => undefined),
+      }),
+    ).resolves.toEqual({ client, transport });
+  });
+
   it("renders a redacted, machine-readable beta acceptance record", () => {
     const report = renderNpmPackageAcceptanceReport({
       version: "0.1.0-beta.1",
@@ -309,7 +525,7 @@ describe("npm-installed package acceptance contract", () => {
       "MCP-Smoke: pass",
       "Plugin-Isolated: pass",
       "Capability-Index: pass",
-      "Kimi ACP / Pi RPC / real-smoke：`0 / 0 / 0`",
+      "Owned-MCP-Cleanup: pass",
       "真实模型调用：`0`",
     ]) {
       expect(report).toContain(marker);

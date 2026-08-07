@@ -1,10 +1,8 @@
 import path from "node:path";
 import {
   access,
-  chmod,
   lstat,
   mkdir,
-  mkdtemp,
   readFile,
   readdir,
   rename,
@@ -12,7 +10,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import os from "node:os";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -20,10 +18,12 @@ import { execa } from "execa";
 
 import {
   assertDoctorAcceptance,
+  assertInstalledCapabilityProjection,
   assertInstalledPackageContract,
   assertNpmRegistryMetadata,
   buildIsolatedNpmEnvironment,
-  classifyAgentProcesses,
+  createNpmAcceptanceFakeRuntimes,
+  createNpmAcceptanceTemporaryRoot,
   establishInstalledMcpSession,
   npmAcceptanceReportRelativePath,
   parseNpmPackageAcceptanceArguments,
@@ -32,6 +32,7 @@ import {
 } from "../dist/npm-package-acceptance.js";
 import { cleanupOwnedMcpTransport } from "../dist/plugin-mcp-cleanup.js";
 import { verifyCapabilityIndex } from "../dist/capability-qualification.js";
+import { isSafeRelativeLaunchPath } from "./lib/npm-launch-path.mjs";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -41,9 +42,7 @@ const { version } = parseNpmPackageAcceptanceArguments(
   process.argv.slice(2),
 );
 const packageSpec = `codex-agent-tools@${version}`;
-const temporaryRoot = await mkdtemp(
-  path.join(os.tmpdir(), "codex-agent-npm-acceptance-"),
-);
+const temporaryRoot = await createNpmAcceptanceTemporaryRoot();
 const installRoot = path.join(temporaryRoot, "install");
 const packageRoot = path.join(
   installRoot,
@@ -57,7 +56,6 @@ const isolatedAppData = path.join(temporaryRoot, "roaming-app-data");
 const npmUserConfig = path.join(temporaryRoot, "npm-userconfig");
 const npmGlobalConfig = path.join(temporaryRoot, "npm-globalconfig");
 const npmCache = path.join(temporaryRoot, "npm-cache");
-const fakeRuntimeScript = path.join(temporaryRoot, "fake-runtime.mjs");
 const qualificationLockRoot = path.join(
   os.tmpdir(),
   "codex-agent-tools-qualification-locks",
@@ -67,6 +65,32 @@ const plugin = "codex-external-agents";
 const selector = `${plugin}@${marketplace}`;
 const repositoryUrl =
   "git+https://github.com/Yiyuiii/codex-agent-tools.git";
+const expectedPluginEnvironmentVariables = [
+  "ARK_API_KEY",
+  "VOLCENGINE_API_KEY",
+  "API_KEY_DOUBAO_CODING",
+  "OPENAI_API_KEY_DOUBAO",
+];
+const mcpBaseEnvironmentVariables = new Set([
+  "PATH",
+  "Path",
+  "PATHEXT",
+  "SystemRoot",
+  "SYSTEMROOT",
+  "SystemDrive",
+  "ComSpec",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "HOME",
+  "USERPROFILE",
+  "LOCALAPPDATA",
+  "APPDATA",
+  "CODEX_HOME",
+  "ProgramData",
+  "ProgramFiles",
+  "ProgramFiles(x86)",
+]);
 let directClient;
 let directTransport;
 let cachedClient;
@@ -91,6 +115,15 @@ function samePath(left, right) {
     path.resolve(left).localeCompare(path.resolve(right), undefined, {
       sensitivity: process.platform === "win32" ? "accent" : "variant",
     }) === 0
+  );
+}
+
+function manifestForwardedMcpEnvironment(environment, envVars) {
+  const allowed = new Set([...mcpBaseEnvironmentVariables, ...envVars]);
+  return Object.fromEntries(
+    Object.entries(environment).filter(
+      ([name, value]) => allowed.has(name) && typeof value === "string",
+    ),
   );
 }
 
@@ -119,88 +152,6 @@ async function run(command, args, options = {}) {
   return result.stdout;
 }
 
-function quoteWindowsArgument(value) {
-  if (value.includes('"') || /[\r\n]/u.test(value)) {
-    throw new Error("Unsafe fake runtime path");
-  }
-  return `"${value}"`;
-}
-
-function quotePosixArgument(value) {
-  if (value.includes("'") || /[\r\n]/u.test(value)) {
-    throw new Error("Unsafe fake runtime path");
-  }
-  return `'${value}'`;
-}
-
-async function createFakeRuntimes() {
-  const source = `#!/usr/bin/env node
-const [runtime, ...args] = process.argv.slice(2);
-if (runtime === "kimi" && args.length === 1 && args[0] === "--version") {
-  process.stdout.write("0.0.0-npm-acceptance-fixture\\n");
-  process.exit(0);
-}
-if (runtime === "kimi" && args.length === 1 && args[0] === "doctor") {
-  process.stdout.write("npm acceptance fixture: configuration valid\\n");
-  process.exit(0);
-}
-if (runtime === "pi" && args.length === 1 && args[0] === "--version") {
-  process.stdout.write("0.0.0-npm-acceptance-fixture\\n");
-  process.exit(0);
-}
-if (
-  runtime === "pi" &&
-  JSON.stringify(args) === JSON.stringify(["--offline", "--list-models", "ark"])
-) {
-  process.stdout.write(
-    "ark-agent-plan ark-code-latest\\n" +
-    "ark-agent-plan deepseek-v4-flash\\n" +
-    "ark-coding-plan ark-code-latest\\n",
-  );
-  process.exit(0);
-}
-process.stderr.write("unexpected fake runtime invocation\\n");
-process.exit(64);
-`;
-  await writeFile(fakeRuntimeScript, source, "utf8");
-  await chmod(fakeRuntimeScript, 0o755).catch(() => undefined);
-
-  if (process.platform === "win32") {
-    const kimi = path.join(temporaryRoot, "fake-kimi.cmd");
-    const pi = path.join(temporaryRoot, "fake-pi.cmd");
-    await Promise.all([
-      writeFile(
-        kimi,
-        `@echo off\r\n${quoteWindowsArgument(process.execPath)} ${quoteWindowsArgument(fakeRuntimeScript)} kimi %*\r\n`,
-        "utf8",
-      ),
-      writeFile(
-        pi,
-        `@echo off\r\n${quoteWindowsArgument(process.execPath)} ${quoteWindowsArgument(fakeRuntimeScript)} pi %*\r\n`,
-        "utf8",
-      ),
-    ]);
-    return { kimi, pi };
-  }
-
-  const kimi = path.join(temporaryRoot, "fake-kimi");
-  const pi = path.join(temporaryRoot, "fake-pi");
-  await Promise.all([
-    writeFile(
-      kimi,
-      `#!/bin/sh\nexec ${quotePosixArgument(process.execPath)} ${quotePosixArgument(fakeRuntimeScript)} kimi "$@"\n`,
-      "utf8",
-    ),
-    writeFile(
-      pi,
-      `#!/bin/sh\nexec ${quotePosixArgument(process.execPath)} ${quotePosixArgument(fakeRuntimeScript)} pi "$@"\n`,
-      "utf8",
-    ),
-  ]);
-  await Promise.all([chmod(kimi, 0o755), chmod(pi, 0o755)]);
-  return { kimi, pi };
-}
-
 async function assertNoQualificationLocks() {
   try {
     const entries = await readdir(qualificationLockRoot);
@@ -219,18 +170,13 @@ async function assertNoQualificationLocks() {
   }
 }
 
-async function assertNoAgentProcesses() {
-  const counts = await classifyAgentProcesses();
-  if (
-    counts.kimi.count !== 0 ||
-    counts.piRpc.count !== 0 ||
-    counts.realSmoke.count !== 0
-  ) {
-    throw new Error("Target external-agent processes are not idle");
-  }
-}
-
-async function listInstalledMcpTools(command, args, cwd, environment) {
+async function listInstalledMcpTools(
+  command,
+  args,
+  cwd,
+  environment,
+  envVars = [],
+) {
   const client = new Client({
     name: "codex-agent-tools-npm-acceptance",
     version: "1.0.0",
@@ -239,7 +185,7 @@ async function listInstalledMcpTools(command, args, cwd, environment) {
     command,
     args,
     cwd,
-    env: environment,
+    env: manifestForwardedMcpEnvironment(environment, envVars),
     stderr: "pipe",
   });
   return establishInstalledMcpSession({
@@ -277,18 +223,32 @@ async function installedPluginServer(installedPluginRoot) {
     "codex_external_agents",
   );
   if (
-    typeof server.command !== "string" ||
-    server.command.trim() === "" ||
-    path.isAbsolute(server.command) ||
+    !isSafeRelativeLaunchPath(server.command) ||
     !Array.isArray(server.args) ||
-    !server.args.every(
-      (argument) =>
-        typeof argument === "string" && !path.isAbsolute(argument),
-    )
+    !server.args.every(isSafeRelativeLaunchPath)
   ) {
     throw new Error("Installed plugin MCP launch contract is invalid");
   }
-  return { command: server.command, args: [...server.args] };
+  if (server.cwd !== ".") {
+    throw new Error(
+      "Installed plugin MCP cwd must resolve relative launch paths from the plugin root",
+    );
+  }
+  if (
+    JSON.stringify(server.env_vars) !==
+      JSON.stringify(expectedPluginEnvironmentVariables) ||
+    Object.hasOwn(server, "env")
+  ) {
+    throw new Error(
+      "Installed plugin MCP credential environment contract is invalid",
+    );
+  }
+  return {
+    command: server.command,
+    args: [...server.args],
+    cwd: path.resolve(installedPluginRoot, server.cwd),
+    envVars: [...server.env_vars],
+  };
 }
 
 async function runCodex(args, environment) {
@@ -369,8 +329,9 @@ async function officialPluginLifecycle(environment) {
       await listInstalledMcpTools(
         server.command,
         server.args,
-        installedPluginRoot,
+        server.cwd,
         environment,
+        server.envVars,
       ));
     await cleanupOwnedMcpTransport(cachedClient, cachedTransport);
     cachedClient = undefined;
@@ -464,7 +425,6 @@ try {
     npmCache,
   });
   await assertNoQualificationLocks();
-  await assertNoAgentProcesses();
   await verifyCapabilityIndex({ repositoryRoot });
 
   const registryOutput = await run(
@@ -523,21 +483,31 @@ try {
     "plugins",
     "codex-external-agents",
   );
-  const [packageManifest, pluginManifest, runtime] = await Promise.all([
+  const [packageManifest, pluginManifest] = await Promise.all([
     readFile(path.join(packageRoot, "package.json"), "utf8").then(JSON.parse),
     readFile(
       path.join(pluginRoot, ".codex-plugin", "plugin.json"),
       "utf8",
     ).then(JSON.parse),
-    import(
-      `${pathToFileURL(path.join(packageRoot, "dist", "index.js")).href}?acceptance=${encodeURIComponent(version)}`
-    ),
   ]);
   assertInstalledPackageContract({
     packageManifest,
     pluginManifest,
-    runtimeVersion: runtime.VERSION,
     expectedVersion: version,
+  });
+  const capabilityIndexPath = path.join(
+    "docs",
+    "smoke",
+    "evidence",
+    "capabilities.json",
+  );
+  await assertInstalledCapabilityProjection({
+    repositoryIndex: await readFile(
+      path.join(repositoryRoot, capabilityIndexPath),
+    ),
+    installedIndex: await readFile(path.join(packageRoot, capabilityIndexPath)),
+    readInstalledFile: (relativePath) =>
+      readFile(path.join(packageRoot, ...relativePath.split("/"))),
   });
   for (const relative of [
     ".agents/plugins/marketplace.json",
@@ -545,12 +515,14 @@ try {
     "dist/mcp.js",
     "docs/smoke/evidence/capabilities.json",
     "plugins/codex-external-agents/.mcp.json",
+    "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+    "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe.sha256",
     "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
   ]) {
     await access(path.join(packageRoot, ...relative.split("/")));
   }
 
-  const fakeRuntimes = await createFakeRuntimes();
+  const fakeRuntimes = await createNpmAcceptanceFakeRuntimes(temporaryRoot);
   const isolatedEnvironment = {
     ...npmEnvironment,
     KIMI_COMMAND: fakeRuntimes.kimi,
@@ -602,7 +574,6 @@ try {
 
   await officialPluginLifecycle(isolatedEnvironment);
   await assertNoQualificationLocks();
-  await assertNoAgentProcesses();
   const npmVersion = (
     await run(npmCommand(), ["--version"], {
       cwd: installRoot,

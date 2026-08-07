@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "sharedBuildContract": {
+    "toolchainLockPath": "native/windows-job-helper/toolchain.lock.json",
+    "buildConfigPath": "native/windows-job-helper/build.config.json",
+    "restoreToolchainPath": "native/windows-job-helper/restore-toolchain.ps1"
+  },
+  "sourceSets": {
+    "production": [
+      "src/AcceptanceState.cs",
+      "src/ObserverProtocol.cs",
+      "src/ObserverSession.cs",
+      "src/ProcessChain.cs",
+      "src/Program.cs",
+      "src/ReceiptWriter.cs",
+      "src/SessionMaterials.cs",
+      "src/StrictJson.cs",
+      "src/WindowsNative.cs"
+    ]
+  },
+  "artifact": {
+    "path": "host-acceptance/win32-x64/codex-host-acceptance-observer.exe"
+  }
+}

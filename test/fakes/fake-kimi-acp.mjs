@@ -1,9 +1,124 @@
+import { spawn } from "node:child_process";
+import {
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { Readable, Writable } from "node:stream";
+import { fileURLToPath } from "node:url";
 
 import * as acp from "@agentclientprotocol/sdk";
 
 const sessions = new Map();
+const rootPidPath = process.env.FAKE_KIMI_ROOT_PID_FILE;
+const carrierPidPath = process.env.FAKE_KIMI_CARRIER_PID_FILE;
+const childPidPath = process.env.FAKE_KIMI_CHILD_PID_FILE;
+let grandchildCarrier;
+let grandchildPid;
+let pidFileSequence = 0;
+let descendantCleanupStarted = false;
+
+function cleanupDescendants() {
+  if (descendantCleanupStarted) return;
+  descendantCleanupStarted = true;
+  if (Number.isSafeInteger(grandchildPid) && grandchildPid > 0) {
+    try {
+      process.kill(grandchildPid);
+    } catch {
+      // It may already have exited.
+    }
+  }
+  if (grandchildCarrier !== undefined) {
+    try {
+      grandchildCarrier.kill();
+    } catch {
+      // It may already have exited.
+    }
+  }
+}
+
+process.stdin.once("end", cleanupDescendants);
+process.stdin.once("close", cleanupDescendants);
+
+function publishPid(filePath, pid) {
+  if (!filePath) return;
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
+    throw new Error(`Cannot publish invalid fixture PID: ${String(pid)}`);
+  }
+  const temporaryPath =
+    `${filePath}.tmp-${process.pid}-${++pidFileSequence}`;
+  try {
+    writeFileSync(temporaryPath, String(pid), {
+      encoding: "utf8",
+      flag: "wx",
+    });
+    renameSync(temporaryPath, filePath);
+  } catch (error) {
+    try {
+      unlinkSync(temporaryPath);
+    } catch {
+      // The temporary file may not have been created or may already be renamed.
+    }
+    throw error;
+  }
+}
+
+publishPid(rootPidPath, process.pid);
+
+async function spawnGrandchildFixture() {
+  if (
+    !childPidPath &&
+    process.env.FAKE_KIMI_SCENARIO !== "complete-with-descendant"
+  ) {
+    return;
+  }
+  grandchildCarrier = spawn(
+    process.execPath,
+    [fileURLToPath(new URL("./spawn-grandchild.mjs", import.meta.url))],
+    {
+      stdio: ["ignore", "pipe", "ignore"],
+      windowsHide: true,
+    },
+  );
+  publishPid(carrierPidPath, grandchildCarrier.pid);
+  grandchildPid = await new Promise((resolve, reject) => {
+    let buffer = "";
+    const cleanup = () => {
+      grandchildCarrier.stdout.off("data", onData);
+      grandchildCarrier.off("error", onError);
+      grandchildCarrier.off("exit", onExit);
+    };
+    const onData = (chunk) => {
+      buffer += chunk.toString("utf8");
+      const newline = buffer.indexOf("\n");
+      if (newline < 0) return;
+      cleanup();
+      const reportedPid = buffer.slice(0, newline).trim();
+      if (!/^[1-9][0-9]*$/u.test(reportedPid)) {
+        reject(new Error(`Invalid spawn-grandchild PID: ${reportedPid}`));
+        return;
+      }
+      resolve(Number(reportedPid));
+    };
+    const onError = (error) => {
+      cleanup();
+      reject(error);
+    };
+    const onExit = (code, signal) => {
+      cleanup();
+      reject(
+        new Error(
+          `spawn-grandchild fixture exited before reporting a PID: code=${String(code)} signal=${String(signal)}`,
+        ),
+      );
+    };
+    grandchildCarrier.stdout.on("data", onData);
+    grandchildCarrier.once("error", onError);
+    grandchildCarrier.once("exit", onExit);
+  });
+  publishPid(childPidPath, grandchildPid);
+}
 
 function configOptions(currentModel) {
   return [
@@ -72,11 +187,21 @@ const agent = {
     const session = sessions.get(params.sessionId);
     if (!session) throw new Error("unknown session");
 
-    if (process.env.FAKE_KIMI_SCENARIO === "hang") {
+    if (
+      process.env.FAKE_KIMI_SCENARIO === "hang" ||
+      process.env.FAKE_KIMI_SCENARIO === "hang-ignore-native-cancel"
+    ) {
+      await spawnGrandchildFixture();
       await new Promise((resolve) => {
-        session.cancel = resolve;
+        if (process.env.FAKE_KIMI_SCENARIO !== "hang-ignore-native-cancel") {
+          session.cancel = resolve;
+        }
       });
       return { stopReason: "cancelled" };
+    }
+
+    if (process.env.FAKE_KIMI_SCENARIO === "complete-with-descendant") {
+      await spawnGrandchildFixture();
     }
 
     const delayMs = Number.parseInt(process.env.FAKE_KIMI_DELAY_MS ?? "0", 10);

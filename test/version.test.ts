@@ -8,7 +8,7 @@ describe("package identity", () => {
     expect(SERVER_NAME).toBe("codex_external_agents");
   });
 
-  it("uses the current stable release version", () => {
-    expect(VERSION).toBe("0.1.0");
+  it("uses the current stable version", () => {
+    expect(VERSION).toBe("0.1.1");
   });
 });

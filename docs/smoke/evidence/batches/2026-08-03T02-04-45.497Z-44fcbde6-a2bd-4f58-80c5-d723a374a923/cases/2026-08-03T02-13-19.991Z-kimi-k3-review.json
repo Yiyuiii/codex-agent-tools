@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 4,
+  "qualification": {
+    "qualificationPlanId": "four-llm-v1",
+    "batchId": "2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923",
+    "ordinal": 3,
+    "llm": "kimi-k3",
+    "task": "review",
+    "frozenCommit": "9054cbc45aaf1c91c2c62817244be5288032ede8",
+    "frozenBuildIdentity": "843b91b84dd2a6836402e1396a47b8cd3f805eec9d786c462905c738f59105de",
+    "authorizationReferenceSha256": "e470bb0f9668c499eea4948f58a8a8a717c7015e710c1133dbefc709d52f73cf",
+    "orchestratorFallbackUsed": false
+  },
+  "timestamp": "2026-08-03T02:13:19.991Z",
+  "llm": "kimi-k3",
+  "actualModel": "kimi-code/k3",
+  "expectedModel": "kimi-code/k3",
+  "runtime": "kimi-acp",
+  "route": "direct",
+  "task": "review",
+  "status": "completed",
+  "passed": true,
+  "failureReason": null,
+  "elapsedMs": 17682,
+  "outputSha256": "f6ac42d5eb33f9078ac834229c4fd81c47c5dfc5a46a884c2ee5026255f9a63a",
+  "filesChanged": [],
+  "diagnosticCount": 0,
+  "adapterClientInvocationCount": 1,
+  "adapterRetryCount": 0,
+  "runtimeReportedAutoRetryCount": 0,
+  "adapterReportedFallbackUsed": false,
+  "ownedProcessDrained": true,
+  "orchestratorFallbackUsed": false,
+  "executionTelemetrySource": "kimi-acp-observable",
+  "checks": {
+    "actualModelMatches": true,
+    "ownedProcessDrained": true,
+    "workspaceUnchanged": true,
+    "knownDefectFound": true,
+    "executionTelemetryValid": true
+  }
+}

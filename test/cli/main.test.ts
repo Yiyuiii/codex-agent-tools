@@ -38,7 +38,7 @@ describe("codex-agent-tools CLI", () => {
     });
   });
 
-  it("advertises the stable package version", () => {
-    expect(createProgram().version()).toBe("0.1.0");
+  it("advertises the current package version", () => {
+    expect(createProgram().version()).toBe("0.1.1");
   });
 });

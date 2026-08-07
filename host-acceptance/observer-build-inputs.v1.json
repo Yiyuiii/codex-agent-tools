@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "artifactPath": "host-acceptance/win32-x64/codex-host-acceptance-observer.exe",
+  "protocol": {
+    "path": "host-acceptance/protocol/observer-protocol.v1.json",
+    "sha256": "7c89855c33b17ab95cc6414dbb86cb74eeebc3f363beb27479118b2585492803"
+  },
+  "inputs": [
+    {
+      "path": "host-acceptance/build.config.json",
+      "sha256": "b7617525dd3784203f721bf3f383d2414434e37f9d3d995804e67a9eaa19417d"
+    },
+    {
+      "path": "host-acceptance/build.ps1",
+      "sha256": "dbfb770219d14a34ad3f126ad84ceca1a8168e7db4d0b419da46772c57eab137"
+    },
+    {
+      "path": "host-acceptance/protocol/observer-protocol.v1.json",
+      "sha256": "7c89855c33b17ab95cc6414dbb86cb74eeebc3f363beb27479118b2585492803"
+    },
+    {
+      "path": "host-acceptance/src/AcceptanceState.cs",
+      "sha256": "ea58f3a42a4c62c319827e5b73286d66bd5d3860b65d0392cb91cd857c330f5f"
+    },
+    {
+      "path": "host-acceptance/src/ObserverProtocol.cs",
+      "sha256": "60bbec72c1789743211c3adb32517c79c6074ec9efad0b21398854e41e1b76d5"
+    },
+    {
+      "path": "host-acceptance/src/ObserverSession.cs",
+      "sha256": "decde09cd3cbdaa06f265664cb8705037a84f6167ce8b927d5ecf1c2dedec0f4"
+    },
+    {
+      "path": "host-acceptance/src/ProcessChain.cs",
+      "sha256": "7d460f954c2349969c1d587df1c44fc8614a3c3e7835ebcfd37cc5b429b895fc"
+    },
+    {
+      "path": "host-acceptance/src/Program.cs",
+      "sha256": "973e8803097f68e440b8012c5dbfce841ea79f00309ac5d52f56142607cf1016"
+    },
+    {
+      "path": "host-acceptance/src/ReceiptWriter.cs",
+      "sha256": "4d3a6bbdf0f308fc309d6fb8ab5764a2938daabc48542a39246659aa8176e23c"
+    },
+    {
+      "path": "host-acceptance/src/SessionMaterials.cs",
+      "sha256": "1e3f6049f358537f768c18781fac4c6419206cb27ceae3f7ebe1cb77de7acbcf"
+    },
+    {
+      "path": "host-acceptance/src/StrictJson.cs",
+      "sha256": "33e24d139fefd37ff78af137bf66d54966dff3dd4c83203349b4e00a80572392"
+    },
+    {
+      "path": "host-acceptance/src/WindowsNative.cs",
+      "sha256": "108161834a039438c5879fe00f6e8a5c72b4c9f24d287c9ba48670ea18fb61ba"
+    },
+    {
+      "path": "native/windows-job-helper/build.config.json",
+      "sha256": "69585eade5760f02525fedb7c93c571b62151654c94e18edf7a41113fc2c969b"
+    },
+    {
+      "path": "native/windows-job-helper/restore-toolchain.ps1",
+      "sha256": "27f0ccd82a1ae6b9ec14d44ea664d8d171e97eef86ae5f1058e8ff446d04cf49"
+    },
+    {
+      "path": "native/windows-job-helper/toolchain.lock.json",
+      "sha256": "b0b211b75e6f3996f9ca228273d56aaeef602022426fb95fe164de1e9b4cf172"
+    }
+  ],
+  "inputsDigestSha256": "143abde38da931e552aa2d0b02ed0d436a59aac901381a6447967cdb11e0a136"
+}

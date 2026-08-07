@@ -22,6 +22,7 @@ import {
   releaseQualificationLock,
   inspectProcessIdentityForPlatform,
   type ProcessIdentityInspector,
+  type RecoverQualificationLockOptions,
 } from "../../src/qualification/lock.js";
 import type { QualificationRecoveryReference } from "../../src/qualification/types.js";
 
@@ -525,11 +526,6 @@ describe("qualification lock", () => {
         tempDirectory: fixture.temp,
         batchId: "batch-1",
         processIdentityInspector: liveInspector,
-        inspectTargetProcesses: async () => ({
-          kimi: { count: 0 },
-          piRpc: { count: 0 },
-          realSmoke: { count: 0 },
-        }),
         inspectTerminalManifest: async () => ({ state: "missing" }),
         publishInterruptedManifest: async () => {},
       }),
@@ -548,7 +544,7 @@ describe("qualification lock", () => {
     expect(handle.owner.batchId).toBe("batch-1");
   });
 
-  it("recovers a dead or PID-reused owner only after zero targets and terminal verification", async () => {
+  it("recovers a dead or PID-reused owner only after immutable terminal verification", async () => {
     const fixture = await tempFixture();
     const handle = await acquireQualificationLock({
       repositoryRoot: fixture.repository,
@@ -588,11 +584,6 @@ describe("qualification lock", () => {
         alive: true,
         startTime: "2026-07-26T01:02:04.000Z",
       }),
-      inspectTargetProcesses: async () => ({
-        kimi: { count: 0 },
-        piRpc: { count: 0 },
-        realSmoke: { count: 0 },
-      }),
       inspectTerminalManifest: async () => terminal,
       publishInterruptedManifest: publisher,
     });
@@ -629,11 +620,6 @@ describe("qualification lock", () => {
         tempDirectory: fixture.temp,
         batchId: "batch-1",
         processIdentityInspector: deadInspector,
-        inspectTargetProcesses: async () => ({
-          kimi: { count: 0 },
-          piRpc: { count: 0 },
-          realSmoke: { count: 0 },
-        }),
         inspectTerminalManifest: async () => ({
           state: "valid",
           batchId: "batch-1",
@@ -665,11 +651,6 @@ describe("qualification lock", () => {
       tempDirectory: fixture.temp,
       batchId: "batch-1",
       processIdentityInspector: deadInspector,
-      inspectTargetProcesses: async () => ({
-        kimi: { count: 0 },
-        piRpc: { count: 0 },
-        realSmoke: { count: 0 },
-      }),
       inspectTerminalManifest: async () => ({
         state: "valid",
         batchId: "batch-1",
@@ -680,6 +661,43 @@ describe("qualification lock", () => {
     });
 
     expect(publisher).not.toHaveBeenCalled();
+  });
+
+  it("never consults a whole-machine target process inventory during recovery", async () => {
+    const fixture = await tempFixture();
+    await acquireQualificationLock({
+      repositoryRoot: fixture.repository,
+      tempDirectory: fixture.temp,
+      batchId: "batch-1",
+      authorizationReferenceSha256: authHash,
+      processId: 123,
+      processIdentityInspector: liveInspector,
+    });
+    const options: RecoverQualificationLockOptions = {
+      repositoryRoot: fixture.repository,
+      tempDirectory: fixture.temp,
+      batchId: "batch-1",
+      processIdentityInspector: deadInspector,
+      inspectTerminalManifest: async () => ({
+        state: "valid",
+        batchId: "batch-1",
+        authorizationReferenceSha256: authHash,
+        qualificationPlanId: "four-llm-v1",
+      }),
+      publishInterruptedManifest: async () => {},
+    };
+    let inventoryReads = 0;
+    Object.defineProperty(options, "inspectTargetProcesses", {
+      enumerable: true,
+      get: () => {
+        inventoryReads += 1;
+        throw new Error("whole-machine inventory must remain unused");
+      },
+    });
+
+    await recoverQualificationLock(options);
+
+    expect(inventoryReads).toBe(0);
   });
 
   it("retains a stale current lock when an existing terminal reports the legacy plan", async () => {
@@ -700,11 +718,6 @@ describe("qualification lock", () => {
         tempDirectory: fixture.temp,
         batchId: "batch-1",
         processIdentityInspector: deadInspector,
-        inspectTargetProcesses: async () => ({
-          kimi: { count: 0 },
-          piRpc: { count: 0 },
-          realSmoke: { count: 0 },
-        }),
         inspectTerminalManifest: async () => ({
           state: "valid",
           batchId: "batch-1",
@@ -739,11 +752,6 @@ describe("qualification lock", () => {
           tempDirectory: fixture.temp,
           batchId: "batch-1",
           processIdentityInspector: deadInspector,
-          inspectTargetProcesses: async () => ({
-            kimi: { count: 0 },
-            piRpc: { count: 0 },
-            realSmoke: { count: 0 },
-          }),
           inspectTerminalManifest: async () =>
             published
               ? {
@@ -764,7 +772,7 @@ describe("qualification lock", () => {
     },
   );
 
-  it.each(["nonzero targets", "damaged owner", "nonce drift"] as const)(
+  it.each(["damaged owner", "nonce drift"] as const)(
     "fails closed for %s without deleting the lock",
     async (scenario) => {
       const fixture = await tempFixture();
@@ -807,11 +815,6 @@ describe("qualification lock", () => {
           tempDirectory: fixture.temp,
           batchId: "batch-1",
           processIdentityInspector: deadInspector,
-          inspectTargetProcesses: async () => ({
-            kimi: { count: scenario === "nonzero targets" ? 1 : 0 },
-            piRpc: { count: 0 },
-            realSmoke: { count: 0 },
-          }),
           inspectTerminalManifest,
           publishInterruptedManifest: async () => {},
         }),
@@ -822,7 +825,7 @@ describe("qualification lock", () => {
     },
   );
 
-  it("does not expose owner corruption or callback secrets", async () => {
+  it("does not expose owner corruption", async () => {
     const fixture = await tempFixture();
     const location = await qualificationLockLocation(
       fixture.repository,
@@ -842,9 +845,6 @@ describe("qualification lock", () => {
         tempDirectory: fixture.temp,
         batchId: "batch-1",
         processIdentityInspector: deadInspector,
-        inspectTargetProcesses: async () => {
-          throw new Error(secret);
-        },
         inspectTerminalManifest: async () => ({ state: "missing" }),
         publishInterruptedManifest: async () => {},
       });
@@ -856,6 +856,37 @@ describe("qualification lock", () => {
       "Qualification lock operation failed",
     );
     expect(JSON.stringify(failure)).not.toContain(secret);
+  });
+
+  it("does not expose immutable terminal callback secrets", async () => {
+    const fixture = await tempFixture();
+    const handle = await acquireQualificationLock({
+      repositoryRoot: fixture.repository,
+      tempDirectory: fixture.temp,
+      batchId: "batch-1",
+      authorizationReferenceSha256: authHash,
+      processId: 123,
+      processIdentityInspector: liveInspector,
+    });
+
+    await expect(
+      recoverQualificationLock({
+        repositoryRoot: fixture.repository,
+        tempDirectory: fixture.temp,
+        batchId: "batch-1",
+        processIdentityInspector: deadInspector,
+        inspectTerminalManifest: async () => {
+          throw new Error(secret);
+        },
+        publishInterruptedManifest: async () => {},
+      }),
+    ).rejects.toMatchObject({
+      name: "QualificationLockError",
+      message: "Qualification lock operation failed",
+    });
+    await expect(
+      readFile(path.join(handle.lockDirectory, "owner.json"), "utf8"),
+    ).resolves.not.toContain(secret);
   });
 
   it.each([
@@ -897,11 +928,6 @@ describe("qualification lock", () => {
           tempDirectory: fixture.temp,
           batchId: "batch-1",
           processIdentityInspector: deadInspector,
-          inspectTargetProcesses: async () => ({
-            kimi: { count: 0 },
-            piRpc: { count: 0 },
-            realSmoke: { count: 0 },
-          }),
           inspectTerminalManifest: async () => ({ state: "missing" }),
           publishInterruptedManifest: async () => {},
         }),
@@ -927,11 +953,6 @@ describe("qualification lock", () => {
           tempDirectory: fixture.temp,
           batchId: "batch-1",
           processIdentityInspector: deadInspector,
-          inspectTargetProcesses: async () => ({
-            kimi: { count: 0 },
-            piRpc: { count: 0 },
-            realSmoke: { count: 0 },
-          }),
           inspectTerminalManifest: async () => ({ state: "missing" }),
           publishInterruptedManifest: async () => {},
         }),

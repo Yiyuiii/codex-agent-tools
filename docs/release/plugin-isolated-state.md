@@ -12,7 +12,7 @@
 
 - 新增：`config.toml`
 - 变化：无
-- 删除：`tmp/arg0/<ephemeral>/.lock`、`tmp/arg0/<ephemeral>/apply_patch.bat`、`tmp/arg0/<ephemeral>/applypatch.bat`
+- 删除：无
 
 ### plugin list before install
 
@@ -22,7 +22,7 @@
 
 ### plugin add
 
-- 新增：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/.codex-plugin/plugin.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/.mcp.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/runtime/codex-external-agents-mcp.mjs`
+- 新增：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/.codex-plugin/plugin.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/.mcp.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/native/win32-x64/codex-agent-job-helper.exe`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/native/win32-x64/codex-agent-job-helper.exe.sha256`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/runtime/codex-external-agents-mcp.mjs`
 - 变化：`config.toml`
 - 删除：无
 
@@ -36,7 +36,7 @@
 
 - 新增：无
 - 变化：`config.toml`
-- 删除：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/.codex-plugin/plugin.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/.mcp.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1/runtime/codex-external-agents-mcp.mjs`
+- 删除：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/.codex-plugin/plugin.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/.mcp.json`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/native/win32-x64/codex-agent-job-helper.exe`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/native/win32-x64/codex-agent-job-helper.exe.sha256`、`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1/runtime/codex-external-agents-mcp.mjs`
 
 ### plugin list after remove
 
@@ -72,14 +72,14 @@
 ## 已安装副本验收
 
 - 官方安装器接受仓库插件中的直接 server-map `.mcp.json`。
-- 官方缓存相对位置：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.0-alpha.1`。
-- 已安装副本从上述缓存目录作为工作目录启动，MCP initialize/listTools 成功。
+- 官方缓存相对位置：`plugins/cache/codex-external-agents-local/codex-external-agents/0.1.1-beta.1`。
+- 已安装副本声明并强制校验 `cwd: "."`；宿主将其解析到上述缓存目录后，MCP initialize/listTools 成功。
 - 工具严格为 `external_review` 与 `external_delegate`；二者输入均要求 `llm`。
 - `external_review` 为只读且非破坏性；`external_delegate` 为可写且具破坏性提示。
 - 已退役的 Gemini review 被已安装 MCP 以 unknown logical LLM 明确拒绝；错误列出精确四项活动 LLM，没有启动 Pi，也没有返回伪造的结构化成功结果。
 - fake Pi 的 Ark Agent Plan DeepSeek V4 Flash review 恰好调用一次并返回 `completed`，实际模型为 `deepseek-v4-flash`，且没有文件变化。
-- fake Pi 包装器确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 Agent Plan 目标凭据，未收到原始候选变量、其它 Ark 目标凭据或 Google 凭据。
-- 异常清理仅管理本脚本所启动 transport 的 PID，并在关闭 MCP client/transport 前终止其整个进程树。
+- fake Pi 可信包入口确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 Agent Plan 目标凭据，未收到原始候选变量、其它 Ark 目标凭据或 Google 凭据。
+- 正常与异常清理都依次通过 SDK `client.close()`、`transport.close()` 触发 stdio 关闭和 Job-owned drain；验收脚本不读取 PID，也不使用任何 PID-based fallback。
 
 ## 语义回滚
 

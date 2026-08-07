@@ -26,14 +26,8 @@ const BATCH_ID = "2026-07-26T12-00-00Z-a1b2c3d4";
 const COMMIT = "a".repeat(40);
 const BUILD_IDENTITY = "b".repeat(64);
 
-const zeroProcesses = Object.freeze({
-  kimi: Object.freeze({ count: 0 }),
-  piRpc: Object.freeze({ count: 0 }),
-  realSmoke: Object.freeze({ count: 0 }),
-});
-
 const preflight = Object.freeze({
-  schemaVersion: 2,
+  schemaVersion: 3,
   qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
   repositoryCommit: COMMIT,
   repositoryBranch: "codex/ark-cutover",
@@ -105,7 +99,6 @@ const preflight = Object.freeze({
       environmentVariableName: null,
     }),
   ]),
-  targetProcesses: zeroProcesses,
 }) satisfies FrozenPreflightRecord;
 
 const lockHandle = Object.freeze({
@@ -125,7 +118,7 @@ const lockHandle = Object.freeze({
 
 function terminal(status: "passed" | "blocked"): QualificationTerminalManifest {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
     batchId: BATCH_ID,
     status,
@@ -235,10 +228,6 @@ function makeDependencies(options?: {
     assertFrozenCandidate: vi.fn(async () => {
       events.push("assert_candidate");
     }),
-    inspectTargetProcesses: vi.fn(async () => {
-      events.push("inspect_processes");
-      return zeroProcesses;
-    }),
     runCase: vi.fn(async ({ identity }) => {
       inFlight += 1;
       maximumInFlight = Math.max(maximumInFlight, inFlight);
@@ -280,7 +269,7 @@ describe("qualification coordinator", () => {
     );
 
     expect(result).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       status: "passed",
       promotionEligible: true,
@@ -386,9 +375,6 @@ describe("qualification coordinator", () => {
 
     expect(result.status).toBe("blocked");
     expect(fixture.publishCaseCompleted).toHaveBeenCalledTimes(3);
-    expect(fixture.dependencies.inspectTargetProcesses).toHaveBeenCalledTimes(
-      8,
-    );
     expect(fixture.publishTerminalManifest).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "blocked",
@@ -400,7 +386,7 @@ describe("qualification coordinator", () => {
     expect(fixture.events.at(-1)).toBe("release");
   });
 
-  it("checks owner, frozen candidate, and zero target processes around every case and rechecks ownership before terminal promotion", async () => {
+  it("checks owner and frozen candidate around every case and before terminal promotion", async () => {
     const fixture = makeDependencies();
 
     await runQualificationBatch(
@@ -415,20 +401,19 @@ describe("qualification coordinator", () => {
     expect(fixture.dependencies.assertFrozenCandidate).toHaveBeenCalledTimes(
       18,
     );
-    expect(fixture.dependencies.inspectTargetProcesses).toHaveBeenCalledTimes(
-      17,
-    );
+    expect(fixture.dependencies).not.toHaveProperty("inspectTargetProcesses");
     for (const identity of ACTIVE_QUALIFICATION_CASES) {
       const run = fixture.events.indexOf(`run:${identity.ordinal}`);
-      expect(fixture.events.slice(Math.max(0, run - 4), run)).toEqual([
+      expect(fixture.events.slice(Math.max(0, run - 3), run)).toEqual([
         "assert_owner",
         "assert_candidate",
-        "inspect_processes",
         `running:${identity.ordinal}`,
       ]);
-      expect(fixture.events[run + 1]).toBe("inspect_processes");
-      expect(fixture.events[run + 2]).toBe("assert_owner");
-      expect(fixture.events[run + 3]).toBe("assert_candidate");
+      expect(fixture.events[run + 1]).toBe("assert_owner");
+      expect(fixture.events[run + 2]).toBe("assert_candidate");
+      expect(fixture.events[run + 3]).toBe(
+        `completed:${identity.ordinal}:passed`,
+      );
     }
   });
 
@@ -460,34 +445,6 @@ describe("qualification coordinator", () => {
         status: "blocked",
         stopReason: "infrastructure_failure",
         notRun: [],
-      }),
-    );
-  });
-
-  it("fails closed when a target process count is nonzero", async () => {
-    const fixture = makeDependencies();
-    vi.mocked(fixture.dependencies.inspectTargetProcesses)
-      .mockResolvedValueOnce(zeroProcesses)
-      .mockResolvedValueOnce({
-        ...zeroProcesses,
-        piRpc: { count: 1 },
-      });
-
-    const result = await runQualificationBatch(
-      {
-        repositoryRoot: "D:/repo",
-        authorizationReference: AUTHORIZATION_REFERENCE,
-      },
-      fixture.dependencies,
-    );
-
-    expect(result.status).toBe("blocked");
-    expect(fixture.publishCaseCompleted).not.toHaveBeenCalled();
-    expect(fixture.publishTerminalManifest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: "blocked",
-        stopReason: "infrastructure_failure",
-        notRun: ACTIVE_QUALIFICATION_CASES.slice(1),
       }),
     );
   });
@@ -604,7 +561,7 @@ describe("qualification coordinator", () => {
     );
   });
 
-  it("stops after evidence when completion checkpoint publication fails", async () => {
+  it("never trusts runner success when strict ledger evidence validation rejects completion", async () => {
     const fixture = makeDependencies({ completedErrorOrdinal: 1 });
 
     const result = await runQualificationBatch(
@@ -626,6 +583,40 @@ describe("qualification coordinator", () => {
         notRun: ACTIVE_QUALIFICATION_CASES.slice(1),
       }),
     );
+  });
+
+  it("awaits the strict ledger evidence commit before running the next case or promoting", async () => {
+    const fixture = makeDependencies();
+    let approveEvidence!: () => void;
+    const evidenceApproved = new Promise<void>((resolve) => {
+      approveEvidence = resolve;
+    });
+    fixture.publishCaseCompleted.mockImplementationOnce(async (input) => {
+      await evidenceApproved;
+      fixture.events.push(`completed:${input.ordinal}:${input.result}`);
+    });
+
+    const pending = runQualificationBatch(
+      {
+        repositoryRoot: "D:/repo",
+        authorizationReference: AUTHORIZATION_REFERENCE,
+      },
+      fixture.dependencies,
+    );
+    await vi.waitFor(() => {
+      expect(fixture.publishCaseCompleted).toHaveBeenCalledTimes(1);
+    });
+
+    expect(fixture.dependencies.runCase).toHaveBeenCalledTimes(1);
+    expect(fixture.publishTerminalManifest).not.toHaveBeenCalled();
+    approveEvidence();
+
+    await expect(pending).resolves.toMatchObject({
+      schemaVersion: 3,
+      status: "passed",
+      promotionEligible: true,
+    });
+    expect(fixture.dependencies.runCase).toHaveBeenCalledTimes(8);
   });
 
   it("rejects malformed authorization before acquiring a lock", async () => {
