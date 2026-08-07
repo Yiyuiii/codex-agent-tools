@@ -6,7 +6,7 @@
 
 - 新插件不调用 `codex_cc_tools`，也不调用、修改或卸载本机 Claude Code；
 - 本轮不卸载、禁用或修改旧 `codex_cc_tools`；
-- 活动 Codex 当前已通过官方插件机制安装并启用已发布的 `0.1.1-beta.4`；该版本修复 beta.3 clean-tag 启动层证据装载缺口，已通过公共精确包验收且缓存五文件摘要与 marker 一致。待完整 App 重启与普通 Stop 的 `cancelled + owned-zero` receipt，真实宿主门禁仍为 partial；
+- 活动 Codex 当前已通过官方插件机制安装并启用已发布的 `0.1.1-beta.4`；该版本修复 beta.3 clean-tag 启动层证据装载缺口，已通过公共精确包验收且缓存五文件摘要与 marker 一致。维护者已跳过普通 Stop 交互验收，没有 PASS receipt；`0.1.1` stable 必须保留 `host_stop_unverified`，不得声称真实宿主取消已通过；
 - 项目代码不得直接读取或写入活动 `~/.codex/config.toml`；官方插件命令可能更新该状态文件，因此每次真实 add/remove 都必须先取得针对该动作的明确许可。
 
 “共存”不是“已经替代”。在全部替代门槛通过前，旧工具保持原状，用户已有工作流不在本轮改动范围内。
@@ -33,7 +33,7 @@
 3. 四个当前逻辑 LLM 的 review/delegate 均由当前能力索引绑定有效的 passed evidence 与运行时指纹；不同能力可以来自不同不可变批次，不要求同一批 8/8；
 4. 从公共 npm 安装已由 GitHub Actions OIDC 发布的精确 beta，并通过官方插件机制升级；
 5. 真实 Codex App 只发现两个批准工具，且二者 `llm` 必填；
-6. 完整 App 重启后，只按 checked-in observer 输出完成旧宿主 Kimi review 握手与新宿主隔离 Kimi delegate；observer 发布 `REQUEST_STARTED` 后点击 App 普通 Stop，并取得精确 `cancelled + owned-zero` receipt；
+6. stable marker 精确绑定 beta.4 公共身份，并把维护者跳过普通 Stop 的决定记录为 `skipped_by_maintainer / host_stop_unverified`；该状态不等于 PASS，也不能泛化到其它版本；
 7. 新旧工具共存状态经过验证，旧工具未被意外修改。
 
 隔离 CLI 生命周期只能证明官方安装器和缓存副本可用，不能替代真实 Codex App 宿主门禁。四层状态和停止条件见 [发布验收清单](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/checklist.md)。
