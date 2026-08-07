@@ -2,7 +2,7 @@
 
 日期：2026-08-07
 
-状态：**实施中 — Task 1/2 已完成，最终门禁复验后进入 Task 3**
+状态：**completed — Task 1–4、公共发布与活动官方插件升级均已完成**
 
 ## 目标
 
@@ -19,6 +19,18 @@ GitHub Actions Trusted Publishing / OIDC；本地不执行 `npm publish`。
   官方插件安装升级；
 - 两次真实宿主会话都没有 PASS receipt；维护者已明确终止继续重试，真实
   `cancelled + owned-zero` 保持 unverified。
+
+## 完成结果
+
+- PR #12 合并提交为 `f503f0c51c5fc5c51a31cbd2db63d2b8434b0c0f`；PR CI
+  `31168056961`、main CI `31168216256`、release run `31168431472` 全部成功；
+- 不可变 `v0.1.1` 通过 GitHub Actions OIDC 发布，npm 为 `latest=0.1.1`、
+  `next=0.1.1-beta.4`，provenance 存在；
+- 公共精确包在 Windows x64 / Node 24 完成隔离验收，真实模型调用为 0；
+- 活动官方插件已升级为 installed/enabled `0.1.1`，五文件缓存与发布源逐项同 SHA、
+  无 reparse，旧 `codex_cc_tools` 仍 enabled；
+- GitHub Release 与仓库证据均明确保留 `host Stop: skipped / unverified`。当前桌面 App
+  仍需完整退出重开后才会由新宿主进程加载 stable，这不改变发布完成状态。
 
 ## 设计选择
 
@@ -86,7 +98,7 @@ registry；本机真实只读 registry 查询通过。完成最终完整门禁�
 
 ### Task 3：通过 GitHub Actions OIDC 发布
 
-状态：**pending**
+状态：**completed**
 
 1. 推送稳定候选并向 `main` 提交 PR，等待 Node 24 CI；
 2. 合并后确认 stable marker 在 `main` 精确重算通过；
@@ -96,7 +108,7 @@ registry；本机真实只读 registry 查询通过。完成最终完整门禁�
 
 ### Task 4：公共 stable 隔离复验
 
-状态：**pending**
+状态：**completed**
 
 从公共 registry 精确安装 `codex-agent-tools@0.1.1`，只做当前宿主的确定性验收：
 

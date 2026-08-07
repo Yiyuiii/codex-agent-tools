@@ -2,7 +2,7 @@
 
 最近更新：2026-08-07
 
-状态：**partial / skipped — beta.4 已公开发布、公共验收并完成官方升级；维护者已终止普通 Stop 验收并批准以 `host_stop_unverified` 风险状态继续 0.1.1 stable 晋级，未取得 `cancelled + owned-zero` receipt**
+状态：**stable published / host Stop skipped — 0.1.1 已公开发布、公共验收并完成官方升级；维护者终止的普通 Stop 验收仍为 `host_stop_unverified`，未取得 `cancelled + owned-zero` receipt**
 
 ## 2026-08-07 维护者跳过决定
 
@@ -21,9 +21,11 @@ in-flight removed 或 owned descendants zero 已在真实 App Stop 中得到证�
 
 ## 当前发布状态
 
-beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调；beta.4 已修复 beta.3 clean-tag 启动层缺口并完成发布、公共验收与官方升级。在完整 App 重启与真实 Stop 证据产生前，当前结果仍只构成确定性、公共包与安装证据。
+beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调；beta.4 已修复 beta.3 clean-tag 启动层缺口。稳定版发布采用维护者明确批准的风险跳过状态，因此确定性、公共包与安装证据已经闭合，但真实 App 普通 Stop 仍没有 PASS 证据。
 
-八项 verifier、beta.4 唯一离线 release gate、PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级均已完成。普通 Stop receipt 未完成且已按维护者决定跳过；互斥且可审计的 stable 发布状态、仓库内决策记录、0.1.1 版本与 marker 已按 TDD 实现。当前剩余路线是最终 Node 24 离线门禁复验、`main` PR/CI、稳定标签 OIDC 发布和公共 stable 隔离复验。禁止本地 `npm publish`，也禁止用风险跳过伪装 PASS。
+八项 verifier、唯一 Node 24 离线 release gate、PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级均已完成。PR #12 merge commit 为 `f503f0c51c5fc5c51a31cbd2db63d2b8434b0c0f`，release run `31168431472` 成功；npm 为 `latest=0.1.1`、`next=0.1.1-beta.4`。普通 Stop receipt 未完成且已按维护者决定跳过；互斥且可审计的 stable 发布状态、仓库内决策记录、0.1.1 版本与 marker 均已验证。禁止用风险跳过伪装 PASS。
+
+公共stable在当前Windows x64 / Node 24宿主完成隔离复验，结果见[0.1.1公共npm隔离验收](0.1.1-npm-acceptance.md)。活动插件已通过官方remove/add升级为installed/enabled `0.1.1`，版本化缓存五个文件与发布源逐项同SHA、无reparse，旧`codex_cc_tools`仍enabled。当前桌面App不会热刷新插件；维护者完整退出重开后，新宿主进程才会实际加载stable。
 
 真实宿主门禁只接受 App 的普通 Stop：必须在 observer 发布 `REQUEST_STARTED` 后点击，并确认外层状态为 `cancelled`、完成标记没有写入、SDK abort 到达、owned descendants zero 且不重生。
 
@@ -45,7 +47,17 @@ beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺
 维护者又完成了整 App 重启并授权继续推进。重启后的第二个新任务仍在同一工具发现
 门禁首错停止；后续修复、beta 发布、本机官方升级和刷新后复验仍沿用这项授权。
 
-## 发布身份
+## 0.1.1 stable 发布身份
+
+- 仓库：`main`，merge commit `f503f0c51c5fc5c51a31cbd2db63d2b8434b0c0f`；
+- 稳定标签：`v0.1.1`，精确指向上述 merge commit；
+- release workflow：`31168431472`，GitHub Actions OIDC / provenance 成功；
+- npm精确版本：`codex-agent-tools@0.1.1`，`latest=0.1.1`、`next=0.1.1-beta.4`；
+- npm `dist.shasum`：`59ab23d0a6eea27a084a686c1ba04f727939044f`；
+- npm `dist.integrity`：`sha512-f4nBGcOkjy1ze3GhM1RRHc5pe67BaQy8pco1mhlbORWeZ4cwmhnT4aPxShPtTWkY74l0fHkOBq9h80i78SE9LA==`；
+- GitHub Release明确记录`host Stop: skipped / unverified`。
+
+## 历史：0.1.0 初始发布身份
 
 - 仓库：`main`，提交 `74ad8137c7a253fd4b2c35fd3b92943ed23a34b9`；
 - 稳定标签：`v0.1.0`，提交
@@ -373,25 +385,17 @@ reparse point，摘要
 `5e374af0a92681b6eb9b4817cfeb9574f6b675906bc634df14a628159ea0e29f` 与 release marker
 完全一致；beta.3 缓存已移除。没有直接读取或修改活动 `config.toml`，也没有调用真实模型。
 
-## 未验证风险与剩余发布门禁
+## 未验证风险与发布后状态
 
 真实 App 普通 Stop 的 `cancelled + owned-zero` 仍未验证。若未来恢复该项验证，PASS 仍
 必须由 observer 唯一写入的 receipt 精确证明 cancelled、completion marker absent、
 handler cancelled、in-flight removed、owned descendants zero 且不重生；本次 stable
 决策记录不能替代或推断这些事实。
 
-维护者已经批准继续 0.1.1 stable 晋级，当前无需再次选择路线。剩余发布门禁是：
-
-1. 在当前 Windows x64 / Node 24 宿主重新完成唯一 `gate:offline` 与差异检查；
-2. 推送 `codex/stable-0.1.1`，向 `main` 提交 PR 并等待 CI；
-3. 合并后创建不可变 `v0.1.1` 标签，只由 GitHub Actions Trusted Publishing / OIDC
-   发布 npm `latest`，Release 说明必须显示 `host Stop: skipped / unverified`；
-4. 从公共 registry 精确安装 stable 并完成确定性隔离复验，不调用真实模型，也不再运行
-   普通 Stop observer。
-
-在这些门禁闭合前，不得把 0.1.1 写成已发布；发布后也不得称为“真实 App 宿主门禁全部
-通过”或“已替代旧 `codex_cc_tools`”。禁止本地 `npm publish`、删除旧工具、恢复开发期
-直连或手工修改活动配置。
+0.1.1 stable晋级与公共隔离复验已经完成，不再有发布阻断。当前只剩维护者完整退出重开
+桌面App，让新宿主进程实际加载已安装的stable插件；这不是补写真实Stop receipt，也不能把
+第四层改成passed。发布后仍不得称为“真实App宿主门禁全部通过”或“已替代旧
+`codex_cc_tools`”。禁止本地`npm publish`、删除旧工具、恢复开发期直连或手工修改活动配置。
 
 完整实施步骤见[跳过真实 Stop 后的 0.1.1 Stable 晋级计划](../superpowers/plans/2026-08-07-stable-promotion-after-host-stop-skip.md)。
 
