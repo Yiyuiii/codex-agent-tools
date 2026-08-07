@@ -112,6 +112,12 @@ export interface NpmDistIdentity {
   readonly shasum: string;
 }
 
+export interface ReleaseNpmViewInvocation {
+  readonly command: string;
+  readonly trustedScriptPath: string | null;
+  readonly args: readonly string[];
+}
+
 export interface PublicBetaIdentity {
   readonly version: string;
   readonly tag: string;
@@ -1633,20 +1639,99 @@ async function defaultReadGitFile(
   }
 }
 
+export function buildReleaseNpmViewInvocation(
+  input: Readonly<{
+    nodeExecutable: string;
+    packageName: string;
+    packageVersion: string;
+    platform: NodeJS.Platform;
+  }>,
+): ReleaseNpmViewInvocation {
+  try {
+    const record = plainRecord(input);
+    exactKeys(record, [
+      "nodeExecutable",
+      "packageName",
+      "packageVersion",
+      "platform",
+    ]);
+    const nodeExecutable = stringValue(record.nodeExecutable, 1024);
+    const packageName = exactString(record.packageName, PACKAGE_NAME);
+    const packageVersion = version(record.packageVersion);
+    const platform = stringValue(record.platform, 32);
+    const queryArgs = [
+      "view",
+      `${packageName}@${packageVersion}`,
+      "version",
+      "dist",
+      "--json",
+      "--registry=https://registry.npmjs.org/",
+    ];
+    if (platform !== "win32") {
+      return Object.freeze({
+        command: "npm",
+        trustedScriptPath: null,
+        args: Object.freeze(queryArgs),
+      });
+    }
+    if (
+      !path.win32.isAbsolute(nodeExecutable) ||
+      path.win32.normalize(nodeExecutable) !== nodeExecutable
+    ) {
+      fail();
+    }
+    const npmCliPath = path.win32.join(
+      path.win32.dirname(nodeExecutable),
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    );
+    return Object.freeze({
+      command: nodeExecutable,
+      trustedScriptPath: npmCliPath,
+      args: Object.freeze([npmCliPath, ...queryArgs]),
+    });
+  } catch {
+    return fail();
+  }
+}
+
+async function requireExactRegularFile(filePath: string): Promise<void> {
+  try {
+    const metadata = await lstat(filePath);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) fail();
+    const canonical = await realpath(filePath);
+    const exact = path.resolve(filePath);
+    if (
+      process.platform === "win32"
+        ? canonical.toLowerCase() !== exact.toLowerCase()
+        : canonical !== exact
+    ) {
+      fail();
+    }
+  } catch {
+    return fail();
+  }
+}
+
 async function defaultLookupNpmDist(
   packageName: string,
   packageVersion: string,
 ): Promise<NpmDistIdentity> {
   try {
+    const invocation = buildReleaseNpmViewInvocation({
+      nodeExecutable: process.execPath,
+      packageName,
+      packageVersion,
+      platform: process.platform,
+    });
+    if (invocation.trustedScriptPath !== null) {
+      await requireExactRegularFile(invocation.trustedScriptPath);
+    }
     const { stdout } = await execFileAsync(
-      process.platform === "win32" ? "npm.cmd" : "npm",
-      [
-        "view",
-        `${packageName}@${packageVersion}`,
-        "version",
-        "dist",
-        "--json",
-      ],
+      invocation.command,
+      invocation.args,
       { encoding: "utf8", maxBuffer: 16_384, windowsHide: true, timeout: 30_000 },
     );
     return parseNpmViewResponse(JSON.parse(stdout) as unknown, packageVersion);

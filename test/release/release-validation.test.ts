@@ -9,6 +9,7 @@ import {
   assertCurrentHostFreezeReceipt,
   assertHostAcceptanceReceipt,
   assertHostStopReleaseDecision,
+  buildReleaseNpmViewInvocation,
   computeHostAcceptanceEventSha256,
   computeHostAcceptanceRequestBindingSha256,
   digestReleasePluginArtifactTree,
@@ -35,6 +36,73 @@ const OBSERVER_MANIFEST_PATH =
   "host-acceptance/observer-build-inputs.v1.json";
 const OBSERVER_PROTOCOL_PATH =
   "host-acceptance/protocol/observer-protocol.v1.json";
+
+describe("release npm metadata invocation", () => {
+  it("runs the fixed npm CLI through the current Node executable on Windows", () => {
+    expect(
+      buildReleaseNpmViewInvocation({
+        nodeExecutable: "C:\\Program Files\\nodejs\\node.exe",
+        packageName: "codex-agent-tools",
+        packageVersion: "0.1.1-beta.4",
+        platform: "win32",
+      }),
+    ).toEqual({
+      command: "C:\\Program Files\\nodejs\\node.exe",
+      trustedScriptPath:
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+      args: [
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "view",
+        "codex-agent-tools@0.1.1-beta.4",
+        "version",
+        "dist",
+        "--json",
+        "--registry=https://registry.npmjs.org/",
+      ],
+    });
+  });
+
+  it("uses npm directly with the same official-registry query on non-Windows hosts", () => {
+    expect(
+      buildReleaseNpmViewInvocation({
+        nodeExecutable: "/usr/local/bin/node",
+        packageName: "codex-agent-tools",
+        packageVersion: "0.1.1-beta.4",
+        platform: "linux",
+      }),
+    ).toEqual({
+      command: "npm",
+      trustedScriptPath: null,
+      args: [
+        "view",
+        "codex-agent-tools@0.1.1-beta.4",
+        "version",
+        "dist",
+        "--json",
+        "--registry=https://registry.npmjs.org/",
+      ],
+    });
+  });
+
+  it("rejects package identity drift and non-absolute Windows Node paths", () => {
+    expect(() =>
+      buildReleaseNpmViewInvocation({
+        nodeExecutable: "node.exe",
+        packageName: "codex-agent-tools",
+        packageVersion: "0.1.1-beta.4",
+        platform: "win32",
+      }),
+    ).toThrow("Release validation evidence is invalid");
+    expect(() =>
+      buildReleaseNpmViewInvocation({
+        nodeExecutable: "C:\\Program Files\\nodejs\\node.exe",
+        packageName: "different-package",
+        packageVersion: "0.1.1-beta.4",
+        platform: "win32",
+      }),
+    ).toThrow("Release validation evidence is invalid");
+  });
+});
 
 type PassedStableMarker = Omit<
   StableReleaseValidationMarker,

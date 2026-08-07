@@ -2,7 +2,7 @@
 
 日期：2026-08-07
 
-状态：**建议方案，尚未实施**
+状态：**实施中 — Task 1/2 已完成，最终门禁复验后进入 Task 3**
 
 ## 目标
 
@@ -50,7 +50,15 @@ Release 说明必须按实际状态输出 `skipped / unverified`，不能沿用�
 
 ## 实施步骤
 
+当前进度：窄决策联合类型、beta.4→0.1.1 硬锁、决策摘要绑定、动态 Release 说明、
+0.1.1 版本元数据与 stable marker 均已按 TDD 完成；八项能力仍为 8 current / 0 legacy，
+首次完整 `gate:offline` 已通过。Windows Node 24 上发现发布验证器直接启动 `npm.cmd`
+会产生 `spawn EINVAL`，现已按 TDD 收敛到当前 `node.exe + 固定 npm-cli.js` 并固定官方
+registry；本机真实只读 registry 查询通过。完成最终完整门禁复验与文档收敛后进入 PR。
+
 ### Task 1：用 TDD 固定窄决策语义
+
+状态：**completed**
 
 修改 `src/release/release-validation.ts` 与 `test/release/release-validation.test.ts`：
 
@@ -64,6 +72,8 @@ Release 说明必须按实际状态输出 `skipped / unverified`，不能沿用�
 
 ### Task 2：准备 0.1.1 stable 候选
 
+状态：**completed；最终完整门禁将在 Windows npm 启动修复后复验一次**
+
 从最新 `origin/next` 创建 `codex/stable-0.1.1`：
 
 1. 统一把 package、lockfile、runtime version 和插件 manifest 设置为 `0.1.1`；
@@ -76,6 +86,8 @@ Release 说明必须按实际状态输出 `skipped / unverified`，不能沿用�
 
 ### Task 3：通过 GitHub Actions OIDC 发布
 
+状态：**pending**
+
 1. 推送稳定候选并向 `main` 提交 PR，等待 Node 24 CI；
 2. 合并后确认 stable marker 在 `main` 精确重算通过；
 3. 创建不可变 `v0.1.1` 标签，只由 `.github/workflows/release.yml` 发布 npm `latest`；
@@ -83,6 +95,8 @@ Release 说明必须按实际状态输出 `skipped / unverified`，不能沿用�
 5. 核对 npm 最终为 `latest=0.1.1`、`next=0.1.1-beta.4`，并验证 provenance 和精确包身份。
 
 ### Task 4：公共 stable 隔离复验
+
+状态：**pending**
 
 从公共 registry 精确安装 `codex-agent-tools@0.1.1`，只做当前宿主的确定性验收：
 

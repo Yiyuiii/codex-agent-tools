@@ -2,7 +2,7 @@
 
 最近更新：2026-08-07
 
-状态：**partial / skipped — beta.4 已公开发布、公共验收并完成官方升级；维护者已终止普通 Stop 验收，未取得 `cancelled + owned-zero` receipt**
+状态：**partial / skipped — beta.4 已公开发布、公共验收并完成官方升级；维护者已终止普通 Stop 验收并批准以 `host_stop_unverified` 风险状态继续 0.1.1 stable 晋级，未取得 `cancelled + owned-zero` receipt**
 
 ## 2026-08-07 维护者跳过决定
 
@@ -14,15 +14,16 @@ observer 已不再运行。第二次遗留的活动 descriptor 已移动到该�
 completion marker 与第一次失败证据均未删除或改写。
 
 这项决定只表示不再继续消耗维护者时间重复交互测试，不表示取消传播、handler cancelled、
-in-flight removed 或 owned descendants zero 已在真实 App Stop 中得到证明。现行 stable
-marker 和 workflow 仍严格要求 observer receipt，因此在发布策略另行调整前，
-`0.1.1` stable 继续被门禁阻断，`0.1.1-beta.4` 保持当前本机可用测试版本。
+in-flight removed 或 owned descendants zero 已在真实 App Stop 中得到证明。维护者随后
+批准方案 A：stable marker schema 2 将真实 `passed + receipt` 与
+`skipped_by_maintainer + host_stop_unverified + decision` 建模为互斥状态，风险跳过只硬锁
+`0.1.1-beta.4 → 0.1.1`，不能泛化到未来版本，也不能输出宿主验收通过。
 
-## 当前发布阻断
+## 当前发布状态
 
 beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调；beta.4 已修复 beta.3 clean-tag 启动层缺口并完成发布、公共验收与官方升级。在完整 App 重启与真实 Stop 证据产生前，当前结果仍只构成确定性、公共包与安装证据。
 
-八项 verifier、beta.4 唯一离线 release gate、PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级均已完成。普通 Stop receipt 未完成且已按维护者决定跳过；现行发布策略下不得发布 stable。若维护者选择继续 stable，下一阶段必须先用 TDD 将“已通过真实 receipt”与“维护者显式接受未验证取消风险”建模为互斥且可审计的发布状态，再重新执行唯一 Node 24 离线门禁和 OIDC 发布链。禁止本地 `npm publish`，也禁止用 waiver 伪装 PASS。
+八项 verifier、beta.4 唯一离线 release gate、PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级均已完成。普通 Stop receipt 未完成且已按维护者决定跳过；互斥且可审计的 stable 发布状态、仓库内决策记录、0.1.1 版本与 marker 已按 TDD 实现。当前剩余路线是最终 Node 24 离线门禁复验、`main` PR/CI、稳定标签 OIDC 发布和公共 stable 隔离复验。禁止本地 `npm publish`，也禁止用风险跳过伪装 PASS。
 
 真实宿主门禁只接受 App 的普通 Stop：必须在 observer 发布 `REQUEST_STARTED` 后点击，并确认外层状态为 `cancelled`、完成标记没有写入、SDK abort 到达、owned descendants zero 且不重生。
 
@@ -372,44 +373,29 @@ reparse point，摘要
 `5e374af0a92681b6eb9b4817cfeb9574f6b675906bc634df14a628159ea0e29f` 与 release marker
 完全一致；beta.3 缓存已移除。没有直接读取或修改活动 `config.toml`，也没有调用真实模型。
 
-## 尚未通过的门禁
+## 未验证风险与剩余发布门禁
 
-完整第 4 层仍缺少以下证据：
+真实 App 普通 Stop 的 `cancelled + owned-zero` 仍未验证。若未来恢复该项验证，PASS 仍
+必须由 observer 唯一写入的 receipt 精确证明 cancelled、completion marker absent、
+handler cancelled、in-flight removed、owned descendants zero 且不重生；本次 stable
+决策记录不能替代或推断这些事实。
 
-1. 完整重启宿主，并在新任务确认 beta.4 缓存与四项脱敏环境变量已经被新
-   app-server 加载。
-2. 从精确 beta.4 tag 的 clean checkout 启动 checked-in observer，只执行它输出的
-   旧宿主 `kimi-k3` `external_review` 握手；随后由 observer 确认真正的旧宿主退出和
-   新宿主身份，不额外重跑任何能力资格。
-3. 在 observer 创建的 nonce 隔离仓库中，逐字使用它输出的 `kimi-k3`
-   `external_delegate` 参数；只有 observer 发布 `REQUEST_STARTED` 后才在 App 中
-   点击普通 Stop。
-4. observer 作为唯一 writer 原子写入 PASS receipt；receipt 必须精确证明请求
-   cancelled、completion marker absent、handler cancelled、in-flight removed、
-   owned descendants zero 且不重生。
-5. 上述门禁全部通过后，只通过 GitHub Actions OIDC 发布 stable。
+维护者已经批准继续 0.1.1 stable 晋级，当前无需再次选择路线。剩余发布门禁是：
 
-在这些缺口闭合前：
+1. 在当前 Windows x64 / Node 24 宿主重新完成唯一 `gate:offline` 与差异检查；
+2. 推送 `codex/stable-0.1.1`，向 `main` 提交 PR 并等待 CI；
+3. 合并后创建不可变 `v0.1.1` 标签，只由 GitHub Actions Trusted Publishing / OIDC
+   发布 npm `latest`，Release 说明必须显示 `host Stop: skipped / unverified`；
+4. 从公共 registry 精确安装 stable 并完成确定性隔离复验，不调用真实模型，也不再运行
+   普通 Stop observer。
 
-- 官方插件可以称为“已安装、已启用，缓存协议验收通过”；
-- 开发期直连可以称为“已通过官方命令移除，CLI 已解析到插件相对入口”；
-- 不得称为“真实 App 宿主门禁全部通过”；
-- verifier 恢复通过前不得发布 beta；真实宿主门禁通过前不得发布 stable；禁止本地 `npm publish`；
-- 不得称为“已替代旧 `codex_cc_tools`”；
-- 不得删除旧工具、恢复开发期直连或手工修改活动配置。
+在这些门禁闭合前，不得把 0.1.1 写成已发布；发布后也不得称为“真实 App 宿主门禁全部
+通过”或“已替代旧 `codex_cc_tools`”。禁止本地 `npm publish`、删除旧工具、恢复开发期
+直连或手工修改活动配置。
 
-## 下一人工节点
+完整实施步骤见[跳过真实 Stop 后的 0.1.1 Stable 晋级计划](../superpowers/plans/2026-08-07-stable-promotion-after-host-stop-skip.md)。
 
-普通 Stop 人工节点已由维护者于 2026-08-07 明确跳过。下一决策节点改为二选一：
-
-1. 保持 `latest=0.1.0`、`next=0.1.1-beta.4`，把 beta.4 作为当前本机版本继续使用，
-   不再为 stable 增加发布策略复杂度；
-2. 继续发布 `0.1.1` stable，但先实现显式风险豁免：严格绑定 beta.4 公共 npm 身份、
-   两次非 PASS 事实和维护者决定，保留 `hostStop=unverified`，且不得接受伪造 receipt。
-
-第二条路线的建议实施步骤见[跳过真实 Stop 后的 0.1.1 Stable 晋级计划](../superpowers/plans/2026-08-07-stable-promotion-after-host-stop-skip.md)。
-
-无论选择哪条，都不额外进行泛化模型复跑，不恢复多 Node 矩阵，也不为外部 CLI 增加
+后续推进仍不额外进行泛化模型复跑，不恢复多 Node 矩阵，也不为外部 CLI 增加
 默认或全局执行限制。
 
 若修复版升级并刷新后的新任务仍报告缺少 Ark 凭据，应单独审计 App 对 `env_vars`
