@@ -6,6 +6,8 @@
 
 > 2026-08-03 当前覆盖：发布实施以[Windows 当前宿主精简计划](2026-08-01-windows-current-host-owned-process.md)为准。下文 Node 20/22/24 矩阵、跨宿主兼容与旧 Markdown marker 只记录历史流程，不是下一版本门禁；当前发布线只使用维护者 Windows x64 / Node 24 宿主、严格 JSON marker、GitHub Actions OIDC、公共 npm 与官方插件完整重启/真实 Stop 验收。Ark Coding Plan 额度恢复只改变当前可调用性，四模型八项资格已为8 current / 0 legacy，不重复运行模型。`0.1.1-beta.4` 已完成PR/双重CI、精确标签、OIDC发布、公共精确包隔离验收与活动官方插件升级；npm为`next=0.1.1-beta.4`、`latest=0.1.0`，五文件活动缓存摘要与marker一致。下一步完整退出并重开App，从beta.4 clean tag启动observer，在`REQUEST_STARTED`后使用普通Stop取得`cancelled + owned-zero` receipt，随后准备stable。
 
+> 2026-08-07 当前覆盖：维护者明确要求跳过普通 Stop 测试。两次 beta.4 宿主会话均未形成 PASS receipt，第二次活动 descriptor 已移入对应 session 留档，避免陈旧绑定。现行 strict stable marker 仍要求真实 receipt，因此 `0.1.1` stable 当前保持阻断；下一计划不再重试 observer，而是在“保持 beta.4”与“用 TDD 增加显式、可审计且不得伪装 PASS 的维护者风险豁免”之间决策。无论哪条路线，都不重复八项真实模型资格、不恢复多 Node 矩阵、不本地 publish。
+
 ## 用户目标
 
 维护者授权 Codex 自主推进正式集成与公开发布，优先复用 `codex-cc-tools` 已验证的发布形态：先发布 beta，在本机从 npm 安装并验证，全部通过后再发布稳定版。

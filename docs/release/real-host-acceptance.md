@@ -1,14 +1,28 @@
 # 真实 Codex App 宿主验收记录
 
-最近更新：2026-08-03
+最近更新：2026-08-07
 
-状态：**partial — beta.4 已公开发布、公共验收并完成官方升级；等待完整 App 重启与普通 Stop 的 `cancelled + owned-zero` receipt**
+状态：**partial / skipped — beta.4 已公开发布、公共验收并完成官方升级；维护者已终止普通 Stop 验收，未取得 `cancelled + owned-zero` receipt**
+
+## 2026-08-07 维护者跳过决定
+
+维护者明确要求跳过当前真实 Stop 测试，转而检查下一步计划。两次 beta.4 会话都不能
+计为 PASS：第一次 delegate 在点击普通 Stop 前自然完成；第二次旧宿主只读握手通过，
+完整重启后对应会话最终出现 completion marker，但没有 observer receipt，且 launcher /
+observer 已不再运行。第二次遗留的活动 descriptor 已移动到该会话目录中的
+`skipped-session.v1.json`，保留审计内容并解除后续公开工具调用的陈旧会话绑定；session、
+completion marker 与第一次失败证据均未删除或改写。
+
+这项决定只表示不再继续消耗维护者时间重复交互测试，不表示取消传播、handler cancelled、
+in-flight removed 或 owned descendants zero 已在真实 App Stop 中得到证明。现行 stable
+marker 和 workflow 仍严格要求 observer receipt，因此在发布策略另行调整前，
+`0.1.1` stable 继续被门禁阻断，`0.1.1-beta.4` 保持当前本机可用测试版本。
 
 ## 当前发布阻断
 
 beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调；beta.4 已修复 beta.3 clean-tag 启动层缺口并完成发布、公共验收与官方升级。在完整 App 重启与真实 Stop 证据产生前，当前结果仍只构成确定性、公共包与安装证据。
 
-晋级顺序只有一条：八项 verifier、beta.4 唯一离线 release gate、PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级均已完成；现在完整退出并重开 App，从 beta.4 clean tag 启动 observer，在其发布 `REQUEST_STARTED` 后使用普通 Stop，取得精确 `cancelled + owned-zero` receipt；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`。
+八项 verifier、beta.4 唯一离线 release gate、PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级均已完成。普通 Stop receipt 未完成且已按维护者决定跳过；现行发布策略下不得发布 stable。若维护者选择继续 stable，下一阶段必须先用 TDD 将“已通过真实 receipt”与“维护者显式接受未验证取消风险”建模为互斥且可审计的发布状态，再重新执行唯一 Node 24 离线门禁和 OIDC 发布链。禁止本地 `npm publish`，也禁止用 waiver 伪装 PASS。
 
 真实宿主门禁只接受 App 的普通 Stop：必须在 observer 发布 `REQUEST_STARTED` 后点击，并确认外层状态为 `cancelled`、完成标记没有写入、SDK abort 到达、owned descendants zero 且不重生。
 
@@ -386,10 +400,17 @@ reparse point，摘要
 
 ## 下一人工节点
 
-下一人工节点已经到达：维护者需要完整退出并重开 Codex App。随后从 beta.4 精确
-clean tag 启动 checked-in observer，按它输出的精确
-Kimi review 握手与隔离 delegate 参数完成普通 Stop 和 `cancelled + owned-zero` receipt；
-不额外进行泛化模型复跑。
+普通 Stop 人工节点已由维护者于 2026-08-07 明确跳过。下一决策节点改为二选一：
+
+1. 保持 `latest=0.1.0`、`next=0.1.1-beta.4`，把 beta.4 作为当前本机版本继续使用，
+   不再为 stable 增加发布策略复杂度；
+2. 继续发布 `0.1.1` stable，但先实现显式风险豁免：严格绑定 beta.4 公共 npm 身份、
+   两次非 PASS 事实和维护者决定，保留 `hostStop=unverified`，且不得接受伪造 receipt。
+
+第二条路线的建议实施步骤见[跳过真实 Stop 后的 0.1.1 Stable 晋级计划](../superpowers/plans/2026-08-07-stable-promotion-after-host-stop-skip.md)。
+
+无论选择哪条，都不额外进行泛化模型复跑，不恢复多 Node 矩阵，也不为外部 CLI 增加
+默认或全局执行限制。
 
 若修复版升级并刷新后的新任务仍报告缺少 Ark 凭据，应单独审计 App 对 `env_vars`
 的实际解析，不恢复开发直连。只有确认新插件安装本身失败时，才对本次新插件使用已
