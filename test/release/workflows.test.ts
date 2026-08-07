@@ -94,6 +94,10 @@ describe("GitHub release workflows", () => {
 
     expect(content).not.toContain("actions/upload-artifact");
     expect(content).not.toMatch(/\bnpm\s+pack(?:\s|$)/u);
+    expect(content).toContain("host_stop_status");
+    expect(content).toContain("host Stop: passed");
+    expect(content).toContain("host Stop: skipped / unverified");
+    expect(content).not.toContain("public beta host acceptance: passed");
   });
 
   it("installs one package-pinned Codex CLI in both workflows", () => {

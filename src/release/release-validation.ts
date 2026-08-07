@@ -135,16 +135,28 @@ export interface PublicBetaIdentity {
 }
 
 export interface StableReleaseValidationMarker {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly kind: "stable";
   readonly package: ReleasePackageIdentity & { readonly npmChannel: "latest" };
   readonly core: ReleaseValidationCore;
   readonly publicBeta: PublicBetaIdentity;
-  readonly hostAcceptance: Readonly<{
-    path: string;
-    sha256: string;
-    sessionNonceSha256: string;
-  }>;
+  readonly hostAcceptance:
+    | Readonly<{
+        status: "passed";
+        receipt: Readonly<{
+          path: string;
+          sha256: string;
+          sessionNonceSha256: string;
+        }>;
+      }>
+    | Readonly<{
+        status: "skipped_by_maintainer";
+        risk: "host_stop_unverified";
+        decision: Readonly<{
+          path: string;
+          sha256: string;
+        }>;
+      }>;
 }
 
 export type ReleaseValidationMarker =
@@ -284,6 +296,13 @@ function controlledEvidencePath(
   );
   if (!pattern.test(candidate)) fail();
   return candidate;
+}
+
+function hostStopDecisionPath(value: unknown, stableVersion: string): string {
+  return exactString(
+    value,
+    `.release-validation/evidence/v${stableVersion}-host-stop-decision.json`,
+  );
 }
 
 function currentHostFreezePath(value: unknown, runtimeCommit: string): string {
@@ -685,7 +704,7 @@ export function parseReleaseValidationMarker(
       "publicBeta",
       "hostAcceptance",
     ]);
-    if (record.schemaVersion !== 1 || context.npmChannel !== "latest") fail();
+    if (record.schemaVersion !== 2 || context.npmChannel !== "latest") fail();
     const publicBeta = parsePublicBeta(record.publicBeta);
     if (
       publicBeta.version.split("-", 1)[0] !== context.packageVersion
@@ -697,26 +716,53 @@ export function parseReleaseValidationMarker(
       context.expectedCanonicalRuntimeDigestSha256,
     );
     const host = plainRecord(record.hostAcceptance);
-    exactKeys(host, ["path", "sha256", "sessionNonceSha256"]);
-    const hostPath = controlledEvidencePath(host.path, "host-acceptance");
-    if (
-      hostPath !==
-      `.release-validation/evidence/v${publicBeta.version}-host-acceptance.json`
-    ) {
+    let hostAcceptance: StableReleaseValidationMarker["hostAcceptance"];
+    if (host.status === "passed") {
+      exactKeys(host, ["status", "receipt"]);
+      const receipt = plainRecord(host.receipt);
+      exactKeys(receipt, ["path", "sha256", "sessionNonceSha256"]);
+      const receiptPath = controlledEvidencePath(
+        receipt.path,
+        "host-acceptance",
+      );
+      if (
+        receiptPath !==
+        `.release-validation/evidence/v${publicBeta.version}-host-acceptance.json`
+      ) {
+        fail();
+      }
+      hostAcceptance = Object.freeze({
+        status: "passed",
+        receipt: Object.freeze({
+          path: receiptPath,
+          sha256: digest(receipt.sha256),
+          sessionNonceSha256: digest(receipt.sessionNonceSha256),
+        }),
+      });
+    } else if (host.status === "skipped_by_maintainer") {
+      exactKeys(host, ["status", "risk", "decision"]);
+      exactString(host.risk, "host_stop_unverified");
+      const decision = plainRecord(host.decision);
+      exactKeys(decision, ["path", "sha256"]);
+      hostAcceptance = Object.freeze({
+        status: "skipped_by_maintainer",
+        risk: "host_stop_unverified",
+        decision: Object.freeze({
+          path: hostStopDecisionPath(decision.path, context.packageVersion),
+          sha256: digest(decision.sha256),
+        }),
+      });
+    } else {
       fail();
     }
     return Object.freeze({
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: "stable",
       package: parseReleasePackage(record.package, context) as
         StableReleaseValidationMarker["package"],
       core,
       publicBeta,
-      hostAcceptance: Object.freeze({
-        path: hostPath,
-        sha256: digest(host.sha256),
-        sessionNonceSha256: digest(host.sessionNonceSha256),
-      }),
+      hostAcceptance,
     });
   } catch {
     return fail();
@@ -910,6 +956,23 @@ interface HostAcceptanceEvent {
   readonly eventSha256: string;
 }
 
+export interface HostStopReleaseDecision {
+  readonly schemaVersion: 1;
+  readonly kind: "host-stop-release-decision";
+  readonly package: ReleasePackageIdentity & { readonly npmChannel: "latest" };
+  readonly publicBeta: PublicBetaIdentity;
+  readonly decision: "skipped_by_maintainer";
+  readonly risk: "host_stop_unverified";
+  readonly receiptPresent: false;
+  readonly attempts: readonly [
+    Readonly<{ readonly outcome: "completed_without_stop" }>,
+    Readonly<{
+      readonly outcome: "completion_marker_present_without_receipt";
+    }>,
+  ];
+  readonly decidedAt: string;
+}
+
 export interface HostAcceptanceReceipt {
   readonly schemaVersion: 1;
   readonly kind: "host-acceptance";
@@ -966,6 +1029,70 @@ function timestamp(value: unknown): string {
 
 function sameJson(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+export function assertHostStopReleaseDecision(
+  value: unknown,
+  marker: StableReleaseValidationMarker,
+): HostStopReleaseDecision {
+  try {
+    if (marker.hostAcceptance.status !== "skipped_by_maintainer") fail();
+    const record = plainRecord(value);
+    exactKeys(record, [
+      "schemaVersion",
+      "kind",
+      "package",
+      "publicBeta",
+      "decision",
+      "risk",
+      "receiptPresent",
+      "attempts",
+      "decidedAt",
+    ]);
+    if (
+      record.schemaVersion !== 1 ||
+      record.kind !== "host-stop-release-decision" ||
+      record.decision !== "skipped_by_maintainer" ||
+      record.risk !== "host_stop_unverified" ||
+      record.receiptPresent !== false
+    ) {
+      fail();
+    }
+    const releasePackage = parseReleasePackage(record.package, {
+      packageVersion: marker.package.version,
+      tag: marker.package.tag,
+      npmChannel: "latest",
+    }) as HostStopReleaseDecision["package"];
+    if (!sameJson(releasePackage, marker.package)) fail();
+    const publicBeta = parsePublicBeta(record.publicBeta);
+    if (!sameJson(publicBeta, marker.publicBeta)) fail();
+    const rawAttempts = strictArray(record.attempts);
+    const expectedOutcomes = [
+      "completed_without_stop",
+      "completion_marker_present_without_receipt",
+    ] as const;
+    if (rawAttempts.length !== expectedOutcomes.length) fail();
+    const attempts = rawAttempts.map((value, index) => {
+      const attempt = plainRecord(value);
+      exactKeys(attempt, ["outcome"]);
+      return Object.freeze({
+        outcome: exactString(attempt.outcome, expectedOutcomes[index]!),
+      });
+    }) as unknown as HostStopReleaseDecision["attempts"];
+    return Object.freeze({
+      schemaVersion: 1,
+      kind: "host-stop-release-decision",
+      package: releasePackage,
+      publicBeta,
+      decision: "skipped_by_maintainer",
+      risk: "host_stop_unverified",
+      receiptPresent: false,
+      attempts: Object.freeze(attempts),
+      decidedAt: timestamp(record.decidedAt),
+    });
+  } catch {
+    return fail();
+  }
 }
 
 export function computeHostAcceptanceRequestBindingSha256(input: Readonly<{
@@ -1060,6 +1187,7 @@ export function assertHostAcceptanceReceipt(
   marker: StableReleaseValidationMarker,
 ): HostAcceptanceReceipt {
   try {
+    if (marker.hostAcceptance.status !== "passed") fail();
     const record = plainRecord(value);
     exactKeys(record, [
       "schemaVersion",
@@ -1101,7 +1229,10 @@ export function assertHostAcceptanceReceipt(
     if (nonce.length < 32) fail();
     const nonceSha256 = digest(session.nonceSha256);
     const descriptorSha256 = digest(session.descriptorSha256);
-    if (sha256(nonce) !== nonceSha256 || nonceSha256 !== marker.hostAcceptance.sessionNonceSha256) fail();
+    if (
+      sha256(nonce) !== nonceSha256 ||
+      nonceSha256 !== marker.hostAcceptance.receipt.sessionNonceSha256
+    ) fail();
 
     const oldHostRecord = plainRecord(record.oldHost);
     exactKeys(oldHostRecord, ["chatGpt", "appServer", "kernelPeerMcp"]);
@@ -1753,15 +1884,23 @@ export async function verifyReleaseValidation(
       dependencies.lookupNpmDist ?? defaultLookupNpmDist
     )(PACKAGE_NAME, marker.publicBeta.version);
     if (!sameJson(registry, marker.publicBeta.npm)) fail();
-    const hostBytes = await readRepositoryFile(
-      options.repositoryRoot,
-      marker.hostAcceptance.path,
-    );
-    if (sha256(hostBytes) !== marker.hostAcceptance.sha256) fail();
-    assertHostAcceptanceReceipt(
-      parseJson(hostBytes),
-      marker,
-    );
+    if (marker.hostAcceptance.status === "passed") {
+      const hostBytes = await readRepositoryFile(
+        options.repositoryRoot,
+        marker.hostAcceptance.receipt.path,
+      );
+      if (sha256(hostBytes) !== marker.hostAcceptance.receipt.sha256) fail();
+      assertHostAcceptanceReceipt(parseJson(hostBytes), marker);
+    } else {
+      const decisionBytes = await readRepositoryFile(
+        options.repositoryRoot,
+        marker.hostAcceptance.decision.path,
+      );
+      if (sha256(decisionBytes) !== marker.hostAcceptance.decision.sha256) {
+        fail();
+      }
+      assertHostStopReleaseDecision(parseJson(decisionBytes), marker);
+    }
     return marker;
   } catch {
     return fail();

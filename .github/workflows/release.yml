@@ -20,6 +20,7 @@ jobs:
       npm_tag: ${{ steps.channel.outputs.npm_tag }}
       tag_version: ${{ steps.version.outputs.tag_version }}
       validation_file: ${{ steps.validation.outputs.validation_file }}
+      host_stop_status: ${{ steps.validation.outputs.host_stop_status }}
 
     steps:
       - uses: actions/checkout@v6
@@ -109,6 +110,17 @@ jobs:
             --tag "$GITHUB_REF_NAME" \
             --tagged-commit "$GITHUB_SHA" \
             --npm-channel "${{ steps.channel.outputs.npm_tag }}"
+          host_stop_status="not_applicable"
+          if [[ "${{ steps.channel.outputs.npm_tag }}" == "latest" ]]; then
+            host_stop_status="$(node -e '
+              const fs = require("node:fs");
+              const marker = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+              const status = marker?.hostAcceptance?.status;
+              if (status !== "passed" && status !== "skipped_by_maintainer") process.exit(1);
+              process.stdout.write(status);
+            ' "$validation_file")"
+          fi
+          echo "host_stop_status=${host_stop_status}" >> "$GITHUB_OUTPUT"
 
       - name: Check whether the version already exists
         id: existing
@@ -173,13 +185,21 @@ jobs:
           tag_version="${{ needs.publish.outputs.tag_version }}"
           npm_tag="${{ needs.publish.outputs.npm_tag }}"
           validation_file="${{ needs.publish.outputs.validation_file }}"
+          host_stop_status="${{ needs.publish.outputs.host_stop_status }}"
           {
             echo "## Validation"
             echo "- CI runtime: Node 24"
             echo "- release smoke: passed"
             echo "- npm package and dist-tag: verified"
             if [[ "$npm_tag" == "latest" ]]; then
-              echo "- public beta host acceptance: passed (see \`${validation_file}\`)"
+              if [[ "$host_stop_status" == "passed" ]]; then
+                echo "- host Stop: passed (see \`${validation_file}\`)"
+              elif [[ "$host_stop_status" == "skipped_by_maintainer" ]]; then
+                echo "- host Stop: skipped / unverified (see \`${validation_file}\`)"
+              else
+                echo "::error::Unknown stable host Stop status: ${host_stop_status}"
+                exit 1
+              fi
             else
               echo "- beta local npm acceptance: required before stable promotion"
             fi
