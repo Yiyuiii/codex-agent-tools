@@ -13,7 +13,7 @@
 
 资格单位是一个精确的“逻辑 LLM × 任务”组合；历史 batch manifest 与 case evidence 永久不可变，不以额度恢复、文档更新或注册表旧 `passed` 文案替代当前指纹验证。最新终态、执行边界和恢复条件只在[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)维护，运维与发布状态只在[运维说明](docs/operations.md)维护。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用只作为历史审计证据保留。
 
-注册表仍保留 8 passed / 0 pending 的历史文案，[`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 是当前候选的现行索引；当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。beta.3 clean-tag 启动层缺口已由 `0.1.1-beta.4` 修复：标签对照 4 个受版本控制制品，实际官方缓存的 5 个安装制品仍全部进入 marker 摘要；该版本已由 GitHub Actions OIDC 发布、通过公共精确包隔离验收并按官方 remove/add 升级为活动 installed/enabled 插件。`0.1.1` stable 候选复用该已验证运行时；维护者已跳过普通 Stop 交互验收，真实 `cancelled + owned-zero` 保持 unverified，发布验证与 Release 文案必须明确显示 `skipped / unverified`，不得暗示 PASS。旧 `codex_cc_tools` 保持启用，项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。现行资格规则见[能力粒度资格设计](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)。
+注册表仍保留 8 passed / 0 pending 的历史文案，[`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 是当前候选的现行索引；当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。beta.3 clean-tag 启动层缺口已由 `0.1.1-beta.4` 修复；其已验证运行时随后作为 `0.1.1` 由 GitHub Actions OIDC 发布到 npm `latest`、通过公共精确包隔离验收并升级为活动 installed/enabled 插件。维护者已跳过普通 Stop 交互验收，真实 `cancelled + owned-zero` 保持 unverified，不得暗示 PASS。2026-08-07 在新插件真实 Kimi 窄 review/delegate 通过且旧工具当前无可用后端后，旧 `codex_cc_tools` 经独立授权使用官方 MCP 命令移除；项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。现行资格规则见[能力粒度资格设计](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)。
 
 2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)。
 
@@ -56,7 +56,7 @@
 
 仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。当前发布线只验证维护者这套 Windows x64 / Node 24 宿主；确定性、隔离插件、包闭包和真实宿主门禁的现行结果统一见[发布验收清单](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/checklist.md)，README 不重复维护易过期的测试计数。
 
-维护者本机已于 2026-07-30 取得逐动作许可，并通过官方 `codex plugin` 命令安装 `codex-external-agents`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。后续又用官方命令移除同名开发期直连，旧 `codex_cc_tools` 保持 enabled。`0.1.1-beta.0` 补齐 `cwd: "."` 后由 GitHub Actions OIDC 发布到 npm `next` 并完成官方升级。维护者真正终止后台宿主并重开后，新任务已发现 `external_review` / `external_delegate` 与旧两项工具共存，真实 Kimi K3 review 通过；Ark Coding Plan review 在启动 Pi 前报告缺少凭据。根因是插件 manifest 没有声明 stdio MCP `env_vars`，宿主按隔离边界没有把父 App 中已存在的 Coding Plan 凭据转发给 MCP。历史阶段的 `0.1.1-beta.1` 已发布到 npm `next` 并已安装到活动官方插件；该版本增加了精确四项变量名白名单且不保存任何值，其 handoff 取消门禁失败促成本轮修复。真实 App 宿主门禁仍为 partial，不能称为已替代旧工具。
+维护者本机已通过逐动作许可和官方 `codex plugin` 命令安装、升级 `codex-external-agents`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。`0.1.1` 发布并完整重启后，新任务已发现 `external_review` / `external_delegate`；发布后真实 Kimi K3 窄 review 为 38.291 秒，隔离 delegate 为 13.913 秒，文件、命令与 owned-zero 均经独立复核。随后维护者独立授权旧工具退役，`codex mcp remove codex_cc_tools` 成功且官方列表复核只保留新插件；全局提示词也已改用两个新工具。当前 App 任务可能继续缓存旧工具定义，需完整重启后在新任务中确认最终发现面。真实 App 普通 Stop 仍为 skipped / unverified，因此替代结论只覆盖日常 review/delegate 路径，不覆盖未完成的宿主取消证明。
 
 完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/checklist.md)。
 
@@ -102,8 +102,8 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-`0.1.1` stable 候选精确绑定由 GitHub Actions OIDC 发布并完成公共本机验收的 `0.1.1-beta.4`。beta.4 已通过当前 Node 24 宿主的完整离线门禁和公共精确包隔离验收，并按官方 remove/add 升级为活动 installed/enabled 插件；五文件缓存摘要与发布 marker 一致，beta.3 缓存已移除。旧 `codex_cc_tools` 继续共存；现行能力索引保持 8 current / 0 legacy，不因 Ark 额度恢复或本次发布策略调整重跑模型。
+`0.1.1` stable 已由 GitHub Actions OIDC 发布并完成公共本机验收；活动官方插件为 installed/enabled 0.1.1，旧 `codex_cc_tools` 已经独立授权退役。现行能力索引保持 8 current / 0 legacy，不因 Ark 额度变化、Kimi CLI 本机升级或工具退役重写不可变模型证据。
 
 维护者于 2026-08-07 终止继续重试普通 Stop observer。两次会话都没有形成 PASS receipt，因此 `0.1.1` 只通过严格 `skipped_by_maintainer / host_stop_unverified` 决策状态晋级；该状态硬锁到 `0.1.1-beta.4 → 0.1.1`，不能泛化到其它版本或门禁。stable 只由 GitHub Actions OIDC 发布，禁止本地 `npm publish`。
 
-真实 App 普通 Stop 仍未验证；确定性取消、Job ownership 与 drain 测试通过不能改写这一事实。旧 `codex_cc_tools` 保持 enabled。
+真实 App 普通 Stop 仍未验证；确定性取消、Job ownership、drain 测试和旧工具退役都不能改写这一事实。Kimi 0.34.0 的 swarm/思考强度探测见[研究记录](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/research/kimi-0.34-swarm-acp.md)：当前不新增无法由 ACP 保证的公开参数。
