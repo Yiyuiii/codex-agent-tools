@@ -48,6 +48,8 @@ const MAX_JSON_EVIDENCE_BYTES = 1024 * 1024;
 const MAX_FIXED_BINARY_EVIDENCE_BYTES = 4 * 1024 * 1024;
 const PRERELEASE_VERSION_SOURCE =
   "(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*";
+const MAINTAINER_SKIPPED_STABLE_VERSION = "0.1.1";
+const MAINTAINER_SKIPPED_BETA_VERSION = "0.1.1-beta.4";
 
 type PlainRecord = Record<string, unknown>;
 export type ReleaseChannel = "next" | "latest";
@@ -740,6 +742,12 @@ export function parseReleaseValidationMarker(
         }),
       });
     } else if (host.status === "skipped_by_maintainer") {
+      if (
+        context.packageVersion !== MAINTAINER_SKIPPED_STABLE_VERSION ||
+        publicBeta.version !== MAINTAINER_SKIPPED_BETA_VERSION
+      ) {
+        fail();
+      }
       exactKeys(host, ["status", "risk", "decision"]);
       exactString(host.risk, "host_stop_unverified");
       const decision = plainRecord(host.decision);
@@ -963,13 +971,7 @@ export interface HostStopReleaseDecision {
   readonly publicBeta: PublicBetaIdentity;
   readonly decision: "skipped_by_maintainer";
   readonly risk: "host_stop_unverified";
-  readonly receiptPresent: false;
-  readonly attempts: readonly [
-    Readonly<{ readonly outcome: "completed_without_stop" }>,
-    Readonly<{
-      readonly outcome: "completion_marker_present_without_receipt";
-    }>,
-  ];
+  readonly reason: "interactive_host_stop_not_completed";
   readonly decidedAt: string;
 }
 
@@ -1045,8 +1047,7 @@ export function assertHostStopReleaseDecision(
       "publicBeta",
       "decision",
       "risk",
-      "receiptPresent",
-      "attempts",
+      "reason",
       "decidedAt",
     ]);
     if (
@@ -1054,7 +1055,7 @@ export function assertHostStopReleaseDecision(
       record.kind !== "host-stop-release-decision" ||
       record.decision !== "skipped_by_maintainer" ||
       record.risk !== "host_stop_unverified" ||
-      record.receiptPresent !== false
+      record.reason !== "interactive_host_stop_not_completed"
     ) {
       fail();
     }
@@ -1066,19 +1067,6 @@ export function assertHostStopReleaseDecision(
     if (!sameJson(releasePackage, marker.package)) fail();
     const publicBeta = parsePublicBeta(record.publicBeta);
     if (!sameJson(publicBeta, marker.publicBeta)) fail();
-    const rawAttempts = strictArray(record.attempts);
-    const expectedOutcomes = [
-      "completed_without_stop",
-      "completion_marker_present_without_receipt",
-    ] as const;
-    if (rawAttempts.length !== expectedOutcomes.length) fail();
-    const attempts = rawAttempts.map((value, index) => {
-      const attempt = plainRecord(value);
-      exactKeys(attempt, ["outcome"]);
-      return Object.freeze({
-        outcome: exactString(attempt.outcome, expectedOutcomes[index]!),
-      });
-    }) as unknown as HostStopReleaseDecision["attempts"];
     return Object.freeze({
       schemaVersion: 1,
       kind: "host-stop-release-decision",
@@ -1086,8 +1074,7 @@ export function assertHostStopReleaseDecision(
       publicBeta,
       decision: "skipped_by_maintainer",
       risk: "host_stop_unverified",
-      receiptPresent: false,
-      attempts: Object.freeze(attempts),
+      reason: "interactive_host_stop_not_completed",
       decidedAt: timestamp(record.decidedAt),
     });
   } catch {

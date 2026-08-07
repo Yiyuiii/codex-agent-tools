@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertCurrentHostFreezeReceipt,
   assertHostAcceptanceReceipt,
+  assertHostStopReleaseDecision,
   computeHostAcceptanceEventSha256,
   computeHostAcceptanceRequestBindingSha256,
   digestReleasePluginArtifactTree,
@@ -244,6 +245,12 @@ function skippedStableMarker(targetCore = core()): SkippedStableMarker {
   const passed = stableMarker(targetCore);
   return {
     ...passed,
+    publicBeta: {
+      ...passed.publicBeta,
+      version: "0.1.1-beta.4",
+      tag: "v0.1.1-beta.4",
+      markerPath: ".release-validation/v0.1.1-beta.4.json",
+    },
     hostAcceptance: {
       status: "skipped_by_maintainer",
       risk: "host_stop_unverified",
@@ -263,11 +270,7 @@ function hostStopDecision(marker: StableReleaseValidationMarker) {
     publicBeta: marker.publicBeta,
     decision: "skipped_by_maintainer",
     risk: "host_stop_unverified",
-    receiptPresent: false,
-    attempts: [
-      { outcome: "completed_without_stop" },
-      { outcome: "completion_marker_present_without_receipt" },
-    ],
+    reason: "interactive_host_stop_not_completed",
     decidedAt: "2026-08-07T09:00:00.000Z",
   };
 }
@@ -509,7 +512,7 @@ describe("strict release validation marker", () => {
         ...skippedStableMarker(),
         hostAcceptance: {
           ...skippedStableMarker().hostAcceptance,
-          receipt: stableMarker().hostAcceptance,
+          receipt: stableMarker().hostAcceptance.receipt,
         },
       }),
     ],
@@ -527,11 +530,48 @@ describe("strict release validation marker", () => {
       "legacy stable schema",
       () => ({ ...stableMarker(), schemaVersion: 1 }),
     ],
+    [
+      "skip bound to another beta",
+      () => ({
+        ...skippedStableMarker(),
+        publicBeta: {
+          ...skippedStableMarker().publicBeta,
+          version: "0.1.1-beta.3",
+          tag: "v0.1.1-beta.3",
+          markerPath: ".release-validation/v0.1.1-beta.3.json",
+        },
+      }),
+    ],
+    [
+      "skip generalized to a later stable",
+      () => ({
+        ...skippedStableMarker(),
+        package: {
+          ...skippedStableMarker().package,
+          version: "0.1.2",
+          tag: "v0.1.2",
+        },
+        publicBeta: {
+          ...skippedStableMarker().publicBeta,
+          version: "0.1.2-beta.4",
+          tag: "v0.1.2-beta.4",
+          markerPath: ".release-validation/v0.1.2-beta.4.json",
+        },
+        hostAcceptance: {
+          ...skippedStableMarker().hostAcceptance,
+          decision: {
+            ...skippedStableMarker().hostAcceptance.decision,
+            path: ".release-validation/evidence/v0.1.2-host-stop-decision.json",
+          },
+        },
+      }),
+    ],
   ])("rejects %s", (_name, mutate) => {
+    const value = mutate();
     expect(() =>
-      parseReleaseValidationMarker(mutate(), {
-        packageVersion: "0.1.1",
-        tag: "v0.1.1",
+      parseReleaseValidationMarker(value, {
+        packageVersion: value.package.version,
+        tag: value.package.tag,
         npmChannel: "latest",
       }),
     ).toThrow("Release validation evidence is invalid");
@@ -913,6 +953,64 @@ describe("release receipts", () => {
       expect(() => assertHostAcceptanceReceipt(invalid, marker)).toThrow();
     }
   });
+
+  it("binds the maintainer skip decision to the exact stable and public beta identities", () => {
+    const marker = skippedStableMarker();
+    const decision = hostStopDecision(marker);
+    expect(assertHostStopReleaseDecision(decision, marker)).toMatchObject({
+      decision: "skipped_by_maintainer",
+      risk: "host_stop_unverified",
+      reason: "interactive_host_stop_not_completed",
+    });
+    const invalid = [
+      { ...decision, extra: true },
+      { ...decision, risk: "generic_release_waiver" },
+      { ...decision, decision: "passed" },
+      {
+        ...decision,
+        package: { ...decision.package, version: "0.1.2" },
+      },
+      {
+        ...decision,
+        publicBeta: {
+          ...decision.publicBeta,
+          markerSha256: "f".repeat(64),
+        },
+      },
+      {
+        ...decision,
+        publicBeta: {
+          ...decision.publicBeta,
+          pluginArtifactTreeDigestSha256: H64,
+        },
+      },
+      {
+        ...decision,
+        publicBeta: {
+          ...decision.publicBeta,
+          npm: { ...decision.publicBeta.npm, shasum: "c".repeat(40) },
+        },
+      },
+      {
+        ...decision,
+        publicBeta: {
+          ...decision.publicBeta,
+          observerArtifact: {
+            ...decision.publicBeta.observerArtifact,
+            sha256: H64,
+          },
+        },
+      },
+    ];
+    for (const value of invalid) {
+      expect(() => assertHostStopReleaseDecision(value, marker)).toThrow(
+        "Release validation evidence is invalid",
+      );
+    }
+    expect(() =>
+      assertHostStopReleaseDecision(new Proxy(decision, {}), marker),
+    ).toThrow("Release validation evidence is invalid");
+  });
 });
 
 describe("release validation verifier", () => {
@@ -1120,7 +1218,15 @@ describe("release validation verifier", () => {
         sha256: sha256(freezeBytes),
       },
     };
-    const beta = betaMarker(finalCore, artifacts);
+    const betaDraft = betaMarker(finalCore, artifacts);
+    const beta = {
+      ...betaDraft,
+      package: {
+        ...betaDraft.package,
+        version: "0.1.1-beta.4",
+        tag: "v0.1.1-beta.4",
+      },
+    };
     const betaBytes = Buffer.from(JSON.stringify(beta));
     const draftStable = skippedStableMarker(finalCore);
     const publicBeta = {
@@ -1164,7 +1270,7 @@ describe("release validation verifier", () => {
         Buffer.from(
           JSON.stringify({
             name: "codex-agent-tools",
-            version: "0.1.1-beta.1",
+            version: "0.1.1-beta.4",
           }),
         ),
       ],
@@ -1228,7 +1334,7 @@ describe("release validation verifier", () => {
 
     const invalidDecision = {
       ...hostStopDecision(preMarker),
-      receiptPresent: true,
+      reason: "generic_skip",
     };
     await expect(
       verifyReleaseValidation(
