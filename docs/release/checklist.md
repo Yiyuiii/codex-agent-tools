@@ -8,7 +8,7 @@
 
 已发布稳定版本：`0.1.1`
 
-当前结论：**`0.1.1` stable 已完成 Node 24 离线门禁、PR/双重 CI、不可变标签、GitHub Actions OIDC 发布、公共精确包隔离验收与活动官方插件升级；现行能力索引为 8 current / 0 legacy。npm 为 `latest=0.1.1`、`next=0.1.1-beta.4`，活动插件 installed/enabled `0.1.1`，旧 `codex_cc_tools` 仍 enabled。维护者已于 2026-08-07 跳过普通 Stop 验收；两次会话均没有 PASS receipt，真实 Stop 保持 `skipped / unverified`。稳定版证据使用严格 `skipped_by_maintainer / host_stop_unverified` 决策状态，GitHub Release 没有把它显示为宿主验收通过。当前 App 需完整退出重开后才会实际加载 stable 插件。**
+当前结论：**`0.1.1` stable 已完成 Node 24 离线门禁、PR/双重 CI、不可变标签、GitHub Actions OIDC 发布、公共精确包隔离验收与活动官方插件升级；现行能力索引为 8 current / 0 legacy。npm 为 `latest=0.1.1`、`next=0.1.1-beta.4`，活动插件 installed/enabled `0.1.1`，旧 `codex_cc_tools` 仍 enabled。维护者完整退出重开后，当前新任务已发现两个公开工具，官方 MCP cwd 指向 `0.1.1` 缓存且插件进程属于新 app-server，stable 已实际加载。维护者已于 2026-08-07 跳过普通 Stop 验收；两次会话均没有 PASS receipt，真实 Stop 保持 `skipped / unverified`。稳定版证据使用严格 `skipped_by_maintainer / host_stop_unverified` 决策状态，GitHub Release 没有把它显示为宿主验收通过。**
 
 最新真实批次绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`，批次 ID 为 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`；标准入口和 execution cell 各只有一个，八项全部 passed，没有 resume、retry、fallback 或补跑。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，immutable-evidence 与 frozen-candidate verifier 均通过，owned process 全部 drained、锁为空；不可变证据由提交 `c09ce74` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。
 

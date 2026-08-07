@@ -29,8 +29,9 @@ GitHub Actions Trusted Publishing / OIDC；本地不执行 `npm publish`。
 - 公共精确包在 Windows x64 / Node 24 完成隔离验收，真实模型调用为 0；
 - 活动官方插件已升级为 installed/enabled `0.1.1`，五文件缓存与发布源逐项同 SHA、
   无 reparse，旧 `codex_cc_tools` 仍 enabled；
-- GitHub Release 与仓库证据均明确保留 `host Stop: skipped / unverified`。当前桌面 App
-  仍需完整退出重开后才会由新宿主进程加载 stable，这不改变发布完成状态。
+- GitHub Release 与仓库证据均明确保留 `host Stop: skipped / unverified`；维护者已在
+  升级后完整退出重开，当前新任务已发现两个公开工具，官方 MCP cwd 与新 app-server
+  子进程共同确认 stable 已实际加载。
 
 ## 设计选择
 
