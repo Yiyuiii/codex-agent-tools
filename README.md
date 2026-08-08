@@ -56,7 +56,7 @@
 
 仓库已包含本地 marketplace、官方插件 manifest、直接 server-map `.mcp.json` 和自包含 MCP bundle。当前发布线只验证维护者这套 Windows x64 / Node 24 宿主；确定性、隔离插件、包闭包和真实宿主门禁的现行结果统一见[发布验收清单](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/checklist.md)，README 不重复维护易过期的测试计数。
 
-维护者本机已通过逐动作许可和官方 `codex plugin` 命令安装、升级 `codex-external-agents`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。`0.1.1` 发布并完整重启后，新任务已发现 `external_review` / `external_delegate`；发布后真实 Kimi K3 窄 review 为 38.291 秒，隔离 delegate 为 13.913 秒，文件、命令与 owned-zero 均经独立复核。随后维护者独立授权旧工具退役，`codex mcp remove codex_cc_tools` 成功且官方列表复核只保留新插件；全局提示词也已改用两个新工具。当前 App 任务可能继续缓存旧工具定义，需完整重启后在新任务中确认最终发现面。真实 App 普通 Stop 仍为 skipped / unverified，因此替代结论只覆盖日常 review/delegate 路径，不覆盖未完成的宿主取消证明。
+维护者本机已通过逐动作许可和官方 `codex plugin` 命令安装、升级 `codex-external-agents`；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。`0.1.1` 发布并完整重启后，新任务已发现 `external_review` / `external_delegate`；发布后真实 Kimi K3 窄 review 为 38.291 秒，隔离 delegate 为 13.913 秒，文件、命令与 owned-zero 均经独立复核。随后维护者独立授权旧工具退役，`codex mcp remove codex_cc_tools` 成功且全局提示词已改用两个新工具。维护者再次完整重启后，新任务工具发现面与官方 MCP 列表均不含旧服务；新宿主中的 Kimi K3 窄 review 在 13.215 秒返回精确 `RESTART_OK`，零诊断、零文件变化。真实 App 普通 Stop 仍为 skipped / unverified，因此替代结论只覆盖日常 review/delegate 路径，不覆盖未完成的宿主取消证明。
 
 完整流程见 [运维说明](docs/operations.md)，与旧工具的共存边界见 [迁移说明](docs/migration-from-codex-cc-tools.md)，四层门禁状态见 [发布验收清单](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/checklist.md)。
 
