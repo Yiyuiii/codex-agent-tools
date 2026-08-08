@@ -1,6 +1,6 @@
 # 从 codex-cc-tools 迁移
 
-## 当前结论：官方配置退役完成，宿主缓存待重启确认
+## 当前结论：官方配置与宿主发现面退役完成
 
 `codex-agent-tools` 现在由 MCP 服务 `codex_external_agents` 通过 `external_review` 与 `external_delegate` 提供 Codex 外部 LLM 能力。2026-08-07 已完成本机替代：
 
@@ -8,7 +8,8 @@
 - 活动 Codex 已通过官方插件机制安装并启用公开稳定版 `0.1.1`，完整重启后的新任务已发现两个新工具，真实 Kimi K3 窄 review/delegate 均通过；
 - 新插件已经覆盖维护者实际使用的 review/delegate 路径，维护者明确决定结束共存；旧 `codex_cc_tools` 的公开 provider 集不含当前唯一可用的 Kimi，Ark 额度耗尽、DeepSeek 欠费、Anthropic 不可用只是本次移除时的动态环境背景，不是永久退役规则。Codex 使用 `codex mcp remove codex_cc_tools` 官方命令移除后，官方列表复核旧服务已不存在；
 - 全局 `AGENTS.md` 已把协作入口从 `cc_review` / `cc_delegate` 更新为 `external_review` / `external_delegate`；
-- 本次移除发生在当前 App 任务运行期间，因此该任务的工具缓存仍可能显示旧定义。必须完整退出并重开 App，再在新任务中确认旧工具消失；这不影响官方配置列表已完成移除的事实；
+- 维护者随后完整退出并重开 App。2026-08-08 的新任务工具发现面只包含 `external_review` / `external_delegate`，不再包含 `cc_review` / `cc_delegate`；同一任务中的官方 MCP 列表也只保留 `codex_external_agents`；
+- 重启后又通过新宿主发起一次无文件、无命令的 Kimi K3 窄 review：`kimi-code/k3` 在 13.215 秒返回精确 `RESTART_OK`，状态为 completed，诊断与文件变化均为空。由此，旧服务的配置退役、宿主缓存清除和新服务可用性均已形成独立证据；
 - 维护者此前跳过普通 Stop 交互验收，没有 PASS receipt；`0.1.1` 继续保留 `host_stop_unverified`，不得声称真实宿主取消已通过；
 - 项目代码不得直接读取或写入活动 `~/.codex/config.toml`；官方插件命令可能更新该状态文件，因此每次真实 add/remove 都必须先取得针对该动作的明确许可。
 
@@ -35,9 +36,9 @@
 2. 官方 marketplace/plugin 的 add、list、缓存副本 MCP 启动与 remove 在临时 `CODEX_HOME` 中通过；
 3. 四个当前逻辑 LLM 的 review/delegate 均由当前能力索引绑定有效的 passed evidence 与运行时指纹；不同能力可以来自不同不可变批次，不要求同一批 8/8；
 4. 从公共 npm 安装已由 GitHub Actions OIDC 发布的精确 beta，并通过官方插件机制升级；
-5. 真实 Codex App 已发现两个新工具且二者 `llm` 必填；旧 MCP 移除后的官方列表已不含旧服务，最终 App 工具发现面仍需重启后在新任务确认；
+5. 真实 Codex App 已发现两个新工具且二者 `llm` 必填；旧 MCP 移除并完整重启后，新任务工具发现面和官方列表均不含旧服务；
 6. stable marker 精确绑定 beta.4 公共身份，并把维护者跳过普通 Stop 的决定记录为 `skipped_by_maintainer / host_stop_unverified`；该状态不等于 PASS，也不能泛化到其它版本；
-7. 0.1.1 重启后的真实 Kimi K3 窄 review 在 38.291 秒成功，隔离 delegate 在 13.913 秒成功，文件、命令与 owned-zero 证据均经独立复核；升级到 Kimi 0.34.0 后的五事实窄 review 又在 57.505 秒成功；
+7. 0.1.1 重启后的真实 Kimi K3 窄 review 在 38.291 秒成功，隔离 delegate 在 13.913 秒成功，文件、命令与 owned-zero 证据均经独立复核；升级到 Kimi 0.34.0 后的五事实窄 review 又在 57.505 秒成功；旧服务移除并再次完整重启后，新宿主窄 review 在 13.215 秒返回精确 `RESTART_OK`；
 8. 旧工具的现行 schema 没有 Kimi 路由，而新插件的 Kimi 路由已加载并可用。
 
 隔离 CLI 生命周期只能证明官方安装器和缓存副本可用，不能替代真实 Codex App 宿主门禁。四层状态和停止条件见 [发布验收清单](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/checklist.md)。
