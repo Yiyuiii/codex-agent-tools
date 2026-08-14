@@ -10,6 +10,9 @@ import {
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_CASES,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+  type CurrentQualificationPlanId,
 } from "../../src/qualification/protocol.js";
 import type {
   FrozenPreflightRecord,
@@ -116,17 +119,67 @@ const lockHandle = Object.freeze({
   }),
 }) satisfies QualificationLockHandle;
 
-function terminal(status: "passed" | "blocked"): QualificationTerminalManifest {
+const directDeepSeekPreflight = Object.freeze({
+  ...preflight,
+  qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+  buildArtifacts: Object.freeze([
+    Object.freeze({ path: "dist/deepseek-smoke.js", sha256: "d".repeat(64) }),
+    Object.freeze({ path: "dist/smoke-evidence.js", sha256: "1".repeat(64) }),
+    Object.freeze({
+      path: "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+      sha256: "2".repeat(64),
+    }),
+  ]),
+  logicalLlms: Object.freeze([
+    Object.freeze({
+      llm: "deepseek-v4-flash",
+      runtime: "pi-rpc" as const,
+      model: "deepseek-v4-flash",
+      provider: "deepseek",
+      route: "direct" as const,
+    }),
+  ]),
+  credentialMatches: Object.freeze([
+    Object.freeze({
+      llm: "deepseek-v4-flash",
+      environmentVariableName: "OPENAI_API_KEY_DEEPSEEK",
+    }),
+  ]),
+}) satisfies FrozenPreflightRecord;
+
+function lockForPlan(
+  qualificationPlanId: CurrentQualificationPlanId,
+): QualificationLockHandle {
+  return qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID
+    ? lockHandle
+    : Object.freeze({
+        ...lockHandle,
+        owner: Object.freeze({
+          ...lockHandle.owner,
+          qualificationPlanId,
+        }),
+      });
+}
+
+function terminal(
+  status: "passed" | "blocked",
+  qualificationPlanId: CurrentQualificationPlanId =
+    ACTIVE_QUALIFICATION_PLAN_ID,
+): QualificationTerminalManifest {
+  const selectedPreflight =
+    qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+      ? directDeepSeekPreflight
+      : preflight;
   return {
     schemaVersion: 3,
-    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+    qualificationPlanId,
     batchId: BATCH_ID,
     status,
     authorizationReferenceSha256: AUTHORIZATION_HASH,
     repositoryCommit: COMMIT,
     buildIdentitySha256: BUILD_IDENTITY,
     preflightSha256: "5".repeat(64),
-    preflight,
+    preflight: selectedPreflight,
     cases: [],
     uncommittedEvidence: null,
     checkpoints: [],
@@ -147,7 +200,14 @@ function makeDependencies(options?: {
   runningErrorOrdinal?: number;
   completedErrorOrdinal?: number;
   ownerFailureFromCall?: number;
+  qualificationPlanId?: CurrentQualificationPlanId;
 }) {
+  const qualificationPlanId =
+    options?.qualificationPlanId ?? ACTIVE_QUALIFICATION_PLAN_ID;
+  const selectedPreflight =
+    qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+      ? directDeepSeekPreflight
+      : preflight;
   const events: string[] = [];
   let inFlight = 0;
   let maximumInFlight = 0;
@@ -184,7 +244,10 @@ function makeDependencies(options?: {
     }) => {
       events.push(`terminal:${input.status}:${input.stopReason ?? "none"}`);
       if (options?.terminalError !== undefined) throw options.terminalError;
-      return terminal(input.status === "passed" ? "passed" : "blocked");
+      return terminal(
+        input.status === "passed" ? "passed" : "blocked",
+        qualificationPlanId,
+      );
     },
   );
   const dependencies: QualificationCoordinatorDependencies = {
@@ -192,7 +255,7 @@ function makeDependencies(options?: {
     now: () => new Date("2026-07-26T12:00:00.000Z"),
     acquireLock: vi.fn(async () => {
       events.push("acquire");
-      return lockHandle;
+      return lockForPlan(qualificationPlanId);
     }),
     releaseLock: vi.fn(async () => {
       events.push("release");
@@ -201,7 +264,7 @@ function makeDependencies(options?: {
     runPreflight: vi.fn(async () => {
       events.push("preflight");
       if (options?.preflightError !== undefined) throw options.preflightError;
-      return preflight;
+      return selectedPreflight;
     }),
     createLedger: vi.fn(() => ({
       batchDirectory: `D:/repo/docs/smoke/evidence/batches/${BATCH_ID}`,
@@ -307,6 +370,47 @@ describe("qualification coordinator", () => {
         notRun: [],
       }),
     );
+  });
+
+  it("runs only the isolated Direct DeepSeek review and delegate cases", async () => {
+    const fixture = makeDependencies({
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    });
+
+    const result = await runQualificationBatch(
+      {
+        repositoryRoot: "D:/repo",
+        authorizationReference: AUTHORIZATION_REFERENCE,
+        qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+      },
+      fixture.dependencies,
+    );
+
+    expect(result).toMatchObject({
+      schemaVersion: 3,
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+      status: "passed",
+    });
+    expect(
+      vi
+        .mocked(fixture.dependencies.runCase)
+        .mock.calls.map(([input]) => input.identity),
+    ).toEqual(DIRECT_DEEPSEEK_QUALIFICATION_CASES);
+    expect(
+      vi.mocked(fixture.dependencies.acquireLock).mock.calls[0]?.[0],
+    ).toMatchObject({
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    });
+    expect(
+      vi.mocked(fixture.dependencies.runPreflight).mock.calls[0]?.[0],
+    ).toMatchObject({
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    });
+    expect(
+      vi.mocked(fixture.dependencies.createLedger).mock.calls[0]?.[0],
+    ).toMatchObject({
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    });
   });
 
   it.each([1, 4])(

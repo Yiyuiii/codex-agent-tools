@@ -5,6 +5,10 @@ import type {
   QualificationVerificationMode,
   QualificationVerificationResult,
 } from "../src/qualification/verifier.js";
+import {
+  ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+} from "../src/qualification/protocol.js";
 
 const HELP = `Usage: npm run verify:qualification -- --mode frozen-candidate --manifest <batch-manifest>
        npm run verify:qualification -- --mode immutable-evidence --manifest <batch-manifest>
@@ -81,8 +85,18 @@ async function verifyProduction(options: {
   return verifier.verifyQualification(options, {
     assertFrozenCandidate: (input) =>
       preflight.assertQualificationFrozenCandidate(input),
-    collectCurrentCandidate: (repositoryRoot) =>
-      preflight.collectQualificationCurrentSnapshot({ repositoryRoot }),
+    collectCurrentCandidate: (repositoryRoot, qualificationPlanId) => {
+      if (
+        qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID &&
+        qualificationPlanId !== DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+      ) {
+        throw new Error("Qualification plan mismatch");
+      }
+      return preflight.collectQualificationCurrentSnapshot({
+        repositoryRoot,
+        qualificationPlanId,
+      });
+    },
   });
 }
 

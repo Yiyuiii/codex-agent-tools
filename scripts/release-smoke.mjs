@@ -1,12 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import {
-  access,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  stat,
-} from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,9 +19,7 @@ import {
   resolveAllowedPackInspectionPaths,
   verifyReleaseWindowsJobHelperArtifact,
 } from "../dist/release-assurance.js";
-import {
-  verifyCapabilityIndex,
-} from "../dist/capability-qualification.js";
+import { verifyCapabilityIndex } from "../dist/capability-qualification.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = path.join(root, "dist");
@@ -58,6 +49,7 @@ const exactLogicalLlms = [
   "ark-agent-deepseek-v4-flash",
   "ark-agent-plan",
   "ark-coding-plan",
+  "deepseek-v4-flash",
   "kimi-k3",
 ];
 const expectedPluginEnvironmentVariables = [
@@ -65,6 +57,7 @@ const expectedPluginEnvironmentVariables = [
   "VOLCENGINE_API_KEY",
   "API_KEY_DOUBAO_CODING",
   "OPENAI_API_KEY_DOUBAO",
+  "OPENAI_API_KEY_DEEPSEEK",
 ];
 const worktreeMarker = `${path.sep}.worktrees${path.sep}`;
 const worktreeMarkerIndex = root
@@ -73,9 +66,7 @@ const worktreeMarkerIndex = root
 const forbiddenDevelopmentPaths = [
   root,
   os.homedir(),
-  ...(worktreeMarkerIndex < 0
-    ? []
-    : [root.slice(0, worktreeMarkerIndex)]),
+  ...(worktreeMarkerIndex < 0 ? [] : [root.slice(0, worktreeMarkerIndex)]),
 ];
 
 function run(command, args, options = {}) {
@@ -201,10 +192,7 @@ async function checkDoctorJson() {
   const actualLogicalLlms = logicalLlms
     .map((check) => check.name.slice("LLM ".length))
     .sort();
-  if (
-    JSON.stringify(actualLogicalLlms) !==
-    JSON.stringify(exactLogicalLlms)
-  ) {
+  if (JSON.stringify(actualLogicalLlms) !== JSON.stringify(exactLogicalLlms)) {
     throw new Error(
       `doctor JSON reported unexpected logical LLMs: ${actualLogicalLlms.join(", ")}`,
     );
@@ -318,8 +306,7 @@ async function checkPluginArtifact(runtimeVersion) {
     )
     .sort();
   if (
-    JSON.stringify(declaredPluginFiles) !==
-    JSON.stringify(expectedPluginFiles)
+    JSON.stringify(declaredPluginFiles) !== JSON.stringify(expectedPluginFiles)
   ) {
     throw new Error("Declared npm package plugin file set is not exact");
   }
@@ -421,8 +408,7 @@ async function checkPackage(packageManifest, capabilitySources) {
     .sort();
   if (
     !requiredPublicFiles.every((name) => declaredFiles.includes(name)) ||
-    JSON.stringify(declaredDistFiles) !==
-      JSON.stringify([...publicBins].sort())
+    JSON.stringify(declaredDistFiles) !== JSON.stringify([...publicBins].sort())
   ) {
     throw new Error("Declared npm public runtime file set is not exact");
   }

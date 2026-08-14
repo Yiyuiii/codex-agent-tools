@@ -2,22 +2,25 @@
 
 `codex-agent-tools` 为 Codex 提供两个外部 LLM 工具：只读审阅 `external_review` 和自主委派 `external_delegate`。MCP 服务名固定为 `codex_external_agents`。
 
-当前代码公开四个固定逻辑 LLM，所有活动子进程均使用直连网络策略：
+当前开发候选登记五个固定逻辑 LLM，所有子进程均使用直连网络策略：
 
 - `kimi-k3`：本机 Kimi Code ACP，直连；
 - `ark-coding-plan`：隔离 Pi RPC / Ark Coding Plan / `ark-code-latest`，直连；
 - `ark-agent-plan`：隔离 Pi RPC / Ark Agent Plan / `ark-code-latest`，直连；
 - `ark-agent-deepseek-v4-flash`：隔离 Pi RPC / Ark Agent Plan / `deepseek-v4-flash`，直连。
+- `deepseek-v4-flash`：隔离 Pi RPC / DeepSeek API / `deepseek-v4-flash`，直连；DeepSeek provider 内不登记其它模型。
 
-当前宿主实现、原生辅助层与冻结证据已经完成。最新真实批次在同一冻结候选上完成四个逻辑 LLM 的八项 review/delegate：8/8 passed、每项单次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，且 owned process 全部排空。现行 `capabilities.json` 已统一引用该批次的不可变 case evidence，`npm run verify:capabilities` 验证为 8 项 current、0 项 legacy。
+Ark 与 Direct DeepSeek 使用分离的版本化 Pi 配置目录；任一路线都不加载另一侧 provider 或凭据占位符。
+
+已发布的 `0.1.1` 仍是四个逻辑 LLM；它曾通过真实宿主加载验收，但 2026-08-13/14 当前任务的实时工具注册表没有本项目的两个工具，不能声称当前任务正在使用插件。它的最新真实批次在同一冻结候选上完成八项 review/delegate：8/8 passed、每项单次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，且 owned process 全部排空。Direct DeepSeek 开发候选已确认宿主 `OPENAI_API_KEY_DEEPSEEK` 存在，但尚未取得两项真实资格证据；本次资格协议变化属于 Kimi/Pi 共享指纹输入，所以八项旧能力当前也全部 stale。因此当前开发候选的 `npm run verify:capabilities` 必须 fail closed，不能发布、安装或声称 Direct DeepSeek 已可调用。详情见 [Direct DeepSeek 接入状态](docs/smoke/deepseek.md)。
 
 资格单位是一个精确的“逻辑 LLM × 任务”组合；历史 batch manifest 与 case evidence 永久不可变，不以额度恢复、文档更新或注册表旧 `passed` 文案替代当前指纹验证。最新终态、执行边界和恢复条件只在[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)维护，运维与发布状态只在[运维说明](docs/operations.md)维护。Gemini 已从活动注册表、运行时、凭据与网络策略、doctor、smoke 和资格入口退役；既有 Gemini 调用只作为历史审计证据保留。
 
-注册表仍保留 8 passed / 0 pending 的历史文案，[`docs/smoke/evidence/capabilities.json`](docs/smoke/evidence/capabilities.json) 是当前候选的现行索引；当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。beta.3 clean-tag 启动层缺口已由 `0.1.1-beta.4` 修复；其已验证运行时随后作为 `0.1.1` 由 GitHub Actions OIDC 发布到 npm `latest`、通过公共精确包隔离验收并升级为活动 installed/enabled 插件。维护者已跳过普通 Stop 交互验收，真实 `cancelled + owned-zero` 保持 unverified，不得暗示 PASS。2026-08-07 在新插件真实 Kimi 窄 review/delegate 通过且旧工具当前无可用后端后，旧 `codex_cc_tools` 经独立授权使用官方 MCP 命令移除；项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。现行资格规则见[能力粒度资格设计](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)。
+现行索引仍只保存已发布四路线的八项不可变证据；Direct DeepSeek 的 review/delegate 保持 pending，不以占位条目、旧 Ark Agent Plan 同名模型证据或手工改写指纹代替真实资格。当前源码指纹与索引不匹配时，唯一发布权威 `npm run verify:capabilities` 会拒绝候选。`0.1.1` 已由 GitHub Actions OIDC 发布到 npm `latest`、通过公共精确包隔离验收并升级为活动 installed/enabled 插件。维护者已跳过普通 Stop 交互验收，真实 `cancelled + owned-zero` 保持 unverified，不得暗示 PASS。2026-08-07 在新插件真实 Kimi 窄 review/delegate 通过且旧工具当前无可用后端后，旧 `codex_cc_tools` 经独立授权使用官方 MCP 命令移除；项目没有直接读取或写入 `~/.codex/config.toml`，也没有调用或修改 Claude Code。现行资格规则见[能力粒度资格设计](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)。
 
 2026-07-27 的 105 秒演练只证明 `exec / wait` 可跨越旧的短时前台阈值；后续真实批次证明同一 cell 可承载到协调器正常终态，但不证明四小时存活。standing authorization 下的真实批次仍须使用 active long-term goal、至少 14,400,000 毫秒的内层 shell timeout、短周期 wait 与现有锁/终态协议。详见[承载演练报告](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/qualification-carrier-rehearsal.md)与[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)。
 
-项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端。
+项目不会调用、修改或卸载本机 Claude Code，也不提供 Anthropic Claude 或 OpenAI/Codex 后端。Direct DeepSeek 只通过隔离 Pi RPC 承载固定的 `deepseek-v4-flash`。
 
 ## 执行预算与取消合同
 
@@ -94,7 +97,7 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 ## 安全边界
 
 - 子进程只继承最小环境白名单；凭据仅按逻辑 LLM 配置显式传入。
-- 四个活动逻辑 LLM 均使用 `direct`；子进程会清除从父进程继承的 HTTP(S)/ALL proxy。
+- 五个登记逻辑 LLM 均使用 `direct`；子进程会清除从父进程继承的 HTTP(S)/ALL proxy。Direct DeepSeek 在资格完成前仍不可调用。
 - 诊断、错误和模型输出在离开适配器前进行令牌与认证头脱敏。
 - 调用方显式取消、单次显式 deadline 和宿主异常退出都会触发进程树清理；并发按固定模型或共享 provider 配额池限制。
 - 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的配额池。
@@ -102,7 +105,7 @@ npm run smoke:kimi -- --llm kimi-k3 --task review
 
 ## 发布状态
 
-`0.1.1` stable 已由 GitHub Actions OIDC 发布并完成公共本机验收；活动官方插件为 installed/enabled 0.1.1，旧 `codex_cc_tools` 已经独立授权退役。现行能力索引保持 8 current / 0 legacy，不因 Ark 额度变化、Kimi CLI 本机升级或工具退役重写不可变模型证据。
+`0.1.1` stable 已由 GitHub Actions OIDC 发布并完成公共本机验收；当时的活动官方插件为 installed/enabled 0.1.1，旧 `codex_cc_tools` 已经独立授权退役。该发布版本的能力索引快照为 8 current / 0 legacy；当前 Direct DeepSeek 开发候选因共享资格协议变化保持 8 stale + 2 missing，直到新的双计划资格证据与十项索引通过 verifier。
 
 维护者于 2026-08-07 终止继续重试普通 Stop observer。两次会话都没有形成 PASS receipt，因此 `0.1.1` 只通过严格 `skipped_by_maintainer / host_stop_unverified` 决策状态晋级；该状态硬锁到 `0.1.1-beta.4 → 0.1.1`，不能泛化到其它版本或门禁。stable 只由 GitHub Actions OIDC 发布，禁止本地 `npm publish`。
 

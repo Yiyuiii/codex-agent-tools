@@ -33,6 +33,8 @@ import {
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_CASES,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
   LEGACY_QUALIFICATION_PLAN_ID,
 } from "../../src/qualification/protocol.js";
@@ -226,6 +228,50 @@ function preflight(): CurrentFrozenPreflightRecord {
   ) as CurrentFrozenPreflightRecord;
 }
 
+function directDeepSeekPreflight(): CurrentFrozenPreflightRecord {
+  const buildArtifacts = [
+    "dist/deepseek-smoke.js",
+    "dist/smoke-evidence.js",
+    "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+  ].map((artifactPath, index) => ({
+    path: artifactPath,
+    sha256: String(index + 5).repeat(64),
+  }));
+  return freezePreflightRecord({
+    schemaVersion: 3,
+    qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    repositoryCommit: commit,
+    repositoryBranch: "codex/deepseek-v4-flash-api",
+    repositoryDirty: false,
+    packageVersion: "0.1.1",
+    packageLockSha256: "d".repeat(64),
+    buildArtifacts,
+    buildIdentitySha256: createHash("sha256")
+      .update(JSON.stringify(buildArtifacts))
+      .digest("hex"),
+    runtimeVersions: {
+      node: "v24.0.0",
+      codex: "codex-cli 0.135.0",
+    },
+    piConfigSha256: "f".repeat(64),
+    logicalLlms: [
+      {
+        llm: "deepseek-v4-flash",
+        runtime: "pi-rpc",
+        model: "deepseek-v4-flash",
+        provider: "deepseek",
+        route: "direct",
+      },
+    ],
+    credentialMatches: [
+      {
+        llm: "deepseek-v4-flash",
+        environmentVariableName: "OPENAI_API_KEY_DEEPSEEK",
+      },
+    ],
+  }) as CurrentFrozenPreflightRecord;
+}
+
 function sparseCopy(values: readonly unknown[]): unknown[] {
   const sparse = new Array<unknown>(values.length);
   values.forEach((value, index) => {
@@ -246,14 +292,19 @@ async function publishEvidence(
   repository: string,
   identity: QualificationCaseIdentity,
   passed = true,
+  options: {
+    batchId?: string;
+    preflight?: CurrentFrozenPreflightRecord;
+  } = {},
 ): Promise<string> {
+  const selectedBatchId = options.batchId ?? batchId;
   const casesDirectory = path.join(
     repository,
     "docs",
     "smoke",
     "evidence",
     "batches",
-    batchId,
+    selectedBatchId,
     "cases",
   );
   await mkdir(casesDirectory, { recursive: true });
@@ -261,7 +312,7 @@ async function publishEvidence(
     casesDirectory,
     `${String(identity.ordinal).padStart(2, "0")}.json`,
   );
-  const frozenPreflight = preflight();
+  const frozenPreflight = options.preflight ?? preflight();
   const identityRecord = frozenPreflight.logicalLlms.find(
     (candidate) => candidate.llm === identity.llm,
   )!;
@@ -302,8 +353,8 @@ async function publishEvidence(
     `${JSON.stringify({
       schemaVersion: 4,
       qualification: {
-        qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
-        batchId,
+        qualificationPlanId: frozenPreflight.qualificationPlanId,
+        batchId: selectedBatchId,
         ordinal: identity.ordinal,
         llm: identity.llm,
         task: identity.task,
@@ -485,10 +536,12 @@ describe("frozen qualification preflight", () => {
     ).rejects.toThrow("Qualification ledger operation failed");
   });
 
-  it("accepts only the current schema and matching four-LLM plan identity", () => {
+  it("accepts only the current schema and matching plan identities", () => {
     const current = currentPreflightRecord();
+    const directDeepSeek = directDeepSeekPreflight();
 
     expect(freezePreflightRecord(current)).toEqual(current);
+    expect(freezePreflightRecord(directDeepSeek)).toEqual(directDeepSeek);
     expect(() =>
       freezePreflightRecord({
         ...legacyPreflight(),
@@ -524,6 +577,13 @@ describe("frozen qualification preflight", () => {
           ...current.runtimeVersions,
           kimi: "0.27.0",
         },
+      }),
+    ).toThrow("Qualification ledger operation failed");
+    expect(() =>
+      freezePreflightRecord({
+        ...directDeepSeek,
+        logicalLlms: current.logicalLlms,
+        credentialMatches: current.credentialMatches,
       }),
     ).toThrow("Qualification ledger operation failed");
   });
@@ -717,6 +777,70 @@ describe("frozen qualification preflight", () => {
       );
     },
   );
+
+  it("publishes an isolated two-case Direct DeepSeek terminal", async () => {
+    const repository = await tempRepository();
+    const directBatchId = "direct-deepseek-batch";
+    const directPreflight = directDeepSeekPreflight();
+    const ledger = createQualificationLedger({
+      repositoryRoot: repository,
+      batchId: directBatchId,
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    });
+
+    await expect(
+      ledger.publishBatchStarted({
+        authorizationReferenceSha256: authHash,
+        preflight: preflight(),
+        recordedAt: "2026-08-14T02:00:00.000Z",
+      }),
+    ).rejects.toThrow("Qualification ledger operation failed");
+    await ledger.publishBatchStarted({
+      authorizationReferenceSha256: authHash,
+      preflight: directPreflight,
+      recordedAt: "2026-08-14T02:00:00.000Z",
+    });
+    for (const identity of DIRECT_DEEPSEEK_QUALIFICATION_CASES) {
+      await ledger.publishCaseRunning({
+        ...identity,
+        recordedAt: `2026-08-14T02:0${identity.ordinal}:00.000Z`,
+      });
+      await ledger.publishCaseCompleted({
+        ...identity,
+        result: "passed",
+        evidencePath: await publishEvidence(repository, identity, true, {
+          batchId: directBatchId,
+          preflight: directPreflight,
+        }),
+        recordedAt: `2026-08-14T02:0${identity.ordinal}:30.000Z`,
+      });
+    }
+    const terminal = await ledger.publishTerminalManifest({
+      status: "passed",
+      stopReason: null,
+      notRun: [],
+      completedAt: "2026-08-14T02:03:00.000Z",
+    });
+
+    expect(terminal).toMatchObject({
+      schemaVersion: 3,
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+      status: "passed",
+      promotionEligible: true,
+    });
+    expect(terminal.cases).toHaveLength(2);
+    await expect(
+      inspectQualificationTerminal({
+        repositoryRoot: repository,
+        batchId: directBatchId,
+      }),
+    ).resolves.toEqual({
+      state: "valid",
+      batchId: directBatchId,
+      authorizationReferenceSha256: authHash,
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    });
+  });
 
   it.each([
     ["missing checks", (evidence: Record<string, unknown>) => {

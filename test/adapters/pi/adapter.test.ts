@@ -202,8 +202,7 @@ describe("PiAdapter", () => {
       environment: {
         PATH: "C:\\Windows",
         CODEX_AGENT_ARK_AGENT_KEY: "ark-secret",
-        PI_CODING_AGENT_DIR:
-          "C:\\cache\\codex-agent-tools\\pi\\0.1.0-alpha.1",
+        PI_CODING_AGENT_DIR: "C:\\cache\\codex-agent-tools\\pi\\0.1.0-alpha.1",
       },
     });
     expect(request.environment.HTTPS_PROXY).toBeUndefined();
@@ -225,33 +224,97 @@ describe("PiAdapter", () => {
     }
   });
 
-  windowsIt("derives redaction secrets from the canonical child credential", async () => {
-    const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
-      completedPiResult(),
-    );
+  it("binds Direct DeepSeek through Pi and forwards only its private child credential", async () => {
+    const runClient = vi.fn(async (_request: PiRpcRunRequest) => ({
+      ...completedPiResult(),
+      actualModel: "deepseek-v4-flash",
+    }));
+    const buildConfig = vi.fn(async () => isolatedConfig());
     const adapter = new PiAdapter({
       ...controlledPiLocators(),
-      buildConfig: async () => isolatedConfig(),
+      buildConfig,
       runClient,
     });
+    const directProfile: LlmProfile = {
+      ...profile(),
+      id: "deepseek-v4-flash",
+      displayName: "DeepSeek V4 Flash",
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      credentialEnv: ["OPENAI_API_KEY_DEEPSEEK"],
+      credentialTargetEnv: "CODEX_AGENT_DEEPSEEK_KEY",
+      concurrencyKey: "deepseek",
+    };
 
-    await adapter.run({
-      profile: profile(),
+    const result = await adapter.run({
+      profile: directProfile,
       task: "review",
       cwd: process.cwd(),
       prompt: "Review",
       parentEnvironment: {
         PATH: "C:\\Windows",
-        openai_api_key_doubao: "lowercase-secret",
+        OPENAI_API_KEY_DEEPSEEK: "deepseek-secret",
+        OPENAI_API_KEY_DOUBAO: "ark-secret-must-not-leak",
+        HTTPS_PROXY: "http://parent:9999",
       },
     });
 
+    expect(result).toMatchObject({
+      status: "completed",
+      actualModel: "deepseek-v4-flash",
+    });
+    expect(buildConfig).toHaveBeenCalledOnce();
+    expect(buildConfig).toHaveBeenCalledWith({
+      version: "0.1.1",
+      providers: ["deepseek"],
+    });
     const request = runClient.mock.calls[0]![0];
-    expect(request.environment.CODEX_AGENT_ARK_AGENT_KEY).toBe(
-      "lowercase-secret",
-    );
-    expect(request.secretValues).toEqual(["lowercase-secret"]);
+    expect(request).toMatchObject({
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      environment: {
+        PATH: "C:\\Windows",
+        CODEX_AGENT_DEEPSEEK_KEY: "deepseek-secret",
+        PI_CODING_AGENT_DIR: "C:\\cache\\pi",
+      },
+    });
+    expect(request.environment.OPENAI_API_KEY_DEEPSEEK).toBeUndefined();
+    expect(request.environment.OPENAI_API_KEY_DOUBAO).toBeUndefined();
+    expect(request.environment.CODEX_AGENT_ARK_AGENT_KEY).toBeUndefined();
+    expect(request.environment.HTTPS_PROXY).toBeUndefined();
+    expect(request.secretValues).toEqual(["deepseek-secret"]);
   });
+
+  windowsIt(
+    "derives redaction secrets from the canonical child credential",
+    async () => {
+      const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
+        completedPiResult(),
+      );
+      const adapter = new PiAdapter({
+        ...controlledPiLocators(),
+        buildConfig: async () => isolatedConfig(),
+        runClient,
+      });
+
+      await adapter.run({
+        profile: profile(),
+        task: "review",
+        cwd: process.cwd(),
+        prompt: "Review",
+        parentEnvironment: {
+          PATH: "C:\\Windows",
+          openai_api_key_doubao: "lowercase-secret",
+        },
+      });
+
+      const request = runClient.mock.calls[0]![0];
+      expect(request.environment.CODEX_AGENT_ARK_AGENT_KEY).toBe(
+        "lowercase-secret",
+      );
+      expect(request.secretValues).toEqual(["lowercase-secret"]);
+    },
+  );
 
   windowsIt("fails closed on case-conflicting credential sources", async () => {
     const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
@@ -279,33 +342,36 @@ describe("PiAdapter", () => {
     expect(runClient).not.toHaveBeenCalled();
   });
 
-  windowsIt("uses the canonical source key when no credential target exists", async () => {
-    const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
-      completedPiResult(),
-    );
-    const adapter = new PiAdapter({
-      ...controlledPiLocators(),
-      buildConfig: async () => isolatedConfig(),
-      runClient,
-    });
-    const { credentialTargetEnv: _omittedTarget, ...profileWithoutTarget } =
-      profile();
+  windowsIt(
+    "uses the canonical source key when no credential target exists",
+    async () => {
+      const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
+        completedPiResult(),
+      );
+      const adapter = new PiAdapter({
+        ...controlledPiLocators(),
+        buildConfig: async () => isolatedConfig(),
+        runClient,
+      });
+      const { credentialTargetEnv: _omittedTarget, ...profileWithoutTarget } =
+        profile();
 
-    await adapter.run({
-      profile: profileWithoutTarget,
-      task: "review",
-      cwd: process.cwd(),
-      prompt: "Review",
-      parentEnvironment: {
-        PATH: "C:\\Windows",
-        openai_api_key_doubao: "source-secret",
-      },
-    });
+      await adapter.run({
+        profile: profileWithoutTarget,
+        task: "review",
+        cwd: process.cwd(),
+        prompt: "Review",
+        parentEnvironment: {
+          PATH: "C:\\Windows",
+          openai_api_key_doubao: "source-secret",
+        },
+      });
 
-    const request = runClient.mock.calls[0]![0];
-    expect(request.environment.OPENAI_API_KEY_DOUBAO).toBe("source-secret");
-    expect(request.secretValues).toEqual(["source-secret"]);
-  });
+      const request = runClient.mock.calls[0]![0];
+      expect(request.environment.OPENAI_API_KEY_DOUBAO).toBe("source-secret");
+      expect(request.secretValues).toEqual(["source-secret"]);
+    },
+  );
 
   windowsIt.each([
     [
@@ -351,33 +417,36 @@ describe("PiAdapter", () => {
         },
       },
     ],
-  ])("rejects a malformed Windows invocation: %s", async (_label, malformed) => {
-    const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
-      completedPiResult(),
-    );
-    const adapter = new PiAdapter({
-      ...controlledPiLocators(
-        "/usr/local/bin/pi",
-        malformed as unknown as PiInvocation,
-      ),
-      buildConfig: async () => isolatedConfig(),
-      runClient,
-    });
+  ])(
+    "rejects a malformed Windows invocation: %s",
+    async (_label, malformed) => {
+      const runClient = vi.fn(async (_request: PiRpcRunRequest) =>
+        completedPiResult(),
+      );
+      const adapter = new PiAdapter({
+        ...controlledPiLocators(
+          "/usr/local/bin/pi",
+          malformed as unknown as PiInvocation,
+        ),
+        buildConfig: async () => isolatedConfig(),
+        runClient,
+      });
 
-    await expect(
-      adapter.run({
-        profile: profile(),
-        task: "review",
-        cwd: process.cwd(),
-        prompt: "Review",
-        parentEnvironment: {
-          PATH: "C:\\Windows",
-          OPENAI_API_KEY_DOUBAO: "secret",
-        },
-      }),
-    ).rejects.toThrow("Pi Windows invocation is invalid");
-    expect(runClient).not.toHaveBeenCalled();
-  });
+      await expect(
+        adapter.run({
+          profile: profile(),
+          task: "review",
+          cwd: process.cwd(),
+          prompt: "Review",
+          parentEnvironment: {
+            PATH: "C:\\Windows",
+            OPENAI_API_KEY_DOUBAO: "secret",
+          },
+        }),
+      ).rejects.toThrow("Pi Windows invocation is invalid");
+      expect(runClient).not.toHaveBeenCalled();
+    },
+  );
 
   posixIt("does not add a timeout when the caller omits it", async () => {
     const runClient = vi.fn(async (_request: PiRpcRunRequest) => ({
@@ -742,5 +811,4 @@ describe("PiAdapter", () => {
       source: "pi-rpc-observable",
     });
   });
-
 });

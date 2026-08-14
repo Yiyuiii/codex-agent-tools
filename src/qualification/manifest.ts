@@ -20,8 +20,11 @@ import { validateCurrentEvidenceContract } from "./evidence-contract.js";
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_CASES,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
   LEGACY_QUALIFICATION_PLAN_ID,
+  type CurrentQualificationPlanId,
   type QualificationPlanId,
 } from "./protocol.js";
 import type {
@@ -62,6 +65,11 @@ const LEGACY_REQUIRED_BUILD_ARTIFACTS = [
 const CURRENT_REQUIRED_BUILD_ARTIFACTS = [
   "dist/ark-smoke.js",
   "dist/kimi-smoke.js",
+  "dist/smoke-evidence.js",
+  "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+] as const;
+const DIRECT_DEEPSEEK_REQUIRED_BUILD_ARTIFACTS = [
+  "dist/deepseek-smoke.js",
   "dist/smoke-evidence.js",
   "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
 ] as const;
@@ -163,6 +171,15 @@ const CURRENT_LOGICAL_LLMS = Object.freeze([
     route: "direct",
   }),
 ] as const satisfies readonly FrozenLogicalLlmIdentity[]);
+const DIRECT_DEEPSEEK_LOGICAL_LLMS = Object.freeze([
+  Object.freeze({
+    llm: "deepseek-v4-flash",
+    runtime: "pi-rpc",
+    model: "deepseek-v4-flash",
+    provider: "deepseek",
+    route: "direct",
+  }),
+] as const satisfies readonly FrozenLogicalLlmIdentity[]);
 
 interface PreflightCredentialRule {
   readonly llm: string;
@@ -208,6 +225,11 @@ const CURRENT_CREDENTIAL_ENVIRONMENT_NAMES = Object.freeze([
   ]),
   frozenCredentialRule("kimi-k3", [null]),
 ]);
+const DIRECT_DEEPSEEK_CREDENTIAL_ENVIRONMENT_NAMES = Object.freeze([
+  frozenCredentialRule("deepseek-v4-flash", [
+    "OPENAI_API_KEY_DEEPSEEK",
+  ]),
+]);
 
 interface QualificationProtocol {
   readonly planId: QualificationPlanId;
@@ -248,6 +270,22 @@ const CURRENT_PROTOCOL: QualificationProtocol = Object.freeze({
   allowGoogleFreeTierQuota: false,
   freezePreflight: freezeCurrentPreflightRecord,
 });
+
+const DIRECT_DEEPSEEK_PROTOCOL: QualificationProtocol = Object.freeze({
+  planId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+  manifestSchemaVersion: 3,
+  checkpointSchemaVersion: 3,
+  evidenceSchemaVersion: 4,
+  schedule: DIRECT_DEEPSEEK_QUALIFICATION_CASES,
+  allowGoogleFreeTierQuota: false,
+  freezePreflight: freezeCurrentPreflightRecord,
+});
+
+function isCurrentProtocol(
+  protocol: QualificationProtocol,
+): boolean {
+  return protocol === CURRENT_PROTOCOL || protocol === DIRECT_DEEPSEEK_PROTOCOL;
+}
 
 export class QualificationLedgerError extends Error {
   readonly category = "infrastructure";
@@ -345,12 +383,21 @@ function protocolForEnvelope(value: unknown): QualificationProtocol {
   ) {
     return CURRENT_PROTOCOL;
   }
+  if (
+    envelope.schemaVersion === 3 &&
+    envelope.qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+  ) {
+    return DIRECT_DEEPSEEK_PROTOCOL;
+  }
   throw new QualificationLedgerError();
 }
 
 function protocolForPlanId(planId: unknown): QualificationProtocol {
   if (planId === LEGACY_QUALIFICATION_PLAN_ID) return LEGACY_PROTOCOL;
   if (planId === ACTIVE_QUALIFICATION_PLAN_ID) return CURRENT_PROTOCOL;
+  if (planId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID) {
+    return DIRECT_DEEPSEEK_PROTOCOL;
+  }
   throw new QualificationLedgerError();
 }
 
@@ -359,14 +406,20 @@ function protocolEnvelope(
 ): Readonly<
   | { schemaVersion: 1 }
   | { schemaVersion: 2; qualificationPlanId: "four-llm-v1" }
-  | { schemaVersion: 3; qualificationPlanId: "four-llm-v1" }
+  | { schemaVersion: 3; qualificationPlanId: CurrentQualificationPlanId }
 > {
   if (protocol === LEGACY_PROTOCOL) {
     return Object.freeze({ schemaVersion: 1 as const });
   }
+  if (protocol === HISTORICAL_CURRENT_PROTOCOL) {
+    return Object.freeze({
+      schemaVersion: 2 as const,
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+    });
+  }
   return Object.freeze({
-    schemaVersion: protocol.manifestSchemaVersion as 2 | 3,
-    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+    schemaVersion: 3 as const,
+    qualificationPlanId: protocol.planId as CurrentQualificationPlanId,
   });
 }
 
@@ -375,6 +428,24 @@ function assertProtocol(
   expected: QualificationProtocol,
 ): void {
   if (actual !== expected) throw new QualificationLedgerError();
+}
+
+function assertPreflightProtocol(
+  preflight: FrozenPreflightRecord,
+  protocol: QualificationProtocol,
+): void {
+  if (
+    (protocol === LEGACY_PROTOCOL && preflight.schemaVersion === 1) ||
+    (protocol === HISTORICAL_CURRENT_PROTOCOL &&
+      preflight.schemaVersion === 2 &&
+      preflight.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID) ||
+    (isCurrentProtocol(protocol) &&
+      preflight.schemaVersion === 3 &&
+      preflight.qualificationPlanId === protocol.planId)
+  ) {
+    return;
+  }
+  throw new QualificationLedgerError();
 }
 
 function keysForProtocol(
@@ -689,20 +760,29 @@ function freezeCurrentPreflightRecord(
   value: unknown,
 ): CurrentV3FrozenPreflightRecord {
   const record = plainRecord(value, CURRENT_PREFLIGHT_KEYS);
+  const directDeepSeek =
+    record.qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID;
   if (
     record.schemaVersion !== 3 ||
-    record.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID
+    (record.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID &&
+      !directDeepSeek)
   ) {
     throw new QualificationLedgerError();
   }
   return Object.freeze({
     schemaVersion: 3,
-    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+    qualificationPlanId: record.qualificationPlanId,
     ...freezePreflightCommon(
       record,
-      CURRENT_REQUIRED_BUILD_ARTIFACTS,
-      CURRENT_LOGICAL_LLMS,
-      CURRENT_CREDENTIAL_ENVIRONMENT_NAMES,
+      directDeepSeek
+        ? DIRECT_DEEPSEEK_REQUIRED_BUILD_ARTIFACTS
+        : CURRENT_REQUIRED_BUILD_ARTIFACTS,
+      directDeepSeek
+        ? DIRECT_DEEPSEEK_LOGICAL_LLMS
+        : CURRENT_LOGICAL_LLMS,
+      directDeepSeek
+        ? DIRECT_DEEPSEEK_CREDENTIAL_ENVIRONMENT_NAMES
+        : CURRENT_CREDENTIAL_ENVIRONMENT_NAMES,
       false,
     ),
   }) as CurrentV3FrozenPreflightRecord;
@@ -1029,7 +1109,7 @@ function identitiesEqual(
 
 interface BatchStartedCheckpoint {
   schemaVersion: 1 | 2 | 3;
-  qualificationPlanId?: "four-llm-v1";
+  qualificationPlanId?: CurrentQualificationPlanId;
   sequence: 0;
   kind: "batch_started";
   batchId: string;
@@ -1041,7 +1121,7 @@ interface BatchStartedCheckpoint {
 
 interface CaseRunningCheckpoint extends QualificationCaseIdentity {
   schemaVersion: 1 | 2 | 3;
-  qualificationPlanId?: "four-llm-v1";
+  qualificationPlanId?: CurrentQualificationPlanId;
   sequence: number;
   kind: "case_running";
   batchId: string;
@@ -1053,7 +1133,7 @@ interface CaseRunningCheckpoint extends QualificationCaseIdentity {
 
 interface CaseCompletedCheckpoint extends QualificationCaseIdentity {
   schemaVersion: 1 | 2 | 3;
-  qualificationPlanId?: "four-llm-v1";
+  qualificationPlanId?: CurrentQualificationPlanId;
   sequence: number;
   kind: "case_completed";
   batchId: string;
@@ -1152,7 +1232,7 @@ function normalizeExecutionTelemetry(
     executionTelemetrySource: record.executionTelemetrySource,
   } as const;
   let ownedProcessDrained: true | null | undefined;
-  if (protocol === CURRENT_PROTOCOL) {
+  if (isCurrentProtocol(protocol)) {
     if (
       !Object.hasOwn(record, "ownedProcessDrained") ||
       (record.ownedProcessDrained !== true &&
@@ -1166,7 +1246,7 @@ function normalizeExecutionTelemetry(
     throw new QualificationLedgerError();
   }
   const normalized = Object.freeze(
-    protocol === CURRENT_PROTOCOL
+    isCurrentProtocol(protocol)
       ? { ...common, ownedProcessDrained: ownedProcessDrained! }
       : common,
   );
@@ -1217,6 +1297,7 @@ function normalizeCheckpoint(
       ]),
     );
     const preflight = protocol.freezePreflight(base.preflight);
+    assertPreflightProtocol(preflight, protocol);
     if (
       expectedSequence !== 0 ||
       typeof base.authorizationReferenceSha256 !== "string" ||
@@ -1303,7 +1384,7 @@ function normalizeCheckpoint(
         "orchestratorFallbackUsed",
         "result",
         "runtimeReportedAutoRetryCount",
-        ...(protocol === CURRENT_PROTOCOL ? ["ownedProcessDrained"] : []),
+        ...(isCurrentProtocol(protocol) ? ["ownedProcessDrained"] : []),
       ]),
     );
     return Object.freeze({
@@ -1377,7 +1458,7 @@ function normalizeFailureReason(
   ) {
     throw new QualificationLedgerError();
   }
-  if (value === "process_residual" && protocol === CURRENT_PROTOCOL) {
+  if (value === "process_residual" && isCurrentProtocol(protocol)) {
     throw new QualificationLedgerError();
   }
   return value as Exclude<QualificationFailureReason, null>;
@@ -1452,7 +1533,7 @@ function validateEvidenceForIdentity(
     protocol === LEGACY_PROTOCOL
       ? qualification.repositoryCommit === preflight.repositoryCommit &&
         qualification.buildIdentitySha256 === preflight.buildIdentitySha256
-      : qualification.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID &&
+      : qualification.qualificationPlanId === protocol.planId &&
         qualification.llm === identity.llm &&
         qualification.task === identity.task &&
         qualification.frozenCommit === preflight.repositoryCommit &&
@@ -1490,6 +1571,8 @@ function validateEvidenceForIdentity(
   const expectedEvidenceCredential =
     identity.llm === "ark-coding-plan"
       ? "CODEX_AGENT_ARK_CODING_KEY"
+      : identity.llm === "deepseek-v4-flash"
+        ? "CODEX_AGENT_DEEPSEEK_KEY"
       : identity.llm === "ark-agent-plan" ||
           identity.llm === "ark-agent-deepseek-v4-flash"
         ? "CODEX_AGENT_ARK_AGENT_KEY"
@@ -1540,7 +1623,7 @@ function validateEvidenceForIdentity(
   ) {
     throw new QualificationLedgerError();
   }
-  if (protocol === CURRENT_PROTOCOL) {
+  if (isCurrentProtocol(protocol)) {
     validateCurrentEvidenceContract(evidence, {
       llm: identity.llm,
       task: identity.task,
@@ -1652,6 +1735,7 @@ async function loadLedgerState(
       running: null,
     };
   }
+  if (protocol === null) throw new QualificationLedgerError();
   const first = loaded[0]!.checkpoint;
   if (first.kind !== "batch_started") throw new QualificationLedgerError();
   const completed: CaseCompletedCheckpoint[] = [];
@@ -1687,7 +1771,7 @@ async function loadLedgerState(
         path.resolve(repositoryRoot, checkpoint.evidence.path),
         first.preflight,
         first.authorizationReferenceSha256,
-        protocol!,
+        protocol,
       );
       if (
         validatedEvidence.reference.path !== checkpoint.evidence.path ||
@@ -1704,7 +1788,7 @@ async function loadLedgerState(
             adapterReportedFallbackUsed: checkpoint.adapterReportedFallbackUsed,
             orchestratorFallbackUsed: false,
             executionTelemetrySource: checkpoint.executionTelemetrySource,
-            ...(protocol === CURRENT_PROTOCOL
+            ...(isCurrentProtocol(protocol)
               ? { ownedProcessDrained: checkpoint.ownedProcessDrained! }
               : {}),
           })
@@ -1920,7 +2004,11 @@ export interface QualificationLedger {
 export function createQualificationLedger(options: {
   repositoryRoot: string;
   batchId: string;
+  qualificationPlanId?: CurrentQualificationPlanId;
 }): QualificationLedger {
+  const protocol = protocolForPlanId(
+    options.qualificationPlanId ?? ACTIVE_QUALIFICATION_PLAN_ID,
+  );
   let directory: string;
   try {
     directory = batchDirectory(options.repositoryRoot, options.batchId);
@@ -1947,7 +2035,7 @@ export function createQualificationLedger(options: {
         const state = await loadLedgerState(
           options.repositoryRoot,
           options.batchId,
-          CURRENT_PROTOCOL,
+          protocol,
         );
         if (
           state.loaded.length !== 0 ||
@@ -1956,12 +2044,13 @@ export function createQualificationLedger(options: {
         ) {
           throw new QualificationLedgerError();
         }
-        const preflight = freezeCurrentPreflightRecord(input.preflight);
+        const preflight = protocol.freezePreflight(input.preflight);
+        assertPreflightProtocol(preflight, protocol);
         await publishLedgerJson(
           options.repositoryRoot,
           checkpointPath(options.repositoryRoot, options.batchId, 0),
           {
-            ...protocolEnvelope(CURRENT_PROTOCOL),
+            ...protocolEnvelope(protocol),
             sequence: 0,
             kind: "batch_started",
             batchId: options.batchId,
@@ -1983,7 +2072,7 @@ export function createQualificationLedger(options: {
             llm: input.llm,
             task: input.task,
           },
-          CURRENT_PROTOCOL,
+          protocol,
         );
         if (!validTimestamp(input.recordedAt)) {
           throw new QualificationLedgerError();
@@ -1991,7 +2080,7 @@ export function createQualificationLedger(options: {
         const state = await loadLedgerState(
           options.repositoryRoot,
           options.batchId,
-          CURRENT_PROTOCOL,
+          protocol,
         );
         if (
           state.started === null ||
@@ -2009,7 +2098,7 @@ export function createQualificationLedger(options: {
             state.loaded.length,
           ),
           {
-            ...protocolEnvelope(CURRENT_PROTOCOL),
+            ...protocolEnvelope(protocol),
             sequence: state.loaded.length,
             kind: "case_running",
             batchId: options.batchId,
@@ -2036,7 +2125,7 @@ export function createQualificationLedger(options: {
             llm: input.llm,
             task: input.task,
           },
-          CURRENT_PROTOCOL,
+          protocol,
         );
         if (
           (input.result !== "passed" && input.result !== "failed") ||
@@ -2047,7 +2136,7 @@ export function createQualificationLedger(options: {
         const state = await loadLedgerState(
           options.repositoryRoot,
           options.batchId,
-          CURRENT_PROTOCOL,
+          protocol,
         );
         if (
           state.started === null ||
@@ -2063,7 +2152,7 @@ export function createQualificationLedger(options: {
           input.evidencePath,
           state.started.preflight,
           state.started.authorizationReferenceSha256,
-          CURRENT_PROTOCOL,
+          protocol,
         );
         if ((input.result === "passed") !== evidence.passed) {
           throw new QualificationLedgerError();
@@ -2076,7 +2165,7 @@ export function createQualificationLedger(options: {
             state.loaded.length,
           ),
           {
-            ...protocolEnvelope(CURRENT_PROTOCOL),
+            ...protocolEnvelope(protocol),
             sequence: state.loaded.length,
             kind: "case_completed",
             batchId: options.batchId,
@@ -2103,10 +2192,10 @@ export function createQualificationLedger(options: {
         const state = await loadLedgerState(
           options.repositoryRoot,
           options.batchId,
-          CURRENT_PROTOCOL,
+          protocol,
         );
         if (state.started === null) throw new QualificationLedgerError();
-        const manifest = buildManifest(state, CURRENT_PROTOCOL, {
+        const manifest = buildManifest(state, protocol, {
           batchId: options.batchId,
           authorizationReferenceSha256:
             state.started.authorizationReferenceSha256,
@@ -2118,7 +2207,7 @@ export function createQualificationLedger(options: {
             options.repositoryRoot,
             options.batchId,
             state,
-            CURRENT_PROTOCOL,
+            protocol,
           ),
         });
         await publishLedgerJson(
@@ -2169,7 +2258,7 @@ function normalizeCaseEntry(
     "result",
     "runtimeReportedAutoRetryCount",
     "task",
-    ...(protocol === CURRENT_PROTOCOL ? ["ownedProcessDrained"] : []),
+    ...(isCurrentProtocol(protocol) ? ["ownedProcessDrained"] : []),
   ]);
   const identity = normalizeCaseIdentity(
     {
@@ -2218,7 +2307,7 @@ function normalizeUncommittedEvidence(
     "runtimeReportedAutoRetryCount",
     "task",
     "validationStatus",
-    ...(protocol === CURRENT_PROTOCOL ? ["ownedProcessDrained"] : []),
+    ...(isCurrentProtocol(protocol) ? ["ownedProcessDrained"] : []),
   ] as const;
   if (base.validationStatus === "valid") {
     const record = plainRecord(value, commonKeys);
@@ -2260,7 +2349,7 @@ function normalizeUncommittedEvidence(
     record.adapterReportedFallbackUsed !== null ||
     record.orchestratorFallbackUsed !== null ||
     record.executionTelemetrySource !== null ||
-    (protocol === CURRENT_PROTOCOL && record.ownedProcessDrained !== null)
+    (isCurrentProtocol(protocol) && record.ownedProcessDrained !== null)
   ) {
     throw new QualificationLedgerError();
   }
@@ -2283,7 +2372,7 @@ function normalizeUncommittedEvidence(
     adapterReportedFallbackUsed: null,
     orchestratorFallbackUsed: null,
     executionTelemetrySource: null,
-    ...(protocol === CURRENT_PROTOCOL ? { ownedProcessDrained: null } : {}),
+    ...(isCurrentProtocol(protocol) ? { ownedProcessDrained: null } : {}),
   });
 }
 
@@ -2535,7 +2624,7 @@ async function findUncommittedEvidence(
       adapterReportedFallbackUsed: null,
       orchestratorFallbackUsed: null,
       executionTelemetrySource: null,
-      ...(protocol === CURRENT_PROTOCOL ? { ownedProcessDrained: null } : {}),
+      ...(isCurrentProtocol(protocol) ? { ownedProcessDrained: null } : {}),
     });
   }
 }

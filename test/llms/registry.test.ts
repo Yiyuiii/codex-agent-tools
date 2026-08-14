@@ -162,7 +162,35 @@ describe("logical LLM registry", () => {
     );
   });
 
-  it("exposes exactly the four active logical LLMs", () => {
+  it("registers the direct DeepSeek candidate without granting unqualified tasks", () => {
+    const profile = resolveLlm("deepseek-v4-flash");
+
+    expect(profile).toMatchObject({
+      id: "deepseek-v4-flash",
+      displayName: "DeepSeek V4 Flash",
+      runtime: "pi-rpc",
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      network: "direct",
+      credentialEnv: ["OPENAI_API_KEY_DEEPSEEK"],
+      credentialTargetEnv: "CODEX_AGENT_DEEPSEEK_KEY",
+      maxConcurrency: 1,
+      concurrencyKey: "deepseek",
+      capabilities: { review: true, delegate: true },
+      qualityGates: {
+        review: { status: "pending" },
+        delegate: { status: "pending" },
+      },
+    });
+    expect(() => resolveLlm("deepseek-v4-flash", "review")).toThrow(
+      /disabled pending real smoke/u,
+    );
+    expect(() => resolveLlm("deepseek-v4-flash", "delegate")).toThrow(
+      /disabled pending real smoke/u,
+    );
+  });
+
+  it("exposes four qualified routes plus the direct DeepSeek candidate", () => {
     expect(resolveLlm("kimi-k3")).toMatchObject({
       runtime: "kimi-acp",
       model: "kimi-code/k3",
@@ -176,6 +204,7 @@ describe("logical LLM registry", () => {
       "ark-agent-deepseek-v4-flash",
       "ark-agent-plan",
       "ark-coding-plan",
+      "deepseek-v4-flash",
       "kimi-k3",
     ]);
     expect(() => resolveLlm("gemini-3.5-flash")).toThrow(
@@ -269,6 +298,7 @@ describe("logical LLM registry", () => {
       "VOLCENGINE_API_KEY",
       "API_KEY_DOUBAO_CODING",
       "OPENAI_API_KEY_DOUBAO",
+      "OPENAI_API_KEY_DEEPSEEK",
     ]);
     expect(credentialEnvironmentNames()).not.toContain("GEMINI_API_KEY");
     expect(credentialEnvironmentNames()).not.toContain("GOOGLE_API_KEY");
@@ -281,7 +311,7 @@ describe("logical LLM registry", () => {
     "does not register excluded source %s",
     (id) => {
       expect(() => resolveLlm(id)).toThrow(
-        /Supported llms: ark-agent-deepseek-v4-flash, ark-agent-plan, ark-coding-plan, kimi-k3/u,
+        /Supported llms: ark-agent-deepseek-v4-flash, ark-agent-plan, ark-coding-plan, deepseek-v4-flash, kimi-k3/u,
       );
     },
   );

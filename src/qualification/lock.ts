@@ -18,7 +18,9 @@ import { execa } from "execa";
 
 import {
   ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_PLAN_ID,
+  type CurrentQualificationPlanId,
   type QualificationPlanId,
 } from "./protocol.js";
 import type {
@@ -256,7 +258,9 @@ function normalizeOwner(value: unknown): QualificationLockOwner {
     record.schemaVersion === 1 && !Object.hasOwn(record, "qualificationPlanId")
       ? LEGACY_OWNER_KEYS
       : record.schemaVersion === 2 &&
-          record.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID
+          (record.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID ||
+            record.qualificationPlanId ===
+              DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID)
         ? CURRENT_OWNER_KEYS
         : null;
   if (
@@ -485,6 +489,7 @@ export interface AcquireQualificationLockOptions {
   repositoryRoot: string;
   batchId: string;
   authorizationReferenceSha256: string;
+  qualificationPlanId?: CurrentQualificationPlanId;
   tempDirectory?: string;
   processId?: number;
   processIdentityInspector?: ProcessIdentityInspector;
@@ -526,7 +531,8 @@ export async function acquireQualificationLock(
     const acquiredAt = (options.now ?? (() => new Date()))().toISOString();
     const owner = normalizeOwner({
       schemaVersion: 2,
-      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      qualificationPlanId:
+        options.qualificationPlanId ?? ACTIVE_QUALIFICATION_PLAN_ID,
       repositoryRealpathSha256: location.repositoryRealpathSha256,
       processId,
       processStartTime: identity.startTime,
@@ -724,7 +730,8 @@ function normalizeTerminalInspection(
     typeof record.authorizationReferenceSha256 === "string" &&
     SHA256_PATTERN.test(record.authorizationReferenceSha256) &&
     (record.qualificationPlanId === LEGACY_QUALIFICATION_PLAN_ID ||
-      record.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID)
+      record.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID ||
+      record.qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID)
   ) {
     return Object.freeze({
       state: "valid",

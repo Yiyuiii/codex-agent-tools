@@ -7,6 +7,11 @@ import type {
   QualificationLockHandle,
   QualificationTerminalManifest,
 } from "../src/qualification/types.js";
+import {
+  ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+  type CurrentQualificationPlanId,
+} from "../src/qualification/protocol.js";
 
 const AUTHORIZATION_REFERENCE_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -19,13 +24,18 @@ const DEFAULT_REPOSITORY_ROOT = path.resolve(
 );
 
 const HELP = `Usage: npm run --silent qualify:gates -- --authorization-ref <uuid>
+       npm run --silent qualify:gates -- --plan direct-deepseek-v1 --authorization-ref <uuid>
        npm run --silent qualify:gates -- --recover-interrupted <batchId>
        npm run --silent qualify:gates -- --help
 `;
 
 export type GateRequalificationCommand =
   | Readonly<{ kind: "help" }>
-  | Readonly<{ kind: "qualify"; authorizationReference: string }>
+  | Readonly<{
+      kind: "qualify";
+      qualificationPlanId: CurrentQualificationPlanId;
+      authorizationReference: string;
+    }>
   | Readonly<{ kind: "recover"; batchId: string }>;
 
 export function parseGateRequalificationArguments(
@@ -42,7 +52,22 @@ export function parseGateRequalificationArguments(
   ) {
     return Object.freeze({
       kind: "qualify",
+      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
       authorizationReference: args[1],
+    });
+  }
+  if (
+    args.length === 4 &&
+    args[0] === "--plan" &&
+    args[1] === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID &&
+    args[2] === "--authorization-ref" &&
+    typeof args[3] === "string" &&
+    AUTHORIZATION_REFERENCE_PATTERN.test(args[3])
+  ) {
+    return Object.freeze({
+      kind: "qualify",
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+      authorizationReference: args[3],
     });
   }
   if (
@@ -65,7 +90,7 @@ interface SmokeMainModule {
     args: readonly string[];
     evidenceDirectory: string;
     qualificationContext: Readonly<{
-      qualificationPlanId: "four-llm-v1";
+      qualificationPlanId: CurrentQualificationPlanId;
       batchId: string;
       ordinal: number;
       llm: string;
@@ -87,6 +112,10 @@ async function smokeModule(
     // @ts-expect-error The production .mjs entrypoint intentionally has no declaration file.
     return import("./real-kimi-smoke.mjs") as Promise<SmokeMainModule>;
   }
+  if (identity.llm === "deepseek-v4-flash") {
+    // @ts-expect-error The production .mjs entrypoint intentionally has no declaration file.
+    return import("./real-deepseek-smoke.mjs") as Promise<SmokeMainModule>;
+  }
   // @ts-expect-error The production .mjs entrypoint intentionally has no declaration file.
   return import("./real-ark-smoke.mjs") as Promise<SmokeMainModule>;
 }
@@ -99,7 +128,7 @@ async function runSmokeCase(options: {
   repositoryRoot: string;
   identity: QualificationCaseIdentity;
   qualificationContext: Readonly<{
-    qualificationPlanId: "four-llm-v1";
+    qualificationPlanId: CurrentQualificationPlanId;
     batchId: string;
     ordinal: number;
     llm: string;
@@ -158,10 +187,13 @@ function ownersEqual(
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function assertActiveQualificationPlan(
+function assertCurrentQualificationPlan(
   qualificationPlanId: unknown,
-): asserts qualificationPlanId is "four-llm-v1" {
-  if (qualificationPlanId !== "four-llm-v1") {
+): asserts qualificationPlanId is CurrentQualificationPlanId {
+  if (
+    qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID &&
+    qualificationPlanId !== DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+  ) {
     throw new Error("Qualification plan mismatch");
   }
 }
@@ -169,6 +201,7 @@ function assertActiveQualificationPlan(
 async function runProductionQualification(options: {
   repositoryRoot: string;
   authorizationReference: string;
+  qualificationPlanId: CurrentQualificationPlanId;
   writeStderr: (text: string) => void;
 }): Promise<QualificationTerminalManifest> {
   const [coordinator, lock, manifest, preflight] = await Promise.all(
@@ -191,12 +224,13 @@ async function runProductionQualification(options: {
     {
       repositoryRoot: options.repositoryRoot,
       authorizationReference: options.authorizationReference,
+      qualificationPlanId: options.qualificationPlanId,
     },
     {
       createBatchId: batchId,
       now: () => new Date(),
       acquireLock: (input) => {
-        assertActiveQualificationPlan(input.qualificationPlanId);
+        assertCurrentQualificationPlan(input.qualificationPlanId);
         return lock.acquireQualificationLock(input);
       },
       releaseLock: (handle) => lock.releaseQualificationLock(handle),
@@ -206,16 +240,17 @@ async function runProductionQualification(options: {
         lockHandle,
         qualificationPlanId,
       }) => {
-        assertActiveQualificationPlan(qualificationPlanId);
+        assertCurrentQualificationPlan(qualificationPlanId);
         return preflight.runQualificationPreflight({
           repositoryRoot,
           authorizationReferenceSha256,
           lockDirectory: lockHandle.lockDirectory,
           currentOwnerNonce: lockHandle.owner.nonce,
+          qualificationPlanId,
         });
       },
       createLedger: (input) => {
-        assertActiveQualificationPlan(input.qualificationPlanId);
+        assertCurrentQualificationPlan(input.qualificationPlanId);
         return manifest.createQualificationLedger(input);
       },
       assertLockOwner: async (handle) => {
@@ -227,7 +262,7 @@ async function runProductionQualification(options: {
         }
       },
       assertFrozenCandidate: (input) => {
-        assertActiveQualificationPlan(input.qualificationPlanId);
+        assertCurrentQualificationPlan(input.qualificationPlanId);
         return preflightModule.assertQualificationCandidateUnchanged(input);
       },
       runCase: ({ identity, qualificationContext, evidenceDirectory }) =>
@@ -316,11 +351,13 @@ export async function main(
     const manifest = await (options.qualify ?? runProductionQualification)({
       repositoryRoot,
       authorizationReference: command.authorizationReference,
+      qualificationPlanId: command.qualificationPlanId,
       writeStderr,
     });
     writeStdout(
       `${JSON.stringify({
         batchId: manifest.batchId,
+        qualificationPlanId: command.qualificationPlanId,
         status: manifest.status,
         completedCases: manifest.cases.length,
         promotionEligible: manifest.promotionEligible,

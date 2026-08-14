@@ -2,10 +2,16 @@ import type { QualificationCaseIdentity } from "./types.js";
 
 export const LEGACY_QUALIFICATION_PLAN_ID = "five-llm-v1" as const;
 export const ACTIVE_QUALIFICATION_PLAN_ID = "four-llm-v1" as const;
+export const DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID =
+  "direct-deepseek-v1" as const;
+
+export type CurrentQualificationPlanId =
+  | typeof ACTIVE_QUALIFICATION_PLAN_ID
+  | typeof DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID;
 
 export type QualificationPlanId =
   | typeof LEGACY_QUALIFICATION_PLAN_ID
-  | typeof ACTIVE_QUALIFICATION_PLAN_ID;
+  | CurrentQualificationPlanId;
 
 type FrozenSchedule<Cases extends readonly QualificationCaseIdentity[]> = {
   readonly [Index in keyof Cases]: Readonly<Cases[Index]>;
@@ -44,6 +50,11 @@ export const ACTIVE_QUALIFICATION_CASES = frozenSchedule([
   { ordinal: 8, llm: "ark-agent-deepseek-v4-flash", task: "delegate" },
 ]);
 
+export const DIRECT_DEEPSEEK_QUALIFICATION_CASES = frozenSchedule([
+  { ordinal: 1, llm: "deepseek-v4-flash", task: "review" },
+  { ordinal: 2, llm: "deepseek-v4-flash", task: "delegate" },
+]);
+
 export function qualificationSchedule(
   planId: typeof LEGACY_QUALIFICATION_PLAN_ID,
 ): typeof LEGACY_QUALIFICATION_CASES;
@@ -51,20 +62,28 @@ export function qualificationSchedule(
   planId: typeof ACTIVE_QUALIFICATION_PLAN_ID,
 ): typeof ACTIVE_QUALIFICATION_CASES;
 export function qualificationSchedule(
-  planId: QualificationPlanId,
-):
-  | typeof LEGACY_QUALIFICATION_CASES
-  | typeof ACTIVE_QUALIFICATION_CASES;
+  planId: typeof DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+): typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES;
 export function qualificationSchedule(
   planId: QualificationPlanId,
 ):
   | typeof LEGACY_QUALIFICATION_CASES
-  | typeof ACTIVE_QUALIFICATION_CASES {
+  | typeof ACTIVE_QUALIFICATION_CASES
+  | typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES;
+export function qualificationSchedule(
+  planId: QualificationPlanId,
+):
+  | typeof LEGACY_QUALIFICATION_CASES
+  | typeof ACTIVE_QUALIFICATION_CASES
+  | typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES {
   if (planId === LEGACY_QUALIFICATION_PLAN_ID) {
     return LEGACY_QUALIFICATION_CASES;
   }
   if (planId === ACTIVE_QUALIFICATION_PLAN_ID) {
     return ACTIVE_QUALIFICATION_CASES;
+  }
+  if (planId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID) {
+    return DIRECT_DEEPSEEK_QUALIFICATION_CASES;
   }
   throw new Error(`Unknown qualification plan: ${String(planId)}`);
 }
@@ -77,10 +96,17 @@ export function qualificationPlanForEnvelope(
     return LEGACY_QUALIFICATION_PLAN_ID;
   }
   if (
-    (schemaVersion === 2 || schemaVersion === 3) &&
+    schemaVersion === 2 &&
     recordedPlanId === ACTIVE_QUALIFICATION_PLAN_ID
   ) {
     return ACTIVE_QUALIFICATION_PLAN_ID;
+  }
+  if (
+    schemaVersion === 3 &&
+    (recordedPlanId === ACTIVE_QUALIFICATION_PLAN_ID ||
+      recordedPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID)
+  ) {
+    return recordedPlanId;
   }
   throw new Error("Qualification schema and plan identity do not match");
 }

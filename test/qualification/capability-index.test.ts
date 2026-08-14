@@ -33,9 +33,9 @@ async function temporaryRoot(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(
-    temporaryDirectories.splice(0).map((directory) =>
-      rm(directory, { recursive: true, force: true }),
-    ),
+    temporaryDirectories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
   );
 });
 
@@ -45,6 +45,8 @@ describe("capability qualification runtime fingerprint", () => {
     const kimiRoots = capabilityRuntimeInputRoots("kimi-acp");
 
     expect(piRoots).toContain("src/adapters/pi");
+    expect(piRoots).toContain("src/smoke/deepseek.ts");
+    expect(piRoots).toContain("scripts/real-deepseek-smoke.mjs");
     expect(piRoots).toContain("src/qualification/verifier.ts");
     expect(piRoots).toContain(
       "host-acceptance/protocol/observer-protocol.v1.json",
@@ -58,12 +60,8 @@ describe("capability qualification runtime fingerprint", () => {
     expect(kimiRoots).not.toContain("package-lock.json");
     expect(piRoots).not.toContain("src/qualification");
     expect(kimiRoots).not.toContain("src/qualification");
-    expect(piRoots).not.toContain(
-      "src/qualification/capability-index.ts",
-    );
-    expect(kimiRoots).not.toContain(
-      "src/qualification/capability-index.ts",
-    );
+    expect(piRoots).not.toContain("src/qualification/capability-index.ts");
+    expect(kimiRoots).not.toContain("src/qualification/capability-index.ts");
     expect(piRoots).not.toContain("src/llms/registry.ts");
     expect(kimiRoots).not.toContain("src/llms/registry.ts");
     expect(capabilityRuntimeInputExclusions()).toEqual([
@@ -128,10 +126,7 @@ describe("capability qualification runtime fingerprint", () => {
       },
     };
 
-    const pi = capabilityDependencyInputFromPackageLock(
-      packageLock,
-      "pi-rpc",
-    );
+    const pi = capabilityDependencyInputFromPackageLock(packageLock, "pi-rpc");
     const kimi = capabilityDependencyInputFromPackageLock(
       packageLock,
       "kimi-acp",
@@ -145,24 +140,16 @@ describe("capability qualification runtime fingerprint", () => {
     packagingOnlyChange.packages[
       "node_modules/@modelcontextprotocol/sdk"
     ].integrity = "sha512-mcp-new";
-    packagingOnlyChange.packages[
-      "node_modules/@hono/node-server"
-    ].version = "2.1.0";
-    packagingOnlyChange.packages[
-      "node_modules/@hono/node-server"
-    ].integrity = "sha512-hono-new";
+    packagingOnlyChange.packages["node_modules/@hono/node-server"].version =
+      "2.1.0";
+    packagingOnlyChange.packages["node_modules/@hono/node-server"].integrity =
+      "sha512-hono-new";
 
     expect(
-      capabilityDependencyInputFromPackageLock(
-        packagingOnlyChange,
-        "pi-rpc",
-      ),
+      capabilityDependencyInputFromPackageLock(packagingOnlyChange, "pi-rpc"),
     ).toEqual(pi);
     expect(
-      capabilityDependencyInputFromPackageLock(
-        packagingOnlyChange,
-        "kimi-acp",
-      ),
+      capabilityDependencyInputFromPackageLock(packagingOnlyChange, "kimi-acp"),
     ).toEqual(kimi);
     expect(pi.content).not.toContain("modelcontextprotocol");
     expect(kimi.content).not.toContain("modelcontextprotocol");
@@ -173,16 +160,10 @@ describe("capability qualification runtime fingerprint", () => {
     sharedRuntimeChange.packages["node_modules/execa"].integrity =
       "sha512-execa-changed";
     expect(
-      capabilityDependencyInputFromPackageLock(
-        sharedRuntimeChange,
-        "pi-rpc",
-      ),
+      capabilityDependencyInputFromPackageLock(sharedRuntimeChange, "pi-rpc"),
     ).not.toEqual(pi);
     expect(
-      capabilityDependencyInputFromPackageLock(
-        sharedRuntimeChange,
-        "kimi-acp",
-      ),
+      capabilityDependencyInputFromPackageLock(sharedRuntimeChange, "kimi-acp"),
     ).not.toEqual(kimi);
 
     const kimiRuntimeChange = structuredClone(packageLock);
@@ -190,16 +171,10 @@ describe("capability qualification runtime fingerprint", () => {
       "node_modules/@agentclientprotocol/sdk"
     ].integrity = "sha512-acp-changed";
     expect(
-      capabilityDependencyInputFromPackageLock(
-        kimiRuntimeChange,
-        "pi-rpc",
-      ),
+      capabilityDependencyInputFromPackageLock(kimiRuntimeChange, "pi-rpc"),
     ).toEqual(pi);
     expect(
-      capabilityDependencyInputFromPackageLock(
-        kimiRuntimeChange,
-        "kimi-acp",
-      ),
+      capabilityDependencyInputFromPackageLock(kimiRuntimeChange, "kimi-acp"),
     ).not.toEqual(kimi);
   });
 
@@ -301,9 +276,7 @@ describe("capability qualification runtime fingerprint", () => {
         profile: {
           id: llm,
           runtime:
-            llm === "kimi-k3"
-              ? ("kimi-acp" as const)
-              : ("pi-rpc" as const),
+            llm === "kimi-k3" ? ("kimi-acp" as const) : ("pi-rpc" as const),
           model: `${llm}-model`,
           network: "direct" as const,
           credentialEnv: [`${llm}_KEY`],
@@ -340,9 +313,7 @@ describe("capability qualification runtime fingerprint", () => {
     );
 
     expect(
-      canonicalChanged.every(
-        (value, index) => value !== baseline[index],
-      ),
+      canonicalChanged.every((value, index) => value !== baseline[index]),
     ).toBe(true);
     expect(
       kimiChanged.map((value, index) => value !== baseline[index]),
@@ -383,11 +354,7 @@ describe("capability qualification runtime fingerprint", () => {
     const root = await temporaryRoot();
     await mkdir(path.join(root, "inputs", "nested"), { recursive: true });
     await writeFile(path.join(root, "inputs", "z.ts"), "z\r\n", "utf8");
-    await writeFile(
-      path.join(root, "inputs", "nested", "a.ts"),
-      "a\n",
-      "utf8",
-    );
+    await writeFile(path.join(root, "inputs", "nested", "a.ts"), "a\n", "utf8");
 
     await expect(
       collectCapabilityRuntimeInputs({
@@ -409,9 +376,7 @@ describe("capability qualification runtime fingerprint", () => {
     const paths = inputs.map((input) => input.path);
     expect(paths).toContain("src/runtime/credentials.ts");
     expect(
-      paths.some((entry) =>
-        capabilityRuntimeInputExclusions().includes(entry),
-      ),
+      paths.some((entry) => capabilityRuntimeInputExclusions().includes(entry)),
     ).toBe(false);
   });
 
@@ -499,6 +464,26 @@ function codingProfile() {
   };
 }
 
+function directDeepSeekProfile() {
+  return {
+    id: "deepseek-v4-flash",
+    displayName: "DeepSeek V4 Flash",
+    runtime: "pi-rpc" as const,
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+    network: "direct" as const,
+    capabilities: { review: true, delegate: true },
+    qualityGates: {
+      review: { status: "pending" as const },
+      delegate: { status: "pending" as const },
+    },
+    credentialEnv: ["OPENAI_API_KEY_DEEPSEEK"],
+    credentialTargetEnv: "CODEX_AGENT_DEEPSEEK_KEY",
+    maxConcurrency: 1,
+    concurrencyKey: "deepseek",
+  };
+}
+
 async function batchFixture(
   root: string,
   currentOwnedEvidence = false,
@@ -510,8 +495,7 @@ async function batchFixture(
   evidence: Record<string, unknown>;
 }> {
   const batchId = "2026-07-29T00-00-00.000Z-batch";
-  const manifestPath =
-    `docs/smoke/evidence/batches/${batchId}/manifest.json`;
+  const manifestPath = `docs/smoke/evidence/batches/${batchId}/manifest.json`;
   const evidencePath =
     `docs/smoke/evidence/batches/${batchId}/cases/` +
     "2026-07-29T00-00-01.000Z-ark-coding-plan-review-ark.json";
@@ -635,9 +619,7 @@ describe("capability qualification evidence source", () => {
         },
       ),
     ).resolves.toEqual({ sourceKind: "batch-case" });
-    expect(verifiedManifests).toEqual([
-      path.join(root, fixture.manifestPath),
-    ]);
+    expect(verifiedManifests).toEqual([path.join(root, fixture.manifestPath)]);
   });
 
   it("accepts current evidence only with exact owned-process drain proof", async () => {
@@ -665,20 +647,118 @@ describe("capability qualification evidence source", () => {
     ).resolves.toEqual({ sourceKind: "batch-case" });
   });
 
+  it("accepts Direct DeepSeek evidence only from its isolated plan", async () => {
+    const root = await temporaryRoot();
+    const fixture = await batchFixture(root, true);
+    const qualification = fixture.evidence.qualification as Record<
+      string,
+      unknown
+    >;
+    Object.assign(qualification, {
+      qualificationPlanId: "direct-deepseek-v1",
+      ordinal: 1,
+      llm: "deepseek-v4-flash",
+    });
+    Object.assign(fixture.evidence, {
+      llm: "deepseek-v4-flash",
+      actualModel: "deepseek-v4-flash",
+      expectedModel: "deepseek-v4-flash",
+      provider: "deepseek",
+      credentialEnv: "CODEX_AGENT_DEEPSEEK_KEY",
+    });
+    fixture.manifest.qualificationPlanId = "direct-deepseek-v1";
+    const manifestCase = (
+      fixture.manifest.cases as Array<Record<string, unknown>>
+    )[0]!;
+    Object.assign(manifestCase, {
+      ordinal: 1,
+      llm: "deepseek-v4-flash",
+    });
+    Object.assign(fixture.entry, {
+      llm: "deepseek-v4-flash",
+    });
+    const evidenceSha256 = await writeJson(
+      root,
+      fixture.evidencePath,
+      fixture.evidence,
+    );
+    manifestCase.evidence = {
+      ...(manifestCase.evidence as Record<string, unknown>),
+      sha256: evidenceSha256,
+    };
+    const manifestSha256 = await writeJson(
+      root,
+      fixture.manifestPath,
+      fixture.manifest,
+    );
+    Object.assign(fixture.entry.source, {
+      evidenceSha256,
+      manifestSha256,
+    });
+
+    await expect(
+      verifyCapabilityEvidenceSource(
+        {
+          repositoryRoot: root,
+          entry: fixture.entry,
+          profile: directDeepSeekProfile(),
+        },
+        {
+          verifyBatchManifest: async () => ({
+            verified: true,
+            mode: "immutable-evidence",
+            batchId: "2026-07-29T00-00-00.000Z-batch",
+            qualificationPlanId: "direct-deepseek-v1",
+            status: "passed",
+            promotionEligible: true,
+          }),
+        },
+      ),
+    ).resolves.toEqual({ sourceKind: "batch-case" });
+    await expect(
+      verifyCapabilityEvidenceSource(
+        {
+          repositoryRoot: root,
+          entry: fixture.entry,
+          profile: directDeepSeekProfile(),
+        },
+        {
+          verifyBatchManifest: async () => ({
+            verified: true,
+            mode: "immutable-evidence",
+            batchId: "2026-07-29T00-00-00.000Z-batch",
+            qualificationPlanId: "four-llm-v1",
+            status: "passed",
+            promotionEligible: true,
+          }),
+        },
+      ),
+    ).rejects.toThrow(/capability qualification/iu);
+  });
+
   it.each([
-    ["missing top-level drain", (evidence: Record<string, unknown>) => {
-      delete evidence.ownedProcessDrained;
-    }],
-    ["false top-level drain", (evidence: Record<string, unknown>) => {
-      evidence.ownedProcessDrained = false;
-    }],
-    ["historical process check", (evidence: Record<string, unknown>) => {
-      evidence.checks = {
-        ...(evidence.checks as Record<string, unknown>),
-        noNewPiRpcProcesses: true,
-      };
-      delete (evidence.checks as Record<string, unknown>).ownedProcessDrained;
-    }],
+    [
+      "missing top-level drain",
+      (evidence: Record<string, unknown>) => {
+        delete evidence.ownedProcessDrained;
+      },
+    ],
+    [
+      "false top-level drain",
+      (evidence: Record<string, unknown>) => {
+        evidence.ownedProcessDrained = false;
+      },
+    ],
+    [
+      "historical process check",
+      (evidence: Record<string, unknown>) => {
+        evidence.checks = {
+          ...(evidence.checks as Record<string, unknown>),
+          noNewPiRpcProcesses: true,
+        };
+        delete (evidence.checks as Record<string, unknown>).ownedProcessDrained;
+      },
+    ],
   ] as const)(
     "rejects current capability evidence with %s",
     async (_name, mutate) => {
@@ -967,7 +1047,7 @@ describe("capability qualification evidence source", () => {
 });
 
 describe("current capability index qualification", () => {
-  it("verifies all eight current batch cases without a legacy exception", async () => {
+  it("keeps historical evidence valid while shared protocol changes stale all eight indexed capabilities", async () => {
     let canonicalCollections = 0;
     const analysis = await analyzeCapabilityIndex(
       { repositoryRoot: process.cwd() },
@@ -986,21 +1066,17 @@ describe("current capability index qualification", () => {
     );
     expect(
       analysis.entries.map((entry) => entry.runtimeFingerprintStatus),
-    ).toEqual(Array.from({ length: 8 }, () => "current"));
+    ).toEqual(Array.from({ length: 8 }, () => "stale"));
+    expect(
+      analysis.entries.some(({ llm }) => llm === "deepseek-v4-flash"),
+    ).toBe(false);
     expect(
       analysis.entries.every((entry) =>
-        /^[a-f0-9]{64}$/u.test(
-          entry.currentRuntimeFingerprintSha256 ?? "",
-        ),
+        /^[a-f0-9]{64}$/u.test(entry.currentRuntimeFingerprintSha256 ?? ""),
       ),
     ).toBe(true);
     await expect(
       verifyCapabilityIndex({ repositoryRoot: process.cwd() }),
-    ).resolves.toEqual({
-      verified: true,
-      indexPath: "docs/smoke/evidence/capabilities.json",
-      entryCount: 8,
-      legacyEntryCount: 0,
-    });
+    ).rejects.toThrow(/capability qualification/iu);
   });
 });

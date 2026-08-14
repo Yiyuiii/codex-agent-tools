@@ -284,7 +284,7 @@ describe("child environment", () => {
         API_KEY_DOUBAO_CODING: "ark-local",
         ANTHROPIC_API_KEY: "forbidden",
         OPENAI_API_KEY: "forbidden",
-        DEEPSEEK_API_KEY: "forbidden",
+        OPENAI_API_KEY_DEEPSEEK: "forbidden",
         GEMINI_API_KEY: "forbidden",
         KIMI_API_KEY: "forbidden",
         HTTPS_PROXY: "http://parent:9999",

@@ -8,6 +8,7 @@ import { execa } from "execa";
 import { locateKimi } from "../adapters/kimi/locator.js";
 import {
   buildIsolatedPiConfig,
+  type BuildIsolatedPiConfigOptions,
   type IsolatedPiConfig,
 } from "../adapters/pi/config.js";
 import {
@@ -35,17 +36,23 @@ export const DOCTOR_QUALIFIED_LLM_IDS = Object.freeze([
   "kimi-k3",
 ] as const);
 
+export const DOCTOR_LLM_IDS = Object.freeze([
+  "deepseek-v4-flash",
+  ...DOCTOR_QUALIFIED_LLM_IDS,
+] as const);
+
 export const DOCTOR_CHECK_NAMES = Object.freeze([
   "Host runtime",
   "Kimi executable",
   "Pi executable",
   "Pi isolated config",
-  "Ark Pi models",
+  "Pi models",
   "Windows native helper",
   "Ark Coding authentication",
   "Ark Agent authentication",
+  "DeepSeek authentication",
   "Public MCP tools",
-  ...DOCTOR_QUALIFIED_LLM_IDS.map((id) => `LLM ${id}` as const),
+  ...DOCTOR_LLM_IDS.map((id) => `LLM ${id}` as const),
 ] as const);
 
 export interface DoctorCheck {
@@ -82,7 +89,9 @@ export interface CollectDoctorOptions {
   readonly locateKimiExecutable?: () => Promise<string>;
   readonly locatePiExecutable?: () => Promise<string>;
   readonly locatePiInvocation?: () => Promise<PiInvocation>;
-  readonly buildPiConfig?: () => Promise<IsolatedPiConfig>;
+  readonly buildPiConfig?: (
+    options: BuildIsolatedPiConfigOptions,
+  ) => Promise<IsolatedPiConfig>;
   readonly resolveWindowsJobHelper?: () => Promise<ResolvedWindowsJobHelper>;
   readonly runWindowsJobHelperProbe?: (
     request: WindowsJobHelperProbeRequest,
@@ -109,8 +118,9 @@ async function defaultRunWindowsJobHelperProbe(
 
 function secretValues(environment: NodeJS.ProcessEnv): string[] {
   return Object.entries(environment)
-    .filter(([name, value]) =>
-      /(?:KEY|TOKEN|SECRET|PASSWORD|AUTH)/iu.test(name) && Boolean(value),
+    .filter(
+      ([name, value]) =>
+        /(?:KEY|TOKEN|SECRET|PASSWORD|AUTH)/iu.test(name) && Boolean(value),
     )
     .map(([, value]) => value!)
     .filter((value) => value.trim() !== "");
@@ -140,10 +150,7 @@ function limitedDetail(value: string, secrets: readonly string[]): string {
     : `${redacted.slice(0, 1_000)}[TRUNCATED]`;
 }
 
-function executableName(
-  executable: string,
-  platform: NodeJS.Platform,
-): string {
+function executableName(executable: string, platform: NodeJS.Platform): string {
   return platform === "win32"
     ? path.win32.basename(executable)
     : path.posix.basename(executable);
@@ -161,8 +168,7 @@ function assertPiInvocation(invocation: PiInvocation): void {
     invocation.argvPrefix.length !== 1 ||
     invocation.argvPrefix[0].trim() === "" ||
     invocation.argvPrefix[0].includes("\0") ||
-    invocation.identity.packageName !==
-      "@earendil-works/pi-coding-agent" ||
+    invocation.identity.packageName !== "@earendil-works/pi-coding-agent" ||
     !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(
       invocation.identity.packageVersion,
     ) ||
@@ -183,12 +189,40 @@ function nodeMajor(version: string): number | undefined {
   return Number.isSafeInteger(major) ? major : undefined;
 }
 
-const EXPECTED_ARK_MODELS = new Map([
-  ["ark-agent-plan", ["ark-code-latest", "deepseek-v4-flash"]],
-  ["ark-coding-plan", ["ark-code-latest"]],
-]);
+const EXPECTED_PI_PROVIDERS = new Map([
+  [
+    "ark-agent-plan",
+    {
+      api: "anthropic-messages",
+      apiKey: "$CODEX_AGENT_ARK_AGENT_KEY",
+      baseUrl: "https://ark.cn-beijing.volces.com/api/plan",
+      models: ["ark-code-latest", "deepseek-v4-flash"],
+    },
+  ],
+  [
+    "ark-coding-plan",
+    {
+      api: "anthropic-messages",
+      apiKey: "$CODEX_AGENT_ARK_CODING_KEY",
+      baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
+      models: ["ark-code-latest"],
+    },
+  ],
+  [
+    "deepseek",
+    {
+      api: "openai-completions",
+      apiKey: "$CODEX_AGENT_DEEPSEEK_KEY",
+      baseUrl: "https://api.deepseek.com",
+      models: ["deepseek-v4-flash"],
+    },
+  ],
+] as const);
 
-async function validateArkPiConfig(config: IsolatedPiConfig): Promise<void> {
+async function validatePiConfig(
+  config: IsolatedPiConfig,
+  providerSet: "ark" | "deepseek",
+): Promise<void> {
   const [settingsText, modelsText] = await Promise.all([
     readFile(config.settingsPath, "utf8"),
     readFile(config.modelsPath, "utf8"),
@@ -214,27 +248,29 @@ async function validateArkPiConfig(config: IsolatedPiConfig): Promise<void> {
     >;
   };
   const providers = root.providers ?? {};
+  const expectedProviderNames: readonly (
+    "ark-agent-plan" | "ark-coding-plan" | "deepseek"
+  )[] =
+    providerSet === "ark"
+      ? ["ark-agent-plan", "ark-coding-plan"]
+      : ["deepseek"];
   if (
     JSON.stringify(Object.keys(providers).sort()) !==
-    JSON.stringify([...EXPECTED_ARK_MODELS.keys()].sort())
+    JSON.stringify([...expectedProviderNames].sort())
   ) {
-    throw new Error("isolated Pi Ark provider set mismatch");
+    throw new Error("isolated Pi provider set mismatch");
   }
 
-  for (const [providerName, expectedModels] of EXPECTED_ARK_MODELS) {
+  for (const providerName of expectedProviderNames) {
+    const expected = EXPECTED_PI_PROVIDERS.get(providerName);
+    if (expected === undefined) {
+      throw new Error("isolated Pi expected provider is invalid");
+    }
     const provider = providers[providerName];
-    const expectedBaseUrl =
-      providerName === "ark-coding-plan"
-        ? "https://ark.cn-beijing.volces.com/api/coding"
-        : "https://ark.cn-beijing.volces.com/api/plan";
-    const expectedKey =
-      providerName === "ark-coding-plan"
-        ? "$CODEX_AGENT_ARK_CODING_KEY"
-        : "$CODEX_AGENT_ARK_AGENT_KEY";
     if (
-      provider?.api !== "anthropic-messages" ||
-      provider.apiKey !== expectedKey ||
-      provider.baseUrl !== expectedBaseUrl
+      provider?.api !== expected.api ||
+      provider.apiKey !== expected.apiKey ||
+      provider.baseUrl !== expected.baseUrl
     ) {
       throw new Error(
         `isolated Pi ${providerName} endpoint or protocol mismatch`,
@@ -246,7 +282,7 @@ async function validateArkPiConfig(config: IsolatedPiConfig): Promise<void> {
       .sort();
     if (
       JSON.stringify(actualModels) !==
-      JSON.stringify([...expectedModels].sort())
+      JSON.stringify([...expected.models].sort())
     ) {
       throw new Error(`isolated Pi ${providerName} model set mismatch`);
     }
@@ -270,9 +306,7 @@ export async function collectDoctorReport(
   const locateStrictPiInvocation =
     options.locatePiInvocation ??
     (() => locatePiInvocation({ environment, platform }));
-  const buildPiConfig =
-    options.buildPiConfig ??
-    (() => buildIsolatedPiConfig({ version: VERSION, providers: ["ark"] }));
+  const buildPiConfig = options.buildPiConfig ?? buildIsolatedPiConfig;
   const resolveWindowsJobHelper =
     options.resolveWindowsJobHelper ?? resolveDefaultWindowsJobHelper;
   const runWindowsJobHelperProbe =
@@ -351,14 +385,23 @@ export async function collectDoctorReport(
     });
   }
 
-  let piConfig: IsolatedPiConfig | undefined;
+  let piConfigs:
+    | Readonly<{
+        ark: IsolatedPiConfig;
+        deepseek: IsolatedPiConfig;
+      }>
+    | undefined;
   try {
-    piConfig = await buildPiConfig();
+    const [ark, deepseek] = await Promise.all([
+      buildPiConfig({ version: VERSION, providers: ["ark"] }),
+      buildPiConfig({ version: VERSION, providers: ["deepseek"] }),
+    ]);
+    piConfigs = Object.freeze({ ark, deepseek });
     checks.push({
       name: "Pi isolated config",
       ok: true,
       level: "ok",
-      detail: `generated; sha256=${piConfig.contentSha256.slice(0, 12)}`,
+      detail: `generated; arkSha256=${ark.contentSha256.slice(0, 12)}; deepseekSha256=${deepseek.contentSha256.slice(0, 12)}`,
     });
   } catch (error) {
     checks.push({
@@ -372,25 +415,29 @@ export async function collectDoctorReport(
     });
   }
 
-  if (piConfig === undefined) {
+  if (piConfigs === undefined) {
     checks.push({
-      name: "Ark Pi models",
+      name: "Pi models",
       ok: false,
       level: "error",
       detail: "isolated Pi configuration unavailable",
     });
   } else {
     try {
-      await validateArkPiConfig(piConfig);
+      await Promise.all([
+        validatePiConfig(piConfigs.ark, "ark"),
+        validatePiConfig(piConfigs.deepseek, "deepseek"),
+      ]);
       checks.push({
-        name: "Ark Pi models",
+        name: "Pi models",
         ok: true,
         level: "ok",
-        detail: `static routes passed; providers=2; models=3; sha256=${piConfig.contentSha256.slice(0, 12)}`,
+        detail:
+          "static routes passed; isolated provider sets=2; providers=3; models=4",
       });
     } catch (error) {
       checks.push({
-        name: "Ark Pi models",
+        name: "Pi models",
         ok: false,
         level: "error",
         detail: limitedDetail(
@@ -469,6 +516,7 @@ export async function collectDoctorReport(
   for (const [name, id] of [
     ["Ark Coding authentication", "ark-coding-plan"],
     ["Ark Agent authentication", "ark-agent-plan"],
+    ["DeepSeek authentication", "deepseek-v4-flash"],
   ] as const) {
     const profile = resolveLlm(id);
     try {
@@ -518,7 +566,7 @@ export async function collectDoctorReport(
     });
   }
 
-  for (const id of DOCTOR_QUALIFIED_LLM_IDS) {
+  for (const id of DOCTOR_LLM_IDS) {
     const profile = resolveLlm(id);
     const review = profile.qualityGates.review.status;
     const delegate = profile.qualityGates.delegate.status;

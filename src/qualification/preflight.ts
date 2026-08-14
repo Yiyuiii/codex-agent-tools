@@ -18,7 +18,11 @@ import {
   assertAuthorizationReferenceUnused,
   freezePreflightRecord,
 } from "./manifest.js";
-import { ACTIVE_QUALIFICATION_PLAN_ID } from "./protocol.js";
+import {
+  ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+  type CurrentQualificationPlanId,
+} from "./protocol.js";
 import type {
   BuildArtifactIdentity,
   CurrentFrozenPreflightRecord,
@@ -40,11 +44,20 @@ export const QUALIFICATION_BUILD_ARTIFACT_PATHS = Object.freeze([
   "dist/smoke-evidence.js",
   "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
 ] as const);
+export const DIRECT_DEEPSEEK_QUALIFICATION_BUILD_ARTIFACT_PATHS =
+  Object.freeze([
+    "dist/deepseek-smoke.js",
+    "dist/smoke-evidence.js",
+    "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+  ] as const);
 const CURRENT_QUALIFICATION_LLM_IDS = Object.freeze([
   "ark-agent-deepseek-v4-flash",
   "ark-agent-plan",
   "ark-coding-plan",
   "kimi-k3",
+] as const);
+const DIRECT_DEEPSEEK_QUALIFICATION_LLM_IDS = Object.freeze([
+  "deepseek-v4-flash",
 ] as const);
 export const QUALIFICATION_MAX_BUILD_ARTIFACT_BYTES = 32 * 1_048_576;
 
@@ -104,6 +117,7 @@ export interface QualificationPreflightOptions {
   authorizationReferenceSha256: string;
   lockDirectory: string;
   currentOwnerNonce: string;
+  qualificationPlanId?: CurrentQualificationPlanId;
 }
 
 export interface QualificationPreflightDependencies {
@@ -116,7 +130,9 @@ export interface QualificationPreflightDependencies {
   locatePosixPiExecutable?: () => Promise<string>;
   createTemporaryCodexHome?: () => Promise<string>;
   removeTemporaryCodexHome?: (directory: string) => Promise<void>;
-  buildQualificationPiConfig?: () => Promise<{
+  buildQualificationPiConfig?: (
+    qualificationPlanId: CurrentQualificationPlanId,
+  ) => Promise<{
     contentSha256: string;
   }>;
   assertAuthorizationUnused?: (options: {
@@ -354,12 +370,15 @@ async function readStableRepositoryFile(
 
 function normalizeBuildArtifacts(
   artifacts: readonly BuildArtifactIdentity[],
+  qualificationPlanId: CurrentQualificationPlanId =
+    ACTIVE_QUALIFICATION_PLAN_ID,
 ): readonly BuildArtifactIdentity[] {
+  const expectedPaths = qualificationBuildArtifactPaths(qualificationPlanId);
   if (
-    artifacts.length !== QUALIFICATION_BUILD_ARTIFACT_PATHS.length ||
+    artifacts.length !== expectedPaths.length ||
     artifacts.some(
       (artifact, index) =>
-        artifact.path !== QUALIFICATION_BUILD_ARTIFACT_PATHS[index] ||
+        artifact.path !== expectedPaths[index] ||
         !SHA256_PATTERN.test(artifact.sha256),
     )
   ) {
@@ -374,17 +393,35 @@ function normalizeBuildArtifacts(
 
 export function computeQualificationBuildIdentitySha256(
   artifacts: readonly BuildArtifactIdentity[],
+  qualificationPlanId: CurrentQualificationPlanId =
+    ACTIVE_QUALIFICATION_PLAN_ID,
 ): string {
-  const normalized = normalizeBuildArtifacts(artifacts);
+  const normalized = normalizeBuildArtifacts(artifacts, qualificationPlanId);
   return sha256(JSON.stringify(normalized));
+}
+
+export function qualificationBuildArtifactPaths(
+  qualificationPlanId: CurrentQualificationPlanId,
+): readonly string[] {
+  if (qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID) {
+    return QUALIFICATION_BUILD_ARTIFACT_PATHS;
+  }
+  if (qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID) {
+    return DIRECT_DEEPSEEK_QUALIFICATION_BUILD_ARTIFACT_PATHS;
+  }
+  throw new QualificationPreflightError("build_initial");
 }
 
 export async function collectQualificationBuildIdentity(
   repositoryRoot: string,
+  qualificationPlanId: CurrentQualificationPlanId =
+    ACTIVE_QUALIFICATION_PLAN_ID,
 ): Promise<QualificationBuildIdentity> {
   try {
     const artifacts: BuildArtifactIdentity[] = [];
-    for (const relativePath of QUALIFICATION_BUILD_ARTIFACT_PATHS) {
+    for (const relativePath of qualificationBuildArtifactPaths(
+      qualificationPlanId,
+    )) {
       const file = await readStableRepositoryFile(
         repositoryRoot,
         relativePath,
@@ -394,11 +431,17 @@ export async function collectQualificationBuildIdentity(
         Object.freeze({ path: relativePath, sha256: file.sha256 }),
       );
     }
-    const buildArtifacts = normalizeBuildArtifacts(artifacts);
+    const buildArtifacts = normalizeBuildArtifacts(
+      artifacts,
+      qualificationPlanId,
+    );
     return Object.freeze({
       buildArtifacts,
       buildIdentitySha256:
-        computeQualificationBuildIdentitySha256(buildArtifacts),
+        computeQualificationBuildIdentitySha256(
+          buildArtifacts,
+          qualificationPlanId,
+        ),
     });
   } catch (error) {
     if (error instanceof QualificationPreflightError) throw error;
@@ -691,19 +734,28 @@ function assertWindowsPiInvocation(value: unknown): void {
 }
 
 async function assertStaticLocators(options: {
+  qualificationPlanId: CurrentQualificationPlanId;
   platform: NodeJS.Platform;
   locateKimiExecutable: () => Promise<string>;
   locatePiInvocation: () => Promise<PiInvocation>;
   locatePosixPiExecutable: () => Promise<string>;
 }): Promise<void> {
   await inStage("locators", async () => {
-    const [kimiExecutable, piLaunch] = await Promise.all([
-      options.locateKimiExecutable(),
+    const locatePiLaunch = () =>
       options.platform === "win32"
         ? options.locatePiInvocation()
-        : options.locatePosixPiExecutable(),
-    ]);
-    safeSingleLine(kimiExecutable, "locators", 32_768);
+        : options.locatePosixPiExecutable();
+    let piLaunch: PiInvocation | string;
+    if (options.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID) {
+      const [kimiExecutable, activePiLaunch] = await Promise.all([
+        options.locateKimiExecutable(),
+        locatePiLaunch(),
+      ]);
+      safeSingleLine(kimiExecutable, "locators", 32_768);
+      piLaunch = activePiLaunch;
+    } else {
+      piLaunch = await locatePiLaunch();
+    }
     if (options.platform === "win32") {
       assertWindowsPiInvocation(piLaunch);
     } else {
@@ -728,14 +780,21 @@ function selectedCredentialName(
   return null;
 }
 
-function collectFixedIdentities(environment: NodeJS.ProcessEnv): {
+function collectFixedIdentities(
+  environment: NodeJS.ProcessEnv,
+  qualificationPlanId: CurrentQualificationPlanId,
+): {
   logicalLlms: readonly FrozenLogicalLlmIdentity[];
   credentialMatches: readonly FrozenCredentialMatch[];
 } {
   const logicalLlms: FrozenLogicalLlmIdentity[] = [];
   const credentialMatches: FrozenCredentialMatch[] = [];
   let missingCredentials = 0;
-  for (const llm of CURRENT_QUALIFICATION_LLM_IDS) {
+  const logicalLlmIds =
+    qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+      ? DIRECT_DEEPSEEK_QUALIFICATION_LLM_IDS
+      : CURRENT_QUALIFICATION_LLM_IDS;
+  for (const llm of logicalLlmIds) {
     const profile = resolveLlm(llm);
     logicalLlms.push(
       Object.freeze({
@@ -784,10 +843,22 @@ function validateInput(options: QualificationPreflightOptions): void {
     options.lockDirectory.trim() === "" ||
     !path.isAbsolute(options.lockDirectory) ||
     typeof options.currentOwnerNonce !== "string" ||
-    !UUID_PATTERN.test(options.currentOwnerNonce)
+    !UUID_PATTERN.test(options.currentOwnerNonce) ||
+    (options.qualificationPlanId !== undefined &&
+      options.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID &&
+      options.qualificationPlanId !==
+        DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID)
   ) {
     throw new QualificationPreflightError("input");
   }
+}
+
+function planForFrozenPreflight(
+  preflight: FrozenPreflightRecord,
+): CurrentQualificationPlanId {
+  return preflight.schemaVersion === 3
+    ? preflight.qualificationPlanId
+    : ACTIVE_QUALIFICATION_PLAN_ID;
 }
 
 function validBatchId(value: string): boolean {
@@ -802,17 +873,22 @@ function validBatchId(value: string): boolean {
 
 async function collectQualificationPiConfigSha256(
   dependencies: QualificationPreflightDependencies,
+  qualificationPlanId: CurrentQualificationPlanId,
 ): Promise<string> {
   return inStage("pi_config", async () => {
     const config = await (
       dependencies.buildQualificationPiConfig ??
-      (() =>
+      ((selectedPlanId) =>
         buildIsolatedPiConfig({
           version: VERSION,
-          providers: ["ark"],
+          providers: [
+            selectedPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+              ? "deepseek"
+              : "ark",
+          ],
           qualification: true,
         }))
-    )();
+    )(qualificationPlanId);
     if (!SHA256_PATTERN.test(config.contentSha256)) {
       throw new QualificationPreflightError("pi_config");
     }
@@ -859,6 +935,7 @@ export async function assertQualificationFrozenCandidate(
       throw new QualificationPreflightError("frozen_candidate");
     }
     const preflight = freezePreflightRecord(options.preflight);
+    const qualificationPlanId = planForFrozenPreflight(preflight);
     const repositoryRoot = path.resolve(options.repositoryRoot);
     const environment = dependencies.environment ?? process.env;
     const runner = dependencies.runCommand ?? defaultCommandRunner;
@@ -893,7 +970,10 @@ export async function assertQualificationFrozenCandidate(
     }
     let currentBuild: QualificationBuildIdentity;
     try {
-      currentBuild = await collectQualificationBuildIdentity(repositoryRoot);
+      currentBuild = await collectQualificationBuildIdentity(
+        repositoryRoot,
+        qualificationPlanId,
+      );
     } catch {
       throw new QualificationPreflightError("frozen_candidate");
     }
@@ -936,6 +1016,7 @@ export const assertQualificationCandidateUnchanged =
 export async function collectQualificationCurrentSnapshot(
   options: {
     repositoryRoot: string;
+    qualificationPlanId?: CurrentQualificationPlanId;
   },
   dependencies: QualificationPreflightDependencies = {},
 ): Promise<QualificationCurrentSnapshot> {
@@ -947,6 +1028,14 @@ export async function collectQualificationCurrentSnapshot(
       throw new QualificationPreflightError("current_snapshot");
     }
     const repositoryRoot = path.resolve(options.repositoryRoot);
+    const qualificationPlanId =
+      options.qualificationPlanId ?? ACTIVE_QUALIFICATION_PLAN_ID;
+    if (
+      qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID &&
+      qualificationPlanId !== DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+    ) {
+      throw new QualificationPreflightError("current_snapshot");
+    }
     const environment = dependencies.environment ?? process.env;
     const platform = dependencies.platform ?? process.platform;
     const runner = dependencies.runCommand ?? defaultCommandRunner;
@@ -971,11 +1060,15 @@ export async function collectQualificationCurrentSnapshot(
     const packageIdentity = await readPackageIdentity(repositoryRoot);
     let buildIdentity: QualificationBuildIdentity;
     try {
-      buildIdentity = await collectQualificationBuildIdentity(repositoryRoot);
+      buildIdentity = await collectQualificationBuildIdentity(
+        repositoryRoot,
+        qualificationPlanId,
+      );
     } catch {
       throw new QualificationPreflightError("current_snapshot");
     }
     await assertStaticLocators({
+      qualificationPlanId,
       platform,
       locateKimiExecutable:
         dependencies.locateKimiExecutable ??
@@ -999,8 +1092,14 @@ export async function collectQualificationCurrentSnapshot(
         defaultRemoveTemporaryCodexHome,
     });
     const piConfigSha256 =
-      await collectQualificationPiConfigSha256(dependencies);
-    const identities = collectFixedIdentities(environment);
+      await collectQualificationPiConfigSha256(
+        dependencies,
+        qualificationPlanId,
+      );
+    const identities = collectFixedIdentities(
+      environment,
+      qualificationPlanId,
+    );
     return Object.freeze({
       repositoryCommit: commit,
       packageVersion: packageIdentity.packageVersion,
@@ -1021,6 +1120,8 @@ export async function runQualificationPreflight(
 ): Promise<CurrentFrozenPreflightRecord> {
   validateInput(options);
   const repositoryRoot = path.resolve(options.repositoryRoot);
+  const qualificationPlanId =
+    options.qualificationPlanId ?? ACTIVE_QUALIFICATION_PLAN_ID;
   const environment = dependencies.environment ?? process.env;
   const platform = dependencies.platform ?? process.platform;
   const runner = dependencies.runCommand ?? defaultCommandRunner;
@@ -1037,9 +1138,10 @@ export async function runQualificationPreflight(
   );
   const packageIdentity = await readPackageIdentity(repositoryRoot);
   const initialBuild = await inStage("build_initial", () =>
-    collectQualificationBuildIdentity(repositoryRoot),
+    collectQualificationBuildIdentity(repositoryRoot, qualificationPlanId),
   );
   await assertStaticLocators({
+    qualificationPlanId,
     platform,
     locateKimiExecutable:
       dependencies.locateKimiExecutable ??
@@ -1061,9 +1163,12 @@ export async function runQualificationPreflight(
     removeTemporaryCodexHome:
       dependencies.removeTemporaryCodexHome ?? defaultRemoveTemporaryCodexHome,
   });
-  const piConfigSha256 = await collectQualificationPiConfigSha256(dependencies);
+  const piConfigSha256 = await collectQualificationPiConfigSha256(
+    dependencies,
+    qualificationPlanId,
+  );
   const fixedIdentities = await inStage("credentials", async () =>
-    collectFixedIdentities(environment),
+    collectFixedIdentities(environment, qualificationPlanId),
   );
   await inStage("authorization", () =>
     assertAuthorizationUnused({
@@ -1100,7 +1205,10 @@ export async function runQualificationPreflight(
   }
   const finalBuild = await inStage("build_final", async () => {
     try {
-      return await collectQualificationBuildIdentity(repositoryRoot);
+      return await collectQualificationBuildIdentity(
+        repositoryRoot,
+        qualificationPlanId,
+      );
     } catch {
       throw new QualificationPreflightError("build_final");
     }
@@ -1121,7 +1229,7 @@ export async function runQualificationPreflight(
   return inStage("record", async () => {
     const preflight = freezePreflightRecord({
       schemaVersion: 3,
-      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      qualificationPlanId,
       repositoryCommit: initialRepository.commit,
       repositoryBranch: initialRepository.branch,
       repositoryDirty: false,

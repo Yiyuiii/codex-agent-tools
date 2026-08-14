@@ -4,17 +4,17 @@
 
 当前 Ark 公开面共有三项固定 Pi/direct 路线：
 
-- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；delegate/review 均由当前批次的精确 passed case 支持。
-- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；review/delegate 均由当前批次的精确 passed case 支持。
-- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；review/delegate 均由当前批次的精确 passed case 支持，不再使用 legacy evidence。
+- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；delegate/review 的历史 passed case 仍有效，当前开发候选的运行时指纹 stale。
+- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；review/delegate 的历史 passed case 仍有效，当前开发候选的运行时指纹 stale。
+- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；review/delegate 不使用 legacy evidence，历史 passed case 仍有效，当前开发候选的运行时指纹 stale。
 
-现行公共调用省略 `timeoutMs` 时，三条 Ark/Pi 路线都不设置模型执行 deadline；只有调用方显式传入的单次值会建立 deadline。Pi 生产路径的原生 retry 保持不变，资格模式仍单独执行 single-attempt、零 retry/fallback。项目不给 Pi 或其外部 CLI 设置全局/default 模型能力上限。现行 `capabilities.json` 已由新 passed evidence 更新，历史 batch manifest 与 case evidence 永久不可变。
+现行公共调用省略 `timeoutMs` 时，三条 Ark/Pi 路线都不设置模型执行 deadline；只有调用方显式传入的单次值会建立 deadline。Pi 生产路径的原生 retry 保持不变，资格模式仍单独执行 single-attempt、零 retry/fallback。项目不给 Pi 或其外部 CLI 设置全局/default 模型能力上限。现行 `capabilities.json` 仍保留已发布 `0.1.1` 的 passed evidence，历史 batch manifest 与 case evidence永久不可变；共享资格输入变化使当前开发候选的六项 Ark 指纹 stale。
 
 最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`。六项 Ark case 的模型、provider、direct route、凭据隔离、single-attempt、零 retry/fallback 与 owned process drain 均符合合同并全部 passed；整个八项批次为 `passed`、`promotionEligible=true`。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
 
 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的 `ark-agent-plan` 配额池。2026-07-20 对旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 完成的四项 passed 证据现仅作为历史事实保留，不属于当前公开面，也不得用于晋级两个新 Agent Plan 路线。原始 evidence JSON 保持不变。
 
-Gemini 退役后，活动产品面共有四个逻辑 LLM、八项能力。资格单位是精确的逻辑 LLM × 任务；[`capabilities.json`](evidence/capabilities.json) 由 verifier 比较 evidence 哈希、case 身份、registry anchor 与运行时指纹，当前结果为 8 current / 0 legacy。
+Gemini 退役后的已发布 `0.1.1` 共有四个逻辑 LLM、八项能力。当前开发候选另登记 Direct `deepseek-v4-flash`，最终目标为五个逻辑 LLM、十项能力。资格单位仍是精确的逻辑 LLM × 任务；[`capabilities.json`](evidence/capabilities.json) 由 verifier 比较 evidence 哈希、case 身份、registry anchor 与运行时指纹。候选当前为旧八项 evidence valid / fingerprint stale，Direct 两项 pending；详情见 [Direct DeepSeek 接入状态](deepseek.md)。
 
 2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据。后续真实批次由单个 `functions.exec` cell 正常承载到协调器终态，证明控制层承载路径有效，但不证明四小时存活。执行边界见[承载手册](../release/four-llm-qualification-execution-runbook.md)，演练事实见[承载演练报告](../release/qualification-carrier-rehearsal.md)。当时的历史闭包为 221 files / 17 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。该历史闭包不改变任何 Ark 路由、证据或资格状态，也不表示已经发布或安装。
 

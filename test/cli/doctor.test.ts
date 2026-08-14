@@ -16,7 +16,7 @@ import {
 
 let tempDirectory: string;
 
-interface ArkModelsDocument {
+interface PiModelsDocument {
   providers: Record<
     string,
     {
@@ -45,6 +45,7 @@ function windowsOptions(
       SystemRoot: "C:\\Windows",
       API_KEY_DOUBAO_CODING: "coding-secret",
       OPENAI_API_KEY_DOUBAO: "agent-secret",
+      OPENAI_API_KEY_DEEPSEEK: "deepseek-secret",
     },
     platform: "win32",
     architecture: "x64",
@@ -64,11 +65,10 @@ function windowsOptions(
         nodeEngine: ">=24.0.0",
       },
     }),
-    buildPiConfig: () =>
+    buildPiConfig: (options) =>
       buildIsolatedPiConfig({
+        ...options,
         root: tempDirectory,
-        version: "0.1.0",
-        providers: ["ark"],
       }),
     resolveWindowsJobHelper: async () => ({
       executablePath:
@@ -83,22 +83,20 @@ function windowsOptions(
 describe("doctor diagnostics", () => {
   it("performs only static target checks and one targetless Windows helper probe", async () => {
     const secret = "must-not-appear";
-    const locateKimiExecutable = vi.fn(async () =>
-      "C:\\Users\\private-user\\.kimi-code\\bin\\kimi.exe",
+    const locateKimiExecutable = vi.fn(
+      async () => "C:\\Users\\private-user\\.kimi-code\\bin\\kimi.exe",
     );
-    const locatePiInvocation = vi.fn(
-      async (): Promise<PiInvocation> => ({
-        executable: process.execPath,
-        argvPrefix: [
-          "C:\\Users\\private-user\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\cli.js",
-        ] as const,
-        identity: {
-          packageName: "@earendil-works/pi-coding-agent",
-          packageVersion: "0.80.10",
-          nodeEngine: ">=24.0.0",
-        },
-      }),
-    );
+    const locatePiInvocation = vi.fn(async (): Promise<PiInvocation> => ({
+      executable: process.execPath,
+      argvPrefix: [
+        "C:\\Users\\private-user\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\cli.js",
+      ] as const,
+      identity: {
+        packageName: "@earendil-works/pi-coding-agent",
+        packageVersion: "0.80.10",
+        nodeEngine: ">=24.0.0",
+      },
+    }));
     const runWindowsJobHelperProbe = vi.fn(
       async (_request: WindowsJobHelperProbeRequest) => ({
         ok: true,
@@ -114,6 +112,7 @@ describe("doctor diagnostics", () => {
           SOME_SECRET: secret,
           api_key_doubao_coding: "local-ark-coding-secret",
           OpenAI_API_KEY_DOUBAO: "agent-ark-secret",
+          openai_api_key_deepseek: "direct-deepseek-secret",
         },
         locateKimiExecutable,
         locatePiInvocation,
@@ -157,7 +156,7 @@ describe("doctor diagnostics", () => {
       "strict locator passed; package=@earendil-works/pi-coding-agent@0.80.10; node=>=24.0.0",
     );
     expect(
-      report.checks.find(({ name }) => name === "Ark Pi models"),
+      report.checks.find(({ name }) => name === "Pi models"),
     ).toMatchObject({ ok: true, level: "ok" });
     expect(
       report.checks.find(({ name }) => name === "Windows native helper"),
@@ -169,9 +168,9 @@ describe("doctor diagnostics", () => {
     expect(
       report.checks.find(({ name }) => name === "Public MCP tools")?.detail,
     ).toBe("external_review, external_delegate");
-    expect(report.checks.filter(({ name }) => name.startsWith("LLM "))).toHaveLength(
-      4,
-    );
+    expect(
+      report.checks.filter(({ name }) => name.startsWith("LLM ")),
+    ).toHaveLength(5);
     expect(
       report.checks.some(({ name }) =>
         ["Kimi version", "Kimi authentication", "Pi version"].includes(name),
@@ -194,6 +193,7 @@ describe("doctor diagnostics", () => {
       environment: {
         ARK_API_KEY: "coding",
         OPENAI_API_KEY_DOUBAO: "agent",
+        OPENAI_API_KEY_DEEPSEEK: "deepseek",
       },
       platform: "linux",
       architecture: "arm64",
@@ -205,11 +205,10 @@ describe("doctor diagnostics", () => {
       locatePiInvocation: async () => {
         throw new Error("must not use Windows invocation on POSIX");
       },
-      buildPiConfig: () =>
+      buildPiConfig: (options) =>
         buildIsolatedPiConfig({
+          ...options,
           root: tempDirectory,
-          version: "posix",
-          providers: ["ark"],
         }),
       resolveWindowsJobHelper,
       runWindowsJobHelperProbe,
@@ -227,7 +226,9 @@ describe("doctor diagnostics", () => {
       level: "warn",
       detail: "not applicable on linux",
     });
-    expect(report.checks.filter(({ level }) => level === "warn")).toHaveLength(1);
+    expect(report.checks.filter(({ level }) => level === "warn")).toHaveLength(
+      2,
+    );
   });
 
   it("fails closed for an unsupported Windows host before resolving the helper", async () => {
@@ -260,6 +261,7 @@ describe("doctor diagnostics", () => {
         environment: {
           ARK_API_KEY: "coding",
           OPENAI_API_KEY_DOUBAO: "agent",
+          OPENAI_API_KEY_DEEPSEEK: "deepseek",
           HELPER_AUTH_TOKEN: secret,
         },
         runWindowsJobHelperProbe: async () => ({
@@ -278,23 +280,24 @@ describe("doctor diagnostics", () => {
     expect(helper?.detail).toBe("Windows job helper probe failed");
   });
 
-  it("rejects an Ark config whose content no longer matches its generated hash", async () => {
+  it("rejects a Pi config whose content no longer matches its generated hash", async () => {
     const report = await collectDoctorReport(
       windowsOptions({
-        buildPiConfig: async () => {
+        buildPiConfig: async (options) => {
           const config = await buildIsolatedPiConfig({
+            ...options,
             root: tempDirectory,
-            version: "drift-test",
-            providers: ["ark"],
           });
-          await writeFile(config.modelsPath, '{"providers":{}}\n', "utf8");
+          if (options.providers[0] === "deepseek") {
+            await writeFile(config.modelsPath, '{"providers":{}}\n', "utf8");
+          }
           return config;
         },
       }),
     );
 
     expect(
-      report.checks.find(({ name }) => name === "Ark Pi models"),
+      report.checks.find(({ name }) => name === "Pi models"),
     ).toMatchObject({
       ok: false,
       level: "error",
@@ -305,26 +308,26 @@ describe("doctor diagnostics", () => {
   it.each([
     [
       "endpoint",
-      (models: ArkModelsDocument) => {
+      (models: PiModelsDocument) => {
         models.providers["ark-coding-plan"]!.baseUrl =
           "https://example.invalid/coding";
       },
     ],
     [
       "protocol",
-      (models: ArkModelsDocument) => {
+      (models: PiModelsDocument) => {
         models.providers["ark-coding-plan"]!.api = "openai-responses";
       },
     ],
     [
       "credential target",
-      (models: ArkModelsDocument) => {
+      (models: PiModelsDocument) => {
         models.providers["ark-agent-plan"]!.apiKey = "$WRONG_KEY";
       },
     ],
     [
       "provider set",
-      (models: ArkModelsDocument) => {
+      (models: PiModelsDocument) => {
         models.providers["ark-rogue"] = {
           api: "anthropic-messages",
           apiKey: "$CODEX_AGENT_ARK_CODING_KEY",
@@ -335,22 +338,35 @@ describe("doctor diagnostics", () => {
     ],
     [
       "model set",
-      (models: ArkModelsDocument) => {
+      (models: PiModelsDocument) => {
         models.providers["ark-agent-plan"]!.models.push({ id: "rogue-model" });
       },
     ],
-  ])("rejects hash-consistent Ark %s drift", async (name, mutate) => {
+    [
+      "DeepSeek endpoint",
+      (models: PiModelsDocument) => {
+        models.providers.deepseek!.baseUrl = "https://example.invalid/v1";
+      },
+    ],
+    [
+      "DeepSeek model set",
+      (models: PiModelsDocument) => {
+        models.providers.deepseek!.models.push({ id: "deepseek-chat" });
+      },
+    ],
+  ])("rejects hash-consistent Pi %s drift", async (name, mutate) => {
+    const targetProviderSet = name.startsWith("DeepSeek") ? "deepseek" : "ark";
     const report = await collectDoctorReport(
       windowsOptions({
-        buildPiConfig: async () => {
+        buildPiConfig: async (options) => {
           const config = await buildIsolatedPiConfig({
+            ...options,
             root: tempDirectory,
-            version: `self-consistent-${name.replaceAll(" ", "-")}`,
-            providers: ["ark"],
           });
+          if (options.providers[0] !== targetProviderSet) return config;
           const models = JSON.parse(
             await readFile(config.modelsPath, "utf8"),
-          ) as ArkModelsDocument;
+          ) as PiModelsDocument;
           mutate(models);
           const modelsText = `${JSON.stringify(models, null, 2)}\n`;
           await writeFile(config.modelsPath, modelsText, "utf8");
@@ -368,7 +384,7 @@ describe("doctor diagnostics", () => {
     );
 
     expect(
-      report.checks.find(({ name }) => name === "Ark Pi models"),
+      report.checks.find(({ name }) => name === "Pi models"),
     ).toMatchObject({ ok: false, level: "error" });
   });
 

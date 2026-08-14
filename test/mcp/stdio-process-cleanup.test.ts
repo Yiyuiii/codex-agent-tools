@@ -1,11 +1,5 @@
 import { EventEmitter } from "node:events";
-import {
-  mkdtemp,
-  readFile,
-  readdir,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
@@ -158,7 +152,9 @@ function rememberPid(pid: number): number {
 function parseFixturePid(value: string): number {
   const trimmed = value.trim();
   if (!/^[1-9][0-9]*$/u.test(trimmed)) {
-    throw new Error("Fixture PID file must contain one complete positive integer");
+    throw new Error(
+      "Fixture PID file must contain one complete positive integer",
+    );
   }
   const pid = Number(trimmed);
   if (!Number.isSafeInteger(pid) || pid <= 0) {
@@ -211,7 +207,9 @@ async function readPidIfAvailable(
 async function captureOwnedProcessIdentity(pid: number): Promise<number> {
   const identity = await inspectProcessIdentity(pid);
   if (!identity.alive || identity.startTime === null) {
-    throw new Error(`Owned PID ${pid} was not alive when identity was captured`);
+    throw new Error(
+      `Owned PID ${pid} was not alive when identity was captured`,
+    );
   }
   const previous = ownedProcessStartTimes.get(pid);
   if (previous !== undefined && previous !== identity.startTime) {
@@ -368,7 +366,9 @@ async function listFiles(directory: string): Promise<string[]> {
       if (entry.isDirectory()) {
         await visit(absolute);
       } else {
-        files.push(path.relative(directory, absolute).split(path.sep).join("/"));
+        files.push(
+          path.relative(directory, absolute).split(path.sep).join("/"),
+        );
       }
     }
   };
@@ -609,16 +609,13 @@ afterEach(async () => {
   );
 
   const latePidReads = await Promise.all(
-    ownedPidFiles
-      .splice(0)
-      .map((pidFile) => readPidIfAvailable(pidFile)),
+    ownedPidFiles.splice(0).map((pidFile) => readPidIfAvailable(pidFile)),
   );
   let retainEvidence = false;
   for (const readResult of latePidReads) {
     const disposition = classifyCleanupPidEvidence(
       readResult,
-      readResult.kind === "pid" &&
-        ownedProcessStartTimes.has(readResult.pid),
+      readResult.kind === "pid" && ownedProcessStartTimes.has(readResult.pid),
     );
     if (disposition.reportFailure) {
       cleanupFailures.push(disposition.failure);
@@ -666,16 +663,12 @@ afterEach(async () => {
         `${handle.label} output retained because session did not resolve`,
       );
     }
-    if (
-      process.listenerCount("SIGINT") !== handle.baselineSigintListeners
-    ) {
+    if (process.listenerCount("SIGINT") !== handle.baselineSigintListeners) {
       cleanupFailures.push(
         `${handle.label} SIGINT listeners did not return to baseline`,
       );
     }
-    if (
-      process.listenerCount("SIGTERM") !== handle.baselineSigtermListeners
-    ) {
+    if (process.listenerCount("SIGTERM") !== handle.baselineSigtermListeners) {
       cleanupFailures.push(
         `${handle.label} SIGTERM listeners did not return to baseline`,
       );
@@ -765,306 +758,288 @@ describe("MCP stdio owned-process cleanup", () => {
     );
   });
 
-  it(
-    "aborts a real Kimi request and waits for its complete owned tree cleanup",
-    async () => {
-      const cwd = await makeTempDirectory();
-      const stateDirectory = await makeTempDirectory();
-      const rootPidPath = path.join(stateDirectory, "root.pid");
-      const carrierPidPath = path.join(stateDirectory, "carrier.pid");
-      const childPidPath = path.join(stateDirectory, "child.pid");
-      ownedPidFiles.push(rootPidPath, carrierPidPath, childPidPath);
+  it("aborts a real Kimi request and waits for its complete owned tree cleanup", async () => {
+    const cwd = await makeTempDirectory();
+    const stateDirectory = await makeTempDirectory();
+    const rootPidPath = path.join(stateDirectory, "root.pid");
+    const carrierPidPath = path.join(stateDirectory, "carrier.pid");
+    const childPidPath = path.join(stateDirectory, "child.pid");
+    ownedPidFiles.push(rootPidPath, carrierPidPath, childPidPath);
 
-      let order = 0;
-      const nextOrder = (): number => ++order;
-      let adapterClientInvocationCount = 0;
-      let clientResolvedOrder = 0;
-      let clientResult: KimiAcpRunResult | undefined;
-      let cleanupWasCompleteWhenClientResolved = false;
-      let clientRequestHadTimeout = false;
-      const adapter = new KimiAdapter({
-        locateExecutable: async () => process.execPath,
-        runClient: async (request) => {
-          adapterClientInvocationCount += 1;
-          clientRequestHadTimeout = Object.hasOwn(request, "timeoutMs");
-          clientResult = await runKimiAcp(
-            {
-              ...request,
-              args: [fakeKimiPath],
-              environment: {
-                ...request.environment,
-                FAKE_KIMI_SCENARIO: "hang",
-                FAKE_KIMI_ROOT_PID_FILE: rootPidPath,
-                FAKE_KIMI_CARRIER_PID_FILE: carrierPidPath,
-                FAKE_KIMI_CHILD_PID_FILE: childPidPath,
-              },
+    let order = 0;
+    const nextOrder = (): number => ++order;
+    let adapterClientInvocationCount = 0;
+    let clientResolvedOrder = 0;
+    let clientResult: KimiAcpRunResult | undefined;
+    let cleanupWasCompleteWhenClientResolved = false;
+    let clientRequestHadTimeout = false;
+    const adapter = new KimiAdapter({
+      locateExecutable: async () => process.execPath,
+      runClient: async (request) => {
+        adapterClientInvocationCount += 1;
+        clientRequestHadTimeout = Object.hasOwn(request, "timeoutMs");
+        clientResult = await runKimiAcp(
+          {
+            ...request,
+            args: [fakeKimiPath],
+            environment: {
+              ...request.environment,
+              FAKE_KIMI_SCENARIO: "hang",
+              FAKE_KIMI_ROOT_PID_FILE: rootPidPath,
+              FAKE_KIMI_CARRIER_PID_FILE: carrierPidPath,
+              FAKE_KIMI_CHILD_PID_FILE: childPidPath,
             },
-            process.platform === "win32"
-              ? {
-                  spawnOwnedAgentProcess: (launch) =>
-                    spawnWindowsOwnedAgentProcessWithDependencies(launch, {
-                      resolveHelper: () =>
-                        resolveWindowsJobHelperForModule(
-                          syntheticDistModuleUrl,
-                        ),
-                    }),
-                }
-              : {},
-          );
-          const [rootPid, carrierPid, childPid] = await Promise.all([
-            readPid(rootPidPath),
-            readPid(carrierPidPath),
-            readPid(childPidPath),
-          ]);
-          cleanupWasCompleteWhenClientResolved =
-            !isAlive(rootPid) &&
-            !isAlive(carrierPid) &&
-            !isAlive(childPid);
-          clientResolvedOrder = nextOrder();
-          return clientResult;
+          },
+          process.platform === "win32"
+            ? {
+                spawnOwnedAgentProcess: (launch) =>
+                  spawnWindowsOwnedAgentProcessWithDependencies(launch, {
+                    resolveHelper: () =>
+                      resolveWindowsJobHelperForModule(syntheticDistModuleUrl),
+                  }),
+              }
+            : {},
+        );
+        const [rootPid, carrierPid, childPid] = await Promise.all([
+          readPid(rootPidPath),
+          readPid(carrierPidPath),
+          readPid(childPidPath),
+        ]);
+        cleanupWasCompleteWhenClientResolved =
+          !isAlive(rootPid) && !isAlive(carrierPid) && !isAlive(childPid);
+        clientResolvedOrder = nextOrder();
+        return clientResult;
+      },
+    });
+    const adapters = new Map<RuntimeKind, ExternalAgentAdapter>([
+      [adapter.runtime, adapter],
+    ]);
+    const realService = new ExternalAgentService({
+      registry: registryFor("kimi-k3"),
+      adapters,
+      parentEnvironment: { ...process.env },
+    });
+    const observation: ServiceObservation = { abortCount: 0 };
+    const abortObserved = deferred<void>();
+    const promptStateReady = observePromptProcessState([
+      { label: "root", pidPath: rootPidPath },
+      { label: "carrier", pidPath: carrierPidPath },
+      { label: "grandchild", pidPath: childPidPath },
+    ]);
+    const service = observeService(
+      realService,
+      observation,
+      abortObserved,
+      nextOrder,
+    );
+
+    const session = await runStdioCancellation(
+      service,
+      cwd,
+      "kimi-k3",
+      "kimi prompt started",
+      promptStateReady,
+      abortObserved,
+      nextOrder,
+    );
+    const [rootPid, carrierPid, childPid] = await Promise.all([
+      readPid(rootPidPath),
+      readPid(carrierPidPath),
+      readPid(childPidPath),
+    ]);
+    await Promise.all([
+      waitUntilDead(rootPid),
+      waitUntilDead(carrierPid),
+      waitUntilDead(childPid),
+    ]);
+
+    expect(observation.signal?.aborted).toBe(true);
+    expect(observation.abortCount).toBe(1);
+    expect(observation.result?.status).toBe("cancelled");
+    expect(observation.result?.status).not.toBe("timed_out");
+    expect(clientResult?.status).toBe("cancelled");
+    expect(clientResult?.executionTelemetry).toMatchObject({
+      adapterClientInvocationCount: 1,
+    });
+    expect(adapterClientInvocationCount).toBe(1);
+    expect(clientRequestHadTimeout).toBe(false);
+    expect(cleanupWasCompleteWhenClientResolved).toBe(true);
+    expect(clientResolvedOrder).toBeLessThan(observation.serviceResolvedOrder!);
+    expect(observation.serviceResolvedOrder).toBeLessThan(
+      session.sessionResolvedOrder,
+    );
+    expect(await listFiles(cwd)).toEqual([]);
+    expect(await listFiles(stateDirectory)).toEqual([
+      "carrier.pid",
+      "child.pid",
+      "root.pid",
+    ]);
+  }, 20_000);
+
+  it("cancels a real Pi request through SDK session shutdown and waits for its complete owned tree cleanup", async () => {
+    const cwd = await makeTempDirectory();
+    const stateDirectory = await makeTempDirectory();
+    const rootPidPath = path.join(stateDirectory, "root.pid");
+    const childPidPath = path.join(stateDirectory, "child.pid");
+    const logPath = path.join(stateDirectory, "rpc-log.jsonl");
+    ownedPidFiles.push(rootPidPath, childPidPath);
+    const isolatedConfig = await buildIsolatedPiConfig({
+      root: path.join(stateDirectory, "pi-config"),
+      version: "stdio-test",
+      providers: ["ark"],
+    });
+    const testConfig: IsolatedPiConfig = isolatedConfig;
+
+    let order = 0;
+    const nextOrder = (): number => ++order;
+    let adapterClientInvocationCount = 0;
+    let clientResolvedOrder = 0;
+    let clientResult: AdapterRunResult | undefined;
+    let cleanupWasCompleteWhenClientResolved = false;
+    let clientRequestHadTimeout = false;
+    let clientRequestHadRetryOverride = false;
+    const adapter = new PiAdapter({
+      locateExecutable: async () => process.execPath,
+      locateInvocation: async () => ({
+        executable: process.execPath,
+        argvPrefix: [fakePiPath],
+        identity: {
+          packageName: "@earendil-works/pi-coding-agent",
+          packageVersion: "0.80.10",
+          nodeEngine: ">=20.0.0",
         },
-      });
-      const adapters = new Map<RuntimeKind, ExternalAgentAdapter>([
-        [adapter.runtime, adapter],
-      ]);
-      const realService = new ExternalAgentService({
-        registry: registryFor("kimi-k3"),
-        adapters,
-        parentEnvironment: { ...process.env },
-      });
-      const observation: ServiceObservation = { abortCount: 0 };
-      const abortObserved = deferred<void>();
-      const promptStateReady = observePromptProcessState([
-        { label: "root", pidPath: rootPidPath },
-        { label: "carrier", pidPath: carrierPidPath },
-        { label: "grandchild", pidPath: childPidPath },
-      ]);
-      const service = observeService(
-        realService,
-        observation,
-        abortObserved,
-        nextOrder,
-      );
+      }),
+      buildConfig: async () => testConfig,
+      runClient: async (request) => {
+        adapterClientInvocationCount += 1;
+        clientRequestHadTimeout = Object.hasOwn(request, "timeoutMs");
+        clientRequestHadRetryOverride =
+          Object.hasOwn(request, "autoRetry") ||
+          Object.hasOwn(request, "autoCompaction");
+        clientResult = await runPiRpc(
+          {
+            ...request,
+            executableArgs: request.executableArgs ?? [fakePiPath],
+            environment: {
+              ...request.environment,
+              FAKE_PI_SCENARIO: "hold",
+              FAKE_PI_LOG: logPath,
+              FAKE_PI_ROOT_PID_FILE: rootPidPath,
+              FAKE_PI_CHILD_PID_FILE: childPidPath,
+            },
+          },
+          process.platform === "win32"
+            ? {
+                spawnOwnedAgentProcess: (launch) =>
+                  spawnWindowsOwnedAgentProcessWithDependencies(launch, {
+                    resolveHelper: () =>
+                      resolveWindowsJobHelperForModule(syntheticDistModuleUrl),
+                  }),
+              }
+            : {},
+        );
+        const [rootPid, childPid] = await Promise.all([
+          readPid(rootPidPath),
+          readPid(childPidPath),
+        ]);
+        cleanupWasCompleteWhenClientResolved =
+          !isAlive(rootPid) && !isAlive(childPid);
+        clientResolvedOrder = nextOrder();
+        return clientResult;
+      },
+    });
+    const adapters = new Map<RuntimeKind, ExternalAgentAdapter>([
+      [adapter.runtime, adapter],
+    ]);
+    const realService = new ExternalAgentService({
+      registry: registryFor("ark-agent-plan"),
+      adapters,
+      parentEnvironment: {
+        ...process.env,
+        OPENAI_API_KEY_DOUBAO: "stdio-test-only-key",
+      },
+    });
+    const observation: ServiceObservation = { abortCount: 0 };
+    const abortObserved = deferred<void>();
+    const promptStateReady = observePromptProcessState([
+      { label: "root", pidPath: rootPidPath },
+      { label: "grandchild", pidPath: childPidPath },
+    ]);
+    const service = observeService(
+      realService,
+      observation,
+      abortObserved,
+      nextOrder,
+    );
 
-      const session = await runStdioCancellation(
-        service,
-        cwd,
-        "kimi-k3",
-        "kimi prompt started",
-        promptStateReady,
-        abortObserved,
-        nextOrder,
-      );
-      const [rootPid, carrierPid, childPid] = await Promise.all([
-        readPid(rootPidPath),
-        readPid(carrierPidPath),
-        readPid(childPidPath),
-      ]);
-      await Promise.all([
-        waitUntilDead(rootPid),
-        waitUntilDead(carrierPid),
-        waitUntilDead(childPid),
-      ]);
+    const session = await runStdioCancellation(
+      service,
+      cwd,
+      "ark-agent-plan",
+      "pi prompt started",
+      promptStateReady,
+      abortObserved,
+      nextOrder,
+    );
+    const rootPid = await readPid(rootPidPath);
+    const childPid = await readPid(childPidPath);
+    await Promise.all([waitUntilDead(rootPid), waitUntilDead(childPid)]);
+    const commands = (await readFile(logPath, "utf8"))
+      .trim()
+      .split(/\r?\n/u)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .filter((entry) => entry.kind === "command")
+      .map((entry) => entry.value as Record<string, unknown>);
+    const settings = JSON.parse(
+      await readFile(isolatedConfig.settingsPath, "utf8"),
+    ) as Record<string, unknown>;
 
-      expect(observation.signal?.aborted).toBe(true);
-      expect(observation.abortCount).toBe(1);
-      expect(observation.result?.status).toBe("cancelled");
-      expect(observation.result?.status).not.toBe("timed_out");
-      expect(clientResult?.status).toBe("cancelled");
+    expect(observation.signal?.aborted).toBe(true);
+    expect(observation.abortCount).toBe(1);
+    expect(observation.result?.status).toBe("cancelled");
+    expect(clientResult?.status).toBe("cancelled");
+    if (process.platform === "win32") {
       expect(clientResult?.executionTelemetry).toMatchObject({
         adapterClientInvocationCount: 1,
+        ownedProcessCompletion: "session_shutdown",
+        ownedProcessDrained: true,
       });
-      expect(adapterClientInvocationCount).toBe(1);
-      expect(clientRequestHadTimeout).toBe(false);
-      expect(cleanupWasCompleteWhenClientResolved).toBe(true);
-      expect(clientResolvedOrder).toBeLessThan(
-        observation.serviceResolvedOrder!,
-      );
-      expect(observation.serviceResolvedOrder).toBeLessThan(
-        session.sessionResolvedOrder,
-      );
-      expect(await listFiles(cwd)).toEqual([]);
-      expect(await listFiles(stateDirectory)).toEqual([
-        "carrier.pid",
-        "child.pid",
-        "root.pid",
-      ]);
-    },
-    20_000,
-  );
-
-  it(
-    "cancels a real Pi request through SDK session shutdown and waits for its complete owned tree cleanup",
-    async () => {
-      const cwd = await makeTempDirectory();
-      const stateDirectory = await makeTempDirectory();
-      const rootPidPath = path.join(stateDirectory, "root.pid");
-      const childPidPath = path.join(stateDirectory, "child.pid");
-      const logPath = path.join(stateDirectory, "rpc-log.jsonl");
-      ownedPidFiles.push(rootPidPath, childPidPath);
-      const isolatedConfig = await buildIsolatedPiConfig({
-        root: path.join(stateDirectory, "pi-config"),
-        version: "stdio-test",
-        providers: ["ark"],
-      });
-      const testConfig: IsolatedPiConfig = isolatedConfig;
-
-      let order = 0;
-      const nextOrder = (): number => ++order;
-      let adapterClientInvocationCount = 0;
-      let clientResolvedOrder = 0;
-      let clientResult: AdapterRunResult | undefined;
-      let cleanupWasCompleteWhenClientResolved = false;
-      let clientRequestHadTimeout = false;
-      let clientRequestHadRetryOverride = false;
-      const adapter = new PiAdapter({
-        locateExecutable: async () => process.execPath,
-        locateInvocation: async () => ({
-          executable: process.execPath,
-          argvPrefix: [fakePiPath],
-          identity: {
-            packageName: "@earendil-works/pi-coding-agent",
-            packageVersion: "0.80.10",
-            nodeEngine: ">=20.0.0",
-          },
-        }),
-        buildConfig: async () => testConfig,
-        runClient: async (request) => {
-          adapterClientInvocationCount += 1;
-          clientRequestHadTimeout = Object.hasOwn(request, "timeoutMs");
-          clientRequestHadRetryOverride =
-            Object.hasOwn(request, "autoRetry") ||
-            Object.hasOwn(request, "autoCompaction");
-          clientResult = await runPiRpc(
-            {
-              ...request,
-              executableArgs: request.executableArgs ?? [fakePiPath],
-              environment: {
-                ...request.environment,
-                FAKE_PI_SCENARIO: "hold",
-                FAKE_PI_LOG: logPath,
-                FAKE_PI_ROOT_PID_FILE: rootPidPath,
-                FAKE_PI_CHILD_PID_FILE: childPidPath,
-              },
-            },
-            process.platform === "win32"
-              ? {
-                  spawnOwnedAgentProcess: (launch) =>
-                    spawnWindowsOwnedAgentProcessWithDependencies(launch, {
-                      resolveHelper: () =>
-                        resolveWindowsJobHelperForModule(
-                          syntheticDistModuleUrl,
-                        ),
-                    }),
-                }
-              : {},
-          );
-          const [rootPid, childPid] = await Promise.all([
-            readPid(rootPidPath),
-            readPid(childPidPath),
-          ]);
-          cleanupWasCompleteWhenClientResolved =
-            !isAlive(rootPid) && !isAlive(childPid);
-          clientResolvedOrder = nextOrder();
-          return clientResult;
-        },
-      });
-      const adapters = new Map<RuntimeKind, ExternalAgentAdapter>([
-        [adapter.runtime, adapter],
-      ]);
-      const realService = new ExternalAgentService({
-        registry: registryFor("ark-agent-plan"),
-        adapters,
-        parentEnvironment: {
-          ...process.env,
-          OPENAI_API_KEY_DOUBAO: "stdio-test-only-key",
-        },
-      });
-      const observation: ServiceObservation = { abortCount: 0 };
-      const abortObserved = deferred<void>();
-      const promptStateReady = observePromptProcessState([
-        { label: "root", pidPath: rootPidPath },
-        { label: "grandchild", pidPath: childPidPath },
-      ]);
-      const service = observeService(
-        realService,
-        observation,
-        abortObserved,
-        nextOrder,
-      );
-
-      const session = await runStdioCancellation(
-        service,
-        cwd,
-        "ark-agent-plan",
-        "pi prompt started",
-        promptStateReady,
-        abortObserved,
-        nextOrder,
-      );
-      const rootPid = await readPid(rootPidPath);
-      const childPid = await readPid(childPidPath);
-      await Promise.all([waitUntilDead(rootPid), waitUntilDead(childPid)]);
-      const commands = (await readFile(logPath, "utf8"))
-        .trim()
-        .split(/\r?\n/u)
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as Record<string, unknown>)
-        .filter((entry) => entry.kind === "command")
-        .map((entry) => entry.value as Record<string, unknown>);
-      const settings = JSON.parse(
-        await readFile(isolatedConfig.settingsPath, "utf8"),
-      ) as Record<string, unknown>;
-
-      expect(observation.signal?.aborted).toBe(true);
-      expect(observation.abortCount).toBe(1);
-      expect(observation.result?.status).toBe("cancelled");
-      expect(clientResult?.status).toBe("cancelled");
-      if (process.platform === "win32") {
-        expect(clientResult?.executionTelemetry).toMatchObject({
-          adapterClientInvocationCount: 1,
-          ownedProcessCompletion: "session_shutdown",
-          ownedProcessDrained: true,
-        });
-      } else {
-        expect(clientResult?.executionTelemetry).toBeNull();
-      }
-      expect(clientResult?.diagnostics).toContain("pi_runtime_identity_unknown");
-      expect(
-        commands.filter((command) => command.type === "prompt"),
-      ).toHaveLength(1);
-      // Parent-side abort write attempt/order and a stalled callback are covered
-      // deterministically in test/adapters/pi/client.test.ts. This integration
-      // observes child consumption only, and Job termination may win that race.
-      expect(
-        commands.filter((command) => command.type === "abort").length,
-      ).toBeLessThanOrEqual(1);
-      expect(adapterClientInvocationCount).toBe(1);
-      expect(clientRequestHadTimeout).toBe(false);
-      expect(clientRequestHadRetryOverride).toBe(false);
-      expect(commands.map((command) => command.type)).not.toContain(
-        "set_auto_retry",
-      );
-      expect(commands.map((command) => command.type)).not.toContain(
-        "set_auto_compaction",
-      );
-      expect(settings).not.toHaveProperty("retry");
-      expect(cleanupWasCompleteWhenClientResolved).toBe(true);
-      expect(clientResolvedOrder).toBeLessThan(
-        observation.serviceResolvedOrder!,
-      );
-      expect(observation.serviceResolvedOrder).toBeLessThan(
-        session.sessionResolvedOrder,
-      );
-      expect(await listFiles(cwd)).toEqual([]);
-      expect(await listFiles(stateDirectory)).toEqual([
-        "child.pid",
-        "pi-config/pi/stdio-test/models.json",
-        "pi-config/pi/stdio-test/settings.json",
-        "root.pid",
-        "rpc-log.jsonl",
-      ]);
-    },
-    20_000,
-  );
+    } else {
+      expect(clientResult?.executionTelemetry).toBeNull();
+    }
+    expect(clientResult?.diagnostics).toContain("pi_runtime_identity_unknown");
+    expect(
+      commands.filter((command) => command.type === "prompt"),
+    ).toHaveLength(1);
+    // Parent-side abort write attempt/order and a stalled callback are covered
+    // deterministically in test/adapters/pi/client.test.ts. This integration
+    // observes child consumption only, and Job termination may win that race.
+    expect(
+      commands.filter((command) => command.type === "abort").length,
+    ).toBeLessThanOrEqual(1);
+    expect(adapterClientInvocationCount).toBe(1);
+    expect(clientRequestHadTimeout).toBe(false);
+    expect(clientRequestHadRetryOverride).toBe(false);
+    expect(commands.map((command) => command.type)).not.toContain(
+      "set_auto_retry",
+    );
+    expect(commands.map((command) => command.type)).not.toContain(
+      "set_auto_compaction",
+    );
+    expect(settings).not.toHaveProperty("retry");
+    expect(cleanupWasCompleteWhenClientResolved).toBe(true);
+    expect(clientResolvedOrder).toBeLessThan(observation.serviceResolvedOrder!);
+    expect(observation.serviceResolvedOrder).toBeLessThan(
+      session.sessionResolvedOrder,
+    );
+    expect(await listFiles(cwd)).toEqual([]);
+    expect(await listFiles(stateDirectory)).toEqual([
+      "child.pid",
+      "pi-config/pi/stdio-test/ark/models.json",
+      "pi-config/pi/stdio-test/ark/settings.json",
+      "root.pid",
+      "rpc-log.jsonl",
+    ]);
+  }, 20_000);
 });

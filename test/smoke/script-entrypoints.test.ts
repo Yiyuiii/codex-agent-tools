@@ -129,6 +129,22 @@ const scripts = [
     usage:
       "Usage: npm run smoke:ark -- --llm <ark-logical-id> --task review|delegate\n",
   },
+  {
+    name: "Direct DeepSeek",
+    script: "scripts/real-deepseek-smoke.mjs",
+    llm: "deepseek-v4-flash",
+    task: "review" as const,
+    expectedFile:
+      "2026-07-25T01-02-03.000Z-deepseek-v4-flash-review-deepseek.json",
+    expectedRuntime: "pi-rpc",
+    expectedRoute: "direct",
+    expectedKind: "deepseek",
+    distModule: "dist/deepseek-smoke.js",
+    parserExport: "parseDeepSeekSmokeArguments",
+    runnerExport: "runDeepSeekSmoke",
+    usage:
+      "Usage: npm run smoke:deepseek -- --llm deepseek-v4-flash --task review|delegate\n",
+  },
 ] as const;
 
 describe("production real-smoke script entrypoints", () => {
@@ -501,6 +517,19 @@ describe("qualification maintainer script entrypoints", () => {
       ]),
     ).toEqual({
       kind: "qualify",
+      qualificationPlanId: "four-llm-v1",
+      authorizationReference,
+    });
+    expect(
+      parseGateRequalificationArguments([
+        "--plan",
+        "direct-deepseek-v1",
+        "--authorization-ref",
+        authorizationReference,
+      ]),
+    ).toEqual({
+      kind: "qualify",
+      qualificationPlanId: "direct-deepseek-v1",
       authorizationReference,
     });
     expect(
@@ -517,6 +546,12 @@ describe("qualification maintainer script entrypoints", () => {
       [],
       ["--authorization-ref"],
       ["--authorization-ref", authorizationReference, "--retry"],
+      [
+        "--plan",
+        "five-llm-v2",
+        "--authorization-ref",
+        authorizationReference,
+      ],
       ["--recover-interrupted", "../escape"],
       ["--only", "1"],
       ["--llm", "kimi-k3"],
@@ -663,6 +698,7 @@ describe("qualification maintainer script entrypoints", () => {
       async (_options: {
         repositoryRoot: string;
         authorizationReference: string;
+        qualificationPlanId: "four-llm-v1" | "direct-deepseek-v1";
         writeStderr: (text: string) => void;
       }) => manifest,
     );
@@ -689,15 +725,18 @@ describe("qualification maintainer script entrypoints", () => {
     expect(qualify).toHaveBeenCalledWith({
       repositoryRoot,
       authorizationReference,
+      qualificationPlanId: "four-llm-v1",
       writeStderr: expect.any(Function),
     });
     expect(Object.keys(qualify.mock.calls[0]![0]).sort()).toEqual([
       "authorizationReference",
+      "qualificationPlanId",
       "repositoryRoot",
       "writeStderr",
     ]);
     expect(JSON.parse(stdout)).toEqual({
       batchId: "batch-fixed-contract",
+      qualificationPlanId: "four-llm-v1",
       status: "blocked",
       completedCases: 0,
       promotionEligible: false,

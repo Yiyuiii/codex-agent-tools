@@ -3,15 +3,8 @@ import { lstat, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { types as nodeUtilTypes } from "node:util";
 
-import type {
-  LlmProfile,
-  RuntimeKind,
-  TaskKind,
-} from "../domain/types.js";
-import {
-  resolveLlm,
-  supportedLlmIds,
-} from "../llms/registry.js";
+import type { LlmProfile, RuntimeKind, TaskKind } from "../domain/types.js";
+import { resolveLlm, supportedLlmIds } from "../llms/registry.js";
 import {
   verifyQualification,
   type QualificationVerificationResult,
@@ -25,6 +18,11 @@ import {
   collectCanonicalRuntimeInputIdentity,
   type CanonicalRuntimeInputIdentity,
 } from "../release/canonical-runtime-inputs.js";
+import {
+  ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+  type CurrentQualificationPlanId,
+} from "./protocol.js";
 
 const MAX_RUNTIME_INPUT_BYTES = 4 * 1024 * 1024;
 
@@ -54,9 +52,11 @@ const SHARED_RUNTIME_INPUT_ROOTS = Object.freeze([
 const PI_RUNTIME_INPUT_ROOTS = Object.freeze([
   ...SHARED_RUNTIME_INPUT_ROOTS,
   "scripts/real-ark-smoke.mjs",
+  "scripts/real-deepseek-smoke.mjs",
   "scripts/real-smoke-main.mjs",
   "src/adapters/pi",
   "src/smoke/ark.ts",
+  "src/smoke/deepseek.ts",
   "src/smoke/pi.ts",
   "src/smoke/pi-write-command-observation.ts",
 ] as const);
@@ -122,9 +122,7 @@ export interface CapabilityQualificationEntry {
   readonly llm: string;
   readonly task: TaskKind;
   readonly runtimeFingerprintSha256: string;
-  readonly source:
-    | BatchCaseCapabilitySource
-    | LegacyStandaloneCapabilitySource;
+  readonly source: BatchCaseCapabilitySource | LegacyStandaloneCapabilitySource;
 }
 
 export interface CapabilityEvidenceVerificationResult {
@@ -221,11 +219,7 @@ export function capabilityDependencyInputFromPackageLock(
       ? KIMI_RUNTIME_DEPENDENCIES
       : SHARED_RUNTIME_DEPENDENCIES;
   const pending = seeds.map((dependencyName) => {
-    const resolved = resolveLockedDependencyPath(
-      packages,
-      "",
-      dependencyName,
-    );
+    const resolved = resolveLockedDependencyPath(packages, "", dependencyName);
     if (resolved === undefined) throw capabilityInputError();
     return resolved;
   });
@@ -253,9 +247,7 @@ export function capabilityDependencyInputFromPackageLock(
     const optionalDependencies = dependencyRanges(
       packageEntry.optionalDependencies,
     );
-    const peerDependencies = dependencyRanges(
-      packageEntry.peerDependencies,
-    );
+    const peerDependencies = dependencyRanges(packageEntry.peerDependencies);
     snapshot.push({
       path: packagePath,
       version,
@@ -306,8 +298,7 @@ function normalizedRelativePath(value: string): string {
   const segments = normalized.split("/");
   if (
     segments.some(
-      (segment) =>
-        segment.length === 0 || segment === "." || segment === "..",
+      (segment) => segment.length === 0 || segment === "." || segment === "..",
     )
   ) {
     throw capabilityInputError();
@@ -578,13 +569,19 @@ function batchIdFromManifestPath(manifestPath: string): string {
   const batchId = match?.[1];
   if (
     batchId === undefined ||
-    !/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9_-])?$/u.test(
-      batchId,
-    )
+    !/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9_-])?$/u.test(batchId)
   ) {
     throw capabilityQualificationError();
   }
   return batchId;
+}
+
+function expectedQualificationPlanId(
+  entry: CapabilityQualificationEntry,
+): CurrentQualificationPlanId {
+  return entry.llm === "deepseek-v4-flash"
+    ? DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+    : ACTIVE_QUALIFICATION_PLAN_ID;
 }
 
 function validateBatchEvidence(
@@ -597,6 +594,7 @@ function validateBatchEvidence(
 ): void {
   const evidence = plainRecord(evidenceValue);
   const qualification = plainRecord(evidence.qualification);
+  const qualificationPlanId = expectedQualificationPlanId(entry);
   if (
     evidence.schemaVersion !== (currentOwnedEvidence ? 4 : 3) ||
     evidence.llm !== entry.llm ||
@@ -620,13 +618,12 @@ function validateBatchEvidence(
     (currentOwnedEvidence
       ? evidence.ownedProcessDrained !== true
       : Object.hasOwn(evidence, "ownedProcessDrained")) ||
-    qualification.qualificationPlanId !== "four-llm-v1" ||
+    qualification.qualificationPlanId !== qualificationPlanId ||
     qualification.batchId !== batchId ||
     qualification.llm !== entry.llm ||
     qualification.task !== entry.task ||
     qualification.frozenCommit !== source.frozenCommit ||
-    qualification.frozenBuildIdentity !==
-      source.buildIdentitySha256 ||
+    qualification.frozenBuildIdentity !== source.buildIdentitySha256 ||
     qualification.orchestratorFallbackUsed !== false ||
     (profile.provider === undefined
       ? Object.hasOwn(evidence, "provider")
@@ -672,8 +669,8 @@ async function verifyBatchCapabilityEvidence(
     throw capabilityQualificationError();
   }
   const batchId = batchIdFromManifestPath(source.manifestPath);
-  const expectedEvidencePrefix =
-    `docs/smoke/evidence/batches/${batchId}/cases/`;
+  const qualificationPlanId = expectedQualificationPlanId(options.entry);
+  const expectedEvidencePrefix = `docs/smoke/evidence/batches/${batchId}/cases/`;
   if (
     !source.evidencePath.startsWith(expectedEvidencePrefix) ||
     !source.evidencePath.endsWith(".json")
@@ -702,7 +699,7 @@ async function verifyBatchCapabilityEvidence(
     verification.verified !== true ||
     verification.mode !== "immutable-evidence" ||
     verification.batchId !== batchId ||
-    verification.qualificationPlanId !== "four-llm-v1"
+    verification.qualificationPlanId !== qualificationPlanId
   ) {
     throw capabilityQualificationError();
   }
@@ -720,7 +717,9 @@ async function verifyBatchCapabilityEvidence(
   const currentOwnedEvidence = manifest.schemaVersion === 3;
   if (
     (manifest.schemaVersion !== 2 && manifest.schemaVersion !== 3) ||
-    manifest.qualificationPlanId !== "four-llm-v1" ||
+    manifest.qualificationPlanId !== qualificationPlanId ||
+    (qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID &&
+      manifest.schemaVersion !== 3) ||
     manifest.batchId !== batchId ||
     manifest.repositoryCommit !== source.frozenCommit ||
     manifest.buildIdentitySha256 !== source.buildIdentitySha256 ||
@@ -801,8 +800,7 @@ async function verifyLegacyCapabilityEvidence(
     evidence.failureReason !== null ||
     !Array.isArray(evidence.filesChanged) ||
     evidence.filesChanged.length !== 1 ||
-    evidence.filesChanged[0] !==
-      "ark-agent-deepseek-v4-flash-smoke.txt"
+    evidence.filesChanged[0] !== "ark-agent-deepseek-v4-flash-smoke.txt"
   ) {
     throw capabilityQualificationError();
   }
@@ -833,11 +831,7 @@ export async function verifyCapabilityEvidenceSource(
     throw capabilityQualificationError();
   }
   return options.entry.source.kind === "batch-case"
-    ? verifyBatchCapabilityEvidence(
-        options,
-        options.entry.source,
-        dependencies,
-      )
+    ? verifyBatchCapabilityEvidence(options, options.entry.source, dependencies)
     : verifyLegacyCapabilityEvidence(options, options.entry.source);
 }
 
@@ -903,12 +897,7 @@ function parseLegacySource(value: unknown): LegacyStandaloneCapabilitySource {
 
 function parseCapabilityEntry(value: unknown): CapabilityQualificationEntry {
   const entry = plainRecord(value);
-  exactRecordKeys(entry, [
-    "llm",
-    "runtimeFingerprintSha256",
-    "source",
-    "task",
-  ]);
+  exactRecordKeys(entry, ["llm", "runtimeFingerprintSha256", "source", "task"]);
   if (
     typeof entry.llm !== "string" ||
     (entry.task !== "review" && entry.task !== "delegate") ||
@@ -969,11 +958,14 @@ async function loadCapabilityIndexEntries(
   }
   const entries = index.entries.map(parseCapabilityEntry);
   const expectedKeys = supportedLlmIds()
-    .flatMap((llm) => ["delegate", "review"].map((task) => `${llm}/${task}`))
+    .flatMap((llm) => {
+      const profile = resolveLlm(llm);
+      return (["delegate", "review"] as const)
+        .filter((task) => profile.qualityGates[task].status === "passed")
+        .map((task) => `${llm}/${task}`);
+    })
     .sort((left, right) => left.localeCompare(right, "en"));
-  const actualKeys = entries.map(
-    (entry) => `${entry.llm}/${entry.task}`,
-  );
+  const actualKeys = entries.map((entry) => `${entry.llm}/${entry.task}`);
   const legacyEntryCount = entries.filter(
     (entry) => entry.source.kind === "legacy-standalone",
   ).length;
@@ -1120,7 +1112,7 @@ export async function verifyCapabilityIndex(options: {
         entry.runtimeFingerprintStatus !== "current",
     )
   ) {
-      throw capabilityQualificationError();
+    throw capabilityQualificationError();
   }
 
   return Object.freeze({
@@ -1161,8 +1153,7 @@ export function fingerprintCapabilitySnapshot(
     .sort((left, right) => left.path.localeCompare(right.path, "en"));
   if (
     inputs.some(
-      (input, index) =>
-        index > 0 && input.path === inputs[index - 1]?.path,
+      (input, index) => index > 0 && input.path === inputs[index - 1]?.path,
     )
   ) {
     throw capabilityInputError();
@@ -1184,9 +1175,7 @@ function fingerprintProfile(profile: LlmProfile): CapabilityFingerprintProfile {
   return Object.freeze({
     id: profile.id,
     runtime: profile.runtime,
-    ...(profile.provider === undefined
-      ? {}
-      : { provider: profile.provider }),
+    ...(profile.provider === undefined ? {} : { provider: profile.provider }),
     model: profile.model,
     network: profile.network,
     credentialEnv: Object.freeze([...profile.credentialEnv]),

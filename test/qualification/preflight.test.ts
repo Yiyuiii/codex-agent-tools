@@ -20,6 +20,7 @@ import {
   collectQualificationBuildIdentity,
   collectQualificationCurrentSnapshot,
   computeQualificationBuildIdentitySha256,
+  DIRECT_DEEPSEEK_QUALIFICATION_BUILD_ARTIFACT_PATHS,
   QUALIFICATION_BUILD_ARTIFACT_PATHS,
   QUALIFICATION_MAX_BUILD_ARTIFACT_BYTES,
   QualificationPreflightError,
@@ -63,7 +64,12 @@ async function tempRepository(): Promise<string> {
   for (const [
     index,
     relativePath,
-  ] of QUALIFICATION_BUILD_ARTIFACT_PATHS.entries()) {
+  ] of [
+    ...new Set([
+      ...QUALIFICATION_BUILD_ARTIFACT_PATHS,
+      ...DIRECT_DEEPSEEK_QUALIFICATION_BUILD_ARTIFACT_PATHS,
+    ]),
+  ].entries()) {
     const absolutePath = path.join(root, ...relativePath.split("/"));
     await mkdir(path.dirname(absolutePath), { recursive: true });
     await writeFile(absolutePath, `artifact-${index}\n`);
@@ -140,12 +146,14 @@ async function harness(
   codexHomes: string[];
   removedCodexHomes: string[];
   locatorCalls: string[];
+  piConfigPlans: string[];
   authorizationChecks: number;
 }> {
   const commands: QualificationPreflightCommandRequest[] = [];
   const codexHomes: string[] = [];
   const removedCodexHomes: string[] = [];
   const locatorCalls: string[] = [];
+  const piConfigPlans: string[] = [];
   let statusCalls = 0;
   let commitCalls = 0;
   let authorizationChecks = 0;
@@ -156,6 +164,7 @@ async function harness(
     CODEX_HOME: activeCodexHome,
     ARK_API_KEY: "ARK_SECRET_VALUE",
     OPENAI_API_KEY_DOUBAO: "AGENT_SECRET_VALUE",
+    OPENAI_API_KEY_DEEPSEEK: "DEEPSEEK_SECRET_VALUE",
   };
   if (options.missingCredential !== undefined) {
     delete environment[options.missingCredential];
@@ -195,9 +204,10 @@ async function harness(
     removeTemporaryCodexHome: async (directory) => {
       removedCodexHomes.push(directory);
     },
-    buildQualificationPiConfig: async () => ({
-      contentSha256: piConfigSha256,
-    }),
+    buildQualificationPiConfig: async (qualificationPlanId) => {
+      piConfigPlans.push(qualificationPlanId);
+      return { contentSha256: piConfigSha256 };
+    },
     assertAuthorizationUnused: async () => {
       authorizationChecks += 1;
       if (options.authorizationUsed === true) {
@@ -288,6 +298,7 @@ async function harness(
     codexHomes,
     removedCodexHomes,
     locatorCalls,
+    piConfigPlans,
     get authorizationChecks() {
       return authorizationChecks;
     },
@@ -297,6 +308,7 @@ async function harness(
 function run(
   repositoryRoot: string,
   dependencies: QualificationPreflightDependencies,
+  qualificationPlanId?: "four-llm-v1" | "direct-deepseek-v1",
 ) {
   return runQualificationPreflight(
     {
@@ -304,6 +316,7 @@ function run(
       authorizationReferenceSha256,
       lockDirectory: path.join(os.tmpdir(), "qualification-lock"),
       currentOwnerNonce: "11111111-1111-4111-8111-111111111111",
+      ...(qualificationPlanId === undefined ? {} : { qualificationPlanId }),
     },
     dependencies,
   );
@@ -330,6 +343,27 @@ describe("qualification build identity", () => {
     ).toBe(identity.buildIdentitySha256);
     expect(Object.isFrozen(identity)).toBe(true);
     expect(Object.isFrozen(identity.buildArtifacts[0])).toBe(true);
+  });
+
+  it("hashes only the Direct DeepSeek qualification artifacts for its plan", async () => {
+    const repositoryRoot = await tempRepository();
+    const identity = await collectQualificationBuildIdentity(
+      repositoryRoot,
+      "direct-deepseek-v1",
+    );
+
+    expect(identity.buildArtifacts.map(({ path: artifactPath }) => artifactPath))
+      .toEqual(DIRECT_DEEPSEEK_QUALIFICATION_BUILD_ARTIFACT_PATHS);
+    expect(identity.buildArtifacts).toHaveLength(3);
+    expect(
+      computeQualificationBuildIdentitySha256(
+        identity.buildArtifacts,
+        "direct-deepseek-v1",
+      ),
+    ).toBe(identity.buildIdentitySha256);
+    expect(() =>
+      computeQualificationBuildIdentitySha256(identity.buildArtifacts),
+    ).toThrow();
   });
 
   it("rejects oversized build artifacts before hashing unbounded input", async () => {
@@ -464,6 +498,45 @@ describe("qualification preflight", () => {
     expect(serialized).not.toContain("ARK_SECRET_VALUE");
     expect(serialized).not.toContain("AGENT_SECRET_VALUE");
     expect(serialized).not.toContain(repositoryRoot);
+  });
+
+  it("isolates Direct DeepSeek preflight from Ark credentials, Kimi, and Ark Pi config", async () => {
+    const repositoryRoot = await tempRepository();
+    const state = await harness(repositoryRoot);
+    delete state.dependencies.environment?.ARK_API_KEY;
+    delete state.dependencies.environment?.OPENAI_API_KEY_DOUBAO;
+
+    const record = await run(
+      repositoryRoot,
+      state.dependencies,
+      "direct-deepseek-v1",
+    );
+
+    expect(record).toMatchObject({
+      schemaVersion: 3,
+      qualificationPlanId: "direct-deepseek-v1",
+      piConfigSha256,
+      logicalLlms: [
+        {
+          llm: "deepseek-v4-flash",
+          runtime: "pi-rpc",
+          model: "deepseek-v4-flash",
+          provider: "deepseek",
+          route: "direct",
+        },
+      ],
+      credentialMatches: [
+        {
+          llm: "deepseek-v4-flash",
+          environmentVariableName: "OPENAI_API_KEY_DEEPSEEK",
+        },
+      ],
+    });
+    expect(record.buildArtifacts.map(({ path: artifactPath }) => artifactPath))
+      .toEqual(DIRECT_DEEPSEEK_QUALIFICATION_BUILD_ARTIFACT_PATHS);
+    expect(state.locatorCalls).toEqual(["pi-invocation"]);
+    expect(state.piConfigPlans).toEqual(["direct-deepseek-v1"]);
+    expect(JSON.stringify(record)).not.toContain("DEEPSEEK_SECRET_VALUE");
   });
 
   it("probes Codex with a fresh temporary CODEX_HOME and always removes it", async () => {
@@ -919,6 +992,32 @@ describe("frozen candidate integration helpers", () => {
     ).toBe(false);
     expect(state.removedCodexHomes).toEqual(state.codexHomes);
     expect(Object.isFrozen(snapshot)).toBe(true);
+  });
+
+  it("collects a Direct DeepSeek verifier snapshot without locating Kimi", async () => {
+    const repositoryRoot = await tempRepository();
+    const state = await harness(repositoryRoot);
+    delete state.dependencies.environment?.ARK_API_KEY;
+    delete state.dependencies.environment?.OPENAI_API_KEY_DOUBAO;
+
+    const snapshot = await collectQualificationCurrentSnapshot(
+      { repositoryRoot, qualificationPlanId: "direct-deepseek-v1" },
+      state.dependencies,
+    );
+
+    expect(snapshot.buildArtifacts.map(({ path: artifactPath }) => artifactPath))
+      .toEqual(DIRECT_DEEPSEEK_QUALIFICATION_BUILD_ARTIFACT_PATHS);
+    expect(snapshot.logicalLlms.map(({ llm }) => llm)).toEqual([
+      "deepseek-v4-flash",
+    ]);
+    expect(snapshot.credentialMatches).toEqual([
+      {
+        llm: "deepseek-v4-flash",
+        environmentVariableName: "OPENAI_API_KEY_DEEPSEEK",
+      },
+    ]);
+    expect(state.locatorCalls).toEqual(["pi-invocation"]);
+    expect(state.piConfigPlans).toEqual(["direct-deepseek-v1"]);
   });
 
   it("does not expose a dead proxy preflight dependency", () => {

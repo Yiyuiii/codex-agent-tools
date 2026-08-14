@@ -1,16 +1,25 @@
-# 四模型八项资格批次执行承载手册
+# 当前能力资格批次执行承载手册
 
 > 2026-07-29 状态：本手册继续约束需要真实运行的 batch 承载、首错停止、证据冻结和 fail-closed 行为，但“必须同批 8/8 才能形成任何资格”的晋级规则已被[能力粒度资格设计](../superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)取代。当前资格以固定 [`capabilities.json`](../smoke/evidence/capabilities.json) 为准；只有 stale、缺失、新增或证据失效的能力才需要运行。历史 batch 的终态不得修改。
+
+> 2026-08-14 补充：当前生产协议有两个互不混合的计划。`four-llm-v1` 保留原四路线八项顺序；`direct-deepseek-v1` 只含 Direct DeepSeek review/delegate 两项。前者绑定 Ark-only Pi 配置哈希，后者绑定 DeepSeek-only Pi 配置哈希。拆分依据见[Direct DeepSeek 双计划资格设计](../superpowers/specs/2026-08-14-direct-deepseek-qualification-design.md)。
 
 状态：维护者运行合同；不是可执行授权脚本，也不授予任何资格批次、安装或发布权限。
 
 ## 当前状态
 
-现行 `capabilities.json` 已用最新真实 passed case 更新，八项能力指纹全部 current，legacy 为 0；`npm run verify:capabilities` 通过。未来仍只为 stale、缺失、新增或证据失效的精确能力运行新 case。历史 batch manifest 与 case evidence 永久不可变，registry 文案不能替代 verifier。
+Direct DeepSeek 开发候选尚未取得两项真实 evidence。资格协议属于 Kimi/Pi 共享指纹输入，因此现行八份历史 evidence 虽仍有效，八项旧能力的指纹也全部 stale；`npm run verify:capabilities` 当前必须 fail closed。下一次真实执行先使用 `--plan direct-deepseek-v1` 完成两项批次并提交不可变终态，再在新的 clean commit 上使用默认 `four-llm-v1` 完成八项批次。两个批次分别生成 fresh 内部执行引用，不能在同一 cell、同一入口或同一 manifest 中合并。历史 batch manifest 与 case evidence 永久不可变，registry 文案不能替代 verifier。
+
+标准入口形状为：
+
+- `four-llm-v1`：`npm run --silent qualify:gates -- --authorization-ref <fresh-uuid>`
+- `direct-deepseek-v1`：`npm run --silent qualify:gates -- --plan direct-deepseek-v1 --authorization-ref <fresh-uuid>`
+
+`fresh-uuid` 只在受控执行 cell 内生成；明文不得写入仓库或报告。
 
 standing authorization 下最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`。唯一标准入口和单一前台承载正常取得可信终态；八项 case 全部 passed，每项为一次 client invocation、零 retry/fallback，owned process 全部 drain。终态 `passed`、`promotionEligible=true`，immutable-evidence 与 frozen-candidate verifier 通过，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，资格锁为空，不可变证据提交为 `c09ce74`。
 
-2026-08-02 的额度失败批次仍作为不可变历史保留；额度恢复只构成重入条件，真正的通过结论来自上述新批次。新批没有补跑、改变顺序、retry、fallback 或恢复 Node 版本矩阵。资格门禁现已闭合，后续进入离线发布门禁。
+2026-08-02 的额度失败批次仍作为不可变历史保留；额度恢复只构成重入条件，真正的通过结论来自上述新批次。新批没有补跑、改变顺序、retry、fallback 或恢复 Node 版本矩阵。当时的 `0.1.1` 资格门禁由此闭合；2026-08-14 Direct DeepSeek 开发候选以本节首段的新状态为准。
 
 以下较早批次事实与哈希继续保持原样。
 
@@ -87,7 +96,7 @@ active long-term goal、4 小时内层预算、短周期 wait 和现有锁/check
 
 ### 成功终态
 
-terminal 已存在且完整八项同批结果为 8/8 passed 时，只读验证 terminal、case evidence、冻结身份、不可变证据、锁释放与目标进程 0/0/0，然后停止并汇报。成功资格只表示可进入后续人工审阅，不自动授权活动安装、旧工具移除、发布或正式工作树变更。
+terminal 已存在且所选计划的完整固定 schedule 全部 passed 时（`four-llm-v1` 为 8/8，`direct-deepseek-v1` 为 2/2），只读验证 terminal、case evidence、冻结身份、不可变证据、锁释放与 owned process drain，然后停止并汇报。成功资格只表示可进入后续索引与发布门禁，不自动授权活动安装、旧工具移除、发布或正式工作树变更。
 
 ### 失败终态
 

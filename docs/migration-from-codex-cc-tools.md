@@ -1,8 +1,8 @@
 # 从 codex-cc-tools 迁移
 
-## 当前结论：官方配置与宿主发现面退役完成
+## 已发布结论与当前开发候选
 
-`codex-agent-tools` 现在由 MCP 服务 `codex_external_agents` 通过 `external_review` 与 `external_delegate` 提供 Codex 外部 LLM 能力。2026-08-07 已完成本机替代：
+`codex-agent-tools` 的已发布 `0.1.1` 由 MCP 服务 `codex_external_agents` 通过 `external_review` 与 `external_delegate` 提供 Codex 外部 LLM 能力。2026-08-07 已完成该版本的本机替代：
 
 - 新插件不调用 `codex_cc_tools`，也不调用、修改或卸载本机 Claude Code；
 - 活动 Codex 已通过官方插件机制安装并启用公开稳定版 `0.1.1`，完整重启后的新任务已发现两个新工具，真实 Kimi K3 窄 review/delegate 均通过；
@@ -23,10 +23,11 @@
 | Ark Coding Plan | `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | review/delegate current passed |
 | Ark Agent Plan 主档 | `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | review/delegate current passed |
 | Ark Agent Plan 经济档 | `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | review/delegate current passed |
+| DeepSeek 官方 API | `deepseek-v4-flash` | Pi / `deepseek` / `deepseek-v4-flash` / direct | 开发候选；review/delegate pending |
 | Anthropic Claude / Claude Code 后端 | 无 | 不进入新产品面 | 不迁移 |
 | OpenAI/Codex 模型家族 | 无 | 顶层已经是 Codex | 不作为外部来源 |
 
-当前 Kimi 只公开 K3；旧 Kimi、旧 Agent Plan 模型和 Gemini 记录只作为历史证据保留，不属于当前注册表。Gemini 的历史 Google / `proxy-10808` 路由与额度失败见 [退役历史页](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/pi-gemini.md)，不构成当前 provider 或待晋级能力。发布资格以能力索引和 verifier 为准：2026-08-03 新批次已使八项全部 current passed，现行索引为 8 current / 0 legacy。只有未来发生 stale、缺失、新增或证据失效时才定向运行对应精确能力；不因临时额度恢复重复运行，不静默切换到其它 LLM，也不改写历史 evidence。
+当前 Kimi 只公开 K3；旧 Kimi、旧 Agent Plan 模型和 Gemini 记录只作为历史证据保留，不属于当前注册表。Gemini 的历史 Google / `proxy-10808` 路由与额度失败见 [退役历史页](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/pi-gemini.md)，不构成当前 provider 或待晋级能力。2026-08-03 批次仍为已发布 `0.1.1` 的 8 current / 0 legacy 快照；Direct DeepSeek 开发候选修改了共享资格输入，当前机器分析为旧八项 evidence valid 但 fingerprint stale，Direct 两项 pending 且尚无索引条目。只有新双计划证据和十项索引通过 verifier 后，才能把开发候选写成 current；历史 evidence 不改写。
 
 ## 已满足的替代证据
 
