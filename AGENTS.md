@@ -10,6 +10,7 @@
 - 不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端；`deepseek-v4-flash` 只作为 Ark Agent Plan 内的固定模型路线提供。
 - 2026-08-13：用户覆盖上一条中的 DeepSeek 边界，要求重新加入 Direct DeepSeek API，并以 Pi 为载体；Direct DeepSeek provider 仅允许 `deepseek-v4-flash`，不得顺带登记其它 DeepSeek 模型。既有 Kimi/Ark 路线继续保留。
 - 2026-08-14：维护者说明本机用户环境已存在 `OPENAI_API_KEY_DEEPSEEK`。Direct DeepSeek 只使用该宿主变量，不要求另建 `DEEPSEEK_API_KEY`；插件、doctor、资格与文档必须统一使用现有变量名，仍不得保存或输出其值。
+- 2026-08-14（本次验收范围）：维护者只要求验证新加入的 Direct DeepSeek 工作正常，不要求刷新或测试既有 Kimi/Ark 功能，并要求暂时跳过额外审阅步骤。该范围足以结束本次开发验证，但不改变未来整包发布或活动插件升级必须满足的既有 release verifier；未经另行授权仍不发布或升级。
 - 原 `codex-cc-tools` 中其余可用来源尽量迁移到 Pi；Kimi 使用本机 Kimi Code。
 - 终端用户不手工维护插件或 Pi 配置，由 Codex 随项目版本维护。
 - 当前迁移不需要额外外部审阅，由 Codex 自主推进；未经明确授权不公开发布 npm。
