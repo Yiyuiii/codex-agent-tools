@@ -73,8 +73,7 @@ describe("Codex plugin artifact", () => {
     expect(pluginManifest).toMatchObject({
       name: "codex-external-agents",
       version: packageManifest.version,
-      description:
-        "Use explicitly selected external LLMs for review and delegated coding tasks.",
+      description: "Use DeepSeek V4 Flash for review and delegated coding tasks.",
       author: {
         name: "codex-agent-tools maintainers",
       },
@@ -82,10 +81,9 @@ describe("Codex plugin artifact", () => {
       mcpServers: "./.mcp.json",
       interface: {
         displayName: "Codex External Agents",
-        shortDescription:
-          "Review and delegate with explicitly selected external LLMs",
+        shortDescription: "Review and delegate with DeepSeek V4 Flash",
         longDescription:
-          "Use explicitly selected local Kimi and Pi-backed LLMs for Codex review and delegated coding tasks.",
+          "Use the fixed deepseek-v4-flash model through an isolated Pi RPC configuration for Codex review and delegated coding tasks.",
         developerName: "codex-agent-tools maintainers",
         category: "Productivity",
         capabilities: ["Interactive", "Write"],

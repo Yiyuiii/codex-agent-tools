@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "kind": "beta",
+  "package": {
+    "name": "codex-agent-tools",
+    "version": "0.1.2-beta.0",
+    "tag": "v0.1.2-beta.0",
+    "npmChannel": "next"
+  },
+  "core": {
+    "runtimeFrozenCommit": "4cac5fba1e7cf4d3d8ff8fc8a28f159955c90acc",
+    "canonicalRuntime": {
+      "schemaVersion": 1,
+      "digestSha256": "06fbdd80e69b0715db13e3970e85dbea0b338f455e35bccf9725bcac8b0126a9"
+    },
+    "windowsJobHelper": {
+      "path": "plugins/codex-external-agents/native/win32-x64/codex-agent-job-helper.exe",
+      "sha256": "c9bc5cddf77e6385c6a9971b7bf4d4cf5bd697f498fa80c2f1c9ec7c706d8dfa"
+    },
+    "capabilityIndex": {
+      "path": "docs/smoke/evidence/capabilities.json",
+      "sha256": "1b695a62be14dbebaa4f23dee31872d1533483e936a6cec7847fac963ff38850",
+      "entryCount": 2
+    },
+    "currentHostFreeze": {
+      "path": ".release-validation/evidence/current-host-4cac5fba1e7cf4d3d8ff8fc8a28f159955c90acc.json",
+      "sha256": "17d2895acc2653bd0828d4980e80f53867b0d8339b1f07b5a0ffe9794fa5d61a"
+    }
+  },
+  "pluginArtifactTree": {
+    "schemaVersion": 1,
+    "digestSha256": "353f249ef290dec0db143a1f82889a490279da8af665975a3a78fb2888e8423c"
+  },
+  "observerArtifact": {
+    "path": "host-acceptance/win32-x64/codex-host-acceptance-observer.exe",
+    "sha256": "dd20110b1cbcae984ab9f3560ece1bfa8e7b1a0e542b206cec5d9ff5047f5a64",
+    "protocolVersion": 1,
+    "buildManifest": {
+      "path": "host-acceptance/observer-build-inputs.v1.json",
+      "sha256": "f97ec39a710cd448030a8eea8316a3e5c87af4c2ccfcb96b43304394c1219ce0"
+    },
+    "protocol": {
+      "path": "host-acceptance/protocol/observer-protocol.v1.json",
+      "sha256": "7c89855c33b17ab95cc6414dbb86cb74eeebc3f363beb27479118b2585492803"
+    },
+    "inputsDigestSha256": "143abde38da931e552aa2d0b02ed0d436a59aac901381a6447967cdb11e0a136"
+  }
+}
