@@ -162,7 +162,7 @@ describe("logical LLM registry", () => {
     );
   });
 
-  it("registers the direct DeepSeek candidate without granting unqualified tasks", () => {
+  it("enables Direct DeepSeek from capability-scoped evidence", () => {
     const profile = resolveLlm("deepseek-v4-flash");
 
     expect(profile).toMatchObject({
@@ -178,19 +178,27 @@ describe("logical LLM registry", () => {
       concurrencyKey: "deepseek",
       capabilities: { review: true, delegate: true },
       qualityGates: {
-        review: { status: "pending" },
-        delegate: { status: "pending" },
+        review: {
+          status: "passed",
+          evidence:
+            "docs/smoke/evidence/capabilities.json#deepseek-v4-flash-review",
+        },
+        delegate: {
+          status: "passed",
+          evidence:
+            "docs/smoke/evidence/capabilities.json#deepseek-v4-flash-delegate",
+        },
       },
     });
-    expect(() => resolveLlm("deepseek-v4-flash", "review")).toThrow(
-      /disabled pending real smoke/u,
+    expect(resolveLlm("deepseek-v4-flash", "review").model).toBe(
+      "deepseek-v4-flash",
     );
-    expect(() => resolveLlm("deepseek-v4-flash", "delegate")).toThrow(
-      /disabled pending real smoke/u,
+    expect(resolveLlm("deepseek-v4-flash", "delegate").model).toBe(
+      "deepseek-v4-flash",
     );
   });
 
-  it("exposes four qualified routes plus the direct DeepSeek candidate", () => {
+  it("exposes five qualified logical routes", () => {
     expect(resolveLlm("kimi-k3")).toMatchObject({
       runtime: "kimi-acp",
       model: "kimi-code/k3",

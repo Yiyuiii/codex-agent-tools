@@ -227,7 +227,7 @@ describe("doctor diagnostics", () => {
       detail: "not applicable on linux",
     });
     expect(report.checks.filter(({ level }) => level === "warn")).toHaveLength(
-      2,
+      1,
     );
   });
 

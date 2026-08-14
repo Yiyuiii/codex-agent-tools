@@ -19,15 +19,15 @@
 
 | 外部来源或用途 | 新逻辑 LLM | 固定路由 | 当前门禁 |
 | --- | --- | --- | --- |
-| Kimi Code 审阅/委派 | `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | review/delegate current passed |
-| Ark Coding Plan | `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | review/delegate current passed |
-| Ark Agent Plan 主档 | `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | review/delegate current passed |
-| Ark Agent Plan 经济档 | `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | review/delegate current passed |
-| DeepSeek 官方 API | `deepseek-v4-flash` | Pi / `deepseek` / `deepseek-v4-flash` / direct | 开发候选；review/delegate pending |
+| Kimi Code 审阅/委派 | `kimi-k3` | Kimi ACP / `kimi-code/k3` / direct | `0.1.1` passed；开发候选 stale |
+| Ark Coding Plan | `ark-coding-plan` | Pi / `ark-coding-plan` / `ark-code-latest` / direct | `0.1.1` passed；开发候选 stale，刷新被账户额度阻断 |
+| Ark Agent Plan 主档 | `ark-agent-plan` | Pi / `ark-agent-plan` / `ark-code-latest` / direct | `0.1.1` passed；开发候选 stale |
+| Ark Agent Plan 经济档 | `ark-agent-deepseek-v4-flash` | Pi / `ark-agent-plan` / `deepseek-v4-flash` / direct | `0.1.1` passed；开发候选 stale |
+| DeepSeek 官方 API | `deepseek-v4-flash` | Pi / `deepseek` / `deepseek-v4-flash` / direct | 开发候选 review/delegate current passed |
 | Anthropic Claude / Claude Code 后端 | 无 | 不进入新产品面 | 不迁移 |
 | OpenAI/Codex 模型家族 | 无 | 顶层已经是 Codex | 不作为外部来源 |
 
-当前 Kimi 只公开 K3；旧 Kimi、旧 Agent Plan 模型和 Gemini 记录只作为历史证据保留，不属于当前注册表。Gemini 的历史 Google / `proxy-10808` 路由与额度失败见 [退役历史页](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/pi-gemini.md)，不构成当前 provider 或待晋级能力。2026-08-03 批次仍为已发布 `0.1.1` 的 8 current / 0 legacy 快照；Direct DeepSeek 开发候选修改了共享资格输入，当前机器分析为旧八项 evidence valid 但 fingerprint stale，Direct 两项 pending 且尚无索引条目。只有新双计划证据和十项索引通过 verifier 后，才能把开发候选写成 current；历史 evidence 不改写。
+当前 Kimi 只公开 K3；旧 Kimi、旧 Agent Plan 模型和 Gemini 记录只作为历史证据保留，不属于当前注册表。Gemini 的历史 Google / `proxy-10808` 路由与额度失败见 [退役历史页](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/pi-gemini.md)，不构成当前 provider 或待晋级能力。2026-08-03 批次仍为已发布 `0.1.1` 的 8 current / 0 legacy 快照；Direct DeepSeek 开发候选修改了共享资格输入。当前十项索引中 Direct 两项 evidence valid / fingerprint current，旧八项 evidence valid / fingerprint stale；八项刷新批次因 Ark Coding Plan 账户额度首错停止。完整 verifier 通过前，不能把整个开发候选写成通过、已发布或已安装；历史 evidence 不改写。
 
 ## 已满足的替代证据
 

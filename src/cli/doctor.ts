@@ -33,13 +33,11 @@ export const DOCTOR_QUALIFIED_LLM_IDS = Object.freeze([
   "ark-agent-deepseek-v4-flash",
   "ark-agent-plan",
   "ark-coding-plan",
+  "deepseek-v4-flash",
   "kimi-k3",
 ] as const);
 
-export const DOCTOR_LLM_IDS = Object.freeze([
-  "deepseek-v4-flash",
-  ...DOCTOR_QUALIFIED_LLM_IDS,
-] as const);
+export const DOCTOR_LLM_IDS = DOCTOR_QUALIFIED_LLM_IDS;
 
 export const DOCTOR_CHECK_NAMES = Object.freeze([
   "Host runtime",

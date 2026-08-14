@@ -415,7 +415,6 @@ async function writeFakePiInstallation() {
   const cli = [
     'const { appendFileSync } = require("node:fs");',
     "const environment = process.env;",
-    `appendFileSync(${JSON.stringify(fakePiInvocationLog)}, "invocation\\n", "utf8");`,
     "function fail(code) { process.exit(code); }",
     "if (environment.HTTPS_PROXY !== undefined) fail(91);",
     "if (environment.HTTP_PROXY !== undefined) fail(92);",
@@ -423,14 +422,19 @@ async function writeFakePiInstallation() {
     "if (environment.all_proxy !== undefined) fail(94);",
     "if (environment.https_proxy !== undefined) fail(95);",
     "if (environment.http_proxy !== undefined) fail(96);",
-    `if (environment.CODEX_AGENT_ARK_AGENT_KEY !== ${JSON.stringify(credentialSentinel)}) fail(97);`,
+    "const arkCredential = environment.CODEX_AGENT_ARK_AGENT_KEY;",
+    "const deepSeekCredential = environment.CODEX_AGENT_DEEPSEEK_KEY;",
+    `const arkRoute = arkCredential === ${JSON.stringify(credentialSentinel)} && deepSeekCredential === undefined;`,
+    `const deepSeekRoute = deepSeekCredential === ${JSON.stringify(`${credentialSentinel}-deepseek`)} && arkCredential === undefined;`,
+    "if (!arkRoute && !deepSeekRoute) fail(97);",
+    "const route = arkRoute ? \"ark-agent\" : \"deepseek\";",
+    `appendFileSync(${JSON.stringify(fakePiInvocationLog)}, route + "\\n", "utf8");`,
     "if (environment.OPENAI_API_KEY_DOUBAO !== undefined) fail(98);",
     "if (environment.CODEX_AGENT_ARK_CODING_KEY !== undefined) fail(99);",
     "if (environment.ARK_API_KEY !== undefined) fail(100);",
     "if (environment.VOLCENGINE_API_KEY !== undefined) fail(101);",
     "if (environment.API_KEY_DOUBAO_CODING !== undefined) fail(102);",
     "if (environment.OPENAI_API_KEY_DEEPSEEK !== undefined) fail(106);",
-    "if (environment.CODEX_AGENT_DEEPSEEK_KEY !== undefined) fail(107);",
     "if (environment.GEMINI_API_KEY !== undefined) fail(103);",
     "if (environment.GOOGLE_API_KEY !== undefined) fail(104);",
     "if (environment.GOOGLE_GENERATIVE_AI_API_KEY !== undefined) fail(105);",
@@ -454,11 +458,14 @@ async function writeFakePiInstallation() {
   await writeFile(fakePiCli, cli, "utf8");
 }
 
-async function readFakePiInvocationCount() {
+async function readFakePiInvocationCount(route) {
   try {
-    return (await readFile(fakePiInvocationLog, "utf8"))
+    const invocations = (await readFile(fakePiInvocationLog, "utf8"))
       .split(/\r?\n/u)
-      .filter((line) => line === "invocation").length;
+      .filter((line) => line === "ark-agent" || line === "deepseek");
+    return route === undefined
+      ? invocations.length
+      : invocations.filter((entry) => entry === route).length;
   } catch (error) {
     if (
       typeof error === "object" &&
@@ -529,9 +536,9 @@ ${configLines}
 - 工具严格为 \`external_review\` 与 \`external_delegate\`；二者输入均要求 \`llm\`。
 - \`external_review\` 为只读且非破坏性；\`external_delegate\` 为可写且具破坏性提示。
 - 已退役的 Gemini review 被已安装 MCP 以 unknown logical LLM 明确拒绝；错误列出精确五项登记 LLM，没有启动 Pi，也没有返回伪造的结构化成功结果。
-- pending Direct DeepSeek review 在启动 Pi 前被已安装 MCP 拒绝，不能把代码接入伪装成真实资格通过。
-- fake Pi 的 Ark Agent Plan DeepSeek V4 Flash review 恰好调用一次并返回 \`completed\`，实际模型为 \`deepseek-v4-flash\`，且没有文件变化。
-- fake Pi 可信包入口确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 Agent Plan 目标凭据，未收到原始候选变量、其它 Ark 目标凭据或 Google 凭据。
+- 已由不可变能力证据晋级的 Direct DeepSeek review 通过已安装 MCP 恰好调用一次 fake Pi，并返回 \`completed\`、实际模型 \`deepseek-v4-flash\`、零文件变化。
+- fake Pi 的 Ark Agent Plan DeepSeek V4 Flash review 也恰好调用一次并返回 \`completed\`，实际模型为 \`deepseek-v4-flash\`，且没有文件变化。
+- fake Pi 可信包入口确认两个 direct 子进程都没有继承父 MCP 的 HTTP(S)/ALL proxy；每次只收到该路线规范化后的目标凭据，未收到原始候选变量、另一条路线目标凭据、其它 Ark 目标凭据或 Google 凭据。
 - 正常与异常清理都依次通过 SDK \`client.close()\`、\`transport.close()\` 触发 stdio 关闭和 Job-owned drain；验收脚本不读取 PID，也不使用任何 PID-based fallback。
 
 ## 语义回滚
@@ -659,27 +666,41 @@ try {
   if ((await readFakePiInvocationCount()) !== 0) {
     throw new Error("Retired Gemini review unexpectedly started fake Pi");
   }
-  const pendingDirectDeepSeek = await client.callTool({
-    name: "external_review",
-    arguments: {
-      llm: "deepseek-v4-flash",
-      task: "review_doc",
-      prompt: "Review README.md without modifying files.",
-      cwd: fixtureRoot,
-    },
-  });
+  const directDeepSeekResult = structuredContent(
+    await client.callTool(
+      {
+        name: "external_review",
+        arguments: {
+          llm: "deepseek-v4-flash",
+          task: "review_doc",
+          prompt: "Review README.md without modifying files.",
+          cwd: fixtureRoot,
+        },
+      },
+      undefined,
+      {
+        timeout: 30_000,
+        maxTotalTimeout: 30_000,
+        resetTimeoutOnProgress: true,
+      },
+    ),
+  );
   if (
-    pendingDirectDeepSeek.isError !== true ||
-    !Array.isArray(pendingDirectDeepSeek.content) ||
-    !pendingDirectDeepSeek.content.some(
-      (entry) =>
-        entry.type === "text" &&
-        typeof entry.text === "string" &&
-        /disabled pending real smoke/u.test(entry.text),
-    ) ||
-    (await readFakePiInvocationCount()) !== 0
+    directDeepSeekResult.status !== "completed" ||
+    directDeepSeekResult.actualModel !== "deepseek-v4-flash" ||
+    !Array.isArray(directDeepSeekResult.filesChanged) ||
+    directDeepSeekResult.filesChanged.length !== 0
   ) {
-    throw new Error("Pending Direct DeepSeek unexpectedly became callable");
+    throw new Error(
+      "Installed MCP Direct DeepSeek fake Pi review did not meet the acceptance gate",
+    );
+  }
+  if (
+    (await readFakePiInvocationCount()) !== 1 ||
+    (await readFakePiInvocationCount("deepseek")) !== 1 ||
+    (await readFakePiInvocationCount("ark-agent")) !== 0
+  ) {
+    throw new Error("Direct DeepSeek review did not invoke fake Pi exactly once");
   }
   const toolResult = structuredContent(
     await client.callTool(
@@ -719,7 +740,11 @@ try {
       )} model=${String(toolResult.actualModel)} diagnostics=${diagnostics}`,
     );
   }
-  if ((await readFakePiInvocationCount()) !== 1) {
+  if (
+    (await readFakePiInvocationCount()) !== 2 ||
+    (await readFakePiInvocationCount("deepseek")) !== 1 ||
+    (await readFakePiInvocationCount("ark-agent")) !== 1
+  ) {
     throw new Error(
       "Ark Agent Plan DeepSeek V4 Flash review did not invoke fake Pi exactly once",
     );

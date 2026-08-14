@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-Direct DeepSeek 开发候选尚未取得两项真实 evidence。资格协议属于 Kimi/Pi 共享指纹输入，因此现行八份历史 evidence 虽仍有效，八项旧能力的指纹也全部 stale；`npm run verify:capabilities` 当前必须 fail closed。下一次真实执行先使用 `--plan direct-deepseek-v1` 完成两项批次并提交不可变终态，再在新的 clean commit 上使用默认 `four-llm-v1` 完成八项批次。两个批次分别生成 fresh 内部执行引用，不能在同一 cell、同一入口或同一 manifest 中合并。历史 batch manifest 与 case evidence 永久不可变，registry 文案不能替代 verifier。
+Direct DeepSeek 开发候选已在独立 `direct-deepseek-v1` 批次取得 2/2 passed evidence，并按能力粒度政策写入索引为 current。资格协议属于 Kimi/Pi 共享指纹输入，因此现行八份历史 evidence 虽仍有效，八项旧能力的指纹全部 stale；`npm run verify:capabilities` 当前必须 fail closed。后续 `four-llm-v1` 刷新批次已在首项被 Ark Coding Plan 账户额度阻断；外部额度状态变化前不得重复。历史 batch manifest 与 case evidence永久不可变，registry 文案不能替代 verifier。
 
 标准入口形状为：
 
@@ -17,9 +17,11 @@ Direct DeepSeek 开发候选尚未取得两项真实 evidence。资格协议属�
 
 `fresh-uuid` 只在受控执行 cell 内生成；明文不得写入仓库或报告。
 
-standing authorization 下最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`。唯一标准入口和单一前台承载正常取得可信终态；八项 case 全部 passed，每项为一次 client invocation、零 retry/fallback，owned process 全部 drain。终态 `passed`、`promotionEligible=true`，immutable-evidence 与 frozen-candidate verifier 通过，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，资格锁为空，不可变证据提交为 `c09ce74`。
+standing authorization 下的 Direct 批次 `2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69` 绑定 frozen commit `469129d708eb90a3b68071c7b01313b7e70c65a2`。唯一标准入口完成两项；每项一次 client invocation、零 retry/fallback、owned process drained，终态 `passed`、`promotionEligible=true`，immutable-evidence 与 frozen-candidate verifier 通过，manifest SHA-256 为 `f0d564aef9d1d62cfe9348b74e54a99f53912e810dd662830704b9860d17279d`，资格锁为空，不可变证据提交为 `9c34156`。
 
-2026-08-02 的额度失败批次仍作为不可变历史保留；额度恢复只构成重入条件，真正的通过结论来自上述新批次。新批没有补跑、改变顺序、retry、fallback 或恢复 Node 版本矩阵。当时的 `0.1.1` 资格门禁由此闭合；2026-08-14 Direct DeepSeek 开发候选以本节首段的新状态为准。
+随后 `four-llm-v1` 批次 `2026-08-14T03-03-14.120Z-3312323b-63e0-4b47-b88c-8fb98bb06e4e` 绑定 frozen commit `9c34156975864d529f18d21500872cf8e9d3fd5b`，在 ordinal 1 `ark-coding-plan/delegate` 因 `account_quota_exceeded` failed 后首错停止；ordinal 2–8 notRun，终态 `blocked / case_failed`，manifest SHA-256 为 `7a1ca09d3f1dc1128596ec9c9d77f74aaf0239391ded50faf7f299cc7f74ca31`。一次 client invocation、零 retry/fallback、owned process drained、immutable verifier passed、资格锁为空；证据提交为 `ceccda6`。没有 resume、补跑或第二批。
+
+已发布 `0.1.1` 的最近八项 passed 批次仍是 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`，绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`；它的不可变 evidence 仍有效，但不能代表当前共享指纹。外部 Ark Coding Plan 额度恢复只构成新 clean frozen candidate 的重入条件，不会自动把八项 stale 改成 current。
 
 以下较早批次事实与哈希继续保持原样。
 

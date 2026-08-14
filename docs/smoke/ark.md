@@ -14,7 +14,9 @@
 
 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的 `ark-agent-plan` 配额池。2026-07-20 对旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 完成的四项 passed 证据现仅作为历史事实保留，不属于当前公开面，也不得用于晋级两个新 Agent Plan 路线。原始 evidence JSON 保持不变。
 
-Gemini 退役后的已发布 `0.1.1` 共有四个逻辑 LLM、八项能力。当前开发候选另登记 Direct `deepseek-v4-flash`，最终目标为五个逻辑 LLM、十项能力。资格单位仍是精确的逻辑 LLM × 任务；[`capabilities.json`](evidence/capabilities.json) 由 verifier 比较 evidence 哈希、case 身份、registry anchor 与运行时指纹。候选当前为旧八项 evidence valid / fingerprint stale，Direct 两项 pending；详情见 [Direct DeepSeek 接入状态](deepseek.md)。
+Gemini 退役后的已发布 `0.1.1` 共有四个逻辑 LLM、八项能力。当前开发候选另登记 Direct `deepseek-v4-flash`，形成五个逻辑 LLM、十项能力。资格单位仍是精确的逻辑 LLM × 任务；[`capabilities.json`](evidence/capabilities.json) 由 verifier 比较 evidence 哈希、case 身份、registry anchor 与运行时指纹。候选当前为旧八项 evidence valid / fingerprint stale，Direct 两项 evidence valid / fingerprint current；详情见 [Direct DeepSeek 接入状态](deepseek.md)。
+
+2026-08-14 的刷新批次 `2026-08-14T03-03-14.120Z-3312323b-63e0-4b47-b88c-8fb98bb06e4e` 绑定 frozen commit `9c34156975864d529f18d21500872cf8e9d3fd5b`。ordinal 1 `ark-coding-plan/delegate` 以 `account_quota_exceeded` failed 后，协调器按合同首错停止；其余七项 notRun，终态 `blocked / case_failed`、`promotionEligible=false`。该 case 为一次 client invocation、零 adapter/runtime retry、零 fallback、owned process drained；immutable verifier 通过，manifest SHA-256 为 `7a1ca09d3f1dc1128596ec9c9d77f74aaf0239391ded50faf7f299cc7f74ca31`。没有 resume、补跑或第二批；账户额度变化前不重复真实运行。
 
 2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据。后续真实批次由单个 `functions.exec` cell 正常承载到协调器终态，证明控制层承载路径有效，但不证明四小时存活。执行边界见[承载手册](../release/four-llm-qualification-execution-runbook.md)，演练事实见[承载演练报告](../release/qualification-carrier-rehearsal.md)。当时的历史闭包为 221 files / 17 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。该历史闭包不改变任何 Ark 路由、证据或资格状态，也不表示已经发布或安装。
 
@@ -48,13 +50,13 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 
 ## 当前证据矩阵
 
-当前 [`capabilities.json`](evidence/capabilities.json) 的三条 Ark 路线六项记录全部引用 2026-08-03 新批次，精确 SHA-256 与当前运行时指纹均由 verifier 验证通过。以下 2026-07-25 条目只保留为历史基线，不代表当前候选资格。
+当前 [`capabilities.json`](evidence/capabilities.json) 的三条 Ark 路线六项记录全部引用 2026-08-03 passed batch case，evidence SHA-256 仍由 verifier 验证有效；共享资格输入变化使当前开发候选的六项运行时指纹 stale。以下 2026-07-25 条目只保留为历史基线，不代表当前候选资格。
 
-| 逻辑 LLM                      | review | delegate | 当前来源摘要 |
-| ----------------------------- | ------ | -------- | ------------ |
-| `ark-coding-plan`             | passed | passed   | 2026-08-03 batch cases |
-| `ark-agent-plan`              | passed | passed   | 2026-08-03 batch cases |
-| `ark-agent-deepseek-v4-flash` | passed | passed   | 2026-08-03 batch cases；0 legacy |
+| 逻辑 LLM                      | evidence | 开发候选指纹 | 当前来源摘要 |
+| ----------------------------- | -------- | ------------ | ------------ |
+| `ark-coding-plan`             | passed cases | stale | 2026-08-03 batch；2026-08-14 刷新被账户额度阻断 |
+| `ark-agent-plan`              | passed cases | stale | 2026-08-03 batch |
+| `ark-agent-deepseek-v4-flash` | passed cases | stale | 2026-08-03 batch；0 legacy |
 
 ## 历史 2026-07-25 逐项基线
 

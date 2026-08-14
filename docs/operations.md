@@ -2,11 +2,13 @@
 
 本文是 `codex_external_agents` 官方插件构建、隔离验收、已授权官方升级与回滚的现行运维真值源。`0.1.1` 已通过 GitHub Actions OIDC 发布到 npm `latest`、完成公共精确包验收，并曾在完整重启后的新任务中发现两个公开工具；这是历史宿主验收事实。2026-08-13 当前任务的实时工具注册表没有这两个工具，所以当前任务没有加载本项目插件；本轮不读取活动配置，installed/enabled 状态与活动版本没有重新确认。普通 Stop 由维护者决定跳过并保持 unverified。旧 `codex_cc_tools` 已于 2026-08-07 经独立授权使用官方 `codex mcp remove` 退役；当前发布线只保证维护者的 Windows x64 / Node 24 宿主，不运行 Node 矩阵或跨宿主认证。
 
-2026-08-13/14 的 Direct DeepSeek 开发候选增加 Pi RPC provider `deepseek`，只登记 `deepseek-v4-flash`，宿主凭据名为 `OPENAI_API_KEY_DEEPSEEK`，Pi 子进程只接收规范化的 `CODEX_AGENT_DEEPSEEK_KEY`。Ark 与 Direct DeepSeek 使用不同的版本化 Pi 配置目录，互不加载对方 provider 或凭据占位符；本机 Pi 0.80.10 的离线模型列表已正确解析该配置。2026-08-14 以不输出值的布尔检查确认该变量在本机 user/process 环境存在。Direct DeepSeek 的 review/delegate 仍保持 pending；资格协议是 Kimi/Pi 共享指纹输入，因此现行八项旧能力也全部 stale，历史 evidence 仍保持有效。当前候选的能力验证与 release smoke 应当失败。资格执行拆为原八项 `four-llm-v1` 与 Direct 两项 `direct-deepseek-v1`，分别绑定 Ark-only 与 DeepSeek-only Pi 配置哈希。不得升级活动插件，直到受影响能力取得新不可变证据、全部离线与隔离门禁通过，并另行取得本次官方插件升级许可。详见 [Direct DeepSeek 接入状态](smoke/deepseek.md)。
+2026-08-13/14 的 Direct DeepSeek 开发候选增加 Pi RPC provider `deepseek`，只登记 `deepseek-v4-flash`，宿主凭据名为 `OPENAI_API_KEY_DEEPSEEK`，Pi 子进程只接收规范化的 `CODEX_AGENT_DEEPSEEK_KEY`。Ark 与 Direct DeepSeek 使用不同的版本化 Pi 配置目录，互不加载对方 provider 或凭据占位符；本机 Pi 0.80.10 的离线模型列表已正确解析该配置。2026-08-14 以不输出值的布尔检查确认该变量在本机 user/process 环境存在。Direct DeepSeek 的 review/delegate 已由独立真实批次 2/2 通过并写入当前能力索引；共享资格协议变化仍使原八项能力 stale，后续 `four-llm-v1` 刷新批次在首项被 Ark Coding Plan 账户额度阻断。当前候选的能力验证与 release smoke 因此继续失败关闭。不得升级活动插件，直到原八项恢复 current、全部离线与发布门禁通过，并另行取得本次官方插件升级许可。详见 [Direct DeepSeek 接入状态](smoke/deepseek.md)。
 
-最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`；四个逻辑 LLM 的八项 review/delegate 全部 passed。每项均为一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，owned process 全部排空；终态为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
+已发布 `0.1.1` 的真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`；四个逻辑 LLM 的八项 review/delegate 全部 passed。每项均为一次 client invocation、零 adapter/runtime retry、零 adapter/orchestrator fallback，owned process 全部排空；终态为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
 
-`0.1.1` 的 `capabilities.json` 统一绑定该批八个精确 case，旧的受限 legacy 入口归零。历史 manifest/case 继续保持不可变；Direct DeepSeek 不复用 Ark Agent Plan 的同名模型证据。当前开发候选以实际 `npm run verify:capabilities` 结果为准。
+Direct 批次 `2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69` 绑定 frozen commit `469129d708eb90a3b68071c7b01313b7e70c65a2`；review/delegate 2/2 passed、每项单次 client invocation、零 retry/fallback、owned process drained，终态 `passed`、`promotionEligible=true`，manifest SHA-256 为 `f0d564aef9d1d62cfe9348b74e54a99f53912e810dd662830704b9860d17279d`。现行 `capabilities.json` 精确绑定这两个 case，不复用 Ark Agent Plan 的同名模型证据。
+
+随后在 frozen commit `9c34156975864d529f18d21500872cf8e9d3fd5b` 启动的 `four-llm-v1` 批次 `2026-08-14T03-03-14.120Z-3312323b-63e0-4b47-b88c-8fb98bb06e4e` 于 ordinal 1 `ark-coding-plan/delegate` 返回 `account_quota_exceeded`，按首错停止为 `blocked / case_failed`，其余七项 notRun；调用次数 1、retry/fallback 0、owned process drained，immutable verifier 通过，manifest SHA-256 为 `7a1ca09d3f1dc1128596ec9c9d77f74aaf0239391ded50faf7f299cc7f74ca31`。没有 resume、补跑或第二批。当前机器分析为 Direct 2 current + 原路线 8 stale；以实际 `npm run verify:capabilities` 的失败结果为准。
 
 资格执行与恢复的唯一详细合同见[执行承载手册](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/four-llm-qualification-execution-runbook.md)；历史 Kimi/Ark case、旧 shell 根因和旧测试计数分别保留在 `docs/smoke/` 与不可变 evidence 中，不在运维入口重复维护。package/release assurance 只证明离线候选，不构成资格、安装或发布。
 
@@ -55,8 +57,8 @@ npm run acceptance:plugin:isolated:built
 - 临时 `CODEX_HOME` 隔离边界成立；
 - 官方安装器接受插件 manifest、直接 server-map `.mcp.json` 与自包含 bundle；
 - 缓存副本只公开 `external_review` 与 `external_delegate`，且 `llm` 必填；
-- 隔离验收先证明已退役的 Gemini 被已安装 MCP 以 unknown logical LLM 明确拒绝，错误列出精确五项登记 LLM；随后证明 pending Direct DeepSeek 在启动 Pi 前被拒绝，二者都不返回伪造的结构化成功结果；
-- 再用 qualified 的 `ark-agent-deepseek-v4-flash` 与 fake Pi 证明恰好一次调用、固定模型、direct 路由、父进程代理清除、只注入目标 Agent 凭据和进程清理门禁通过；
+- 隔离验收先证明已退役的 Gemini 被已安装 MCP 以 unknown logical LLM 明确拒绝，错误列出精确五项登记 LLM且不启动 Pi；
+- 再分别用 qualified 的 Direct `deepseek-v4-flash` 与 `ark-agent-deepseek-v4-flash` 调用 fake Pi，各恰好一次，证明固定模型、direct 路由、父进程代理清除、每次只注入对应目标凭据和进程清理门禁通过；
 - 官方 remove 后列表语义回滚，残留状态可解释；
 - 报告结论没有被扩张成真实 Codex App 已通过。
 

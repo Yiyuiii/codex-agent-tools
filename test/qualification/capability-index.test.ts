@@ -1047,7 +1047,7 @@ describe("capability qualification evidence source", () => {
 });
 
 describe("current capability index qualification", () => {
-  it("keeps historical evidence valid while shared protocol changes stale all eight indexed capabilities", async () => {
+  it("keeps Direct DeepSeek current while shared protocol changes stale the prior eight capabilities", async () => {
     let canonicalCollections = 0;
     const analysis = await analyzeCapabilityIndex(
       { repositoryRoot: process.cwd() },
@@ -1060,16 +1060,24 @@ describe("current capability index qualification", () => {
     );
 
     expect(canonicalCollections).toBe(1);
-    expect(analysis.entries).toHaveLength(8);
+    expect(analysis.entries).toHaveLength(10);
     expect(analysis.entries.map((entry) => entry.evidenceStatus)).toEqual(
-      Array.from({ length: 8 }, () => "valid"),
+      Array.from({ length: 10 }, () => "valid"),
     );
+    const directEntries = analysis.entries.filter(
+      ({ llm }) => llm === "deepseek-v4-flash",
+    );
+    const priorEntries = analysis.entries.filter(
+      ({ llm }) => llm !== "deepseek-v4-flash",
+    );
+    expect(directEntries).toHaveLength(2);
     expect(
-      analysis.entries.map((entry) => entry.runtimeFingerprintStatus),
+      directEntries.map((entry) => entry.runtimeFingerprintStatus),
+    ).toEqual(["current", "current"]);
+    expect(priorEntries).toHaveLength(8);
+    expect(
+      priorEntries.map((entry) => entry.runtimeFingerprintStatus),
     ).toEqual(Array.from({ length: 8 }, () => "stale"));
-    expect(
-      analysis.entries.some(({ llm }) => llm === "deepseek-v4-flash"),
-    ).toBe(false);
     expect(
       analysis.entries.every((entry) =>
         /^[a-f0-9]{64}$/u.test(entry.currentRuntimeFingerprintSha256 ?? ""),

@@ -77,9 +77,9 @@
 - 工具严格为 `external_review` 与 `external_delegate`；二者输入均要求 `llm`。
 - `external_review` 为只读且非破坏性；`external_delegate` 为可写且具破坏性提示。
 - 已退役的 Gemini review 被已安装 MCP 以 unknown logical LLM 明确拒绝；错误列出精确五项登记 LLM，没有启动 Pi，也没有返回伪造的结构化成功结果。
-- pending Direct DeepSeek review 在启动 Pi 前被已安装 MCP 拒绝，不能把代码接入伪装成真实资格通过。
-- fake Pi 的 Ark Agent Plan DeepSeek V4 Flash review 恰好调用一次并返回 `completed`，实际模型为 `deepseek-v4-flash`，且没有文件变化。
-- fake Pi 可信包入口确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 Agent Plan 目标凭据，未收到原始候选变量、其它 Ark 目标凭据或 Google 凭据。
+- 已由不可变能力证据晋级的 Direct DeepSeek review 通过已安装 MCP 恰好调用一次 fake Pi，并返回 `completed`、实际模型 `deepseek-v4-flash`、零文件变化。
+- fake Pi 的 Ark Agent Plan DeepSeek V4 Flash review 也恰好调用一次并返回 `completed`，实际模型为 `deepseek-v4-flash`，且没有文件变化。
+- fake Pi 可信包入口确认两个 direct 子进程都没有继承父 MCP 的 HTTP(S)/ALL proxy；每次只收到该路线规范化后的目标凭据，未收到原始候选变量、另一条路线目标凭据、其它 Ark 目标凭据或 Google 凭据。
 - 正常与异常清理都依次通过 SDK `client.close()`、`transport.close()` 触发 stdio 关闭和 Job-owned drain；验收脚本不读取 PID，也不使用任何 PID-based fallback。
 
 ## 语义回滚

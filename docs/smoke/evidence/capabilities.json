@@ -86,6 +86,34 @@
       }
     },
     {
+      "llm": "deepseek-v4-flash",
+      "task": "delegate",
+      "runtimeFingerprintSha256": "e09413589d103f7995cf99069c9d7b23f51b69404aa570a300b9dd165d73fab7",
+      "source": {
+        "kind": "batch-case",
+        "manifestPath": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/manifest.json",
+        "manifestSha256": "f0d564aef9d1d62cfe9348b74e54a99f53912e810dd662830704b9860d17279d",
+        "evidencePath": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/cases/2026-08-14T03-01-30.618Z-deepseek-v4-flash-delegate-deepseek.json",
+        "evidenceSha256": "7bbb2b11cc45e193a8b77e5ce1215b93f02ca80268b1914325d4f0c6490ea342",
+        "frozenCommit": "469129d708eb90a3b68071c7b01313b7e70c65a2",
+        "buildIdentitySha256": "8e2474e56da83f880580058d8db766239c57d00d5c6c1f6daca473953734264a"
+      }
+    },
+    {
+      "llm": "deepseek-v4-flash",
+      "task": "review",
+      "runtimeFingerprintSha256": "87f380818effe27bd74ada86f5d4279fa54d4a4ee18cfd0b6adff42b4ef22641",
+      "source": {
+        "kind": "batch-case",
+        "manifestPath": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/manifest.json",
+        "manifestSha256": "f0d564aef9d1d62cfe9348b74e54a99f53912e810dd662830704b9860d17279d",
+        "evidencePath": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/cases/2026-08-14T03-01-19.339Z-deepseek-v4-flash-review-deepseek.json",
+        "evidenceSha256": "4318245eeed8a8c798badf896f4fd68c0e8f4fee6c463956c1b2f579e2ee1d5a",
+        "frozenCommit": "469129d708eb90a3b68071c7b01313b7e70c65a2",
+        "buildIdentitySha256": "8e2474e56da83f880580058d8db766239c57d00d5c6c1f6daca473953734264a"
+      }
+    },
+    {
       "llm": "kimi-k3",
       "task": "delegate",
       "runtimeFingerprintSha256": "4e529d89aa8bcd61b20f414fde72d5a8c14b88e522a5fcfab02db91ac7910181",

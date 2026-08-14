@@ -30,15 +30,6 @@ const capabilityQualifiedTasks = (anchorPrefix: string) =>
     anchorPrefix,
   );
 
-const pendingTasks = () =>
-  ({
-    capabilities: { review: true, delegate: true },
-    qualityGates: {
-      review: { status: "pending" },
-      delegate: { status: "pending" },
-    },
-  }) as const;
-
 const DEFAULT_PROFILES: readonly LlmProfile[] = [
   {
     id: "ark-coding-plan",
@@ -96,7 +87,7 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     credentialTargetEnv: "CODEX_AGENT_DEEPSEEK_KEY",
     maxConcurrency: 1,
     concurrencyKey: "deepseek",
-    ...pendingTasks(),
+    ...capabilityQualifiedTasks("deepseek-v4-flash"),
   },
   {
     id: "kimi-k3",
