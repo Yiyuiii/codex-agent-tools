@@ -2,6 +2,8 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_CASES,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
   LEGACY_QUALIFICATION_PLAN_ID,
   qualificationPlanForEnvelope,
@@ -73,6 +75,16 @@ describe("qualification protocol", () => {
     ]);
   });
 
+  it("freezes the isolated Direct DeepSeek schedule", () => {
+    expect(DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID).toBe(
+      "direct-deepseek-v1",
+    );
+    expect(DIRECT_DEEPSEEK_QUALIFICATION_CASES).toEqual([
+      { ordinal: 1, llm: "deepseek-v4-flash", task: "review" },
+      { ordinal: 2, llm: "deepseek-v4-flash", task: "delegate" },
+    ]);
+  });
+
   it("dispatches envelopes without guessing a plan", () => {
     expect(qualificationPlanForEnvelope(1, undefined)).toBe(
       LEGACY_QUALIFICATION_PLAN_ID,
@@ -83,16 +95,30 @@ describe("qualification protocol", () => {
     expect(
       qualificationPlanForEnvelope(3, ACTIVE_QUALIFICATION_PLAN_ID),
     ).toBe(ACTIVE_QUALIFICATION_PLAN_ID);
+    expect(
+      qualificationPlanForEnvelope(
+        3,
+        DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+      ),
+    ).toBe(DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID);
     expect(() => qualificationPlanForEnvelope(1, "four-llm-v1")).toThrow();
     expect(() => qualificationPlanForEnvelope(2, undefined)).toThrow();
     expect(() => qualificationPlanForEnvelope(2, "five-llm-v1")).toThrow();
+    expect(() =>
+      qualificationPlanForEnvelope(
+        2,
+        DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+      ),
+    ).toThrow();
     expect(() => qualificationPlanForEnvelope(3, undefined)).toThrow();
     expect(() => qualificationPlanForEnvelope(3, "five-llm-v1")).toThrow();
     expect(() => qualificationPlanForEnvelope(4, "four-llm-v1")).toThrow();
   });
 
   it("returns frozen schedules without exposing mutable identities", () => {
-    const schedule = qualificationSchedule(ACTIVE_QUALIFICATION_PLAN_ID);
+    const schedule = qualificationSchedule(
+      DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    );
 
     expect(Object.isFrozen(schedule)).toBe(true);
     expect(Object.isFrozen(schedule[0])).toBe(true);
@@ -100,6 +126,8 @@ describe("qualification protocol", () => {
 
   it("preserves exact deeply readonly active case identities", () => {
     type ActiveCase = (typeof ACTIVE_QUALIFICATION_CASES)[number];
+    type DirectDeepSeekCase =
+      (typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES)[number];
     type LegacyCase = (typeof LEGACY_QUALIFICATION_CASES)[number];
 
     expectTypeOf<ActiveCase["llm"]>().toEqualTypeOf<
@@ -110,6 +138,12 @@ describe("qualification protocol", () => {
     >();
     expectTypeOf<
       TypeEqual<ActiveCase, DeepReadonly<ActiveCase>>
+    >().toEqualTypeOf<true>();
+    expectTypeOf<DirectDeepSeekCase["llm"]>().toEqualTypeOf<
+      "deepseek-v4-flash"
+    >();
+    expectTypeOf<
+      TypeEqual<DirectDeepSeekCase, DeepReadonly<DirectDeepSeekCase>>
     >().toEqualTypeOf<true>();
     expectTypeOf<LegacyCase["llm"]>().toEqualTypeOf<
       | "gemini-3.5-flash"
@@ -130,6 +164,9 @@ describe("qualification protocol", () => {
     const legacySchedule = qualificationSchedule(
       LEGACY_QUALIFICATION_PLAN_ID,
     );
+    const directDeepSeekSchedule = qualificationSchedule(
+      DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    );
     type ActiveSelectedCase = (typeof activeSchedule)[number];
     type LegacySelectedCase = (typeof legacySchedule)[number];
 
@@ -138,6 +175,9 @@ describe("qualification protocol", () => {
     >();
     expectTypeOf(legacySchedule).toEqualTypeOf<
       typeof LEGACY_QUALIFICATION_CASES
+    >();
+    expectTypeOf(directDeepSeekSchedule).toEqualTypeOf<
+      typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES
     >();
     expectTypeOf<
       TypeEqual<ActiveSelectedCase, DeepReadonly<ActiveSelectedCase>>
@@ -153,6 +193,7 @@ describe("qualification protocol", () => {
 
     expectTypeOf<ReturnType<typeof selectSchedule>>().toEqualTypeOf<
       | typeof ACTIVE_QUALIFICATION_CASES
+      | typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES
       | typeof LEGACY_QUALIFICATION_CASES
     >();
   });

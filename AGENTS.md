@@ -8,6 +8,10 @@
 - 每个逻辑 LLM 固定绑定一个执行后端。Pi 与 Kimi 可以共存。
 - 项目完全不调用、不修改、不卸载本机 Claude Code。
 - 不提供 Anthropic Claude、OpenAI/Codex 或独立 DeepSeek 后端；`deepseek-v4-flash` 只作为 Ark Agent Plan 内的固定模型路线提供。
+- 2026-08-13：用户覆盖上一条中的 DeepSeek 边界，要求重新加入 Direct DeepSeek API，并以 Pi 为载体；Direct DeepSeek provider 仅允许 `deepseek-v4-flash`，不得顺带登记其它 DeepSeek 模型。既有 Kimi/Ark 路线继续保留。
+- 2026-08-14：维护者说明本机用户环境已存在 `OPENAI_API_KEY_DEEPSEEK`。Direct DeepSeek 只使用该宿主变量，不要求另建 `DEEPSEEK_API_KEY`；插件、doctor、资格与文档必须统一使用现有变量名，仍不得保存或输出其值。
+- 2026-08-14（本次验收范围）：维护者只要求验证新加入的 Direct DeepSeek 工作正常，不要求刷新或测试既有 Kimi/Ark 功能，并要求暂时跳过额外审阅步骤。该范围足以结束本次开发验证，但不改变未来整包发布或活动插件升级必须满足的既有 release verifier；未经另行授权仍不发布或升级。
+- 2026-08-14（DeepSeek-only beta 发布授权）：维护者明确同意准备并公开发布 DeepSeek-only beta。当前目标版本为 `0.1.2-beta.0`，仅公开逻辑 LLM `deepseek-v4-flash`，保留 `external_review` 与 `external_delegate` 两个工具；历史 Kimi/Ark 实现和不可变证据留库但不进入 beta 注册表、凭据白名单、能力索引或 npm 证据集合。授权覆盖 `next` PR/合并、不可变 beta 标签、GitHub Release、GitHub Actions OIDC npm `next` 发布及公共精确包隔离验收；不授权活动插件安装/升级、活动 `config.toml` 访问或 Claude Code 变更。
 - 原 `codex-cc-tools` 中其余可用来源尽量迁移到 Pi；Kimi 使用本机 Kimi Code。
 - 终端用户不手工维护插件或 Pi 配置，由 Codex 随项目版本维护。
 - 当前迁移不需要额外外部审阅，由 Codex 自主推进；未经明确授权不公开发布 npm。
@@ -26,22 +30,31 @@
 - 2026-07-30（外部 CLI 原生能力边界）：用户确认此前 Kimi 被系统施加的全局最大 100 步限制显著损害了模型效能，并已自行解除。后续 Codex 不得为 Kimi、Pi、Claude Code 或其它外部 CLI 持久化、全局注入或悄然降低步数、轮数、工具调用次数、上下文、token、执行时长等上限，也不得把某次验收需要的局部限制写成 CLI 的长期默认。只有在单次任务确有安全、成本或验收必要时，才能使用作用域仅限该次调用的显式边界；必须说明原因、范围和停止语义，并在任务结束后不留下全局配置变化。外层承载 timeout、取消和进程清理仍可用于防止失控或残留，但不能伪装成模型能力上限，也不能在超时后把截断结果算作成功。
 - 2026-08-01（当前宿主优先）：用户明确不要求为了良好发布版本测试三个Node版本，只要求自己的当前环境鲁棒可用，并要求同步审计、删除其它冗余事项。该要求取消Windows Node 20/22/24 archive/matrix与跨机器兼容证明目标，但不取消Job原子归属、进程清理、凭据隔离、能力资格或beta→本机公共验收→stable发布门禁。具体精简由[Windows当前宿主最小可靠owned process设计](docs/superpowers/specs/2026-08-01-windows-current-host-minimal-design.md)维护；不得把历史多版本计划重新解释为用户硬要求。
 - 2026-08-01/02（当前发布验收授权）：用户批准方案A及新增受控Windows原生辅助层，并要求继续采用子智能体驱动；目标仍是先发布beta、在维护者当前宿主从公共npm与官方插件完成真实验收，确认完整App重启、真实Stop/interrupt和owned-zero后再发布stable。该授权没有恢复跨Node/跨机器兼容目标，也没有授权为外部CLI增加全局/default执行预算限制。
+- 2026-08-07（真实 Stop 验收调整）：维护者明确要求跳过当前普通 Stop 验收并转向下一步计划。该要求终止继续重试当前 observer 流程；它不等于 `cancelled + owned-zero` 已通过，也不能生成、补写或推断 PASS receipt。若后续仍要发布 `0.1.1` stable，必须先明确调整现行 stable 发布策略，并把未验证的取消风险保留为可审计事实。建议实施路线见[跳过真实 Stop 后的 0.1.1 Stable 晋级计划](docs/superpowers/plans/2026-08-07-stable-promotion-after-host-stop-skip.md)。
+- 2026-08-07（0.1.1 stable 方案 A 批准）：维护者明确批准按方案 A 继续发布 stable。发布证据必须把真实 `passed + receipt` 与 `skipped_by_maintainer + host_stop_unverified + decision` 保持为互斥状态；本次风险跳过只能硬锁 `0.1.1-beta.4 → 0.1.1`，不得泛化到未来版本、伪造 receipt 或输出真实宿主 Stop 已通过。剩余工作由 Codex 自主完成唯一 Node 24 离线门禁、`main` PR/CI、不可变 stable 标签、GitHub Actions OIDC 发布与公共 stable 隔离复验；不调用真实模型，不恢复 Node 矩阵，不本地发布 npm，也不直接接触活动配置。
+- 2026-08-07（Kimi swarm 与旧工具退役授权）：维护者要求尝试启用 Kimi 集群模式，并在只有 Kimi 可用的当前环境中评估、移除旧 `codex_cc_tools`，同时同步全局提示词。允许升级本机 Kimi、运行窄真实探测、通过官方 Codex MCP 命令移除旧工具和更新全局 `AGENTS.md`；仍不得直接读写活动 `~/.codex/config.toml`，不得为 Kimi 或其它外部 CLI 设置 default/global 步数、时长、token 或并发上限。协议或真实证据不能证明 swarm 时，不得以提示词包装成已启用功能。
 
 ## 当前事实状态
 
+- 2026-08-14 DeepSeek-only beta 候选：版本已设为 `0.1.2-beta.0`；公开注册表、doctor、插件凭据白名单、能力索引、包证据集合和隔离验收均收窄为 Direct `deepseek-v4-flash`。公开工具仍为 `external_review` 与 `external_delegate`。Direct review/delegate 两项沿用同一精确运行时指纹的真实 passed evidence，当前 verifier 为 2 current / 0 legacy；旧 Kimi/Ark 代码和证据仅作历史审计。发布仍须完成新运行时冻结凭据、全量离线/隔离门禁、`next` CI、OIDC 发布与公共 npm 精确验收，且不触碰活动插件或配置。
 - 2026-07-18：产品设计和 Kimi、Pi/Gemini、Ark/cutover 三阶段实现已完成。公开面只有 `external_review` 与 `external_delegate`，`llm` 始终必填。
-- 本机 Kimi Code 0.27.0 通过官方 ACP SDK 接入；当前公开面只保留 `kimi-k3`，2026-07-25 串行复跑的 review/delegate 两项真实门禁均通过并生成新证据。`kimi-k2.7` 与 `kimi-k2.7-highspeed` 的四项 passed 证据只作为历史记录保留，不再属于当前公开面，详见 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
+- 本机 Kimi Code 0.34.0 通过官方 ACP SDK 接入；当前公开面只保留 `kimi-k3`，2026-07-25 串行复跑的 review/delegate 两项真实门禁均通过并生成新证据。`kimi-k2.7` 与 `kimi-k2.7-highspeed` 的四项 passed 证据只作为历史记录保留，不再属于当前公开面。0.34.0 的 ACP 不公开 `swarm` 模式且思考值域只有 `on`；一次强制 `AgentSwarm` 的双文件窄任务四分钟无终态，不登记 PASS，也不增加公开参数，详见 [Kimi 0.34.0 AgentSwarm / ACP 探测](docs/research/kimi-0.34-swarm-acp.md)与 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
 - 本机 `@earendil-works/pi-coding-agent` 0.80.10 通过严格 RPC JSONL 接入。版本化隔离配置位于应用自有缓存，不读取或修改用户 `~/.pi/agent`，也不保存真实凭据。
 - Pi 桥覆盖命令关联、最终完成语义、工具证据、脱敏、心跳、取消/超时和 Windows 进程树清理。review 一旦出现 bash/edit/write 事件即以 `review_policy_violation` 失败；委派不自动重试，避免重复写入。
 - `gemini-3.5-flash` 已从活动注册表、Pi 配置、Google 凭据继承、网络策略、doctor、standalone smoke 和资格执行入口退役；旧 Google / `proxy-10808` 路由、额度失败与 blocked 批次只作为历史审计材料保留，见 [Pi / Gemini 退役历史](docs/smoke/pi-gemini.md)。
-- 当前 Ark 公开面为三项固定 Pi/direct 路线：`ark-coding-plan` 使用 provider `ark-coding-plan` 与模型 `ark-code-latest`；`ark-agent-plan` 与 `ark-agent-deepseek-v4-flash` 共享 provider `ark-agent-plan` 和并发上限 1，分别固定使用 `ark-code-latest` 与 `deepseek-v4-flash`。2026-08-03 新批次已使六项 Ark review/delegate 与两项 Kimi 能力全部 current passed，现行索引不再使用 legacy evidence。旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 证据只作为历史记录保留，不能用于新路线晋级，详见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
-- Ark Coding 凭据候选依次为 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING`；本机用户环境实际命中第三项。Agent Plan 使用 `OPENAI_API_KEY_DOUBAO`。MCP 只转发候选白名单，运行时再向 Pi 注入单个项目私有变量，doctor 只报告变量名而不报告值。
+- 当前 Ark 公开面为三项固定 Pi/direct 路线：`ark-coding-plan` 使用 provider `ark-coding-plan` 与模型 `ark-code-latest`；`ark-agent-plan` 与 `ark-agent-deepseek-v4-flash` 共享 provider `ark-agent-plan` 和并发上限 1，分别固定使用 `ark-code-latest` 与 `deepseek-v4-flash`。2026-08-03 新批次使六项 Ark review/delegate 与两项 Kimi 能力在 `0.1.1` 发布快照中全部 current passed，现行索引不使用 legacy evidence；Direct 接入改变共享资格输入后，这八项 evidence 仍 valid，但开发候选指纹全部 stale。旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 证据只作为历史记录保留，不能用于新路线晋级，详见 [Ark / Pi 真实能力门禁](docs/smoke/ark.md)。
+- 2026-08-13/14 Direct DeepSeek 开发候选：新增逻辑 ID `deepseek-v4-flash`，固定 provider `deepseek`、官方 API `https://api.deepseek.com`、Pi `openai-completions` 协议、宿主 `OPENAI_API_KEY_DEEPSEEK` → 子进程 `CODEX_AGENT_DEEPSEEK_KEY`，并发池 `deepseek=1`；该 provider 只含 `deepseek-v4-flash`。Ark 与 Direct DeepSeek 使用 `.../pi/<version>/ark` 与 `.../pi/<version>/deepseek` 两个隔离目录；Pi 0.80.10 离线解析探针已确认精确模型、1M context、384K max output 与 thinking。以不输出值的布尔检查确认宿主变量在 user/process 环境存在。`direct-deepseek-v1` 批次 `2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69` 在 frozen commit `469129d708eb90a3b68071c7b01313b7e70c65a2` 上 2/2 passed；每项单次 client invocation、零 retry/fallback、owned process drained，manifest SHA-256 `f0d564aef9d1d62cfe9348b74e54a99f53912e810dd662830704b9860d17279d`，不可变证据提交 `9c34156`。Direct 两项现为 evidence valid / fingerprint current，且未复用 Ark Agent Plan 同名模型证据。
+- 2026-08-14 旧八项刷新阻断：随后在 frozen commit `9c34156975864d529f18d21500872cf8e9d3fd5b` 启动的 `four-llm-v1` 批次 `2026-08-14T03-03-14.120Z-3312323b-63e0-4b47-b88c-8fb98bb06e4e` 于 ordinal 1 `ark-coding-plan/delegate` 因 `account_quota_exceeded` 首错停止；其余七项 notRun，终态 `blocked / case_failed`。该 case 一次调用、零 retry/fallback、owned process drained，immutable verifier passed，manifest SHA-256 `7a1ca09d3f1dc1128596ec9c9d77f74aaf0239391ded50faf7f299cc7f74ca31`，证据提交 `ceccda6`。当前十项索引为 Direct 2 current + 原路线 8 stale，完整 verifier/release 保持 fail closed；额度状态变化前不重复批次。状态与复核入口见 [Direct DeepSeek 接入状态](docs/smoke/deepseek.md)、[Ark 门禁](docs/smoke/ark.md)和[双计划资格设计](docs/superpowers/specs/2026-08-14-direct-deepseek-qualification-design.md)。
+- 2026-08-14 Ark 额度重入复核：官方当前说明 Coding Plan 同时受 5 小时、周与订阅月限额约束，并由方舟控制台显示使用量与剩余额度；没有找到公开的只读额度 API。只读复核发生在失败后 0.539 小时，隔离浏览器没有可复用登录态，因此没有额度恢复证据，也没有运行探测性模型请求。后续只有维护者确认控制台已有剩余额度或取得其它明确外部状态变化时，才可在新 clean frozen commit 上启动一次 fresh `four-llm-v1`；doctor、凭据存在或仅凭时间推测都不构成重入证据。详见 [Ark 门禁](docs/smoke/ark.md)与[执行手册](docs/release/four-llm-qualification-execution-runbook.md)。
+- Ark Coding 凭据候选依次为 `ARK_API_KEY`、`VOLCENGINE_API_KEY`、`API_KEY_DOUBAO_CODING`；本机用户环境实际命中第三项。Agent Plan 使用 `OPENAI_API_KEY_DOUBAO`；Direct DeepSeek 使用 `OPENAI_API_KEY_DEEPSEEK`。MCP 只转发候选白名单，运行时再向 Pi 注入当前逻辑 LLM 的单个项目私有变量，doctor 只报告变量名而不报告值。
 - 历史资格与公共包验收曾通过 WMI/`ps` 全机快照要求 Kimi ACP、Pi RPC 与 real-smoke 数量为零；它会把无关外部 CLI 或旧插件进程误判为本项目泄漏。该生产扫描路线已由`754a796`与`7823d47`删除，当前资格只使用case-owned Job terminal/drain与qualification lock owner identity，不得重新引入scanner或把无关外部CLI当成本项目泄漏。历史preflight v1/v2的`targetProcesses`字段只保留读取兼容，不得改写旧manifest/evidence。
 - 历史实现曾包含 `install --replace-codex-cc-tools` 和 `restore --backup`，但这套应用内自检未能证明真实 Codex App 可正常启动。历史实现当前已禁用，不得用于活动配置；相关公开 CLI 与源代码已删除，不能再把显式测试副本当作当前运维路线。
 - 2026-07-25 官方插件实施任务 1 已由提交 `db60c67` 完成：公开 CLI 只保留只读 `doctor`，不再接受 `--config`，历史 install/uninstall/restore/cutover 源码与测试已删除，doctor 不再读取 Codex 配置或报告 MCP registration。该提交经独立规格与代码质量审阅通过，当前基线为 147 项测试和类型检查全绿。
 - 2026-07-20：157 项测试、类型检查、构建、release smoke 和真实 stdio MCP 验收全绿；验收摘要 SHA-256 为 `0e4aca2d35c4e124a5f3b6ca60e8df440bfad27253d3e710334ba0fe29169d04`。
 - 2026-07-20 的自动 cutover 当时通过文件级、MCP initialize/listTools 和 strict doctor 检查，但重启后的真实 Codex App 运行异常。用户已于 2026-07-24 恢复原始 `~/.codex/config.toml`。因此“新 MCP 已在活动配置中完全替代旧 MCP”的结论已撤销；当前真实配置内容以用户恢复结果为准，未经许可不读取或修改。
-- 当前唯一推进路线：代码公开`ark-agent-deepseek-v4-flash`、`ark-agent-plan`、`ark-coding-plan`、`kimi-k3`四个固定逻辑LLM。最新真实`four-llm-v1`批次`2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`绑定frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`，八项review/delegate全部passed、零retry/fallback、owned process全部排空，`promotionEligible=true`；不可变证据提交为`c09ce74`，现行`capabilities.json`为8 current / 0 legacy。`0.1.1-beta.4`已完成PR/双重CI、精确标签、GitHub Actions OIDC发布、公共精确包隔离验收与活动官方插件升级；npm为`next=0.1.1-beta.4`、`latest=0.1.0`，活动插件installed/enabled beta.4，五文件缓存摘要与marker一致，旧`codex_cc_tools`仍enabled。下一步完整退出并重开App，从精确beta.4 clean tag启动checked-in observer；只在`REQUEST_STARTED`后点击普通Stop并取得精确`cancelled + owned-zero` receipt，随后才发布stable。禁止恢复Node矩阵、无理由重复模型资格或为外部CLI增加default/global限制。宿主历史证据见[真实宿主验收记录](docs/release/real-host-acceptance.md)。
+- 当前唯一推进路线：代码公开`ark-agent-deepseek-v4-flash`、`ark-agent-plan`、`ark-coding-plan`、`kimi-k3`四个固定逻辑LLM。最新真实`four-llm-v1`批次`2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`绑定frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`，八项review/delegate全部passed、零retry/fallback、owned process全部排空，`promotionEligible=true`；不可变证据提交为`c09ce74`，现行`capabilities.json`为8 current / 0 legacy。`0.1.1`已由PR #12合并到`main`（merge `f503f0c51c5fc5c51a31cbd2db63d2b8434b0c0f`），PR CI `31168056961`、main CI `31168216256`与release run `31168431472`均通过；不可变`v0.1.1`标签通过GitHub Actions OIDC发布，npm现为`latest=0.1.1`、`next=0.1.1-beta.4`。公共stable隔离验收在当前Windows x64 / Node 24宿主全绿，真实模型调用为0；npm integrity为`sha512-f4nBGcOkjy1ze3GhM1RRHc5pe67BaQy8pco1mhlbORWeZ4cwmhnT4aPxShPtTWkY74l0fHkOBq9h80i78SE9LA==`，shasum为`59ab23d0a6eea27a084a686c1ba04f727939044f`。活动官方插件已用官方remove/add从beta.4升级到installed/enabled `0.1.1`，五文件缓存与发布源逐项同SHA且无reparse。维护者随后完整退出重开App；当前新任务已发现`external_review`与`external_delegate`，官方MCP cwd仍精确指向`0.1.1`缓存，插件MCP进程由新app-server启动，因此stable已实际加载。2026-08-07 确认旧工具没有 Kimi 路由且当前其它旧来源均不可用后，维护者授权并由`codex mcp remove codex_cc_tools`官方命令成功移除；官方列表复核只保留新插件。维护者在2026-08-08再次完整退出重开App后，新任务工具发现面只包含`external_review`与`external_delegate`，不再包含旧工具；同一新任务中的官方MCP列表仍只保留`codex_external_agents`，并由`kimi-code/k3`在13.215秒内完成精确`RESTART_OK`窄review、零诊断/零文件变化。因此旧服务配置退役、宿主缓存清除和新服务可用性均已确认。两次beta.4真实宿主验收均没有PASS receipt，维护者批准的方案A只把`host Stop`记录为`skipped_by_maintainer / host_stop_unverified`并硬锁beta.4→0.1.1；发布与Release均未把它伪装为PASS。后续没有稳定版发布或激活阻断，只保留可选的未来真实Stop补证；禁止伪造receipt、恢复Node矩阵、无理由重复模型资格或为外部CLI增加default/global限制。宿主历史证据见[真实宿主验收记录](docs/release/real-host-acceptance.md)，公共包结果见[0.1.1 公共 npm 隔离验收](docs/release/0.1.1-npm-acceptance.md)。
+- 2026-08-14 最新覆盖状态：上一条“当前唯一推进路线”只描述已发布 `0.1.1` 与当时真实宿主验收的历史基线。开发候选现登记第五个逻辑 LLM `deepseek-v4-flash`；Direct review/delegate 已真实 2/2 passed 并为 current，八项旧能力因共享指纹变化保持 stale，刷新又被 Ark Coding Plan 账户额度阻断。当前任务的实时工具注册表没有 `codex_external_agents` 的 `external_review` / `external_delegate`，因此当前任务并未加载本项目插件；未经读取活动配置，不能据此进一步断言 installed/enabled 状态或活动版本。本轮只在临时 `CODEX_HOME` 完成官方插件 add/list/cache MCP/remove 验收，没有发布、活动安装、升级或活动配置动作。
+- 2026-08-07 发布后 Kimi 实测：活动 0.1.1 插件加载后，先取消了一次三分钟无正文的宽泛仓库审阅，owned helper/Kimi 后代在15秒内排空且仓库无变更，不计PASS；随后把两代工具契约内嵌成窄 review，`kimi-code/k3` 在`38.291s`成功、零诊断/零文件变化；一次隔离 delegate 在`13.913s`创建精确两行结果并运行精确`git status --short`，结构化文件/命令证据、独立内容/状态复核与owned-zero全部通过。升级Kimi到0.34.0后，本轮五事实窄复核又在`57.505s`成功、零诊断/零文件变化。上述结果证明维护者当前窄review/delegate路径，不替代真实App普通Stop的skipped/unverified事实。
 - 当前宿主 observer 与启动层已完成：`ca9cf9e`、`f96e1ac`、`020c82d`、`228c6a3`、`1a029f1`、`e922276`闭合精确owned completion、MCP请求生命周期、named-pipe descriptor、真实socket/Job排空、严格JSON release marker与单一Node 24 workflow；`5046ab9`固定checked-in observer artifact及确定性build manifest，`4a0b3d0`固定只接受当前Windows x64/Node 24的无参启动层。observer不进入公开npm包、不新增CLI/doctor面，不扫描整机、不按PID重开、不用`taskkill`，也不读取活动config或设置外部CLI default/global预算。最终验证为observer managed 34/34、kernel 7/7、release 206/206、全库69文件1224 passed / 5 skipped、类型、语法、真实npm registry查询、dirty/non-tag fail-closed与diff均通过，fresh终审无P1/P2/P3；详细演进与哈希以[当前宿主精简计划](docs/superpowers/plans/2026-08-01-windows-current-host-owned-process.md)为准。
 - 2026-08-02去冗余最终状态：资格preflight保留一次build、`test:deterministic`、隔离插件验收与diff，不再在8项stale资格前循环执行必然fail-closed的release smoke；完整release smoke和唯一真实exact pack只在8/8后由`gate:offline`执行。current-host freeze只记录宿主、native helper/observer/canonical identity和8项stale事实，不重复自报通用测试、隔离插件或裸pack结果。Node矩阵、跨宿主认证、全机目标进程scanner及重复Markdown/实现细节断言均已从当前路线移除。
 - 2026-07-29：能力粒度资格设计和实施计划见 [设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)与[计划](docs/superpowers/plans/2026-07-29-capability-scoped-qualification.md)。八项索引中只有 `ark-agent-deepseek-v4-flash/delegate` 使用受限 legacy standalone evidence；verifier 将其固定为唯一允许的旧证据，不能泛化到其它能力。release smoke 在打包前执行同一能力 verifier。此次迁移没有重新调用任何真实产品模型，没有修改活动 `~/.codex/config.toml`、活动插件、Claude Code 或旧 `codex_cc_tools`。
@@ -162,7 +175,7 @@
 
 - 2026-07-30 的实现审计当时确认源码没有 `maxSteps`、`maxTurns`、100 步或工具调用次数硬编码，但公开 schema 当时仍把 `timeoutMs` 限制到最多 900,000ms，Kimi/Pi profile 当时仍有 600,000/900,000ms 单次硬上限。该历史审计促成了本轮设计；这些数值描述旧实现，不是现行合同。
 - 2026-07-31 beta.1 handoff 暴露了真实取消缺口：外层任务已 interrupted，夹具完成标记没有写入，但服务端 MCP 与 Kimi ACP 可以继续或重生，最终只能精确清理该插件 MCP 树。该现象不是 stable Stop gate 的通过证据。
-- 显式deadline、在途跟踪、stdio session shutdown与既有fake Kimi/Pi进程树证据已经闭合；当前只使用[当前宿主精简计划](docs/superpowers/plans/2026-08-01-windows-current-host-owned-process.md)的编号和顺序。clean freeze后恢复真实8/8并使verifier green，随后由GitHub Actions发布beta，从公共npm验收、官方插件升级、完整App重启，并在observer发布`REQUEST_STARTED`后由普通Stop取得`cancelled + owned-zero` receipt后才发布stable；历史编号不得被重新激活，也不得用编号变化跳过门禁。
+- 显式deadline、在途跟踪、stdio session shutdown与既有fake Kimi/Pi进程树证据已经闭合；当前只使用[当前宿主精简计划](docs/superpowers/plans/2026-08-01-windows-current-host-owned-process.md)和[0.1.1 stable 风险跳过计划](docs/superpowers/plans/2026-08-07-stable-promotion-after-host-stop-skip.md)的现行状态。原路线要求普通Stop取得`cancelled + owned-zero` receipt后才发布stable；该宿主证据没有取得，维护者已批准仅对beta.4→0.1.1使用严格`skipped_by_maintainer / host_stop_unverified`状态继续发布。它不改变历史事实、不能泛化为通用跳过机制，也不能写成真实Stop已通过。
 
 ## 架构与计划索引
 
@@ -178,6 +191,7 @@
 - [Pi 资格规定命令成功语义设计](docs/superpowers/specs/2026-07-28-qualification-required-command-success-design.md)
 - [当前：真实资格实验长期默认授权设计](docs/superpowers/specs/2026-07-28-standing-experiment-authorization-design.md)
 - [当前：能力级资格复用与变更影响失效设计](docs/superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)
+- [当前：Direct DeepSeek 双计划资格设计](docs/superpowers/specs/2026-08-14-direct-deepseek-qualification-design.md)
 - [当前：stdio 生命周期与外部 CLI 原生执行预算设计](docs/superpowers/specs/2026-07-31-stdio-lifecycle-and-native-execution-budget-design.md)
 - [基线：Windows Job Object owned process 补充设计](docs/superpowers/specs/2026-07-31-windows-job-object-owned-process-design.md)
 - [当前覆盖：Windows 当前宿主最小可靠 owned process 设计](docs/superpowers/specs/2026-08-01-windows-current-host-minimal-design.md)
@@ -186,11 +200,13 @@
 - [历史：Windows Job Object owned process 14项实施计划](docs/superpowers/plans/2026-07-31-windows-job-object-owned-process.md)
 - [Task 2 硬门禁证据：Windows fd3 write-half-close preflight](docs/research/windows-fd3-half-close-preflight.md)
 - [当前：外部 CLI 原生能力上限审计](docs/research/external-cli-native-limits.md)
+- [当前：Kimi 0.34.0 AgentSwarm / ACP 探测](docs/research/kimi-0.34-swarm-acp.md)
 - [历史未采用：Windows split control channels 补充规格](docs/superpowers/specs/2026-08-01-windows-split-control-channels-amendment-proposal.md)
 - [当前宿主精简变更说明](docs/review/2026-08-01-windows-split-control-channels-approval.html)
 - [历史已覆盖：stdio 生命周期与外部 CLI 原生执行预算实施计划](docs/superpowers/plans/2026-07-31-stdio-lifecycle-and-native-execution-budget.md)
 - [当前：能力级资格复用与 Ark Coding Plan 晋级实施计划](docs/superpowers/plans/2026-07-29-capability-scoped-qualification.md)
 - [当前：Beta → Stable 发布实施计划](docs/superpowers/plans/2026-07-29-beta-to-stable-release.md)
+- [当前：跳过真实 Stop 后的 0.1.1 Stable 晋级计划](docs/superpowers/plans/2026-08-07-stable-promotion-after-host-stop-skip.md)
 - [当前：长期默认授权与自主资格收敛实施计划](docs/superpowers/plans/2026-07-28-standing-authorization-and-autonomous-qualification.md)
 - [Pi 写入命令生命周期脱敏诊断实施计划](docs/superpowers/plans/2026-07-28-pi-write-command-lifecycle-diagnostics.md)
 - [Pi Windows shell 环境闭环实施计划](docs/superpowers/plans/2026-07-28-pi-windows-shell-environment.md)
@@ -220,6 +236,7 @@
 - [0.1.1-beta.1 公共 npm 隔离验收](docs/release/0.1.1-beta.1-npm-acceptance.md)
 - [0.1.1-beta.3 公共 npm 隔离验收](docs/release/0.1.1-beta.3-npm-acceptance.md)
 - [0.1.1-beta.4 公共 npm 隔离验收](docs/release/0.1.1-beta.4-npm-acceptance.md)
+- [0.1.1 公共 npm 隔离验收](docs/release/0.1.1-npm-acceptance.md)
 
 ## 开发约定
 

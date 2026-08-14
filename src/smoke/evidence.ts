@@ -10,15 +10,17 @@ import { types as nodeUtilTypes } from "node:util";
 
 import { resolveLlm } from "../llms/registry.js";
 import {
-  ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+  qualificationSchedule,
+  type CurrentQualificationPlanId,
 } from "../qualification/protocol.js";
 
-export type SmokeKind = "kimi" | "ark";
+export type SmokeKind = "kimi" | "ark" | "deepseek";
 export type SmokeTask = "review" | "delegate";
 
 export interface SmokeQualificationContext {
-  readonly qualificationPlanId: "four-llm-v1";
+  readonly qualificationPlanId: CurrentQualificationPlanId;
   readonly batchId: string;
   readonly ordinal: number;
   readonly llm: string;
@@ -250,7 +252,7 @@ function freezeQualificationContext(
   context: SmokeQualificationContext,
 ): SmokeQualificationContext {
   return Object.freeze({
-    qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+    qualificationPlanId: context.qualificationPlanId,
     batchId: context.batchId,
     ordinal: context.ordinal,
     llm: context.llm,
@@ -293,14 +295,22 @@ export function normalizeSmokeQualificationContext(
     descriptors.authorizationReferenceSha256?.value;
   const orchestratorFallbackUsed =
     descriptors.orchestratorFallbackUsed?.value;
-  const activeIdentity = ACTIVE_QUALIFICATION_CASES.find(
-    (identity) =>
-      identity.ordinal === ordinal &&
-      identity.llm === llm &&
-      identity.task === task,
-  );
+  const currentPlan =
+    qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID ||
+    qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+      ? qualificationPlanId
+      : null;
+  const activeIdentity =
+    currentPlan === null
+      ? undefined
+      : qualificationSchedule(currentPlan).find(
+          (identity) =>
+            identity.ordinal === ordinal &&
+            identity.llm === llm &&
+            identity.task === task,
+        );
   if (
-    qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID ||
+    currentPlan === null ||
     typeof batchId !== "string" ||
     !BATCH_ID_PATTERN.test(batchId) ||
     batchId === "." ||

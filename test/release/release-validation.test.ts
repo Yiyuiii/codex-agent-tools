@@ -8,6 +8,8 @@ import { describe, expect, it } from "vitest";
 import {
   assertCurrentHostFreezeReceipt,
   assertHostAcceptanceReceipt,
+  assertHostStopReleaseDecision,
+  buildReleaseNpmViewInvocation,
   computeHostAcceptanceEventSha256,
   computeHostAcceptanceRequestBindingSha256,
   digestReleasePluginArtifactTree,
@@ -35,19 +37,100 @@ const OBSERVER_MANIFEST_PATH =
 const OBSERVER_PROTOCOL_PATH =
   "host-acceptance/protocol/observer-protocol.v1.json";
 
+describe("release npm metadata invocation", () => {
+  it("runs the fixed npm CLI through the current Node executable on Windows", () => {
+    expect(
+      buildReleaseNpmViewInvocation({
+        nodeExecutable: "C:\\Program Files\\nodejs\\node.exe",
+        packageName: "codex-agent-tools",
+        packageVersion: "0.1.1-beta.4",
+        platform: "win32",
+      }),
+    ).toEqual({
+      command: "C:\\Program Files\\nodejs\\node.exe",
+      trustedScriptPath:
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+      args: [
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "view",
+        "codex-agent-tools@0.1.1-beta.4",
+        "version",
+        "dist",
+        "--json",
+        "--registry=https://registry.npmjs.org/",
+      ],
+    });
+  });
+
+  it("uses npm directly with the same official-registry query on non-Windows hosts", () => {
+    expect(
+      buildReleaseNpmViewInvocation({
+        nodeExecutable: "/usr/local/bin/node",
+        packageName: "codex-agent-tools",
+        packageVersion: "0.1.1-beta.4",
+        platform: "linux",
+      }),
+    ).toEqual({
+      command: "npm",
+      trustedScriptPath: null,
+      args: [
+        "view",
+        "codex-agent-tools@0.1.1-beta.4",
+        "version",
+        "dist",
+        "--json",
+        "--registry=https://registry.npmjs.org/",
+      ],
+    });
+  });
+
+  it("rejects package identity drift and non-absolute Windows Node paths", () => {
+    expect(() =>
+      buildReleaseNpmViewInvocation({
+        nodeExecutable: "node.exe",
+        packageName: "codex-agent-tools",
+        packageVersion: "0.1.1-beta.4",
+        platform: "win32",
+      }),
+    ).toThrow("Release validation evidence is invalid");
+    expect(() =>
+      buildReleaseNpmViewInvocation({
+        nodeExecutable: "C:\\Program Files\\nodejs\\node.exe",
+        packageName: "different-package",
+        packageVersion: "0.1.1-beta.4",
+        platform: "win32",
+      }),
+    ).toThrow("Release validation evidence is invalid");
+  });
+});
+
+type PassedStableMarker = Omit<
+  StableReleaseValidationMarker,
+  "hostAcceptance"
+> & {
+  readonly hostAcceptance: Extract<
+    StableReleaseValidationMarker["hostAcceptance"],
+    { readonly status: "passed" }
+  >;
+};
+
+type SkippedStableMarker = Omit<
+  StableReleaseValidationMarker,
+  "hostAcceptance"
+> & {
+  readonly hostAcceptance: Extract<
+    StableReleaseValidationMarker["hostAcceptance"],
+    { readonly status: "skipped_by_maintainer" }
+  >;
+};
+
 function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
 const capabilities: readonly CapabilityFingerprintProjection[] = [
-  ["ark-agent-deepseek-v4-flash", "delegate"],
-  ["ark-agent-deepseek-v4-flash", "review"],
-  ["ark-agent-plan", "delegate"],
-  ["ark-agent-plan", "review"],
-  ["ark-coding-plan", "delegate"],
-  ["ark-coding-plan", "review"],
-  ["kimi-k3", "delegate"],
-  ["kimi-k3", "review"],
+  ["deepseek-v4-flash", "delegate"],
+  ["deepseek-v4-flash", "review"],
 ].map(([llm, task], index) => ({
   llm: llm!,
   task: task as "delegate" | "review",
@@ -80,7 +163,7 @@ function core(indexBytes = capabilityIndexBytes()): ReleaseValidationCore {
     capabilityIndex: {
       path: "docs/smoke/evidence/capabilities.json",
       sha256: sha256(indexBytes),
-      entryCount: 8,
+      entryCount: 2,
     },
     currentHostFreeze: {
       path: `.release-validation/evidence/current-host-${RUNTIME_COMMIT}.json`,
@@ -182,10 +265,10 @@ function betaMarker(targetCore = core(), artifacts = pluginEntries()) {
   };
 }
 
-function stableMarker(targetCore = core()): StableReleaseValidationMarker {
+function stableMarker(targetCore = core()): PassedStableMarker {
   const beta = betaMarker(targetCore);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: "stable",
     package: {
       name: "codex-agent-tools",
@@ -209,17 +292,54 @@ function stableMarker(targetCore = core()): StableReleaseValidationMarker {
       },
     },
     hostAcceptance: {
-      path:
-        ".release-validation/evidence/v0.1.1-beta.1-host-acceptance.json",
-      sha256: H64,
-      sessionNonceSha256: H64,
+      status: "passed",
+      receipt: {
+        path:
+          ".release-validation/evidence/v0.1.1-beta.1-host-acceptance.json",
+        sha256: H64,
+        sessionNonceSha256: H64,
+      },
     },
+  };
+}
+
+function skippedStableMarker(targetCore = core()): SkippedStableMarker {
+  const passed = stableMarker(targetCore);
+  return {
+    ...passed,
+    publicBeta: {
+      ...passed.publicBeta,
+      version: "0.1.1-beta.4",
+      tag: "v0.1.1-beta.4",
+      markerPath: ".release-validation/v0.1.1-beta.4.json",
+    },
+    hostAcceptance: {
+      status: "skipped_by_maintainer",
+      risk: "host_stop_unverified",
+      decision: {
+        path: ".release-validation/evidence/v0.1.1-host-stop-decision.json",
+        sha256: H64,
+      },
+    },
+  };
+}
+
+function hostStopDecision(marker: StableReleaseValidationMarker) {
+  return {
+    schemaVersion: 1,
+    kind: "host-stop-release-decision",
+    package: marker.package,
+    publicBeta: marker.publicBeta,
+    decision: "skipped_by_maintainer",
+    risk: "host_stop_unverified",
+    reason: "interactive_host_stop_not_completed",
+    decidedAt: "2026-08-07T09:00:00.000Z",
   };
 }
 
 function freezeReceipt(
   targetCore: ReleaseValidationCore,
-  staleCount = 8,
+  staleCount = 0,
   projection: readonly CapabilityFingerprintProjection[] = capabilities,
   observer = observerArtifact(),
 ) {
@@ -244,7 +364,7 @@ function freezeReceipt(
       nativePreflight: "passed",
       nativeVerify: "passed",
       observerVerify: "passed",
-      capabilityEvidenceValidCount: 8,
+      capabilityEvidenceValidCount: 2,
       prequalificationStaleCount: staleCount,
       realModelCalls: 0,
       activeConfigAccesses: 0,
@@ -407,7 +527,7 @@ function canonicalIdentity() {
 }
 
 describe("strict release validation marker", () => {
-  it("accepts exact beta and stable markers bound to workflow context", () => {
+  it("accepts exact beta and both stable host-decision states bound to workflow context", () => {
     expect(
       parseReleaseValidationMarker(betaMarker(), {
         packageVersion: "0.1.1-beta.1",
@@ -422,6 +542,101 @@ describe("strict release validation marker", () => {
         npmChannel: "latest",
       }).kind,
     ).toBe("stable");
+    const skipped = parseReleaseValidationMarker(skippedStableMarker(), {
+      packageVersion: "0.1.1",
+      tag: "v0.1.1",
+      npmChannel: "latest",
+    });
+    expect(skipped).toMatchObject({
+      kind: "stable",
+      schemaVersion: 2,
+      hostAcceptance: {
+        status: "skipped_by_maintainer",
+        risk: "host_stop_unverified",
+      },
+    });
+  });
+
+  it.each([
+    [
+      "passed state with skip decision fields",
+      () => ({
+        ...stableMarker(),
+        hostAcceptance: {
+          ...stableMarker().hostAcceptance,
+          risk: "host_stop_unverified",
+        },
+      }),
+    ],
+    [
+      "skipped state with receipt fields",
+      () => ({
+        ...skippedStableMarker(),
+        hostAcceptance: {
+          ...skippedStableMarker().hostAcceptance,
+          receipt: stableMarker().hostAcceptance.receipt,
+        },
+      }),
+    ],
+    [
+      "unknown skip risk",
+      () => ({
+        ...skippedStableMarker(),
+        hostAcceptance: {
+          ...skippedStableMarker().hostAcceptance,
+          risk: "generic_release_waiver",
+        },
+      }),
+    ],
+    [
+      "legacy stable schema",
+      () => ({ ...stableMarker(), schemaVersion: 1 }),
+    ],
+    [
+      "skip bound to another beta",
+      () => ({
+        ...skippedStableMarker(),
+        publicBeta: {
+          ...skippedStableMarker().publicBeta,
+          version: "0.1.1-beta.3",
+          tag: "v0.1.1-beta.3",
+          markerPath: ".release-validation/v0.1.1-beta.3.json",
+        },
+      }),
+    ],
+    [
+      "skip generalized to a later stable",
+      () => ({
+        ...skippedStableMarker(),
+        package: {
+          ...skippedStableMarker().package,
+          version: "0.1.2",
+          tag: "v0.1.2",
+        },
+        publicBeta: {
+          ...skippedStableMarker().publicBeta,
+          version: "0.1.2-beta.4",
+          tag: "v0.1.2-beta.4",
+          markerPath: ".release-validation/v0.1.2-beta.4.json",
+        },
+        hostAcceptance: {
+          ...skippedStableMarker().hostAcceptance,
+          decision: {
+            ...skippedStableMarker().hostAcceptance.decision,
+            path: ".release-validation/evidence/v0.1.2-host-stop-decision.json",
+          },
+        },
+      }),
+    ],
+  ])("rejects %s", (_name, mutate) => {
+    const value = mutate();
+    expect(() =>
+      parseReleaseValidationMarker(value, {
+        packageVersion: value.package.version,
+        tag: value.package.tag,
+        npmChannel: "latest",
+      }),
+    ).toThrow("Release validation evidence is invalid");
   });
 
   it.each([
@@ -629,17 +844,17 @@ describe("strict release validation marker", () => {
 });
 
 describe("release receipts", () => {
-  it("binds all eight capability fingerprints and requires all eight to be stale", () => {
+  it("binds both DeepSeek capability fingerprints as current", () => {
     expect(
       assertCurrentHostFreezeReceipt(
-        freezeReceipt(core(), 8),
+        freezeReceipt(core(), 0),
         core(),
         capabilities,
         observerArtifact(),
       )
         .checks.prequalificationStaleCount,
-    ).toBe(8);
-    for (const staleCount of [0, 7, 9, 1.5]) {
+    ).toBe(0);
+    for (const staleCount of [1, 2, 8, 1.5]) {
       expect(() =>
         assertCurrentHostFreezeReceipt(
           freezeReceipt(core(), staleCount),
@@ -692,7 +907,10 @@ describe("release receipts", () => {
       ...draft,
       hostAcceptance: {
         ...draft.hostAcceptance,
-        sessionNonceSha256: receipt.session.nonceSha256,
+        receipt: {
+          ...draft.hostAcceptance.receipt,
+          sessionNonceSha256: receipt.session.nonceSha256,
+        },
       },
     };
     expect(assertHostAcceptanceReceipt(receipt, marker).result).toBe("passed");
@@ -797,6 +1015,64 @@ describe("release receipts", () => {
       expect(() => assertHostAcceptanceReceipt(invalid, marker)).toThrow();
     }
   });
+
+  it("binds the maintainer skip decision to the exact stable and public beta identities", () => {
+    const marker = skippedStableMarker();
+    const decision = hostStopDecision(marker);
+    expect(assertHostStopReleaseDecision(decision, marker)).toMatchObject({
+      decision: "skipped_by_maintainer",
+      risk: "host_stop_unverified",
+      reason: "interactive_host_stop_not_completed",
+    });
+    const invalid = [
+      { ...decision, extra: true },
+      { ...decision, risk: "generic_release_waiver" },
+      { ...decision, decision: "passed" },
+      {
+        ...decision,
+        package: { ...decision.package, version: "0.1.2" },
+      },
+      {
+        ...decision,
+        publicBeta: {
+          ...decision.publicBeta,
+          markerSha256: "f".repeat(64),
+        },
+      },
+      {
+        ...decision,
+        publicBeta: {
+          ...decision.publicBeta,
+          pluginArtifactTreeDigestSha256: H64,
+        },
+      },
+      {
+        ...decision,
+        publicBeta: {
+          ...decision.publicBeta,
+          npm: { ...decision.publicBeta.npm, shasum: "c".repeat(40) },
+        },
+      },
+      {
+        ...decision,
+        publicBeta: {
+          ...decision.publicBeta,
+          observerArtifact: {
+            ...decision.publicBeta.observerArtifact,
+            sha256: H64,
+          },
+        },
+      },
+    ];
+    for (const value of invalid) {
+      expect(() => assertHostStopReleaseDecision(value, marker)).toThrow(
+        "Release validation evidence is invalid",
+      );
+    }
+    expect(() =>
+      assertHostStopReleaseDecision(new Proxy(decision, {}), marker),
+    ).toThrow("Release validation evidence is invalid");
+  });
 });
 
 describe("release validation verifier", () => {
@@ -875,8 +1151,11 @@ describe("release validation verifier", () => {
       ...preMarker,
       hostAcceptance: {
         ...preMarker.hostAcceptance,
-        sha256: sha256(hostBytes),
-        sessionNonceSha256: receipt.session.nonceSha256,
+        receipt: {
+          ...preMarker.hostAcceptance.receipt,
+          sha256: sha256(hostBytes),
+          sessionNonceSha256: receipt.session.nonceSha256,
+        },
       },
     };
     const files = new Map<string, Buffer>([
@@ -884,7 +1163,7 @@ describe("release validation verifier", () => {
       [".release-validation/v0.1.1.json", Buffer.from(JSON.stringify(stable))],
       ["docs/smoke/evidence/capabilities.json", indexBytes],
       [finalCore.currentHostFreeze.path, freezeBytes],
-      [stable.hostAcceptance.path, hostBytes],
+      [stable.hostAcceptance.receipt.path, hostBytes],
       // Deliberately no current plugin or observer artifacts: stable is bound to beta bytes.
     ]);
     const gitFiles = new Map<string, Buffer>([
@@ -983,6 +1262,157 @@ describe("release validation verifier", () => {
             file === OBSERVER_PATH
               ? Buffer.from("tampered observer")
               : dependencies.readGitFile(root, target, file),
+        },
+      ),
+    ).rejects.toThrow("Release validation evidence is invalid");
+  });
+
+  it("verifies an exact maintainer skip decision without reading or implying a receipt", async () => {
+    const indexBytes = capabilityIndexBytes();
+    const artifacts = pluginEntries();
+    const observer = observerFixture();
+    const draftCore = core(indexBytes);
+    const freezeBytes = Buffer.from(JSON.stringify(freezeReceipt(draftCore)));
+    const finalCore = {
+      ...draftCore,
+      currentHostFreeze: {
+        ...draftCore.currentHostFreeze,
+        sha256: sha256(freezeBytes),
+      },
+    };
+    const betaDraft = betaMarker(finalCore, artifacts);
+    const beta = {
+      ...betaDraft,
+      package: {
+        ...betaDraft.package,
+        version: "0.1.1-beta.4",
+        tag: "v0.1.1-beta.4",
+      },
+    };
+    const betaBytes = Buffer.from(JSON.stringify(beta));
+    const draftStable = skippedStableMarker(finalCore);
+    const publicBeta = {
+      ...draftStable.publicBeta,
+      markerSha256: sha256(betaBytes),
+      pluginArtifactTreeDigestSha256: beta.pluginArtifactTree.digestSha256,
+      observerArtifact: beta.observerArtifact,
+    };
+    const preMarker = { ...draftStable, publicBeta };
+    const decisionBytes = Buffer.from(
+      JSON.stringify(hostStopDecision(preMarker)),
+    );
+    const stable = {
+      ...preMarker,
+      hostAcceptance: {
+        ...preMarker.hostAcceptance,
+        decision: {
+          ...preMarker.hostAcceptance.decision,
+          sha256: sha256(decisionBytes),
+        },
+      },
+    };
+    const files = new Map<string, Buffer>([
+      [
+        "package.json",
+        Buffer.from(
+          JSON.stringify({ name: "codex-agent-tools", version: "0.1.1" }),
+        ),
+      ],
+      [
+        ".release-validation/v0.1.1.json",
+        Buffer.from(JSON.stringify(stable)),
+      ],
+      ["docs/smoke/evidence/capabilities.json", indexBytes],
+      [finalCore.currentHostFreeze.path, freezeBytes],
+      [stable.hostAcceptance.decision.path, decisionBytes],
+    ]);
+    const gitFiles = new Map<string, Buffer>([
+      [
+        `${BETA_COMMIT}:package.json`,
+        Buffer.from(
+          JSON.stringify({
+            name: "codex-agent-tools",
+            version: "0.1.1-beta.4",
+          }),
+        ),
+      ],
+      [`${BETA_COMMIT}:${publicBeta.markerPath}`, betaBytes],
+      [`${BETA_COMMIT}:${OBSERVER_PATH}`, observer.artifactBytes],
+      [`${BETA_COMMIT}:${OBSERVER_MANIFEST_PATH}`, observer.manifestBytes],
+      ...[...observer.inputFiles].map(
+        ([inputPath, bytes]) =>
+          [`${BETA_COMMIT}:${inputPath}`, bytes] as const,
+      ),
+    ]);
+    const repositoryReads: string[] = [];
+    const dependencies = {
+      readRepositoryFile: async (_root: string, file: string) => {
+        repositoryReads.push(file);
+        const bytes = files.get(file);
+        if (bytes === undefined) throw new Error(`unexpected read: ${file}`);
+        return bytes;
+      },
+      collectCanonicalIdentity: async () => canonicalIdentity(),
+      resolveGitTagCommit: async (_root: string, tag: string) =>
+        tag === publicBeta.tag ? BETA_COMMIT : TAG_COMMIT,
+      isGitAncestor: async (
+        _root: string,
+        ancestor: string,
+        descendant: string,
+      ) =>
+        (ancestor === RUNTIME_COMMIT &&
+          (descendant === BETA_COMMIT || descendant === TAG_COMMIT)) ||
+        (ancestor === BETA_COMMIT && descendant === TAG_COMMIT),
+      readGitFile: async (_root: string, target: string, file: string) => {
+        const bytes = gitFiles.get(`${target}:${file}`);
+        if (bytes === undefined) throw new Error(`unexpected git read: ${file}`);
+        return bytes;
+      },
+      lookupNpmDist: async () => publicBeta.npm,
+    };
+
+    await expect(
+      verifyReleaseValidation(
+        {
+          repositoryRoot: "virtual",
+          packageVersion: "0.1.1",
+          tag: "v0.1.1",
+          taggedCommit: TAG_COMMIT,
+          npmChannel: "latest",
+        },
+        dependencies,
+      ),
+    ).resolves.toMatchObject({
+      kind: "stable",
+      hostAcceptance: {
+        status: "skipped_by_maintainer",
+        risk: "host_stop_unverified",
+      },
+    });
+    expect(repositoryReads).toContain(stable.hostAcceptance.decision.path);
+    expect(repositoryReads).not.toContain(
+      ".release-validation/evidence/v0.1.1-beta.1-host-acceptance.json",
+    );
+
+    const invalidDecision = {
+      ...hostStopDecision(preMarker),
+      reason: "generic_skip",
+    };
+    await expect(
+      verifyReleaseValidation(
+        {
+          repositoryRoot: "virtual",
+          packageVersion: "0.1.1",
+          tag: "v0.1.1",
+          taggedCommit: TAG_COMMIT,
+          npmChannel: "latest",
+        },
+        {
+          ...dependencies,
+          readRepositoryFile: async (root, file) =>
+            file === stable.hostAcceptance.decision.path
+              ? Buffer.from(JSON.stringify(invalidDecision))
+              : dependencies.readRepositoryFile(root, file),
         },
       ),
     ).rejects.toThrow("Release validation evidence is invalid");

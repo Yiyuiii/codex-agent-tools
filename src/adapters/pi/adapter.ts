@@ -9,14 +9,11 @@ import { VERSION } from "../../version.js";
 import { buildPiChildEnvironment } from "../../runtime/environment.js";
 import {
   buildIsolatedPiConfig,
+  type BuildIsolatedPiConfigOptions,
   type IsolatedPiConfig,
 } from "./config.js";
 import { runPiRpc, type PiRpcRunRequest } from "./client.js";
-import {
-  locatePi,
-  locatePiInvocation,
-  type PiInvocation,
-} from "./locator.js";
+import { locatePi, locatePiInvocation, type PiInvocation } from "./locator.js";
 
 export interface PiAdapterDependencies {
   readonly locateExecutable?: (
@@ -25,10 +22,10 @@ export interface PiAdapterDependencies {
   readonly locateInvocation?: (
     environment: NodeJS.ProcessEnv,
   ) => Promise<PiInvocation>;
-  readonly buildConfig?: () => Promise<IsolatedPiConfig>;
-  readonly runClient?: (
-    request: PiRpcRunRequest,
-  ) => Promise<AdapterRunResult>;
+  readonly buildConfig?: (
+    options: BuildIsolatedPiConfigOptions,
+  ) => Promise<IsolatedPiConfig>;
+  readonly runClient?: (request: PiRpcRunRequest) => Promise<AdapterRunResult>;
   readonly retryMode?: "default" | "qualification-single-attempt";
 }
 
@@ -91,7 +88,8 @@ function mapToolEvent(event: unknown): unknown {
   ) {
     return event;
   }
-  const toolName = typeof record.toolName === "string" ? record.toolName : "unknown";
+  const toolName =
+    typeof record.toolName === "string" ? record.toolName : "unknown";
   if (record.type === "tool_execution_end") {
     const mapped: Record<string, unknown> = {
       type: "tool_result",
@@ -134,10 +132,10 @@ export class PiAdapter implements ExternalAgentAdapter {
   readonly #locateInvocation: (
     environment: NodeJS.ProcessEnv,
   ) => Promise<PiInvocation>;
-  readonly #buildConfig: () => Promise<IsolatedPiConfig>;
-  readonly #runClient: (
-    request: PiRpcRunRequest,
-  ) => Promise<AdapterRunResult>;
+  readonly #buildConfig: (
+    options: BuildIsolatedPiConfigOptions,
+  ) => Promise<IsolatedPiConfig>;
+  readonly #runClient: (request: PiRpcRunRequest) => Promise<AdapterRunResult>;
   readonly #retryMode: "default" | "qualification-single-attempt";
 
   public constructor(dependencies: PiAdapterDependencies = {}) {
@@ -147,34 +145,43 @@ export class PiAdapter implements ExternalAgentAdapter {
     this.#locateInvocation =
       dependencies.locateInvocation ??
       ((environment) => locatePiInvocation({ environment }));
-    this.#buildConfig =
-      dependencies.buildConfig ??
-      (() =>
-        buildIsolatedPiConfig({
-          version: VERSION,
-          providers: ["ark"],
-        }));
+    this.#buildConfig = dependencies.buildConfig ?? buildIsolatedPiConfig;
     this.#runClient = dependencies.runClient ?? runPiRpc;
     this.#retryMode = dependencies.retryMode ?? "default";
   }
 
   public async run(request: AdapterRunRequest): Promise<AdapterRunResult> {
     if (request.profile.runtime !== this.runtime) {
-      throw new Error(`PiAdapter cannot run runtime ${request.profile.runtime}`);
+      throw new Error(
+        `PiAdapter cannot run runtime ${request.profile.runtime}`,
+      );
     }
     if (request.profile.provider === undefined) {
       throw new Error(`Pi profile ${request.profile.id} has no fixed provider`);
     }
-    const launchPromise: Promise<PiClientLaunch> = process.platform === "win32"
-      ? this.#locateInvocation(request.parentEnvironment).then(
-          validatedWindowsLaunch,
-        )
-      : this.#locateExecutable(request.parentEnvironment).then(
-          (executable) => ({ executable }),
-        );
+    const providerSet =
+      request.profile.provider === "deepseek"
+        ? "deepseek"
+        : request.profile.provider === "ark-agent-plan" ||
+            request.profile.provider === "ark-coding-plan"
+          ? "ark"
+          : undefined;
+    if (providerSet === undefined) {
+      throw new Error(
+        `Pi profile ${request.profile.id} has unsupported provider ${request.profile.provider}`,
+      );
+    }
+    const launchPromise: Promise<PiClientLaunch> =
+      process.platform === "win32"
+        ? this.#locateInvocation(request.parentEnvironment).then(
+            validatedWindowsLaunch,
+          )
+        : this.#locateExecutable(request.parentEnvironment).then(
+            (executable) => ({ executable }),
+          );
     const [launch, config] = await Promise.all([
       launchPromise,
-      this.#buildConfig(),
+      this.#buildConfig({ version: VERSION, providers: [providerSet] }),
     ]);
     const environment = buildPiChildEnvironment(
       request.profile,
@@ -218,12 +225,13 @@ export class PiAdapter implements ExternalAgentAdapter {
     const combined = {
       ...result,
       events: result.events
-        .filter((event) =>
-          typeof event === "object" &&
-          event !== null &&
-          ((event as Record<string, unknown>).type ===
-            "tool_execution_start" ||
-            (event as Record<string, unknown>).type === "tool_execution_end"),
+        .filter(
+          (event) =>
+            typeof event === "object" &&
+            event !== null &&
+            ((event as Record<string, unknown>).type ===
+              "tool_execution_start" ||
+              (event as Record<string, unknown>).type === "tool_execution_end"),
         )
         .map(mapToolEvent),
     };
@@ -247,10 +255,7 @@ export class PiAdapter implements ExternalAgentAdapter {
               },
       };
     }
-    if (
-      result.status === "completed" &&
-      result.actualModel === undefined
-    ) {
+    if (result.status === "completed" && result.actualModel === undefined) {
       return {
         ...combined,
         status: "failed",

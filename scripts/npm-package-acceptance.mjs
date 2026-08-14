@@ -38,17 +38,11 @@ const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
-const { version } = parseNpmPackageAcceptanceArguments(
-  process.argv.slice(2),
-);
+const { version } = parseNpmPackageAcceptanceArguments(process.argv.slice(2));
 const packageSpec = `codex-agent-tools@${version}`;
 const temporaryRoot = await createNpmAcceptanceTemporaryRoot();
 const installRoot = path.join(temporaryRoot, "install");
-const packageRoot = path.join(
-  installRoot,
-  "node_modules",
-  "codex-agent-tools",
-);
+const packageRoot = path.join(installRoot, "node_modules", "codex-agent-tools");
 const isolatedHome = path.join(temporaryRoot, "codex-home");
 const isolatedUserHome = path.join(temporaryRoot, "user-home");
 const isolatedLocalAppData = path.join(temporaryRoot, "local-app-data");
@@ -63,14 +57,8 @@ const qualificationLockRoot = path.join(
 const marketplace = "codex-external-agents-local";
 const plugin = "codex-external-agents";
 const selector = `${plugin}@${marketplace}`;
-const repositoryUrl =
-  "git+https://github.com/Yiyuiii/codex-agent-tools.git";
-const expectedPluginEnvironmentVariables = [
-  "ARK_API_KEY",
-  "VOLCENGINE_API_KEY",
-  "API_KEY_DOUBAO_CODING",
-  "OPENAI_API_KEY_DOUBAO",
-];
+const repositoryUrl = "git+https://github.com/Yiyuiii/codex-agent-tools.git";
+const expectedPluginEnvironmentVariables = ["OPENAI_API_KEY_DEEPSEEK"];
 const mcpBaseEnvironmentVariables = new Set([
   "PATH",
   "Path",
@@ -159,11 +147,7 @@ async function assertNoQualificationLocks() {
       throw new Error("Qualification lock is present");
     }
   } catch (error) {
-    if (
-      error instanceof Error &&
-      "code" in error &&
-      error.code === "ENOENT"
-    ) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       return;
     }
     throw error;
@@ -261,9 +245,7 @@ async function runCodex(args, environment) {
 }
 
 function assertPluginStatus(output, expectedInstalled) {
-  const line = output
-    .split(/\r?\n/u)
-    .find((entry) => entry.includes(selector));
+  const line = output.split(/\r?\n/u).find((entry) => entry.includes(selector));
   if (line === undefined) {
     throw new Error("Official plugin list omitted the target plugin");
   }
@@ -472,17 +454,10 @@ try {
   );
 
   const packageMetadata = await lstat(packageRoot);
-  if (
-    !packageMetadata.isDirectory() ||
-    packageMetadata.isSymbolicLink()
-  ) {
+  if (!packageMetadata.isDirectory() || packageMetadata.isSymbolicLink()) {
     throw new Error("Installed npm package root is invalid");
   }
-  const pluginRoot = path.join(
-    packageRoot,
-    "plugins",
-    "codex-external-agents",
-  );
+  const pluginRoot = path.join(packageRoot, "plugins", "codex-external-agents");
   const [packageManifest, pluginManifest] = await Promise.all([
     readFile(path.join(packageRoot, "package.json"), "utf8").then(JSON.parse),
     readFile(
@@ -525,10 +500,8 @@ try {
   const fakeRuntimes = await createNpmAcceptanceFakeRuntimes(temporaryRoot);
   const isolatedEnvironment = {
     ...npmEnvironment,
-    KIMI_COMMAND: fakeRuntimes.kimi,
     PI_COMMAND: fakeRuntimes.pi,
-    ARK_API_KEY: "npm-acceptance-coding-fixture",
-    OPENAI_API_KEY_DOUBAO: "npm-acceptance-agent-fixture",
+    OPENAI_API_KEY_DEEPSEEK: "npm-acceptance-deepseek-fixture",
   };
   const cliPath = path.join(packageRoot, "dist", "cli.js");
   const cliVersion = (
@@ -546,10 +519,7 @@ try {
     env: isolatedEnvironment,
     label: "installed CLI help",
   });
-  if (
-    !help.includes("codex-agent-tools") ||
-    !help.includes("doctor")
-  ) {
+  if (!help.includes("codex-agent-tools") || !help.includes("doctor")) {
     throw new Error("Installed CLI help contract is invalid");
   }
   const doctor = JSON.parse(
@@ -599,14 +569,12 @@ try {
   );
 } finally {
   try {
-    await cleanupOwnedMcpTransport(
-      directClient,
-      directTransport,
-    ).catch(() => undefined);
-    await cleanupOwnedMcpTransport(
-      cachedClient,
-      cachedTransport,
-    ).catch(() => undefined);
+    await cleanupOwnedMcpTransport(directClient, directTransport).catch(
+      () => undefined,
+    );
+    await cleanupOwnedMcpTransport(cachedClient, cachedTransport).catch(
+      () => undefined,
+    );
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

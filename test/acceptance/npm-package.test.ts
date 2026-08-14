@@ -24,8 +24,7 @@ import { locateKimi } from "../../src/adapters/kimi/locator.js";
 import { locatePiInvocation } from "../../src/adapters/pi/locator.js";
 import { DOCTOR_CHECK_NAMES } from "../../src/cli/doctor.js";
 
-const repositoryUrl =
-  "git+https://github.com/Yiyuiii/codex-agent-tools.git";
+const repositoryUrl = "git+https://github.com/Yiyuiii/codex-agent-tools.git";
 const windowsIt = it.runIf(process.platform === "win32");
 
 function acceptedDoctorChecks() {
@@ -66,45 +65,47 @@ function packageManifest(version = "0.1.0-beta.1") {
 }
 
 describe("npm-installed package acceptance contract", () => {
-  windowsIt("creates fake runtimes that satisfy the strict Windows locator contracts", async () => {
-    const temporaryRoot = await createNpmAcceptanceTemporaryRoot();
-    try {
-      await expect(realpath(temporaryRoot)).resolves.toBe(temporaryRoot);
-      const fakeRuntimes = await createNpmAcceptanceFakeRuntimes(
-        temporaryRoot,
-      );
+  windowsIt(
+    "creates fake runtimes that satisfy the strict Windows locator contracts",
+    async () => {
+      const temporaryRoot = await createNpmAcceptanceTemporaryRoot();
+      try {
+        await expect(realpath(temporaryRoot)).resolves.toBe(temporaryRoot);
+        const fakeRuntimes =
+          await createNpmAcceptanceFakeRuntimes(temporaryRoot);
 
-      expect(basename(fakeRuntimes.kimi).toLowerCase()).toBe("kimi.exe");
-      await expect(
-        locateKimi({
-          environment: { KIMI_COMMAND: fakeRuntimes.kimi },
+        expect(basename(fakeRuntimes.kimi).toLowerCase()).toBe("kimi.exe");
+        await expect(
+          locateKimi({
+            environment: { KIMI_COMMAND: fakeRuntimes.kimi },
+            platform: "win32",
+          }),
+        ).resolves.toBe(fakeRuntimes.kimi);
+
+        const pi = await locatePiInvocation({
+          environment: { PI_COMMAND: fakeRuntimes.pi },
           platform: "win32",
-        }),
-      ).resolves.toBe(fakeRuntimes.kimi);
-
-      const pi = await locatePiInvocation({
-        environment: { PI_COMMAND: fakeRuntimes.pi },
-        platform: "win32",
-      });
-      expect(pi.identity).toEqual({
-        packageName: "@earendil-works/pi-coding-agent",
-        packageVersion: "0.0.0",
-        nodeEngine: ">=24.0.0",
-      });
-      expect(pi.argvPrefix).toEqual([
-        join(
-          resolve(fakeRuntimes.pi, ".."),
-          "node_modules",
-          "@earendil-works",
-          "pi-coding-agent",
-          "dist",
-          "cli.js",
-        ),
-      ]);
-    } finally {
-      await rm(temporaryRoot, { force: true, recursive: true });
-    }
-  });
+        });
+        expect(pi.identity).toEqual({
+          packageName: "@earendil-works/pi-coding-agent",
+          packageVersion: "0.0.0",
+          nodeEngine: ">=24.0.0",
+        });
+        expect(pi.argvPrefix).toEqual([
+          join(
+            resolve(fakeRuntimes.pi, ".."),
+            "node_modules",
+            "@earendil-works",
+            "pi-coding-agent",
+            "dist",
+            "cli.js",
+          ),
+        ]);
+      } finally {
+        await rm(temporaryRoot, { force: true, recursive: true });
+      }
+    },
+  );
 
   it("builds an npm environment that cannot inherit active homes, config, cache, or credentials", () => {
     const environment = buildIsolatedNpmEnvironment({
@@ -171,9 +172,9 @@ describe("npm-installed package acceptance contract", () => {
     expect(
       parseNpmPackageAcceptanceArguments(["--version", "0.1.0-beta.1"]),
     ).toEqual({ version: "0.1.0-beta.1" });
-    expect(
-      parseNpmPackageAcceptanceArguments(["--version=0.1.0"]),
-    ).toEqual({ version: "0.1.0" });
+    expect(parseNpmPackageAcceptanceArguments(["--version=0.1.0"])).toEqual({
+      version: "0.1.0",
+    });
 
     for (const args of [
       [],
@@ -224,8 +225,7 @@ describe("npm-installed package acceptance contract", () => {
           {
             version: "0.1.0-beta.1",
             "dist.integrity": "sha512-ZmFrZS1pbnRlZ3JpdHk=",
-            "dist.shasum":
-              "0123456789abcdef0123456789abcdef01234567",
+            "dist.shasum": "0123456789abcdef0123456789abcdef01234567",
             "repository.url": repositoryUrl,
             ...drift,
           },
@@ -259,23 +259,21 @@ describe("npm-installed package acceptance contract", () => {
     ).toThrow(/installed package contract/iu);
   });
 
-  it("accepts only an all-green doctor report with the four qualified llms", () => {
+  it("accepts only an all-green doctor report with DeepSeek", () => {
     const checks = acceptedDoctorChecks();
 
-    expect(() =>
-      assertDoctorAcceptance({ ok: true, checks }),
-    ).not.toThrow();
+    expect(() => assertDoctorAcceptance({ ok: true, checks })).not.toThrow();
     expect(() =>
       assertDoctorAcceptance({
         ok: true,
-        checks: checks.filter(({ name }) => name !== "LLM kimi-k3"),
+        checks: checks.filter(({ name }) => name !== "LLM deepseek-v4-flash"),
       }),
     ).toThrow(/doctor acceptance/iu);
     expect(() =>
       assertDoctorAcceptance({
         ok: false,
         checks: checks.map((check) =>
-          check.name === "Ark Pi models"
+          check.name === "Pi models"
             ? {
                 ...check,
                 ok: false,
@@ -286,10 +284,11 @@ describe("npm-installed package acceptance contract", () => {
         ),
       }),
     ).toThrow(
-      "Installed doctor acceptance is invalid: failed checks=Ark Pi models",
+      "Installed doctor acceptance is invalid: failed checks=Pi models",
     );
 
-    const mismatchedPlatform = process.platform === "linux" ? "darwin" : "linux";
+    const mismatchedPlatform =
+      process.platform === "linux" ? "darwin" : "linux";
     expect(() =>
       assertDoctorAcceptance({
         ok: true,
@@ -305,7 +304,7 @@ describe("npm-installed package acceptance contract", () => {
                   level: "warn",
                   detail: `not applicable on ${mismatchedPlatform}`,
                 }
-            : check,
+              : check,
         ),
       }),
     ).toThrow(/doctor acceptance/iu);
@@ -341,8 +340,7 @@ describe("npm-installed package acceptance contract", () => {
       createHash("sha256").update(content).digest("hex");
     const batchEvidencePath =
       "docs/smoke/evidence/batches/current/cases/review.json";
-    const manifestPath =
-      "docs/smoke/evidence/batches/current/manifest.json";
+    const manifestPath = "docs/smoke/evidence/batches/current/manifest.json";
     const legacyPath = "docs/smoke/evidence/legacy.json";
     const batchEvidence = Buffer.from('{"passed":true}\n');
     const legacyEvidence = Buffer.from('{"passed":true}\n');

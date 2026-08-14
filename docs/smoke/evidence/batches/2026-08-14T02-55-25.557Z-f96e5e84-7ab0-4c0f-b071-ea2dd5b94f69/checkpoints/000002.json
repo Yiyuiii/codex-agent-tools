@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 3,
+  "qualificationPlanId": "direct-deepseek-v1",
+  "sequence": 2,
+  "kind": "case_completed",
+  "batchId": "2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69",
+  "recordedAt": "2026-08-14T03:01:19.832Z",
+  "repositoryCommit": "469129d708eb90a3b68071c7b01313b7e70c65a2",
+  "buildIdentitySha256": "8e2474e56da83f880580058d8db766239c57d00d5c6c1f6daca473953734264a",
+  "preflightSha256": "6ea6a9e6dc5b8ca950dc7346d6465d14644064789af90059b19b368140c56baf",
+  "ordinal": 1,
+  "llm": "deepseek-v4-flash",
+  "task": "review",
+  "result": "passed",
+  "evidence": {
+    "path": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/cases/2026-08-14T03-01-19.339Z-deepseek-v4-flash-review-deepseek.json",
+    "sha256": "4318245eeed8a8c798badf896f4fd68c0e8f4fee6c463956c1b2f579e2ee1d5a"
+  },
+  "adapterClientInvocationCount": 1,
+  "adapterRetryCount": 0,
+  "runtimeReportedAutoRetryCount": 0,
+  "adapterReportedFallbackUsed": false,
+  "orchestratorFallbackUsed": false,
+  "executionTelemetrySource": "pi-rpc-observable",
+  "ownedProcessDrained": true,
+  "failureReason": null
+}

@@ -162,7 +162,43 @@ describe("logical LLM registry", () => {
     );
   });
 
-  it("exposes exactly the four active logical LLMs", () => {
+  it("enables Direct DeepSeek from capability-scoped evidence", () => {
+    const profile = resolveLlm("deepseek-v4-flash");
+
+    expect(profile).toMatchObject({
+      id: "deepseek-v4-flash",
+      displayName: "DeepSeek V4 Flash",
+      runtime: "pi-rpc",
+      provider: "deepseek",
+      model: "deepseek-v4-flash",
+      network: "direct",
+      credentialEnv: ["OPENAI_API_KEY_DEEPSEEK"],
+      credentialTargetEnv: "CODEX_AGENT_DEEPSEEK_KEY",
+      maxConcurrency: 1,
+      concurrencyKey: "deepseek",
+      capabilities: { review: true, delegate: true },
+      qualityGates: {
+        review: {
+          status: "passed",
+          evidence:
+            "docs/smoke/evidence/capabilities.json#deepseek-v4-flash-review",
+        },
+        delegate: {
+          status: "passed",
+          evidence:
+            "docs/smoke/evidence/capabilities.json#deepseek-v4-flash-delegate",
+        },
+      },
+    });
+    expect(resolveLlm("deepseek-v4-flash", "review").model).toBe(
+      "deepseek-v4-flash",
+    );
+    expect(resolveLlm("deepseek-v4-flash", "delegate").model).toBe(
+      "deepseek-v4-flash",
+    );
+  });
+
+  it("exposes only Direct DeepSeek while retaining historical profiles for evidence inspection", () => {
     expect(resolveLlm("kimi-k3")).toMatchObject({
       runtime: "kimi-acp",
       model: "kimi-code/k3",
@@ -172,12 +208,10 @@ describe("logical LLM registry", () => {
     expectTypeOf<
       "timeoutMs" extends keyof LlmProfile ? false : true
     >().toEqualTypeOf<true>();
-    expect(supportedLlmIds()).toEqual([
-      "ark-agent-deepseek-v4-flash",
-      "ark-agent-plan",
-      "ark-coding-plan",
-      "kimi-k3",
-    ]);
+    expect(supportedLlmIds()).toEqual(["deepseek-v4-flash"]);
+    expect(() => resolveLlm("kimi-k3", "review")).toThrow(
+      /Supported llms: deepseek-v4-flash/u,
+    );
     expect(() => resolveLlm("gemini-3.5-flash")).toThrow(
       /Unknown logical llm/u,
     );
@@ -212,10 +246,11 @@ describe("logical LLM registry", () => {
         },
       },
     });
-    expect(resolveLlm("ark-coding-plan", "review").model).toBe(
+    const retainedRegistry = createLlmRegistry([profile]);
+    expect(retainedRegistry.resolve("ark-coding-plan", "review").model).toBe(
       "ark-code-latest",
     );
-    expect(resolveLlm("ark-coding-plan", "delegate").model).toBe(
+    expect(retainedRegistry.resolve("ark-coding-plan", "delegate").model).toBe(
       "ark-code-latest",
     );
   });
@@ -258,18 +293,14 @@ describe("logical LLM registry", () => {
           },
         },
       });
-      expect(resolveLlm(id, "review").model).toBe(model);
-      expect(resolveLlm(id, "delegate").model).toBe(model);
+      const retainedRegistry = createLlmRegistry([profile]);
+      expect(retainedRegistry.resolve(id, "review").model).toBe(model);
+      expect(retainedRegistry.resolve(id, "delegate").model).toBe(model);
     },
   );
 
-  it("derives the complete MCP credential allowlist from logical profiles", () => {
-    expect(credentialEnvironmentNames()).toEqual([
-      "ARK_API_KEY",
-      "VOLCENGINE_API_KEY",
-      "API_KEY_DOUBAO_CODING",
-      "OPENAI_API_KEY_DOUBAO",
-    ]);
+  it("derives the DeepSeek-only MCP credential allowlist", () => {
+    expect(credentialEnvironmentNames()).toEqual(["OPENAI_API_KEY_DEEPSEEK"]);
     expect(credentialEnvironmentNames()).not.toContain("GEMINI_API_KEY");
     expect(credentialEnvironmentNames()).not.toContain("GOOGLE_API_KEY");
     expect(credentialEnvironmentNames()).not.toContain(
@@ -281,7 +312,7 @@ describe("logical LLM registry", () => {
     "does not register excluded source %s",
     (id) => {
       expect(() => resolveLlm(id)).toThrow(
-        /Supported llms: ark-agent-deepseek-v4-flash, ark-agent-plan, ark-coding-plan, kimi-k3/u,
+        /Supported llms: ark-agent-deepseek-v4-flash, ark-agent-plan, ark-coding-plan, deepseek-v4-flash, kimi-k3/u,
       );
     },
   );
@@ -301,7 +332,7 @@ describe("logical LLM registry", () => {
   ] as const)(
     "enables %s %s only with its real-smoke evidence",
     (id, task, anchor) => {
-      const profile = resolveLlm(id, task);
+      const profile = createLlmRegistry([resolveLlm(id)]).resolve(id, task);
       expect(profile.capabilities[task]).toBe(true);
       expect(profile.qualityGates[task]).toEqual({
         status: "passed",

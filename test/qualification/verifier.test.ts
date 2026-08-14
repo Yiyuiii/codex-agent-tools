@@ -13,6 +13,8 @@ import {
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_CASES,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
 } from "../../src/qualification/protocol.js";
 import {
   type FrozenPreflightRecord,
@@ -126,6 +128,48 @@ function frozenPreflight(): FrozenPreflightRecord {
   });
 }
 
+function directDeepSeekPreflight(): FrozenPreflightRecord {
+  const buildArtifacts = [
+    { path: "dist/deepseek-smoke.js", sha256: "1".repeat(64) },
+    { path: "dist/smoke-evidence.js", sha256: "3".repeat(64) },
+    {
+      path: "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+      sha256: "4".repeat(64),
+    },
+  ];
+  return freezePreflightRecord({
+    schemaVersion: 3,
+    qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    repositoryCommit,
+    repositoryBranch: "codex/deepseek-v4-flash-api",
+    repositoryDirty: false,
+    packageVersion: "0.1.1",
+    packageLockSha256: "d".repeat(64),
+    buildArtifacts,
+    buildIdentitySha256: sha256(JSON.stringify(buildArtifacts)),
+    runtimeVersions: {
+      node: "v24.0.0",
+      codex: "codex-cli 0.135.0",
+    },
+    piConfigSha256: "f".repeat(64),
+    logicalLlms: [
+      {
+        llm: "deepseek-v4-flash",
+        runtime: "pi-rpc",
+        model: "deepseek-v4-flash",
+        provider: "deepseek",
+        route: "direct",
+      },
+    ],
+    credentialMatches: [
+      {
+        llm: "deepseek-v4-flash",
+        environmentVariableName: "OPENAI_API_KEY_DEEPSEEK",
+      },
+    ],
+  });
+}
+
 function frozenCandidate(
   preflight: FrozenPreflightRecord = frozenPreflight(),
 ): FrozenCandidateSnapshot {
@@ -215,7 +259,10 @@ function evidenceForCase(
   return {
     schemaVersion: 4,
     qualification: {
-      qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
+      qualificationPlanId:
+        "qualificationPlanId" in preflight
+          ? preflight.qualificationPlanId
+          : ACTIVE_QUALIFICATION_PLAN_ID,
       batchId,
       ordinal: identity.ordinal,
       llm: identity.llm,
@@ -242,7 +289,9 @@ function evidenceForCase(
           credentialEnv:
             identity.llm === "ark-coding-plan"
               ? "CODEX_AGENT_ARK_CODING_KEY"
-              : "CODEX_AGENT_ARK_AGENT_KEY",
+              : identity.llm === "deepseek-v4-flash"
+                ? "CODEX_AGENT_DEEPSEEK_KEY"
+                : "CODEX_AGENT_ARK_AGENT_KEY",
         }
       : {}),
     passed: true,
@@ -365,6 +414,68 @@ async function createPassedBatch(
   }
   return {
     manifestPath,
+    preflight,
+  };
+}
+
+async function createPassedDirectDeepSeekBatch(
+  repositoryRoot: string,
+): Promise<{ manifestPath: string; preflight: FrozenPreflightRecord }> {
+  const preflight = directDeepSeekPreflight();
+  const ledger = createQualificationLedger({
+    repositoryRoot,
+    batchId,
+    qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+  });
+  await ledger.publishBatchStarted({
+    authorizationReferenceSha256: authorizationHash,
+    preflight,
+    recordedAt: "2026-08-14T00:00:00.000Z",
+  });
+  for (const identity of DIRECT_DEEPSEEK_QUALIFICATION_CASES) {
+    await ledger.publishCaseRunning({
+      ...identity,
+      recordedAt: "2026-08-14T00:00:00.000Z",
+    });
+    const evidencePath = path.join(
+      repositoryRoot,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      batchId,
+      "cases",
+      `${String(identity.ordinal).padStart(2, "0")}.json`,
+    );
+    await mkdir(path.dirname(evidencePath), { recursive: true });
+    await writeFile(
+      evidencePath,
+      `${JSON.stringify(evidenceForCase(identity, preflight))}\n`,
+      { encoding: "utf8", flag: "wx" },
+    );
+    await ledger.publishCaseCompleted({
+      ...identity,
+      result: "passed",
+      evidencePath,
+      recordedAt: "2026-08-14T00:00:00.000Z",
+    });
+  }
+  await ledger.publishTerminalManifest({
+    status: "passed",
+    stopReason: null,
+    notRun: [],
+    completedAt: "2026-08-14T00:00:00.000Z",
+  });
+  return {
+    manifestPath: path.join(
+      repositoryRoot,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      batchId,
+      "manifest.json",
+    ),
     preflight,
   };
 }
@@ -690,6 +801,51 @@ describe("qualification verifier", () => {
       status: "blocked",
       promotionEligible: false,
     });
+  });
+
+  it("verifies the isolated Direct DeepSeek plan as immutable and frozen-candidate evidence", async () => {
+    const repositoryRoot = await tempRepository();
+    const { manifestPath, preflight } =
+      await createPassedDirectDeepSeekBatch(repositoryRoot);
+    let frozenAssertions = 0;
+
+    await expect(
+      verifyQualification({
+        repositoryRoot,
+        manifestPath,
+        mode: "immutable-evidence",
+      }),
+    ).resolves.toMatchObject({
+      verified: true,
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+      status: "passed",
+      promotionEligible: true,
+    });
+    await expect(
+      verifyQualification(
+        {
+          repositoryRoot,
+          manifestPath,
+          mode: "frozen-candidate",
+        },
+        {
+          assertFrozenCandidate: async () => {
+            frozenAssertions += 1;
+          },
+          collectCurrentCandidate: async (_receivedRoot, receivedPlanId) => {
+            expect(receivedPlanId).toBe(
+              DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+            );
+            return frozenCandidate(preflight);
+          },
+        },
+      ),
+    ).resolves.toMatchObject({
+      verified: true,
+      mode: "frozen-candidate",
+      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    });
+    expect(frozenAssertions).toBe(2);
   });
 
   it("verifies the real historical blocked batch as immutable five-llm-v1 evidence", async () => {

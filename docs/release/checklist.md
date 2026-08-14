@@ -2,34 +2,38 @@
 
 建立日期：2026-07-25
 
-最近复核：2026-08-03
+最近复核：2026-08-14
 
-目标发布分支：`next`；当前证据分支：`codex/stdio-lifecycle-and-native-budget`
+目标发布分支：`main`；发布后证据分支：`codex/record-0.1.1-acceptance`
 
-候选包版本：`0.1.1-beta.4`
+已发布稳定版本：`0.1.1`
 
-当前结论：**当前宿主离线实现、原生辅助层、observer、freeze、四模型八项真实资格与离线 release gate 均已完成；现行能力索引为 8 current / 0 legacy。`0.1.1-beta.4` 已完成 PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共精确包隔离验收与活动官方插件升级；npm 为 `next=0.1.1-beta.4`、`latest=0.1.0`，旧 `codex_cc_tools` 仍 enabled。完整 App 重启，并在 beta.4 clean-tag observer 的 `REQUEST_STARTED` 后由普通 Stop 取得 `cancelled + owned-zero` receipt 前，stable 继续阻断。**
+`0.1.1` 发布快照结论：**stable 已完成 Node 24 离线门禁、PR/双重 CI、不可变标签、GitHub Actions OIDC 发布、公共精确包隔离验收与活动官方插件升级；该发布快照的能力索引为 8 current / 0 legacy。npm 为 `latest=0.1.1`、`next=0.1.1-beta.4`，当时活动插件 installed/enabled `0.1.1`，旧 `codex_cc_tools` 仍 enabled。维护者完整退出重开后，新任务发现两个公开工具，官方 MCP cwd 指向 `0.1.1` 缓存且插件进程属于新 app-server。维护者于 2026-08-07 跳过普通 Stop 验收；两次会话均没有 PASS receipt，真实 Stop 保持 `skipped / unverified`。稳定版证据使用严格 `skipped_by_maintainer / host_stop_unverified` 决策状态，GitHub Release 没有把它显示为宿主验收通过。**
 
-最新真实批次绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`，批次 ID 为 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`；标准入口和 execution cell 各只有一个，八项全部 passed，没有 resume、retry、fallback 或补跑。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，immutable-evidence 与 frozen-candidate verifier 均通过，owned process 全部 drained、锁为空；不可变证据由提交 `c09ce74` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。
+2026-08-14 当前开发候选新增 Direct DeepSeek，且共享资格输入已经变化。本清单以下“8 current”均描述 `0.1.1` 发布快照；开发候选当前为 Direct 两项 evidence valid / fingerprint current 与旧八项 evidence valid / fingerprint stale。八项刷新批次因 Ark Coding Plan 账户额度首错停止，因此整个候选未通过、未发布、未安装。实时状态见 [Direct DeepSeek 接入状态](../smoke/deepseek.md)。
+
+`0.1.1` 最近的八项 passed 批次绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`，批次 ID 为 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`；标准入口和 execution cell 各只有一个，八项全部 passed，没有 resume、retry、fallback 或补跑。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，immutable-evidence 与 frozen-candidate verifier 均通过，owned process 全部 drained、锁为空；不可变证据由提交 `c09ce74` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。
+
+当前开发候选的局部门禁证据为：build、类型检查、70 文件单 worker 回归（1276 passed / 5 平台条件 skipped / 0 failed）、临时 `CODEX_HOME` 官方插件生命周期与 26-file npm pack dry-run 均通过；Direct 与 blocked Ark 批次的 immutable verifier 都通过。完整 release smoke 在能力索引处按预期非零，因为原八项仍 stale。上述局部通过不构成第 1 层或整个候选通过。
 
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 
-## 当前资格闭合
+## `0.1.1` 资格闭合（历史发布快照）
 
-`capabilities.json` 已用新批次的八个 passed case 更新，当前八项运行时指纹全部 current，legacy 条目为 0。历史 batch manifest 与 case evidence 永久不可变；registry 文案仍不能替代唯一机器发布权威 `npm run verify:capabilities`。
+`0.1.1` 的 `capabilities.json` 已用当时新批次的八个 passed case 更新，发布快照的八项运行时指纹全部 current，legacy 条目为 0。历史 batch manifest 与 case evidence 永久不可变；registry 文案仍不能替代唯一机器发布权威 `npm run verify:capabilities`。当前开发候选的十项索引与失败关闭状态以上方 2026-08-14 覆盖说明为准。
 
 beta.1 handoff 只证明旧宿主断开会留下服务端任务，不是 stable Stop gate 的唯一证据。
 
-晋级顺序只有一条：beta.4 的 PR/双重 CI、精确标签、OIDC 发布、公共 npm 精确版本验收和官方插件升级已经完成；现在完整退出并重开 App，从 beta.4 clean tag 启动 observer，在其发布 `REQUEST_STARTED` 后使用普通 Stop，并证明 receipt 为 `cancelled + owned-zero`；最后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`；未来候选版本仍须先查询 registry，不得猜测或复用已发布版本。`v0.1.1-beta.2` 与 `v0.1.1-beta.3` 的历史阻断保持不可变。
+晋级顺序已经闭合：beta.4 公共身份与仓库内风险决策被 stable marker 精确绑定；Node 24 离线门禁、main PR/CI、稳定标签 OIDC 发布、公共 stable 隔离复验和活动官方插件升级均完成。禁止本地 `npm publish`；未来候选版本仍须先查询 registry，不得猜测或复用已发布版本。`v0.1.1-beta.2` 与 `v0.1.1-beta.3` 的历史阻断保持不可变。
 
-## 状态总览
+## `0.1.1` 发布快照状态总览
 
 | 层级 | 验收对象                                  | 当前状态                                                                    | 通过证据路径                                                                                                                                                                                                               |
 | ---- | ----------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | 确定性单测、类型检查、构建、release smoke | passed：69 files / 1235 passed / 5 platform skips，release smoke passed    | 2026-08-03 beta.4 `gate:offline`；当前 Node 24 宿主与精确 23-file pack                                                                                                                                                        |
+| 1    | 确定性单测、类型检查、构建、release smoke | passed：69 files / 1246 passed / 5 platform skips，release smoke passed    | 2026-08-07 stable `gate:offline`；当前 Node 24 宿主与精确 23-file pack                                                                                                                                                       |
 | 2    | 临时 `CODEX_HOME` 中的官方插件生命周期    | passed                                                                      | [plugin-isolated-state.md](plugin-isolated-state.md)、`scripts/plugin-isolated-acceptance.mjs`                                                                                                                             |
 | 3    | 四个逻辑 LLM 的八项真实模型门禁           | passed：8 current / 0 stale / 0 legacy                                      | 2026-08-03 passed batch、不可变 case evidence 与现行能力索引                                                                                                                                                                 |
-| 4    | 活动 Codex 的真实 App 宿主门禁            | partial：beta.4 已发布/验收/安装；待完整重启与普通 Stop receipt              | 公共包证据为 [0.1.1-beta.4-npm-acceptance.md](0.1.1-beta.4-npm-acceptance.md)；权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；宿主结果为 [real-host-acceptance.md](real-host-acceptance.md) |
+| 4    | 活动 Codex 的真实 App 宿主门禁            | skipped / unverified：维护者终止普通 Stop 复验；没有 PASS receipt             | 公共包证据为 [0.1.1-npm-acceptance.md](0.1.1-npm-acceptance.md)；权限包为 [real-plugin-install-review.md](real-plugin-install-review.md)；宿主结果为 [real-host-acceptance.md](real-host-acceptance.md) |
 
 ## 第 1 层：确定性单测与构建
 
@@ -70,7 +74,7 @@ git diff --check
 npm run acceptance:plugin:isolated:built
 ```
 
-该入口复用第1层已经构建的候选。脚本必须在唯一临时 `CODEX_HOME` 中完成官方 marketplace add/list、plugin add/list、从官方缓存副本启动 MCP、plugin remove/list 与 marketplace remove/list。调用门禁先证明已退役的 `gemini-3.5-flash` 以 unknown logical LLM 被明确拒绝、错误精确列出四项活动 LLM 且没有启动 Pi，再用 qualified 的 `ark-agent-deepseek-v4-flash` 验证从官方缓存副本恰好调用 fake Pi 一次、direct 路由、父代理清除、只注入目标 Agent 凭据和进程清理。脚本还必须验证 MCP 契约和官方列表语义回滚。单独运行第2层时改用`npm run acceptance:plugin:isolated`先构建一次。
+该入口复用第1层已经构建的候选。脚本必须在唯一临时 `CODEX_HOME` 中完成官方 marketplace add/list、plugin add/list、从官方缓存副本启动 MCP、plugin remove/list 与 marketplace remove/list。调用门禁先证明已退役的 `gemini-3.5-flash` 以 unknown logical LLM 被明确拒绝、错误精确列出五项登记 LLM 且没有启动 Pi，再分别用 qualified 的 Direct `deepseek-v4-flash` 与 `ark-agent-deepseek-v4-flash` 验证从官方缓存副本各恰好调用 fake Pi 一次、direct 路由、父代理清除、逐路线目标凭据隔离和进程清理。脚本还必须验证 MCP 契约和官方列表语义回滚。单独运行第2层时改用`npm run acceptance:plugin:isolated`先构建一次。
 
 ### 当前证据
 
@@ -80,7 +84,7 @@ npm run acceptance:plugin:isolated:built
 
 临时 home 边界、官方 add/list/remove、缓存副本启动、固定路由、环境白名单、进程回收或列表语义回滚任一失败即停止。不得改用活动 Codex home 诊断，也不得直接读取或写入活动 `config.toml`。
 
-## 第 3 层：四模型八项真实门禁
+## 第 3 层：`0.1.1` 四模型八项真实门禁（历史发布快照）
 
 ### 当前矩阵
 
@@ -176,7 +180,7 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 ### 前置权限
 
-2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。维护者后来真正终止旧宿主进程并重开，新任务发现新旧四项工具共存；真实 Kimi review 通过，Ark Coding review 因 MCP 没有收到父 App 已存在的 Coding Plan 凭据而在启动 Pi 前失败。根因是 `.mcp.json` 缺少官方 stdio MCP `env_vars` 白名单。历史 `0.1.1-beta.1` 随后增加精确四项变量名并禁止静态 `env`，已通过 OIDC 发布、公共 npm 验收和官方升级；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。`v0.1.1-beta.2` 已通过 PR 与双重 CI，但 release workflow 在 npm publish 前被严格 marker 阻断。`0.1.1-beta.3` 已完成 EOL/marker 回归、PR/CI、OIDC 发布、公共 npm 验收与官方升级；升级时只精准终止 19 个由当前 app-server 启动、命令行精确匹配且无子进程的旧插件 MCP Node 进程，未停止 App、Kimi/Pi、旧工具或其它 Node 进程。其 clean-tag 宿主启动随后在 observer 前因生成 runtime 不受 Git 跟踪而 fail closed。`0.1.1-beta.4` 已完成PR/双重CI、OIDC发布、公共验收与官方升级；当前进入完整宿主重启节点。
+2026-07-30 已取得针对本次 add、升级与失败 remove 的明确许可。0.1.1-beta.0 已发布到 npm `next` 并通过公共 registry 隔离验收；活动插件按官方 remove/add 升级成功，CLI 已解析版本化缓存工作目录且旧 `codex_cc_tools` 保持 enabled。维护者后来真正终止旧宿主进程并重开，新任务发现新旧四项工具共存；真实 Kimi review 通过，Ark Coding review 因 MCP 没有收到父 App 已存在的 Coding Plan 凭据而在启动 Pi 前失败。根因是 `.mcp.json` 缺少官方 stdio MCP `env_vars` 白名单。历史 `0.1.1-beta.1` 随后增加精确四项变量名并禁止静态 `env`，已通过 OIDC 发布、公共 npm 验收和官方升级；项目代码没有直接读取或写入活动 `~/.codex/config.toml`。`v0.1.1-beta.2` 已通过 PR 与双重 CI，但 release workflow 在 npm publish 前被严格 marker 阻断。`0.1.1-beta.3` 已完成 EOL/marker 回归、PR/CI、OIDC 发布、公共 npm 验收与官方升级；升级时只精准终止 19 个由当前 app-server 启动、命令行精确匹配且无子进程的旧插件 MCP Node 进程，未停止 App、Kimi/Pi、旧工具或其它 Node 进程。其 clean-tag 宿主启动随后在 observer 前因生成 runtime 不受 Git 跟踪而 fail closed。`0.1.1-beta.4` 已完成PR/双重CI、OIDC发布、公共验收与官方升级。两次普通 Stop 会话均未取得 PASS receipt；维护者于 2026-08-07 明确跳过该测试，stable 候选保留 `host_stop_unverified` 风险并转入严格决策证据路线。
 
 ### 通过标准
 
@@ -201,5 +205,5 @@ blocked case 的 raw/normalized 双哈希已确定结果文件为 `ARK_SMOKE_OK:
 
 - 第四层通过只表示新插件具备替代条件，不会自动移除旧 `codex_cc_tools`。
 - 旧工具移除是后续独立变更，需要新的影响评估、验证、回滚方案与明确授权。
-- 本轮不调用或修改 Claude Code；beta 只通过 GitHub Actions OIDC 发布到 npm
-  `next`，没有本地手工 `npm publish`，也不发布公共 marketplace。
+- 本轮不调用或修改 Claude Code；beta 与 stable 都只通过 GitHub Actions OIDC 发布，
+  没有本地手工 `npm publish`，也不发布公共 marketplace。

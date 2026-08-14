@@ -1,16 +1,29 @@
-# 四模型八项资格批次执行承载手册
+# 当前能力资格批次执行承载手册
 
 > 2026-07-29 状态：本手册继续约束需要真实运行的 batch 承载、首错停止、证据冻结和 fail-closed 行为，但“必须同批 8/8 才能形成任何资格”的晋级规则已被[能力粒度资格设计](../superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)取代。当前资格以固定 [`capabilities.json`](../smoke/evidence/capabilities.json) 为准；只有 stale、缺失、新增或证据失效的能力才需要运行。历史 batch 的终态不得修改。
+
+> 2026-08-14 补充：当前生产协议有两个互不混合的计划。`four-llm-v1` 保留原四路线八项顺序；`direct-deepseek-v1` 只含 Direct DeepSeek review/delegate 两项。前者绑定 Ark-only Pi 配置哈希，后者绑定 DeepSeek-only Pi 配置哈希。拆分依据见[Direct DeepSeek 双计划资格设计](../superpowers/specs/2026-08-14-direct-deepseek-qualification-design.md)。
 
 状态：维护者运行合同；不是可执行授权脚本，也不授予任何资格批次、安装或发布权限。
 
 ## 当前状态
 
-现行 `capabilities.json` 已用最新真实 passed case 更新，八项能力指纹全部 current，legacy 为 0；`npm run verify:capabilities` 通过。未来仍只为 stale、缺失、新增或证据失效的精确能力运行新 case。历史 batch manifest 与 case evidence 永久不可变，registry 文案不能替代 verifier。
+Direct DeepSeek 开发候选已在独立 `direct-deepseek-v1` 批次取得 2/2 passed evidence，并按能力粒度政策写入索引为 current。资格协议属于 Kimi/Pi 共享指纹输入，因此现行八份历史 evidence 虽仍有效，八项旧能力的指纹全部 stale；`npm run verify:capabilities` 当前必须 fail closed。后续 `four-llm-v1` 刷新批次已在首项被 Ark Coding Plan 账户额度阻断；外部额度状态变化前不得重复。历史 batch manifest 与 case evidence永久不可变，registry 文案不能替代 verifier。
 
-standing authorization 下最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`。唯一标准入口和单一前台承载正常取得可信终态；八项 case 全部 passed，每项为一次 client invocation、零 retry/fallback，owned process 全部 drain。终态 `passed`、`promotionEligible=true`，immutable-evidence 与 frozen-candidate verifier 通过，manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，资格锁为空，不可变证据提交为 `c09ce74`。
+标准入口形状为：
 
-2026-08-02 的额度失败批次仍作为不可变历史保留；额度恢复只构成重入条件，真正的通过结论来自上述新批次。新批没有补跑、改变顺序、retry、fallback 或恢复 Node 版本矩阵。资格门禁现已闭合，后续进入离线发布门禁。
+- `four-llm-v1`：`npm run --silent qualify:gates -- --authorization-ref <fresh-uuid>`
+- `direct-deepseek-v1`：`npm run --silent qualify:gates -- --plan direct-deepseek-v1 --authorization-ref <fresh-uuid>`
+
+`fresh-uuid` 只在受控执行 cell 内生成；明文不得写入仓库或报告。
+
+standing authorization 下的 Direct 批次 `2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69` 绑定 frozen commit `469129d708eb90a3b68071c7b01313b7e70c65a2`。唯一标准入口完成两项；每项一次 client invocation、零 retry/fallback、owned process drained，终态 `passed`、`promotionEligible=true`，immutable-evidence 与 frozen-candidate verifier 通过，manifest SHA-256 为 `f0d564aef9d1d62cfe9348b74e54a99f53912e810dd662830704b9860d17279d`，资格锁为空，不可变证据提交为 `9c34156`。
+
+随后 `four-llm-v1` 批次 `2026-08-14T03-03-14.120Z-3312323b-63e0-4b47-b88c-8fb98bb06e4e` 绑定 frozen commit `9c34156975864d529f18d21500872cf8e9d3fd5b`，在 ordinal 1 `ark-coding-plan/delegate` 因 `account_quota_exceeded` failed 后首错停止；ordinal 2–8 notRun，终态 `blocked / case_failed`，manifest SHA-256 为 `7a1ca09d3f1dc1128596ec9c9d77f74aaf0239391ded50faf7f299cc7f74ca31`。一次 client invocation、零 retry/fallback、owned process drained、immutable verifier passed、资格锁为空；证据提交为 `ceccda6`。没有 resume、补跑或第二批。
+
+该外部阻断的重入证据必须来自维护者在方舟控制台确认剩余额度，或其它明确的账户状态变化。官方当前说明存在 5 小时、周、订阅月三类限额并由控制台显示使用情况；doctor、凭据存在、单纯等待不足一个周期或未经认证的 API 探针都不能证明额度恢复。[官方额度说明](https://www.volcengine.com/article/37932)。2026-08-14 的只读检查发生在失败后 0.539 小时，且没有可复用的控制台登录态，因此没有重跑。未来一旦取得状态变化证据，仍须先形成新的 clean frozen commit，再生成 fresh 内部执行引用并只调用一次标准入口。
+
+已发布 `0.1.1` 的最近八项 passed 批次仍是 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`，绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`；它的不可变 evidence 仍有效，但不能代表当前共享指纹。外部 Ark Coding Plan 额度恢复只构成新 clean frozen candidate 的重入条件，不会自动把八项 stale 改成 current。
 
 以下较早批次事实与哈希继续保持原样。
 
@@ -87,7 +100,7 @@ active long-term goal、4 小时内层预算、短周期 wait 和现有锁/check
 
 ### 成功终态
 
-terminal 已存在且完整八项同批结果为 8/8 passed 时，只读验证 terminal、case evidence、冻结身份、不可变证据、锁释放与目标进程 0/0/0，然后停止并汇报。成功资格只表示可进入后续人工审阅，不自动授权活动安装、旧工具移除、发布或正式工作树变更。
+terminal 已存在且所选计划的完整固定 schedule 全部 passed 时（`four-llm-v1` 为 8/8，`direct-deepseek-v1` 为 2/2），只读验证 terminal、case evidence、冻结身份、不可变证据、锁释放与 owned process drain，然后停止并汇报。成功资格只表示可进入后续索引与发布门禁，不自动授权活动安装、旧工具移除、发布或正式工作树变更。
 
 ### 失败终态
 

@@ -6,7 +6,7 @@ import path from "node:path";
 export interface BuildIsolatedPiConfigOptions {
   root?: string;
   version: string;
-  providers?: readonly "ark"[];
+  providers: readonly ["ark" | "deepseek"];
   qualification?: boolean;
 }
 
@@ -51,6 +51,37 @@ const ARK_PROVIDERS = {
         reasoning: true,
         contextWindow: 200_000,
         maxTokens: 32_000,
+      },
+    ],
+  },
+} as const;
+
+const DEEPSEEK_PROVIDER = {
+  deepseek: {
+    baseUrl: "https://api.deepseek.com",
+    api: "openai-completions",
+    apiKey: "$CODEX_AGENT_DEEPSEEK_KEY",
+    models: [
+      {
+        id: "deepseek-v4-flash",
+        name: "DeepSeek V4 Flash",
+        contextWindow: 1_000_000,
+        maxTokens: 384_000,
+        input: ["text"],
+        reasoning: true,
+        thinkingLevelMap: {
+          minimal: null,
+          low: "low",
+          medium: null,
+          high: "high",
+          xhigh: null,
+          max: "max",
+        },
+        compat: {
+          maxTokensField: "max_tokens",
+          requiresReasoningContentOnAssistantMessages: true,
+          thinkingFormat: "deepseek",
+        },
       },
     ],
   },
@@ -103,7 +134,8 @@ export function getDefaultPiConfigRoot(
     return path.win32.join(localAppData, "codex-agent-tools");
   }
   const cacheRoot =
-    environment.XDG_CACHE_HOME?.trim() || path.posix.join(homeDirectory, ".cache");
+    environment.XDG_CACHE_HOME?.trim() ||
+    path.posix.join(homeDirectory, ".cache");
   return path.posix.join(cacheRoot, "codex-agent-tools");
 }
 
@@ -113,15 +145,23 @@ export async function buildIsolatedPiConfig(
   if (!/^[0-9A-Za-z._-]+$/u.test(options.version)) {
     throw new Error("Pi config version must contain only safe path characters");
   }
-  const providerSets = options.providers ?? ["ark"];
-  if (providerSets.length !== 1 || providerSets[0] !== "ark") {
-    throw new Error('Pi config providers must be exactly ["ark"]');
+  const providerSets = options.providers;
+  if (
+    !Array.isArray(providerSets) ||
+    providerSets.length !== 1 ||
+    (providerSets[0] !== "ark" && providerSets[0] !== "deepseek")
+  ) {
+    throw new Error(
+      'Pi config providers must be exactly ["ark"] or ["deepseek"]',
+    );
   }
+  const providerSet = providerSets[0];
   const root = path.resolve(options.root ?? getDefaultPiConfigRoot());
   const agentDir = path.join(
     root,
     options.qualification === true ? "pi-qualification" : "pi",
     options.version,
+    providerSet,
   );
   const settingsPath = path.join(agentDir, "settings.json");
   const modelsPath = path.join(agentDir, "models.json");
@@ -145,7 +185,9 @@ export async function buildIsolatedPiConfig(
     skills: [],
     themes: [],
   });
-  const models = jsonText({ providers: ARK_PROVIDERS });
+  const models = jsonText({
+    providers: providerSet === "ark" ? ARK_PROVIDERS : DEEPSEEK_PROVIDER,
+  });
 
   await mkdir(agentDir, { recursive: true });
   await atomicWrite(settingsPath, settings);

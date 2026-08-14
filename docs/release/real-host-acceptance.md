@@ -1,14 +1,46 @@
 # 真实 Codex App 宿主验收记录
 
-最近更新：2026-08-03
+最近更新：2026-08-07
 
-状态：**partial — beta.4 已公开发布、公共验收并完成官方升级；等待完整 App 重启与普通 Stop 的 `cancelled + owned-zero` receipt**
+状态：**stable published / host Stop skipped — 0.1.1 已公开发布、公共验收并完成官方升级；维护者终止的普通 Stop 验收仍为 `host_stop_unverified`，未取得 `cancelled + owned-zero` receipt**
 
-## 当前发布阻断
+## 2026-08-07 维护者跳过决定
 
-beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调；beta.4 已修复 beta.3 clean-tag 启动层缺口并完成发布、公共验收与官方升级。在完整 App 重启与真实 Stop 证据产生前，当前结果仍只构成确定性、公共包与安装证据。
+维护者明确要求跳过当前真实 Stop 测试，转而检查下一步计划。两次 beta.4 会话都不能
+计为 PASS：第一次 delegate 在点击普通 Stop 前自然完成；第二次旧宿主只读握手通过，
+完整重启后对应会话最终出现 completion marker，但没有 observer receipt，且 launcher /
+observer 已不再运行。第二次遗留的活动 descriptor 已移动到该会话目录中的
+`skipped-session.v1.json`，保留审计内容并解除后续公开工具调用的陈旧会话绑定；session、
+completion marker 与第一次失败证据均未删除或改写。
 
-晋级顺序只有一条：八项 verifier、beta.4 唯一离线 release gate、PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级均已完成；现在完整退出并重开 App，从 beta.4 clean tag 启动 observer，在其发布 `REQUEST_STARTED` 后使用普通 Stop，取得精确 `cancelled + owned-zero` receipt；全部通过后才由 GitHub Actions OIDC 发布 stable。禁止本地 `npm publish`。
+这项决定只表示不再继续消耗维护者时间重复交互测试，不表示取消传播、handler cancelled、
+in-flight removed 或 owned descendants zero 已在真实 App Stop 中得到证明。维护者随后
+批准方案 A：stable marker schema 2 将真实 `passed + receipt` 与
+`skipped_by_maintainer + host_stop_unverified + decision` 建模为互斥状态，风险跳过只硬锁
+`0.1.1-beta.4 → 0.1.1`，不能泛化到未来版本，也不能输出宿主验收通过。
+
+## 当前发布状态
+
+beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺口，不是 stable Stop gate 的唯一证据。本轮源码已经为 stdio end/close/error、SIGINT/SIGTERM 和 SDK 取消建立统一关闭协调；beta.4 已修复 beta.3 clean-tag 启动层缺口。稳定版发布采用维护者明确批准的风险跳过状态，因此确定性、公共包与安装证据已经闭合，但真实 App 普通 Stop 仍没有 PASS 证据。
+
+八项 verifier、唯一 Node 24 离线 release gate、PR/双重 CI、精确标签、GitHub Actions OIDC 发布、公共 npm 精确包验收和官方插件升级均已完成。PR #12 merge commit 为 `f503f0c51c5fc5c51a31cbd2db63d2b8434b0c0f`，release run `31168431472` 成功；npm 为 `latest=0.1.1`、`next=0.1.1-beta.4`。普通 Stop receipt 未完成且已按维护者决定跳过；互斥且可审计的 stable 发布状态、仓库内决策记录、0.1.1 版本与 marker 均已验证。禁止用风险跳过伪装 PASS。
+
+公共stable在当前Windows x64 / Node 24宿主完成隔离复验，结果见[0.1.1公共npm隔离验收](0.1.1-npm-acceptance.md)。活动插件已通过官方remove/add升级为installed/enabled `0.1.1`，版本化缓存五个文件与发布源逐项同SHA、无reparse，旧`codex_cc_tools`仍enabled。桌面App不会热刷新插件；维护者已在升级后完整退出重开，新宿主进程现已实际加载stable。
+
+## 2026-08-07 stable 重启后加载确认
+
+维护者报告完整退出并重开后，本次新任务的工具发现结果包含`external_review`与
+`external_delegate`。官方只读状态同时确认：
+
+- marketplace仍指向stable工作树，插件为installed/enabled `0.1.1`；
+- `codex_external_agents`的cwd精确指向版本化`0.1.1`缓存，四个凭据变量名白名单保持不变，
+  没有静态`env`；
+- 新产生的插件MCP Node进程均以当前新`codex.exe app-server`为父进程；
+- 旧`codex_cc_tools`仍enabled。
+
+本轮只做工具发现、官方状态和进程归属检查，没有调用真实Kimi/Pi/Ark模型，也没有读取
+或修改活动配置。该证据证明stable插件已经被新App宿主加载，不证明普通Stop的取消传播或
+owned-zero，因此第四层仍保持`skipped / unverified`。
 
 真实宿主门禁只接受 App 的普通 Stop：必须在 observer 发布 `REQUEST_STARTED` 后点击，并确认外层状态为 `cancelled`、完成标记没有写入、SDK abort 到达、owned descendants zero 且不重生。
 
@@ -30,7 +62,17 @@ beta.1 handoff 暴露了调用方离开后 MCP 服务端任务继续运行的缺
 维护者又完成了整 App 重启并授权继续推进。重启后的第二个新任务仍在同一工具发现
 门禁首错停止；后续修复、beta 发布、本机官方升级和刷新后复验仍沿用这项授权。
 
-## 发布身份
+## 0.1.1 stable 发布身份
+
+- 仓库：`main`，merge commit `f503f0c51c5fc5c51a31cbd2db63d2b8434b0c0f`；
+- 稳定标签：`v0.1.1`，精确指向上述 merge commit；
+- release workflow：`31168431472`，GitHub Actions OIDC / provenance 成功；
+- npm精确版本：`codex-agent-tools@0.1.1`，`latest=0.1.1`、`next=0.1.1-beta.4`；
+- npm `dist.shasum`：`59ab23d0a6eea27a084a686c1ba04f727939044f`；
+- npm `dist.integrity`：`sha512-f4nBGcOkjy1ze3GhM1RRHc5pe67BaQy8pco1mhlbORWeZ4cwmhnT4aPxShPtTWkY74l0fHkOBq9h80i78SE9LA==`；
+- GitHub Release明确记录`host Stop: skipped / unverified`。
+
+## 历史：0.1.0 初始发布身份
 
 - 仓库：`main`，提交 `74ad8137c7a253fd4b2c35fd3b92943ed23a34b9`；
 - 稳定标签：`v0.1.0`，提交
@@ -358,38 +400,22 @@ reparse point，摘要
 `5e374af0a92681b6eb9b4817cfeb9574f6b675906bc634df14a628159ea0e29f` 与 release marker
 完全一致；beta.3 缓存已移除。没有直接读取或修改活动 `config.toml`，也没有调用真实模型。
 
-## 尚未通过的门禁
+## 未验证风险与发布后状态
 
-完整第 4 层仍缺少以下证据：
+真实 App 普通 Stop 的 `cancelled + owned-zero` 仍未验证。若未来恢复该项验证，PASS 仍
+必须由 observer 唯一写入的 receipt 精确证明 cancelled、completion marker absent、
+handler cancelled、in-flight removed、owned descendants zero 且不重生；本次 stable
+决策记录不能替代或推断这些事实。
 
-1. 完整重启宿主，并在新任务确认 beta.4 缓存与四项脱敏环境变量已经被新
-   app-server 加载。
-2. 从精确 beta.4 tag 的 clean checkout 启动 checked-in observer，只执行它输出的
-   旧宿主 `kimi-k3` `external_review` 握手；随后由 observer 确认真正的旧宿主退出和
-   新宿主身份，不额外重跑任何能力资格。
-3. 在 observer 创建的 nonce 隔离仓库中，逐字使用它输出的 `kimi-k3`
-   `external_delegate` 参数；只有 observer 发布 `REQUEST_STARTED` 后才在 App 中
-   点击普通 Stop。
-4. observer 作为唯一 writer 原子写入 PASS receipt；receipt 必须精确证明请求
-   cancelled、completion marker absent、handler cancelled、in-flight removed、
-   owned descendants zero 且不重生。
-5. 上述门禁全部通过后，只通过 GitHub Actions OIDC 发布 stable。
+0.1.1 stable晋级、公共隔离复验和重启后stable加载确认均已完成，不再有发布或激活阻断。
+这不是补写真实Stop receipt，也不能把第四层改成passed。发布后仍不得称为“真实App宿主
+门禁全部通过”或“已替代旧
+`codex_cc_tools`”。禁止本地`npm publish`、删除旧工具、恢复开发期直连或手工修改活动配置。
 
-在这些缺口闭合前：
+完整实施步骤见[跳过真实 Stop 后的 0.1.1 Stable 晋级计划](../superpowers/plans/2026-08-07-stable-promotion-after-host-stop-skip.md)。
 
-- 官方插件可以称为“已安装、已启用，缓存协议验收通过”；
-- 开发期直连可以称为“已通过官方命令移除，CLI 已解析到插件相对入口”；
-- 不得称为“真实 App 宿主门禁全部通过”；
-- verifier 恢复通过前不得发布 beta；真实宿主门禁通过前不得发布 stable；禁止本地 `npm publish`；
-- 不得称为“已替代旧 `codex_cc_tools`”；
-- 不得删除旧工具、恢复开发期直连或手工修改活动配置。
-
-## 下一人工节点
-
-下一人工节点已经到达：维护者需要完整退出并重开 Codex App。随后从 beta.4 精确
-clean tag 启动 checked-in observer，按它输出的精确
-Kimi review 握手与隔离 delegate 参数完成普通 Stop 和 `cancelled + owned-zero` receipt；
-不额外进行泛化模型复跑。
+后续推进仍不额外进行泛化模型复跑，不恢复多 Node 矩阵，也不为外部 CLI 增加
+默认或全局执行限制。
 
 若修复版升级并刷新后的新任务仍报告缺少 Ark 凭据，应单独审计 App 对 `env_vars`
 的实际解析，不恢复开发直连。只有确认新插件安装本身失败时，才对本次新插件使用已

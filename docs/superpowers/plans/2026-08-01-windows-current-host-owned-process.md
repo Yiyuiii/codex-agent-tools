@@ -8,6 +8,8 @@
 
 **现行规格：** [Windows 当前宿主最小可靠 owned process 设计](../specs/2026-08-01-windows-current-host-minimal-design.md)；stable 前的真实 App 重启/Stop 凭据见[当前宿主发布 Observer 最小设计](../specs/2026-08-02-current-host-release-observer-design.md)。
 
+**2026-08-07 状态覆盖：** 维护者明确要求跳过当前真实 App 普通 Stop 验收。两次 beta.4 会话都没有生成 PASS receipt；该测试不得记为通过，也不再继续重试。Tasks 2–8、8/8 资格、beta.4 OIDC 发布、公共 npm 隔离验收和官方插件升级仍保持完成。本文第 10–11 节的 receipt 要求继续描述现行 strict stable 门禁；若要发布 `0.1.1` stable，必须另行以 TDD 设计显式风险豁免并始终报告 `hostStop=unverified`，或保持 beta.4 而不发布 stable。
+
 **历史基线：** Task 1提交`88cf22b`与文档提交`b575dd9`有效保留；旧Task 2的单fd3 write-half-close失败由`0bb610e`保存。旧14项计划只作为历史，不再指导Task 2以后实现。
 
 ## 1. 执行边界

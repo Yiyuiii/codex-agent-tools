@@ -15,6 +15,8 @@ import {
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  DIRECT_DEEPSEEK_QUALIFICATION_CASES,
+  DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
   LEGACY_QUALIFICATION_PLAN_ID,
   type QualificationPlanId,
@@ -55,6 +57,7 @@ export interface QualificationVerifierDependencies {
   }) => Promise<void>;
   collectCurrentCandidate?: (
     repositoryRoot: string,
+    qualificationPlanId: QualificationPlanId,
   ) => Promise<FrozenCandidateSnapshot>;
 }
 
@@ -101,6 +104,20 @@ const CURRENT_VERIFIER_PROTOCOL: VerifierProtocol = Object.freeze({
   schedule: ACTIVE_QUALIFICATION_CASES,
 });
 
+const DIRECT_DEEPSEEK_VERIFIER_PROTOCOL: VerifierProtocol = Object.freeze({
+  planId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+  manifestSchemaVersion: 3,
+  evidenceSchemaVersion: 4,
+  schedule: DIRECT_DEEPSEEK_QUALIFICATION_CASES,
+});
+
+function isCurrentVerifierProtocol(protocol: VerifierProtocol): boolean {
+  return (
+    protocol === CURRENT_VERIFIER_PROTOCOL ||
+    protocol === DIRECT_DEEPSEEK_VERIFIER_PROTOCOL
+  );
+}
+
 function verifierProtocolForEnvelope(value: unknown): VerifierProtocol {
   const envelope = plainRecord(value);
   if (
@@ -114,6 +131,12 @@ function verifierProtocolForEnvelope(value: unknown): VerifierProtocol {
       return HISTORICAL_CURRENT_VERIFIER_PROTOCOL;
     }
     if (envelope.schemaVersion === 3) return CURRENT_VERIFIER_PROTOCOL;
+  }
+  if (
+    envelope.schemaVersion === 3 &&
+    envelope.qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+  ) {
+    return DIRECT_DEEPSEEK_VERIFIER_PROTOCOL;
   }
   throw new QualificationVerificationError();
 }
@@ -256,7 +279,7 @@ function validateTerminalManifest(
     manifest.schemaVersion !== protocol.manifestSchemaVersion ||
     (protocol === LEGACY_VERIFIER_PROTOCOL
       ? Object.hasOwn(manifest, "qualificationPlanId")
-      : manifest.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID) ||
+      : manifest.qualificationPlanId !== protocol.planId) ||
     manifest.batchId !== batchId ||
     (status !== "passed" &&
       status !== "blocked" &&
@@ -281,7 +304,7 @@ function validateTerminalManifest(
   }
   if (mode === "frozen-candidate") {
     if (
-      protocol !== CURRENT_VERIFIER_PROTOCOL ||
+      !isCurrentVerifierProtocol(protocol) ||
       status !== "passed" ||
       manifest.promotionEligible !== true ||
       manifest.stopReason !== null ||
@@ -310,7 +333,7 @@ function expectedChecks(
   identity: Readonly<QualificationCaseIdentity>,
   runtime: FrozenLogicalLlmIdentity["runtime"],
 ): readonly string[] {
-  if (protocol === CURRENT_VERIFIER_PROTOCOL) {
+  if (isCurrentVerifierProtocol(protocol)) {
     return currentEvidenceCheckKeys(runtime, identity.task);
   }
   const ownershipCheck =
@@ -698,7 +721,7 @@ function validateQualificationIdentity(
     protocol === LEGACY_VERIFIER_PROTOCOL
       ? qualification.repositoryCommit === preflight.repositoryCommit &&
         qualification.buildIdentitySha256 === preflight.buildIdentitySha256
-      : qualification.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID &&
+      : qualification.qualificationPlanId === protocol.planId &&
         qualification.llm === identity.llm &&
         qualification.task === identity.task &&
         qualification.frozenCommit === preflight.repositoryCommit &&
@@ -787,7 +810,7 @@ function validateEvidenceIdentityAndAcceptance(
     throw new QualificationVerificationError();
   }
   if (
-    protocol === CURRENT_VERIFIER_PROTOCOL
+    isCurrentVerifierProtocol(protocol)
       ? !Object.hasOwn(evidence, "ownedProcessDrained") ||
         (evidence.ownedProcessDrained !== true &&
           evidence.ownedProcessDrained !== null) ||
@@ -803,7 +826,9 @@ function validateEvidenceIdentityAndAcceptance(
         : identity.llm === "ark-agent-plan" ||
             identity.llm === "ark-agent-deepseek-v4-flash"
           ? "CODEX_AGENT_ARK_AGENT_KEY"
-          : credential.environmentVariableName;
+          : identity.llm === "deepseek-v4-flash"
+            ? "CODEX_AGENT_DEEPSEEK_KEY"
+            : credential.environmentVariableName;
     if (
       evidence.provider !== logicalIdentity.provider ||
       (!isCurrentInfrastructureFailure &&
@@ -824,7 +849,7 @@ function validateEvidenceIdentityAndAcceptance(
   ) {
     throw new QualificationVerificationError();
   }
-  if (protocol === CURRENT_VERIFIER_PROTOCOL) {
+  if (isCurrentVerifierProtocol(protocol)) {
     validateCurrentEvidenceContract(evidence, {
       llm: identity.llm,
       task: identity.task,
@@ -845,7 +870,7 @@ function validateEvidenceIdentityAndAcceptance(
       logicalIdentity.runtime,
     );
   }
-  if (protocol !== CURRENT_VERIFIER_PROTOCOL) {
+  if (!isCurrentVerifierProtocol(protocol)) {
     validateCommandObservationDiagnostics(
       evidence,
       identity,
@@ -878,7 +903,7 @@ function validateInfrastructureChecks(
 ): void {
   const checks = plainRecord(evidence.checks);
   const keys = Object.keys(checks).sort();
-  if (protocol === CURRENT_VERIFIER_PROTOCOL) {
+  if (isCurrentVerifierProtocol(protocol)) {
     if (
       keys.length !== 1 ||
       keys[0] !== "ownedProcessDrained" ||
@@ -920,7 +945,7 @@ function validateCurrentFailedSemantics(
   }
   const checks = validateTaskCheckShape(evidence, protocol, identity, runtime);
   if (
-    protocol === CURRENT_VERIFIER_PROTOCOL &&
+    isCurrentVerifierProtocol(protocol) &&
     checks.ownedProcessDrained !== (evidence.ownedProcessDrained === true)
   ) {
     throw new QualificationVerificationError();
@@ -968,10 +993,10 @@ async function validateManifestEvidence(
     (protocol === LEGACY_VERIFIER_PROTOCOL && preflight.schemaVersion !== 1) ||
     (protocol === HISTORICAL_CURRENT_VERIFIER_PROTOCOL &&
       preflight.schemaVersion !== 2) ||
-    (protocol === CURRENT_VERIFIER_PROTOCOL && preflight.schemaVersion !== 3) ||
+    (isCurrentVerifierProtocol(protocol) && preflight.schemaVersion !== 3) ||
     (protocol !== LEGACY_VERIFIER_PROTOCOL &&
       (!("qualificationPlanId" in preflight) ||
-        preflight.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID))
+        preflight.qualificationPlanId !== protocol.planId))
   ) {
     throw new QualificationVerificationError();
   }
@@ -1226,7 +1251,10 @@ export async function verifyQualification(
         preflight,
       });
       const current = normalizeCurrentCandidate(
-        await dependencies.collectCurrentCandidate(options.repositoryRoot),
+        await dependencies.collectCurrentCandidate(
+          options.repositoryRoot,
+          protocol.planId,
+        ),
       );
       await dependencies.assertFrozenCandidate({
         repositoryRoot: options.repositoryRoot,

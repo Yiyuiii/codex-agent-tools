@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "host-stop-release-decision",
+  "package": {
+    "name": "codex-agent-tools",
+    "version": "0.1.1",
+    "tag": "v0.1.1",
+    "npmChannel": "latest"
+  },
+  "publicBeta": {
+    "version": "0.1.1-beta.4",
+    "tag": "v0.1.1-beta.4",
+    "taggedCommit": "e9390b1dc71b6b88cff3d8449c37060ecd3e75ed",
+    "markerPath": ".release-validation/v0.1.1-beta.4.json",
+    "markerSha256": "afe50de85719646f85433e34a376032509162230e169d7036b0ac8814d4f7d39",
+    "pluginArtifactTreeDigestSha256": "5e374af0a92681b6eb9b4817cfeb9574f6b675906bc634df14a628159ea0e29f",
+    "observerArtifact": {
+      "path": "host-acceptance/win32-x64/codex-host-acceptance-observer.exe",
+      "sha256": "dd20110b1cbcae984ab9f3560ece1bfa8e7b1a0e542b206cec5d9ff5047f5a64",
+      "protocolVersion": 1,
+      "buildManifest": {
+        "path": "host-acceptance/observer-build-inputs.v1.json",
+        "sha256": "f97ec39a710cd448030a8eea8316a3e5c87af4c2ccfcb96b43304394c1219ce0"
+      },
+      "protocol": {
+        "path": "host-acceptance/protocol/observer-protocol.v1.json",
+        "sha256": "7c89855c33b17ab95cc6414dbb86cb74eeebc3f363beb27479118b2585492803"
+      },
+      "inputsDigestSha256": "143abde38da931e552aa2d0b02ed0d436a59aac901381a6447967cdb11e0a136"
+    },
+    "npm": {
+      "integrity": "sha512-qkvoGlb1knReI7IrkgXcoWwX1rgVbgAR+z7Msc33wYk7wvq2f5P1GQsvJfJfDHLzTnugMhLnIwPFzlKudR96Cw==",
+      "shasum": "9957a46844082f7efac5392d04db46801abd908f"
+    }
+  },
+  "decision": "skipped_by_maintainer",
+  "risk": "host_stop_unverified",
+  "reason": "interactive_host_stop_not_completed",
+  "decidedAt": "2026-08-07T09:20:56.649Z"
+}

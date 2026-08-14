@@ -63,12 +63,7 @@ const fakePiScript = path.join(
 const inheritedProxy = "http://parent-proxy.invalid:9999";
 const inheritedAllProxy = "socks5://parent-proxy.invalid:9999";
 const credentialSentinel = "isolated-plugin-sentinel";
-const expectedPluginEnvironmentVariables = [
-  "ARK_API_KEY",
-  "VOLCENGINE_API_KEY",
-  "API_KEY_DOUBAO_CODING",
-  "OPENAI_API_KEY_DOUBAO",
-];
+const expectedPluginEnvironmentVariables = ["OPENAI_API_KEY_DEEPSEEK"];
 const mcpBaseEnvironmentVariables = new Set([
   "PATH",
   "Path",
@@ -103,9 +98,7 @@ const temporaryBase =
     ? path.join(windowsLocalAppData, "Temp")
     : os.tmpdir();
 const temporaryRoot = await realpath(
-  await mkdtemp(
-    path.join(temporaryBase, "codex-plugin-isolated-acceptance-"),
-  ),
+  await mkdtemp(path.join(temporaryBase, "codex-plugin-isolated-acceptance-")),
 );
 const isolatedHome = path.resolve(temporaryRoot, "codex-home");
 const isolatedLocalAppData = path.resolve(temporaryRoot, "local-app-data");
@@ -336,10 +329,7 @@ async function readInstalledMcpServer(installedPluginRoot) {
   }
   if (
     !Array.isArray(server.args) ||
-    !server.args.every(
-      (argument) =>
-        isSafeRelativeLaunchPath(argument),
-    )
+    !server.args.every((argument) => isSafeRelativeLaunchPath(argument))
   ) {
     throw new Error("Installed MCP args must all be relative strings");
   }
@@ -419,25 +409,27 @@ async function writeFakePiInstallation() {
   const cli = [
     'const { appendFileSync } = require("node:fs");',
     "const environment = process.env;",
-    `appendFileSync(${JSON.stringify(fakePiInvocationLog)}, "invocation\\n", "utf8");`,
     "function fail(code) { process.exit(code); }",
-    'if (environment.HTTPS_PROXY !== undefined) fail(91);',
-    'if (environment.HTTP_PROXY !== undefined) fail(92);',
-    'if (environment.ALL_PROXY !== undefined) fail(93);',
-    'if (environment.all_proxy !== undefined) fail(94);',
-    'if (environment.https_proxy !== undefined) fail(95);',
-    'if (environment.http_proxy !== undefined) fail(96);',
-    `if (environment.CODEX_AGENT_ARK_AGENT_KEY !== ${JSON.stringify(credentialSentinel)}) fail(97);`,
-    'if (environment.OPENAI_API_KEY_DOUBAO !== undefined) fail(98);',
-    'if (environment.CODEX_AGENT_ARK_CODING_KEY !== undefined) fail(99);',
-    'if (environment.ARK_API_KEY !== undefined) fail(100);',
-    'if (environment.VOLCENGINE_API_KEY !== undefined) fail(101);',
-    'if (environment.API_KEY_DOUBAO_CODING !== undefined) fail(102);',
-    'if (environment.GEMINI_API_KEY !== undefined) fail(103);',
-    'if (environment.GOOGLE_API_KEY !== undefined) fail(104);',
-    'if (environment.GOOGLE_GENERATIVE_AI_API_KEY !== undefined) fail(105);',
+    "if (environment.HTTPS_PROXY !== undefined) fail(91);",
+    "if (environment.HTTP_PROXY !== undefined) fail(92);",
+    "if (environment.ALL_PROXY !== undefined) fail(93);",
+    "if (environment.all_proxy !== undefined) fail(94);",
+    "if (environment.https_proxy !== undefined) fail(95);",
+    "if (environment.http_proxy !== undefined) fail(96);",
+    "const deepSeekCredential = environment.CODEX_AGENT_DEEPSEEK_KEY;",
+    `if (deepSeekCredential !== ${JSON.stringify(`${credentialSentinel}-deepseek`)}) fail(97);`,
+    `appendFileSync(${JSON.stringify(fakePiInvocationLog)}, "deepseek\\n", "utf8");`,
+    "if (environment.OPENAI_API_KEY_DOUBAO !== undefined) fail(98);",
+    "if (environment.CODEX_AGENT_ARK_CODING_KEY !== undefined) fail(99);",
+    "if (environment.ARK_API_KEY !== undefined) fail(100);",
+    "if (environment.VOLCENGINE_API_KEY !== undefined) fail(101);",
+    "if (environment.API_KEY_DOUBAO_CODING !== undefined) fail(102);",
+    "if (environment.OPENAI_API_KEY_DEEPSEEK !== undefined) fail(106);",
+    "if (environment.GEMINI_API_KEY !== undefined) fail(103);",
+    "if (environment.GOOGLE_API_KEY !== undefined) fail(104);",
+    "if (environment.GOOGLE_GENERATIVE_AI_API_KEY !== undefined) fail(105);",
     `void import(${JSON.stringify(pathToFileURL(fakePiScript).href)}).catch((error) => {`,
-    '  process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\\n`);',
+    "  process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\\n`);",
     "  process.exitCode = 1;",
     "});",
     "",
@@ -456,11 +448,14 @@ async function writeFakePiInstallation() {
   await writeFile(fakePiCli, cli, "utf8");
 }
 
-async function readFakePiInvocationCount() {
+async function readFakePiInvocationCount(route) {
   try {
-    return (await readFile(fakePiInvocationLog, "utf8"))
+    const invocations = (await readFile(fakePiInvocationLog, "utf8"))
       .split(/\r?\n/u)
-      .filter((line) => line === "invocation").length;
+      .filter((line) => line === "deepseek");
+    return route === undefined
+      ? invocations.length
+      : invocations.filter((entry) => entry === route).length;
   } catch (error) {
     if (
       typeof error === "object" &&
@@ -530,9 +525,9 @@ ${configLines}
 - 已安装副本声明并强制校验 \`cwd: "."\`；宿主将其解析到上述缓存目录后，MCP initialize/listTools 成功。
 - 工具严格为 \`external_review\` 与 \`external_delegate\`；二者输入均要求 \`llm\`。
 - \`external_review\` 为只读且非破坏性；\`external_delegate\` 为可写且具破坏性提示。
-- 已退役的 Gemini review 被已安装 MCP 以 unknown logical LLM 明确拒绝；错误列出精确四项活动 LLM，没有启动 Pi，也没有返回伪造的结构化成功结果。
-- fake Pi 的 Ark Agent Plan DeepSeek V4 Flash review 恰好调用一次并返回 \`completed\`，实际模型为 \`deepseek-v4-flash\`，且没有文件变化。
-- fake Pi 可信包入口确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 Agent Plan 目标凭据，未收到原始候选变量、其它 Ark 目标凭据或 Google 凭据。
+- 已退役的 Gemini review 被已安装 MCP 以 unknown logical LLM 明确拒绝；错误只列出 \`deepseek-v4-flash\`，没有启动 Pi，也没有返回伪造的结构化成功结果。
+- 已由不可变能力证据晋级的 Direct DeepSeek review 通过已安装 MCP 恰好调用一次 fake Pi，并返回 \`completed\`、实际模型 \`deepseek-v4-flash\`、零文件变化。
+- fake Pi 可信包入口确认 direct 子进程没有继承父 MCP 的 HTTP(S)/ALL proxy；只收到规范化后的 DeepSeek 目标凭据，未收到原始候选变量、Ark 目标凭据或 Google 凭据。
 - 正常与异常清理都依次通过 SDK \`client.close()\`、\`transport.close()\` 触发 stdio 关闭和 Job-owned drain；验收脚本不读取 PID，也不使用任何 PID-based fallback。
 
 ## 语义回滚
@@ -617,7 +612,7 @@ try {
     LOCALAPPDATA: isolatedLocalAppData,
     APPDATA: isolatedAppData,
     PI_COMMAND: fakePiCommand,
-    OPENAI_API_KEY_DOUBAO: credentialSentinel,
+    OPENAI_API_KEY_DEEPSEEK: `${credentialSentinel}-deepseek`,
     HTTPS_PROXY: inheritedProxy,
     HTTP_PROXY: inheritedProxy,
     ALL_PROXY: inheritedAllProxy,
@@ -626,10 +621,7 @@ try {
     command: server.command,
     args: server.args,
     cwd: server.cwd,
-    env: manifestForwardedMcpEnvironment(
-      mcpEnvironment,
-      server.envVars,
-    ),
+    env: manifestForwardedMcpEnvironment(mcpEnvironment, server.envVars),
     stderr: "pipe",
   });
   await client.connect(transport);
@@ -652,7 +644,7 @@ try {
       (entry) =>
         entry.type === "text" &&
         typeof entry.text === "string" &&
-        /Unknown logical llm.*ark-agent-deepseek-v4-flash, ark-agent-plan, ark-coding-plan, kimi-k3/u.test(
+        /Unknown logical llm.*Supported llms: deepseek-v4-flash/u.test(
           entry.text,
         ),
     )
@@ -662,12 +654,12 @@ try {
   if ((await readFakePiInvocationCount()) !== 0) {
     throw new Error("Retired Gemini review unexpectedly started fake Pi");
   }
-  const toolResult = structuredContent(
+  const directDeepSeekResult = structuredContent(
     await client.callTool(
       {
         name: "external_review",
         arguments: {
-          llm: "ark-agent-deepseek-v4-flash",
+          llm: "deepseek-v4-flash",
           task: "review_doc",
           prompt: "Review README.md without modifying files.",
           cwd: fixtureRoot,
@@ -682,28 +674,20 @@ try {
     ),
   );
   if (
-    toolResult.status !== "completed" ||
-    toolResult.actualModel !== "deepseek-v4-flash" ||
-    !Array.isArray(toolResult.filesChanged) ||
-    toolResult.filesChanged.length !== 0
+    directDeepSeekResult.status !== "completed" ||
+    directDeepSeekResult.actualModel !== "deepseek-v4-flash" ||
+    !Array.isArray(directDeepSeekResult.filesChanged) ||
+    directDeepSeekResult.filesChanged.length !== 0
   ) {
-    const diagnostics = Array.isArray(toolResult.diagnostics)
-      ? toolResult.diagnostics
-          .filter((entry) => typeof entry === "string")
-          .slice(0, 2)
-          .join(" | ")
-          .slice(0, 512)
-      : "";
     throw new Error(
-      `Installed MCP fake Pi review did not meet the acceptance gate: status=${String(
-        toolResult.status,
-      )} model=${String(toolResult.actualModel)} diagnostics=${diagnostics}`,
+      "Installed MCP Direct DeepSeek fake Pi review did not meet the acceptance gate",
     );
   }
-  if ((await readFakePiInvocationCount()) !== 1) {
-    throw new Error(
-      "Ark Agent Plan DeepSeek V4 Flash review did not invoke fake Pi exactly once",
-    );
+  if (
+    (await readFakePiInvocationCount()) !== 1 ||
+    (await readFakePiInvocationCount("deepseek")) !== 1
+  ) {
+    throw new Error("Direct DeepSeek review did not invoke fake Pi exactly once");
   }
   await client.close();
   client = undefined;

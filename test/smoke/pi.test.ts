@@ -47,10 +47,12 @@ afterEach(async () => {
   );
 });
 
-function runtimeEvidence(environment: NodeJS.ProcessEnv = {
-  CODEX_AGENT_ARK_AGENT_KEY: "secret",
-  PI_CODING_AGENT_DIR: "C:\\cache\\pi",
-}) {
+function runtimeEvidence(
+  environment: NodeJS.ProcessEnv = {
+    CODEX_AGENT_ARK_AGENT_KEY: "secret",
+    PI_CODING_AGENT_DIR: "C:\\cache\\pi",
+  },
+) {
   return {
     configSha256: "a".repeat(64),
     childEnvironment: environment,
@@ -87,7 +89,9 @@ const delegateQualificationContext = {
 
 describe("Ark Pi real-smoke harness", () => {
   it("limits public smoke kinds to active launchers", () => {
-    expectTypeOf<SmokeKind>().toEqualTypeOf<"ark" | "kimi">();
+    expectTypeOf<SmokeKind>().toEqualTypeOf<
+      "ark" | "deepseek" | "kimi"
+    >();
   });
 
   it.each([
@@ -137,6 +141,7 @@ describe("Ark Pi real-smoke harness", () => {
       label: "standalone Ark",
       llm: "ark-agent-plan",
       qualificationContext: null,
+      expectedProviders: ["ark"] as const,
       expectedQualification: undefined,
       expectedRetryMode: "default",
     },
@@ -144,14 +149,24 @@ describe("Ark Pi real-smoke harness", () => {
       label: "qualified Ark",
       llm: "ark-agent-plan",
       qualificationContext,
+      expectedProviders: ["ark"] as const,
       expectedQualification: true,
       expectedRetryMode: "qualification-single-attempt",
+    },
+    {
+      label: "standalone Direct DeepSeek",
+      llm: "deepseek-v4-flash",
+      qualificationContext: null,
+      expectedProviders: ["deepseek"] as const,
+      expectedQualification: undefined,
+      expectedRetryMode: "default",
     },
   ] as const)(
     "constructs $label runtime with the intended config and retry mode",
     async ({
       llm,
       qualificationContext: context,
+      expectedProviders,
       expectedQualification,
       expectedRetryMode,
     }) => {
@@ -166,9 +181,7 @@ describe("Ark Pi real-smoke harness", () => {
               buildConfig: (
                 options: BuildIsolatedPiConfigOptions,
               ) => Promise<IsolatedPiConfig>;
-              createAdapter: (
-                dependencies: PiAdapterDependencies,
-              ) => PiAdapter;
+              createAdapter: (dependencies: PiAdapterDependencies) => PiAdapter;
             },
           ) => Promise<unknown>;
         }
@@ -197,7 +210,7 @@ describe("Ark Pi real-smoke harness", () => {
 
       expect(configCalls).toHaveLength(1);
       expect(configCalls[0]).toMatchObject({
-        providers: ["ark"],
+        providers: expectedProviders,
         ...(expectedQualification === undefined
           ? {}
           : { qualification: expectedQualification }),
@@ -339,8 +352,7 @@ describe("Ark Pi real-smoke harness", () => {
       llm: "ark-agent-deepseek-v4-flash",
       resultFileName: "ark-agent-deepseek-v4-flash-smoke.txt",
       expectedLine: "ARK_SMOKE_OK:ark-agent-deepseek-v4-flash",
-      payloadBase64:
-        "QVJLX1NNT0tFX09LOmFyay1hZ2VudC1kZWVwc2Vlay12NC1mbGFzaAo=",
+      payloadBase64: "QVJLX1NNT0tFX09LOmFyay1hZ2VudC1kZWVwc2Vlay12NC1mbGFzaAo=",
     },
   ] as const)(
     "builds an unambiguous delegate write contract for $llm",
@@ -454,14 +466,10 @@ describe("Ark Pi real-smoke harness", () => {
       filesChanged: ["ark-agent-plan-smoke.txt"],
       commandCount: 1,
       resultFileReadStatus: "read",
-      resultFileByteLength: Buffer.byteLength(
-        "ARK_SMOKE_OK:ark-agent-plan\n",
-      ),
+      resultFileByteLength: Buffer.byteLength("ARK_SMOKE_OK:ark-agent-plan\n"),
       resultFileRawSha256: sha256("ARK_SMOKE_OK:ark-agent-plan\n"),
       resultFileNormalizedSha256: sha256("ARK_SMOKE_OK:ark-agent-plan"),
-      expectedResultNormalizedSha256: sha256(
-        "ARK_SMOKE_OK:ark-agent-plan",
-      ),
+      expectedResultNormalizedSha256: sha256("ARK_SMOKE_OK:ark-agent-plan"),
       resultFileNormalizedLineCount: 1,
       resultFileContainsExpectedLine: true,
       checks: {
@@ -1063,5 +1071,4 @@ describe("Ark Pi real-smoke harness", () => {
       expect(evidence.checks.executionTelemetryValid).toBe(false);
     }
   });
-
 });

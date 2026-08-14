@@ -197,6 +197,32 @@ describe("qualification lock", () => {
     }
   });
 
+  it("persists and recovers the Direct DeepSeek plan in a current lock owner", async () => {
+    const fixture = await tempFixture();
+    const handle = await acquireQualificationLock({
+      repositoryRoot: fixture.repository,
+      tempDirectory: fixture.temp,
+      batchId: "direct-deepseek-batch",
+      authorizationReferenceSha256: authHash,
+      qualificationPlanId: "direct-deepseek-v1",
+      processId: 123,
+      processIdentityInspector: liveInspector,
+      nonce: "11111111-1111-4111-8111-111111111111",
+    });
+
+    await expect(
+      readQualificationLockOwner(handle.lockDirectory),
+    ).resolves.toMatchObject({
+      schemaVersion: 2,
+      qualificationPlanId: "direct-deepseek-v1",
+      batchId: "direct-deepseek-batch",
+    });
+    expect(qualificationPlanForOwner(handle.owner)).toBe(
+      "direct-deepseek-v1",
+    );
+    await releaseQualificationLock(handle);
+  });
+
   it("rejects a prebuilt lock-root directory link without writing through it", async () => {
     const fixture = await tempFixture();
     const external = path.join(

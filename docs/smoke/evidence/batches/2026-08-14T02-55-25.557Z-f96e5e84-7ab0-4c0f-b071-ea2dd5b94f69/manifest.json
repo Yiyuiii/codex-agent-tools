@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 3,
+  "qualificationPlanId": "direct-deepseek-v1",
+  "batchId": "2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69",
+  "status": "passed",
+  "authorizationReferenceSha256": "bde9af70635715e0c3dd4514992c96b3514a55a77051667b925f2d1b73772d07",
+  "repositoryCommit": "469129d708eb90a3b68071c7b01313b7e70c65a2",
+  "buildIdentitySha256": "8e2474e56da83f880580058d8db766239c57d00d5c6c1f6daca473953734264a",
+  "preflightSha256": "6ea6a9e6dc5b8ca950dc7346d6465d14644064789af90059b19b368140c56baf",
+  "preflight": {
+    "schemaVersion": 3,
+    "qualificationPlanId": "direct-deepseek-v1",
+    "repositoryCommit": "469129d708eb90a3b68071c7b01313b7e70c65a2",
+    "repositoryBranch": "codex/deepseek-v4-flash-api",
+    "repositoryDirty": false,
+    "packageVersion": "0.1.1",
+    "packageLockSha256": "9115deed968ebdde43199988b129a176a17319b2f04fd78cb399271a595b33e5",
+    "buildArtifacts": [
+      {
+        "path": "dist/deepseek-smoke.js",
+        "sha256": "b2fd3f0d74d349081259aaeb11622e9072773914aa39920a3157c8a22cfd49f9"
+      },
+      {
+        "path": "dist/smoke-evidence.js",
+        "sha256": "175bb0bce2b03f3a56f59ccd237f72877ddc53af9c4e8de00e4ff8436cb616b9"
+      },
+      {
+        "path": "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+        "sha256": "1dca1fdb3aa68d0cdfed5308fb3db676284efeb67ca897362dd6bad5a7a5e0e0"
+      }
+    ],
+    "buildIdentitySha256": "8e2474e56da83f880580058d8db766239c57d00d5c6c1f6daca473953734264a",
+    "runtimeVersions": {
+      "node": "v24.14.1",
+      "codex": "codex-cli 0.135.0"
+    },
+    "piConfigSha256": "df984c1998e80825c4371ebdf4cc5c78701d29edb991147b6c7eab14786432bc",
+    "logicalLlms": [
+      {
+        "llm": "deepseek-v4-flash",
+        "runtime": "pi-rpc",
+        "model": "deepseek-v4-flash",
+        "provider": "deepseek",
+        "route": "direct"
+      }
+    ],
+    "credentialMatches": [
+      {
+        "llm": "deepseek-v4-flash",
+        "environmentVariableName": "OPENAI_API_KEY_DEEPSEEK"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "ordinal": 1,
+      "llm": "deepseek-v4-flash",
+      "task": "review",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/cases/2026-08-14T03-01-19.339Z-deepseek-v4-flash-review-deepseek.json",
+        "sha256": "4318245eeed8a8c798badf896f4fd68c0e8f4fee6c463956c1b2f579e2ee1d5a"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable",
+      "ownedProcessDrained": true
+    },
+    {
+      "ordinal": 2,
+      "llm": "deepseek-v4-flash",
+      "task": "delegate",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/cases/2026-08-14T03-01-30.618Z-deepseek-v4-flash-delegate-deepseek.json",
+        "sha256": "7bbb2b11cc45e193a8b77e5ce1215b93f02ca80268b1914325d4f0c6490ea342"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable",
+      "ownedProcessDrained": true
+    }
+  ],
+  "uncommittedEvidence": null,
+  "checkpoints": [
+    {
+      "sequence": 0,
+      "path": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/checkpoints/000000.json",
+      "sha256": "9a47f76ff144364312ec3ae3141ee9e11e3cec45d80d8a42a389f5cd95f53575"
+    },
+    {
+      "sequence": 1,
+      "path": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/checkpoints/000001.json",
+      "sha256": "ace57a53cda85762856802955c3cf887ad1e28e529c99a49c5ac390c08413ceb"
+    },
+    {
+      "sequence": 2,
+      "path": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/checkpoints/000002.json",
+      "sha256": "6cadcf697f839d6af0ce14ac93409e3b39b44202277a6c8519053681df64144f"
+    },
+    {
+      "sequence": 3,
+      "path": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/checkpoints/000003.json",
+      "sha256": "38c4fb048539e318a5f234a167aaa0d5629acdef2cf896bef5aecc123a9d2889"
+    },
+    {
+      "sequence": 4,
+      "path": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/checkpoints/000004.json",
+      "sha256": "34d15e0f5193c6a02ff3c99080dda372688cf7d6946aba82748f630fc2de3afe"
+    }
+  ],
+  "stopReason": null,
+  "notRun": [],
+  "promotionEligible": true,
+  "completedAt": "2026-08-14T03:01:31.629Z"
+}

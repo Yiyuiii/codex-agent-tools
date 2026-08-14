@@ -2,8 +2,9 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 
 import {
-  ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  qualificationSchedule,
+  type CurrentQualificationPlanId,
 } from "./protocol.js";
 import type {
   CurrentFrozenPreflightRecord,
@@ -15,11 +16,6 @@ import type { QualificationLedger } from "./manifest.js";
 
 const AUTHORIZATION_REFERENCE_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-const ACTIVE_QUALIFICATION_PROTOCOL = Object.freeze({
-  qualificationPlanId: ACTIVE_QUALIFICATION_PLAN_ID,
-  schedule: ACTIVE_QUALIFICATION_CASES,
-});
-
 export type QualificationCoordinatorStage =
   "arguments" | "lock" | "preflight" | "batch" | "release";
 
@@ -49,31 +45,31 @@ export interface QualificationCoordinatorDependencies {
     repositoryRoot: string;
     batchId: string;
     authorizationReferenceSha256: string;
-    qualificationPlanId: "four-llm-v1";
+    qualificationPlanId: CurrentQualificationPlanId;
   }): Promise<QualificationLockHandle>;
   releaseLock(handle: QualificationLockHandle): Promise<void>;
   runPreflight(options: {
     repositoryRoot: string;
     authorizationReferenceSha256: string;
     lockHandle: QualificationLockHandle;
-    qualificationPlanId: "four-llm-v1";
+    qualificationPlanId: CurrentQualificationPlanId;
   }): Promise<CurrentFrozenPreflightRecord>;
   createLedger(options: {
     repositoryRoot: string;
     batchId: string;
-    qualificationPlanId: "four-llm-v1";
+    qualificationPlanId: CurrentQualificationPlanId;
   }): QualificationLedger;
   assertLockOwner(handle: QualificationLockHandle): Promise<void>;
   assertFrozenCandidate(options: {
     repositoryRoot: string;
     batchId: string;
     preflight: CurrentFrozenPreflightRecord;
-    qualificationPlanId: "four-llm-v1";
+    qualificationPlanId: CurrentQualificationPlanId;
   }): Promise<void>;
   runCase(options: {
     identity: QualificationCaseIdentity;
     qualificationContext: Readonly<{
-      qualificationPlanId: "four-llm-v1";
+      qualificationPlanId: CurrentQualificationPlanId;
       batchId: string;
       ordinal: number;
       llm: string;
@@ -156,10 +152,16 @@ export async function runQualificationBatch(
   options: {
     repositoryRoot: string;
     authorizationReference: string;
+    qualificationPlanId?: CurrentQualificationPlanId;
   },
   dependencies: QualificationCoordinatorDependencies,
 ): Promise<QualificationTerminalManifest> {
-  const protocol = ACTIVE_QUALIFICATION_PROTOCOL;
+  const qualificationPlanId =
+    options.qualificationPlanId ?? ACTIVE_QUALIFICATION_PLAN_ID;
+  const protocol = Object.freeze({
+    qualificationPlanId,
+    schedule: qualificationSchedule(qualificationPlanId),
+  });
   if (
     typeof options.repositoryRoot !== "string" ||
     options.repositoryRoot.length === 0 ||

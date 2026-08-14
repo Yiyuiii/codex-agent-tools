@@ -199,6 +199,26 @@ describe("qualification evidence identity", () => {
     expect(Object.isFrozen(normalized)).toBe(true);
   });
 
+  it("normalizes only exact identities from the isolated Direct DeepSeek schedule", () => {
+    const directContext = {
+      ...validContext,
+      qualificationPlanId: "direct-deepseek-v1" as const,
+      ordinal: 1,
+      llm: "deepseek-v4-flash",
+    };
+
+    expect(normalizeSmokeQualificationContext(directContext)).toEqual(
+      directContext,
+    );
+    expect(() =>
+      normalizeSmokeQualificationContext({
+        ...directContext,
+        ordinal: 2,
+        task: "review",
+      }),
+    ).toThrow("Invalid smoke qualification context");
+  });
+
   it.each([
     { ...validContext, qualificationPlanId: "five-llm-v1" },
     { ...validContext, qualificationPlanId: "unknown-plan" },

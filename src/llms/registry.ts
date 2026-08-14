@@ -30,15 +30,6 @@ const capabilityQualifiedTasks = (anchorPrefix: string) =>
     anchorPrefix,
   );
 
-const pendingTasks = () =>
-  ({
-    capabilities: { review: true, delegate: true },
-    qualityGates: {
-      review: { status: "pending" },
-      delegate: { status: "pending" },
-    },
-  }) as const;
-
 const DEFAULT_PROFILES: readonly LlmProfile[] = [
   {
     id: "ark-coding-plan",
@@ -86,6 +77,19 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     ),
   },
   {
+    id: "deepseek-v4-flash",
+    displayName: "DeepSeek V4 Flash",
+    runtime: "pi-rpc",
+    provider: "deepseek",
+    model: "deepseek-v4-flash",
+    network: "direct",
+    credentialEnv: ["OPENAI_API_KEY_DEEPSEEK"],
+    credentialTargetEnv: "CODEX_AGENT_DEEPSEEK_KEY",
+    maxConcurrency: 1,
+    concurrencyKey: "deepseek",
+    ...capabilityQualifiedTasks("deepseek-v4-flash"),
+  },
+  {
     id: "kimi-k3",
     displayName: "Kimi K3",
     runtime: "kimi-acp",
@@ -96,6 +100,9 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
     ...capabilityQualifiedTasks("kimi-k3"),
   },
 ];
+
+const PUBLIC_PROFILE_IDS = Object.freeze(["deepseek-v4-flash"] as const);
+const PUBLIC_PROFILE_ID_SET = new Set<string>(PUBLIC_PROFILE_IDS);
 
 export function createLlmRegistry(profiles: readonly LlmProfile[]): LlmRegistry {
   const byId = new Map<string, LlmProfile>();
@@ -201,15 +208,24 @@ function immutableProfile(profile: LlmProfile): LlmProfile {
 const registry = createLlmRegistry(DEFAULT_PROFILES);
 
 export function supportedLlmIds(): string[] {
-  return registry.ids();
+  return [...PUBLIC_PROFILE_IDS];
 }
 
 export function credentialEnvironmentNames(): string[] {
   return [
-    ...new Set(DEFAULT_PROFILES.flatMap((profile) => profile.credentialEnv)),
+    ...new Set(
+      PUBLIC_PROFILE_IDS.flatMap(
+        (id) => registry.resolve(id).credentialEnv,
+      ),
+    ),
   ];
 }
 
 export function resolveLlm(id: string, task?: TaskKind): LlmProfile {
+  if (task !== undefined && !PUBLIC_PROFILE_ID_SET.has(id)) {
+    throw new Error(
+      `Unknown logical llm "${id}". Supported llms: ${PUBLIC_PROFILE_IDS.join(", ")}`,
+    );
+  }
   return registry.resolve(id, task);
 }

@@ -1,4 +1,7 @@
-import type { QualificationPlanId } from "./protocol.js";
+import type {
+  CurrentQualificationPlanId,
+  QualificationPlanId,
+} from "./protocol.js";
 
 interface QualificationLockOwnerCommon {
   repositoryRealpathSha256: string;
@@ -16,7 +19,7 @@ export interface LegacyQualificationLockOwner extends QualificationLockOwnerComm
 
 export interface CurrentQualificationLockOwner extends QualificationLockOwnerCommon {
   schemaVersion: 2;
-  qualificationPlanId: "four-llm-v1";
+  qualificationPlanId: CurrentQualificationPlanId;
 }
 
 export type QualificationLockOwner =
@@ -102,7 +105,7 @@ export interface HistoricalCurrentFrozenPreflightRecord
 export type CurrentV3FrozenPreflightRecord = Readonly<
   Omit<FrozenPreflightRecordCommon, "runtimeVersions" | "targetProcesses"> & {
     readonly schemaVersion: 3;
-    readonly qualificationPlanId: "four-llm-v1";
+    readonly qualificationPlanId: CurrentQualificationPlanId;
     readonly runtimeVersions: Readonly<{
       readonly node: string;
       readonly codex: string;
@@ -127,7 +130,7 @@ export interface LegacyQualificationProtocolIdentity {
 
 export interface CurrentQualificationProtocolIdentity {
   readonly schemaVersion: 3;
-  readonly qualificationPlanId: "four-llm-v1";
+  readonly qualificationPlanId: CurrentQualificationPlanId;
 }
 
 export interface HistoricalCurrentQualificationProtocolIdentity {
@@ -251,7 +254,7 @@ export type CurrentQualificationTerminalManifest =
   QualificationTerminalManifestCommon &
     Readonly<{
       schemaVersion: 3;
-      qualificationPlanId: "four-llm-v1";
+      qualificationPlanId: CurrentQualificationPlanId;
     }>;
 
 export type QualificationTerminalManifest =

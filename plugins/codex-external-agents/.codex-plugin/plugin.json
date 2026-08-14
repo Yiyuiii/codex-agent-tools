@@ -1,7 +1,7 @@
 {
   "name": "codex-external-agents",
-  "version": "0.1.1-beta.4",
-  "description": "Use explicitly selected external LLMs for review and delegated coding tasks.",
+  "version": "0.1.2-beta.0",
+  "description": "Use DeepSeek V4 Flash for review and delegated coding tasks.",
   "author": {
     "name": "codex-agent-tools maintainers"
   },
@@ -9,8 +9,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Codex External Agents",
-    "shortDescription": "Review and delegate with explicitly selected external LLMs",
-    "longDescription": "Use explicitly selected local Kimi and Pi-backed LLMs for Codex review and delegated coding tasks.",
+    "shortDescription": "Review and delegate with DeepSeek V4 Flash",
+    "longDescription": "Use the fixed deepseek-v4-flash model through an isolated Pi RPC configuration for Codex review and delegated coding tasks.",
     "developerName": "codex-agent-tools maintainers",
     "category": "Productivity",
     "capabilities": [
@@ -18,8 +18,8 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Review my current changes with kimi-k3.",
-      "Delegate this coding task to ark-coding-plan."
+      "Review my current changes with deepseek-v4-flash.",
+      "Delegate this coding task to deepseek-v4-flash."
     ]
   }
 }

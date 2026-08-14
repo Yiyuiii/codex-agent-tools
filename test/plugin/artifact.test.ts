@@ -27,10 +27,7 @@ const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
-const pluginRoot = resolve(
-  repositoryRoot,
-  "plugins/codex-external-agents",
-);
+const pluginRoot = resolve(repositoryRoot, "plugins/codex-external-agents");
 
 function readJson(relativePath: string): Record<string, unknown> {
   return JSON.parse(
@@ -63,9 +60,7 @@ describe("Codex plugin artifact", () => {
       ],
     });
 
-    const [plugin] = marketplace.plugins as [
-      Record<string, unknown>,
-    ];
+    const [plugin] = marketplace.plugins as [Record<string, unknown>];
     expect((plugin.policy as Record<string, unknown>).products).toBeUndefined();
   });
 
@@ -78,8 +73,7 @@ describe("Codex plugin artifact", () => {
     expect(pluginManifest).toMatchObject({
       name: "codex-external-agents",
       version: packageManifest.version,
-      description:
-        "Use explicitly selected external LLMs for review and delegated coding tasks.",
+      description: "Use DeepSeek V4 Flash for review and delegated coding tasks.",
       author: {
         name: "codex-agent-tools maintainers",
       },
@@ -87,10 +81,9 @@ describe("Codex plugin artifact", () => {
       mcpServers: "./.mcp.json",
       interface: {
         displayName: "Codex External Agents",
-        shortDescription:
-          "Review and delegate with explicitly selected external LLMs",
+        shortDescription: "Review and delegate with DeepSeek V4 Flash",
         longDescription:
-          "Use explicitly selected local Kimi and Pi-backed LLMs for Codex review and delegated coding tasks.",
+          "Use the fixed deepseek-v4-flash model through an isolated Pi RPC configuration for Codex review and delegated coding tasks.",
         developerName: "codex-agent-tools maintainers",
         category: "Productivity",
         capabilities: ["Interactive", "Write"],
@@ -102,9 +95,8 @@ describe("Codex plugin artifact", () => {
     expect(pluginManifest).not.toHaveProperty("apps");
     expect(JSON.stringify(pluginManifest)).not.toContain("TODO");
 
-    const defaultPrompt = (
-      pluginManifest.interface as Record<string, unknown>
-    ).defaultPrompt;
+    const defaultPrompt = (pluginManifest.interface as Record<string, unknown>)
+      .defaultPrompt;
 
     expect(Array.isArray(defaultPrompt)).toBe(true);
     if (!Array.isArray(defaultPrompt)) return;
@@ -160,21 +152,14 @@ describe("Codex plugin artifact", () => {
   });
 
   it("starts exactly one MCP server through the bundled relative path", () => {
-    const mcpManifest = readJson(
-      "plugins/codex-external-agents/.mcp.json",
-    );
+    const mcpManifest = readJson("plugins/codex-external-agents/.mcp.json");
 
     expect(mcpManifest).toEqual({
       codex_external_agents: {
         command: "node",
         args: ["./runtime/codex-external-agents-mcp.mjs"],
         cwd: ".",
-        env_vars: [
-          "ARK_API_KEY",
-          "VOLCENGINE_API_KEY",
-          "API_KEY_DOUBAO_CODING",
-          "OPENAI_API_KEY_DOUBAO",
-        ],
+        env_vars: ["OPENAI_API_KEY_DEEPSEEK"],
       },
     });
     expect(mcpManifest.codex_external_agents).not.toHaveProperty("env");
@@ -234,12 +219,8 @@ describe("Codex plugin artifact", () => {
     const packageFiles = packageManifest.files as string[];
 
     expect(scripts["build:library"]).toBe("tsup");
-    expect(scripts["build:plugin"]).toBe(
-      "tsup --config tsup.plugin.config.ts",
-    );
-    expect(scripts.build).toBe(
-      "npm run build:library && npm run build:plugin",
-    );
+    expect(scripts["build:plugin"]).toBe("tsup --config tsup.plugin.config.ts");
+    expect(scripts.build).toBe("npm run build:library && npm run build:plugin");
     expect(scripts["acceptance:plugin:isolated"]).toBe(
       "npm run build && npm run acceptance:plugin:isolated:built",
     );
@@ -247,9 +228,7 @@ describe("Codex plugin artifact", () => {
       "node scripts/plugin-isolated-acceptance.mjs",
     );
     expect(scripts).not.toHaveProperty("smoke:pi");
-    const capabilityIndex = readJson(
-      "docs/smoke/evidence/capabilities.json",
-    );
+    const capabilityIndex = readJson("docs/smoke/evidence/capabilities.json");
     expect(packageFiles).toEqual([
       "dist/cli.js",
       "dist/mcp.js",
@@ -266,12 +245,8 @@ describe("Codex plugin artifact", () => {
       "docs/smoke/evidence/capabilities.json",
       ...capabilitySourcePathsFromIndex(capabilityIndex),
     ]);
-    expect(packageFilePathsFromManifest(packageManifest)).toEqual(
-      packageFiles,
-    );
-    expect(dirname(pluginRoot)).toBe(
-      resolve(repositoryRoot, "plugins"),
-    );
+    expect(packageFilePathsFromManifest(packageManifest)).toEqual(packageFiles);
+    expect(dirname(pluginRoot)).toBe(resolve(repositoryRoot, "plugins"));
   });
 
   it("packages exactly the verified Windows x64 managed job helper pair", async () => {
@@ -351,9 +326,7 @@ describe("Codex plugin artifact", () => {
       expect(output).toContain(
         "codex-external-agents-mcp - codex_external_agents stdio MCP server",
       );
-      expect(output).toContain(
-        "Tools: external_review, external_delegate",
-      );
+      expect(output).toContain("Tools: external_review, external_delegate");
       expect(staticImports.length).toBeGreaterThan(0);
       expect(
         [...new Set(staticImports)].filter(

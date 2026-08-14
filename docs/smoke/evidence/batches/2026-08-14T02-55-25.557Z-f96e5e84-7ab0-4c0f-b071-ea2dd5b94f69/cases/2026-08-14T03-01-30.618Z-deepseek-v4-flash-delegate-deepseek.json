@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 4,
+  "qualification": {
+    "qualificationPlanId": "direct-deepseek-v1",
+    "batchId": "2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69",
+    "ordinal": 2,
+    "llm": "deepseek-v4-flash",
+    "task": "delegate",
+    "frozenCommit": "469129d708eb90a3b68071c7b01313b7e70c65a2",
+    "frozenBuildIdentity": "8e2474e56da83f880580058d8db766239c57d00d5c6c1f6daca473953734264a",
+    "authorizationReferenceSha256": "bde9af70635715e0c3dd4514992c96b3514a55a77051667b925f2d1b73772d07",
+    "orchestratorFallbackUsed": false
+  },
+  "timestamp": "2026-08-14T03:01:30.618Z",
+  "llm": "deepseek-v4-flash",
+  "actualModel": "deepseek-v4-flash",
+  "expectedModel": "deepseek-v4-flash",
+  "runtime": "pi-rpc",
+  "provider": "deepseek",
+  "endpointHost": "api.deepseek.com",
+  "route": "direct",
+  "credentialEnv": "CODEX_AGENT_DEEPSEEK_KEY",
+  "configSha256": "df984c1998e80825c4371ebdf4cc5c78701d29edb991147b6c7eab14786432bc",
+  "task": "delegate",
+  "status": "completed",
+  "passed": true,
+  "failureReason": null,
+  "elapsedMs": 9645,
+  "outputSha256": "bfe3e8657445d622b824d28229e4a4e8ceb8db2a49860b445c0a95a9f2e21f44",
+  "filesChanged": [
+    "deepseek-v4-flash-smoke.txt"
+  ],
+  "commandCount": 2,
+  "diagnosticCount": 0,
+  "adapterClientInvocationCount": 1,
+  "adapterRetryCount": 0,
+  "runtimeReportedAutoRetryCount": 0,
+  "adapterReportedFallbackUsed": false,
+  "ownedProcessDrained": true,
+  "orchestratorFallbackUsed": false,
+  "executionTelemetrySource": "pi-rpc-observable",
+  "checks": {
+    "actualModelMatches": true,
+    "environmentIsolated": true,
+    "ownedProcessDrained": true,
+    "resultFileValid": true,
+    "resultFileObserved": true,
+    "onlyExpectedFileChanged": true,
+    "requiredCommandObserved": true,
+    "executionTelemetryValid": true
+  },
+  "resultFileReadStatus": "read",
+  "expectedResultNormalizedSha256": "4a282bd59556422780c8e0a0ff192d2024d50dcc8752145db873f145f692854e",
+  "resultFileByteLength": 31,
+  "resultFileRawSha256": "0280905b9fc9e7eb24200814d5aa49f67c8b8808b2ea5475849e87845a7bc77a",
+  "resultFileNormalizedSha256": "4a282bd59556422780c8e0a0ff192d2024d50dcc8752145db873f145f692854e",
+  "resultFileNormalizedLineCount": 1,
+  "resultFileContainsExpectedLine": true,
+  "writeCommandObservations": [
+    {
+      "source": "raw_input",
+      "match": "exact",
+      "outcome": "success"
+    },
+    {
+      "source": "raw_input",
+      "match": "status_exact",
+      "outcome": "success"
+    }
+  ]
+}
