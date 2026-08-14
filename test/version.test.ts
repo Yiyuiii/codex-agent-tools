@@ -9,6 +9,6 @@ describe("package identity", () => {
   });
 
   it("uses the current stable version", () => {
-    expect(VERSION).toBe("0.1.1");
+    expect(VERSION).toBe("0.1.2-beta.0");
   });
 });

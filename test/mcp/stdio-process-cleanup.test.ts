@@ -758,7 +758,7 @@ describe("MCP stdio owned-process cleanup", () => {
     );
   });
 
-  it("aborts a real Kimi request and waits for its complete owned tree cleanup", async () => {
+  it.skip("retained Kimi cleanup path is outside the DeepSeek-only beta matrix", async () => {
     const cwd = await makeTempDirectory();
     const stateDirectory = await makeTempDirectory();
     const rootPidPath = path.join(stateDirectory, "root.pid");
@@ -876,7 +876,7 @@ describe("MCP stdio owned-process cleanup", () => {
     ]);
   }, 20_000);
 
-  it("cancels a real Pi request through SDK session shutdown and waits for its complete owned tree cleanup", async () => {
+  it("cancels a real DeepSeek Pi request through SDK session shutdown and drains its owned tree", async () => {
     const cwd = await makeTempDirectory();
     const stateDirectory = await makeTempDirectory();
     const rootPidPath = path.join(stateDirectory, "root.pid");
@@ -886,7 +886,7 @@ describe("MCP stdio owned-process cleanup", () => {
     const isolatedConfig = await buildIsolatedPiConfig({
       root: path.join(stateDirectory, "pi-config"),
       version: "stdio-test",
-      providers: ["ark"],
+      providers: ["deepseek"],
     });
     const testConfig: IsolatedPiConfig = isolatedConfig;
 
@@ -952,11 +952,11 @@ describe("MCP stdio owned-process cleanup", () => {
       [adapter.runtime, adapter],
     ]);
     const realService = new ExternalAgentService({
-      registry: registryFor("ark-agent-plan"),
+      registry: registryFor("deepseek-v4-flash"),
       adapters,
       parentEnvironment: {
         ...process.env,
-        OPENAI_API_KEY_DOUBAO: "stdio-test-only-key",
+        OPENAI_API_KEY_DEEPSEEK: "stdio-test-only-key",
       },
     });
     const observation: ServiceObservation = { abortCount: 0 };
@@ -975,7 +975,7 @@ describe("MCP stdio owned-process cleanup", () => {
     const session = await runStdioCancellation(
       service,
       cwd,
-      "ark-agent-plan",
+      "deepseek-v4-flash",
       "pi prompt started",
       promptStateReady,
       abortObserved,
@@ -1036,8 +1036,8 @@ describe("MCP stdio owned-process cleanup", () => {
     expect(await listFiles(cwd)).toEqual([]);
     expect(await listFiles(stateDirectory)).toEqual([
       "child.pid",
-      "pi-config/pi/stdio-test/ark/models.json",
-      "pi-config/pi/stdio-test/ark/settings.json",
+      "pi-config/pi/stdio-test/deepseek/models.json",
+      "pi-config/pi/stdio-test/deepseek/settings.json",
       "root.pid",
       "rpc-log.jsonl",
     ]);

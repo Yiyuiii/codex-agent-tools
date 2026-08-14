@@ -265,7 +265,7 @@ describe("PiAdapter", () => {
     });
     expect(buildConfig).toHaveBeenCalledOnce();
     expect(buildConfig).toHaveBeenCalledWith({
-      version: "0.1.1",
+      version: "0.1.2-beta.0",
       providers: ["deepseek"],
     });
     const request = runClient.mock.calls[0]![0];

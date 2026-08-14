@@ -161,13 +161,7 @@ describe("Codex plugin artifact", () => {
         command: "node",
         args: ["./runtime/codex-external-agents-mcp.mjs"],
         cwd: ".",
-        env_vars: [
-          "ARK_API_KEY",
-          "VOLCENGINE_API_KEY",
-          "API_KEY_DOUBAO_CODING",
-          "OPENAI_API_KEY_DOUBAO",
-          "OPENAI_API_KEY_DEEPSEEK",
-        ],
+        env_vars: ["OPENAI_API_KEY_DEEPSEEK"],
       },
     });
     expect(mcpManifest.codex_external_agents).not.toHaveProperty("env");

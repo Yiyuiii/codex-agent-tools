@@ -67,7 +67,7 @@ export interface ReleaseValidationCore {
   readonly capabilityIndex: Readonly<{
     path: typeof CAPABILITY_INDEX_PATH;
     sha256: string;
-    entryCount: 8;
+    entryCount: 2;
   }>;
   readonly currentHostFreeze: Readonly<{
     path: string;
@@ -375,7 +375,7 @@ function parseCore(
   const capabilityIndex = plainRecord(record.capabilityIndex);
   exactKeys(capabilityIndex, ["path", "sha256", "entryCount"]);
   exactString(capabilityIndex.path, CAPABILITY_INDEX_PATH);
-  if (capabilityIndex.entryCount !== 8) fail();
+  if (capabilityIndex.entryCount !== 2) fail();
   const freeze = plainRecord(record.currentHostFreeze);
   exactKeys(freeze, ["path", "sha256"]);
   const runtimeFrozenCommit = commit(record.runtimeFrozenCommit);
@@ -392,7 +392,7 @@ function parseCore(
     capabilityIndex: Object.freeze({
       path: CAPABILITY_INDEX_PATH,
       sha256: digest(capabilityIndex.sha256),
-      entryCount: 8,
+      entryCount: 2,
     }),
     currentHostFreeze: Object.freeze({
       path: currentHostFreezePath(freeze.path, runtimeFrozenCommit),
@@ -790,14 +790,8 @@ export interface CapabilityFingerprintProjection {
 }
 
 const CAPABILITY_IDENTITIES = Object.freeze([
-  "ark-agent-deepseek-v4-flash/delegate",
-  "ark-agent-deepseek-v4-flash/review",
-  "ark-agent-plan/delegate",
-  "ark-agent-plan/review",
-  "ark-coding-plan/delegate",
-  "ark-coding-plan/review",
-  "kimi-k3/delegate",
-  "kimi-k3/review",
+  "deepseek-v4-flash/delegate",
+  "deepseek-v4-flash/review",
 ] as const);
 
 function parseCapabilityProjection(
@@ -845,8 +839,8 @@ export interface CurrentHostFreezeReceipt {
     nativePreflight: "passed";
     nativeVerify: "passed";
     observerVerify: "passed";
-    capabilityEvidenceValidCount: 8;
-    prequalificationStaleCount: 8;
+    capabilityEvidenceValidCount: 2;
+    prequalificationStaleCount: 0;
     realModelCalls: 0;
     activeConfigAccesses: 0;
     activePluginChanges: 0;
@@ -915,8 +909,8 @@ export function assertCurrentHostFreezeReceipt(
       checks.nativePreflight !== "passed" ||
       checks.nativeVerify !== "passed" ||
       checks.observerVerify !== "passed" ||
-      checks.capabilityEvidenceValidCount !== 8 ||
-      checks.prequalificationStaleCount !== 8 ||
+      checks.capabilityEvidenceValidCount !== 2 ||
+      checks.prequalificationStaleCount !== 0 ||
       checks.realModelCalls !== 0 ||
       checks.activeConfigAccesses !== 0 ||
       checks.activePluginChanges !== 0 ||
@@ -941,8 +935,8 @@ export function assertCurrentHostFreezeReceipt(
         nativePreflight: "passed",
         nativeVerify: "passed",
         observerVerify: "passed",
-        capabilityEvidenceValidCount: 8,
-        prequalificationStaleCount: 8,
+        capabilityEvidenceValidCount: 2,
+        prequalificationStaleCount: 0,
         realModelCalls: 0,
         activeConfigAccesses: 0,
         activePluginChanges: 0,

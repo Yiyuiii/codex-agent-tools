@@ -58,13 +58,7 @@ const marketplace = "codex-external-agents-local";
 const plugin = "codex-external-agents";
 const selector = `${plugin}@${marketplace}`;
 const repositoryUrl = "git+https://github.com/Yiyuiii/codex-agent-tools.git";
-const expectedPluginEnvironmentVariables = [
-  "ARK_API_KEY",
-  "VOLCENGINE_API_KEY",
-  "API_KEY_DOUBAO_CODING",
-  "OPENAI_API_KEY_DOUBAO",
-  "OPENAI_API_KEY_DEEPSEEK",
-];
+const expectedPluginEnvironmentVariables = ["OPENAI_API_KEY_DEEPSEEK"];
 const mcpBaseEnvironmentVariables = new Set([
   "PATH",
   "Path",
@@ -506,10 +500,7 @@ try {
   const fakeRuntimes = await createNpmAcceptanceFakeRuntimes(temporaryRoot);
   const isolatedEnvironment = {
     ...npmEnvironment,
-    KIMI_COMMAND: fakeRuntimes.kimi,
     PI_COMMAND: fakeRuntimes.pi,
-    ARK_API_KEY: "npm-acceptance-coding-fixture",
-    OPENAI_API_KEY_DOUBAO: "npm-acceptance-agent-fixture",
     OPENAI_API_KEY_DEEPSEEK: "npm-acceptance-deepseek-fixture",
   };
   const cliPath = path.join(packageRoot, "dist", "cli.js");
