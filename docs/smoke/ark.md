@@ -18,6 +18,8 @@ Gemini 退役后的已发布 `0.1.1` 共有四个逻辑 LLM、八项能力。当
 
 2026-08-14 的刷新批次 `2026-08-14T03-03-14.120Z-3312323b-63e0-4b47-b88c-8fb98bb06e4e` 绑定 frozen commit `9c34156975864d529f18d21500872cf8e9d3fd5b`。ordinal 1 `ark-coding-plan/delegate` 以 `account_quota_exceeded` failed 后，协调器按合同首错停止；其余七项 notRun，终态 `blocked / case_failed`、`promotionEligible=false`。该 case 为一次 client invocation、零 adapter/runtime retry、零 fallback、owned process drained；immutable verifier 通过，manifest SHA-256 为 `7a1ca09d3f1dc1128596ec9c9d77f74aaf0239391ded50faf7f299cc7f74ca31`。没有 resume、补跑或第二批；账户额度变化前不重复真实运行。
 
+2026-08-14 只读重入复核：火山引擎当前公开说明将 Coding Plan 限额分为 5 小时、周与订阅月三个周期，并指向方舟控制台查看使用量与剩余额度；没有找到可替代控制台的公开只读额度 API。[官方说明](https://www.volcengine.com/article/37932)。本轮复核时距失败 evidence 仅 0.539 小时，隔离浏览器没有可复用的登录态，因而没有取得额度已恢复的证据，也没有发起探测性模型调用。后续重入必须由维护者确认控制台已有剩余额度，或取得其它明确的外部状态变化证据；仅凭时间推测、凭据存在或 doctor 通过都不足以重跑。
+
 2026-07-27 的 105 秒资格承载演练只构成离线基础设施证据。后续真实批次由单个 `functions.exec` cell 正常承载到协调器终态，证明控制层承载路径有效，但不证明四小时存活。执行边界见[承载手册](../release/four-llm-qualification-execution-runbook.md)，演练事实见[承载演练报告](../release/qualification-carrier-rehearsal.md)。当时的历史闭包为 221 files / 17 Markdown/HTML / 4 个精确插件工件（marketplace、plugin manifest、`.mcp.json`、runtime），且没有持久 `.tgz`。该历史闭包不改变任何 Ark 路由、证据或资格状态，也不表示已经发布或安装。
 
 上一份执行到 Agent Plan 的历史记录：2026-07-28 在 frozen commit `0113da97a6b1fef35cc4c45025caa9e36a002176` 上只调用一次标准入口，启动 `four-llm-v1` 批次 `2026-07-28T14-33-04.239Z-3b17ac96-4bb1-4a63-9f37-6caf35ad715c`。ordinal 1–5 passed；ordinal 6 `ark-agent-plan/delegate` 的 provider `ark-agent-plan`、模型 `ark-code-latest`、direct route、Agent Plan 凭据隔离、single-attempt 与零 retry/fallback 均正确，结果文件精确通过，但以 `account_quota_exceeded` failed；ordinal 7–8 notRun。ordinal 1 与 6 的规定写入、规定状态命令均各一次 success，文件范围只含预期文件，证明此前 Windows shell 与资格假阳性缺口已经真实闭合。

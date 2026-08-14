@@ -21,6 +21,8 @@ standing authorization 下的 Direct 批次 `2026-08-14T02-55-25.557Z-f96e5e84-7
 
 随后 `four-llm-v1` 批次 `2026-08-14T03-03-14.120Z-3312323b-63e0-4b47-b88c-8fb98bb06e4e` 绑定 frozen commit `9c34156975864d529f18d21500872cf8e9d3fd5b`，在 ordinal 1 `ark-coding-plan/delegate` 因 `account_quota_exceeded` failed 后首错停止；ordinal 2–8 notRun，终态 `blocked / case_failed`，manifest SHA-256 为 `7a1ca09d3f1dc1128596ec9c9d77f74aaf0239391ded50faf7f299cc7f74ca31`。一次 client invocation、零 retry/fallback、owned process drained、immutable verifier passed、资格锁为空；证据提交为 `ceccda6`。没有 resume、补跑或第二批。
 
+该外部阻断的重入证据必须来自维护者在方舟控制台确认剩余额度，或其它明确的账户状态变化。官方当前说明存在 5 小时、周、订阅月三类限额并由控制台显示使用情况；doctor、凭据存在、单纯等待不足一个周期或未经认证的 API 探针都不能证明额度恢复。[官方额度说明](https://www.volcengine.com/article/37932)。2026-08-14 的只读检查发生在失败后 0.539 小时，且没有可复用的控制台登录态，因此没有重跑。未来一旦取得状态变化证据，仍须先形成新的 clean frozen commit，再生成 fresh 内部执行引用并只调用一次标准入口。
+
 已发布 `0.1.1` 的最近八项 passed 批次仍是 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`，绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`；它的不可变 evidence 仍有效，但不能代表当前共享指纹。外部 Ark Coding Plan 额度恢复只构成新 clean frozen candidate 的重入条件，不会自动把八项 stale 改成 current。
 
 以下较早批次事实与哈希继续保持原样。
