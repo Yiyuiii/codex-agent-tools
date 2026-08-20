@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { execa } from "execa";
 
+import { locateKimi } from "../adapters/kimi/locator.js";
 import {
   buildIsolatedPiConfig,
   type BuildIsolatedPiConfigOptions,
@@ -29,17 +30,24 @@ import {
 import { VERSION } from "../version.js";
 
 export const DOCTOR_QUALIFIED_LLM_IDS = Object.freeze([
+  "ark-agent-deepseek-v4-flash",
+  "ark-agent-plan",
+  "ark-coding-plan",
   "deepseek-v4-flash",
+  "kimi-k3",
 ] as const);
 
 export const DOCTOR_LLM_IDS = DOCTOR_QUALIFIED_LLM_IDS;
 
 export const DOCTOR_CHECK_NAMES = Object.freeze([
   "Host runtime",
+  "Kimi executable",
   "Pi executable",
   "Pi isolated config",
   "Pi models",
   "Windows native helper",
+  "Ark Coding authentication",
+  "Ark Agent authentication",
   "DeepSeek authentication",
   "Public MCP tools",
   ...DOCTOR_LLM_IDS.map((id) => `LLM ${id}` as const),
@@ -76,6 +84,7 @@ export interface CollectDoctorOptions {
   readonly osRelease?: () => string;
   readonly nodeVersion?: string;
   readonly libuvVersion?: string;
+  readonly locateKimiExecutable?: () => Promise<string>;
   readonly locatePiExecutable?: () => Promise<string>;
   readonly locatePiInvocation?: () => Promise<PiInvocation>;
   readonly buildPiConfig?: (
@@ -180,6 +189,24 @@ function nodeMajor(version: string): number | undefined {
 
 const EXPECTED_PI_PROVIDERS = new Map([
   [
+    "ark-agent-plan",
+    {
+      api: "anthropic-messages",
+      apiKey: "$CODEX_AGENT_ARK_AGENT_KEY",
+      baseUrl: "https://ark.cn-beijing.volces.com/api/plan",
+      models: ["ark-code-latest", "deepseek-v4-flash"],
+    },
+  ],
+  [
+    "ark-coding-plan",
+    {
+      api: "anthropic-messages",
+      apiKey: "$CODEX_AGENT_ARK_CODING_KEY",
+      baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
+      models: ["ark-code-latest"],
+    },
+  ],
+  [
     "deepseek",
     {
       api: "openai-completions",
@@ -192,6 +219,7 @@ const EXPECTED_PI_PROVIDERS = new Map([
 
 async function validatePiConfig(
   config: IsolatedPiConfig,
+  providerSet: "ark" | "deepseek",
 ): Promise<void> {
   const [settingsText, modelsText] = await Promise.all([
     readFile(config.settingsPath, "utf8"),
@@ -218,7 +246,12 @@ async function validatePiConfig(
     >;
   };
   const providers = root.providers ?? {};
-  const expectedProviderNames = ["deepseek"] as const;
+  const expectedProviderNames: readonly (
+    "ark-agent-plan" | "ark-coding-plan" | "deepseek"
+  )[] =
+    providerSet === "ark"
+      ? ["ark-agent-plan", "ark-coding-plan"]
+      : ["deepseek"];
   if (
     JSON.stringify(Object.keys(providers).sort()) !==
     JSON.stringify([...expectedProviderNames].sort())
@@ -263,6 +296,9 @@ export async function collectDoctorReport(
   const release = options.osRelease?.() ?? os.release();
   const nodeVersion = options.nodeVersion ?? process.versions.node;
   const libuvVersion = options.libuvVersion ?? process.versions.uv;
+  const locateKimiExecutable =
+    options.locateKimiExecutable ??
+    (() => locateKimi({ environment, platform }));
   const locatePiExecutable =
     options.locatePiExecutable ?? (() => locatePi({ environment, platform }));
   const locateStrictPiInvocation =
@@ -293,6 +329,27 @@ export async function collectDoctorReport(
       secrets,
     ),
   });
+
+  try {
+    const executable = await locateKimiExecutable();
+    assertLocatedExecutable(executable);
+    checks.push({
+      name: "Kimi executable",
+      ok: true,
+      level: "ok",
+      detail: `strict locator passed; executable=${executableName(executable, platform)}`,
+    });
+  } catch (error) {
+    checks.push({
+      name: "Kimi executable",
+      ok: false,
+      level: "error",
+      detail: limitedDetail(
+        error instanceof Error ? error.message : String(error),
+        secrets,
+      ),
+    });
+  }
 
   try {
     if (platform === "win32") {
@@ -326,17 +383,23 @@ export async function collectDoctorReport(
     });
   }
 
-  let piConfig: IsolatedPiConfig | undefined;
+  let piConfigs:
+    | Readonly<{
+        ark: IsolatedPiConfig;
+        deepseek: IsolatedPiConfig;
+      }>
+    | undefined;
   try {
-    piConfig = await buildPiConfig({
-      version: VERSION,
-      providers: ["deepseek"],
-    });
+    const [ark, deepseek] = await Promise.all([
+      buildPiConfig({ version: VERSION, providers: ["ark"] }),
+      buildPiConfig({ version: VERSION, providers: ["deepseek"] }),
+    ]);
+    piConfigs = Object.freeze({ ark, deepseek });
     checks.push({
       name: "Pi isolated config",
       ok: true,
       level: "ok",
-      detail: `generated; deepseekSha256=${piConfig.contentSha256.slice(0, 12)}`,
+      detail: `generated; arkSha256=${ark.contentSha256.slice(0, 12)}; deepseekSha256=${deepseek.contentSha256.slice(0, 12)}`,
     });
   } catch (error) {
     checks.push({
@@ -350,7 +413,7 @@ export async function collectDoctorReport(
     });
   }
 
-  if (piConfig === undefined) {
+  if (piConfigs === undefined) {
     checks.push({
       name: "Pi models",
       ok: false,
@@ -359,12 +422,16 @@ export async function collectDoctorReport(
     });
   } else {
     try {
-      await validatePiConfig(piConfig);
+      await Promise.all([
+        validatePiConfig(piConfigs.ark, "ark"),
+        validatePiConfig(piConfigs.deepseek, "deepseek"),
+      ]);
       checks.push({
         name: "Pi models",
         ok: true,
         level: "ok",
-        detail: "static route passed; providers=1; models=1",
+        detail:
+          "static routes passed; isolated provider sets=2; providers=3; models=4",
       });
     } catch (error) {
       checks.push({
@@ -445,6 +512,8 @@ export async function collectDoctorReport(
   }
 
   for (const [name, id] of [
+    ["Ark Coding authentication", "ark-coding-plan"],
+    ["Ark Agent authentication", "ark-agent-plan"],
     ["DeepSeek authentication", "deepseek-v4-flash"],
   ] as const) {
     const profile = resolveLlm(id);

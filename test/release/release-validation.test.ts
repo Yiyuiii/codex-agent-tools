@@ -129,8 +129,16 @@ function sha256(value: string | Buffer): string {
 }
 
 const capabilities: readonly CapabilityFingerprintProjection[] = [
+  ["ark-agent-deepseek-v4-flash", "delegate"],
+  ["ark-agent-deepseek-v4-flash", "review"],
+  ["ark-agent-plan", "delegate"],
+  ["ark-agent-plan", "review"],
+  ["ark-coding-plan", "delegate"],
+  ["ark-coding-plan", "review"],
   ["deepseek-v4-flash", "delegate"],
   ["deepseek-v4-flash", "review"],
+  ["kimi-k3", "delegate"],
+  ["kimi-k3", "review"],
 ].map(([llm, task], index) => ({
   llm: llm!,
   task: task as "delegate" | "review",
@@ -163,7 +171,7 @@ function core(indexBytes = capabilityIndexBytes()): ReleaseValidationCore {
     capabilityIndex: {
       path: "docs/smoke/evidence/capabilities.json",
       sha256: sha256(indexBytes),
-      entryCount: 2,
+      entryCount: 10,
     },
     currentHostFreeze: {
       path: `.release-validation/evidence/current-host-${RUNTIME_COMMIT}.json`,
@@ -339,7 +347,7 @@ function hostStopDecision(marker: StableReleaseValidationMarker) {
 
 function freezeReceipt(
   targetCore: ReleaseValidationCore,
-  staleCount = 0,
+  staleCount = 8,
   projection: readonly CapabilityFingerprintProjection[] = capabilities,
   observer = observerArtifact(),
 ) {
@@ -364,7 +372,7 @@ function freezeReceipt(
       nativePreflight: "passed",
       nativeVerify: "passed",
       observerVerify: "passed",
-      capabilityEvidenceValidCount: 2,
+      capabilityEvidenceValidCount: 10,
       prequalificationStaleCount: staleCount,
       realModelCalls: 0,
       activeConfigAccesses: 0,
@@ -844,17 +852,17 @@ describe("strict release validation marker", () => {
 });
 
 describe("release receipts", () => {
-  it("binds both DeepSeek capability fingerprints as current", () => {
+  it("binds all ten capability fingerprints and requires the prior eight to be stale", () => {
     expect(
       assertCurrentHostFreezeReceipt(
-        freezeReceipt(core(), 0),
+        freezeReceipt(core(), 8),
         core(),
         capabilities,
         observerArtifact(),
       )
         .checks.prequalificationStaleCount,
-    ).toBe(0);
-    for (const staleCount of [1, 2, 8, 1.5]) {
+    ).toBe(8);
+    for (const staleCount of [0, 1, 2, 7, 9, 10, 11, 1.5]) {
       expect(() =>
         assertCurrentHostFreezeReceipt(
           freezeReceipt(core(), staleCount),

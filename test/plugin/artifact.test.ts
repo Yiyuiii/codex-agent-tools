@@ -73,7 +73,8 @@ describe("Codex plugin artifact", () => {
     expect(pluginManifest).toMatchObject({
       name: "codex-external-agents",
       version: packageManifest.version,
-      description: "Use DeepSeek V4 Flash for review and delegated coding tasks.",
+      description:
+        "Use explicitly selected external LLMs for review and delegated coding tasks.",
       author: {
         name: "codex-agent-tools maintainers",
       },
@@ -81,9 +82,10 @@ describe("Codex plugin artifact", () => {
       mcpServers: "./.mcp.json",
       interface: {
         displayName: "Codex External Agents",
-        shortDescription: "Review and delegate with DeepSeek V4 Flash",
+        shortDescription:
+          "Review and delegate with explicitly selected external LLMs",
         longDescription:
-          "Use the fixed deepseek-v4-flash model through an isolated Pi RPC configuration for Codex review and delegated coding tasks.",
+          "Use explicitly selected Kimi and Pi-backed LLMs for Codex review and delegated coding tasks.",
         developerName: "codex-agent-tools maintainers",
         category: "Productivity",
         capabilities: ["Interactive", "Write"],
@@ -159,7 +161,13 @@ describe("Codex plugin artifact", () => {
         command: "node",
         args: ["./runtime/codex-external-agents-mcp.mjs"],
         cwd: ".",
-        env_vars: ["OPENAI_API_KEY_DEEPSEEK"],
+        env_vars: [
+          "ARK_API_KEY",
+          "VOLCENGINE_API_KEY",
+          "API_KEY_DOUBAO_CODING",
+          "OPENAI_API_KEY_DOUBAO",
+          "OPENAI_API_KEY_DEEPSEEK",
+        ],
       },
     });
     expect(mcpManifest.codex_external_agents).not.toHaveProperty("env");

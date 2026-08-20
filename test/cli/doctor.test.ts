@@ -43,6 +43,8 @@ function windowsOptions(
     environment: {
       Path: "C:\\Windows\\System32",
       SystemRoot: "C:\\Windows",
+      API_KEY_DOUBAO_CODING: "coding-secret",
+      OPENAI_API_KEY_DOUBAO: "agent-secret",
       OPENAI_API_KEY_DEEPSEEK: "deepseek-secret",
     },
     platform: "win32",
@@ -50,6 +52,8 @@ function windowsOptions(
     osRelease: () => "10.0.26100",
     nodeVersion: "24.14.1",
     libuvVersion: "1.51.0",
+    locateKimiExecutable: async () =>
+      "C:\\Users\\fixture\\.kimi-code\\bin\\kimi.exe",
     locatePiInvocation: async () => ({
       executable: process.execPath,
       argvPrefix: [
@@ -73,9 +77,12 @@ function windowsOptions(
   };
 }
 
-describe("DeepSeek-only doctor diagnostics", () => {
-  it("checks only the fixed Direct DeepSeek route and one targetless helper probe", async () => {
+describe("multi-model doctor diagnostics", () => {
+  it("checks all five routes and one targetless helper probe", async () => {
     const secret = "must-not-appear";
+    const locateKimiExecutable = vi.fn(
+      async () => "C:\\Users\\private-user\\.kimi-code\\bin\\kimi.exe",
+    );
     const locatePiInvocation = vi.fn(async (): Promise<PiInvocation> => ({
       executable: process.execPath,
       argvPrefix: [
@@ -100,8 +107,11 @@ describe("DeepSeek-only doctor diagnostics", () => {
           path: "C:\\Windows\\System32",
           systemroot: "C:\\Windows",
           SOME_SECRET: secret,
+          api_key_doubao_coding: "local-ark-coding-secret",
+          OpenAI_API_KEY_DOUBAO: "agent-ark-secret",
           openai_api_key_deepseek: "direct-deepseek-secret",
         },
+        locateKimiExecutable,
         locatePiInvocation,
         runWindowsJobHelperProbe,
       }),
@@ -109,6 +119,7 @@ describe("DeepSeek-only doctor diagnostics", () => {
 
     expect(report.ok).toBe(true);
     expect(report.checks.map(({ name }) => name)).toEqual(DOCTOR_CHECK_NAMES);
+    expect(locateKimiExecutable).toHaveBeenCalledOnce();
     expect(locatePiInvocation).toHaveBeenCalledOnce();
     expect(runWindowsJobHelperProbe).toHaveBeenCalledWith({
       executablePath:
@@ -122,18 +133,15 @@ describe("DeepSeek-only doctor diagnostics", () => {
     });
     expect(
       report.checks.find(({ name }) => name === "Pi models")?.detail,
-    ).toBe("static route passed; providers=1; models=1");
+    ).toBe(
+      "static routes passed; isolated provider sets=2; providers=3; models=4",
+    );
     expect(
       report.checks.find(({ name }) => name === "Public MCP tools")?.detail,
     ).toBe("external_review, external_delegate");
     expect(
       report.checks.filter(({ name }) => name.startsWith("LLM ")),
-    ).toEqual([
-      expect.objectContaining({
-        name: "LLM deepseek-v4-flash",
-        ok: true,
-      }),
-    ]);
+    ).toHaveLength(5);
     expect(JSON.stringify(report)).not.toContain(secret);
     expect(JSON.stringify(report)).not.toContain("private-user");
   });
@@ -141,12 +149,17 @@ describe("DeepSeek-only doctor diagnostics", () => {
   it("reports POSIX native support as the sole warning", async () => {
     const locatePiExecutable = vi.fn(async () => "/usr/local/bin/pi");
     const report = await collectDoctorReport({
-      environment: { OPENAI_API_KEY_DEEPSEEK: "deepseek" },
+      environment: {
+        ARK_API_KEY: "coding",
+        OPENAI_API_KEY_DOUBAO: "agent",
+        OPENAI_API_KEY_DEEPSEEK: "deepseek",
+      },
       platform: "linux",
       architecture: "arm64",
       osRelease: () => "6.8.0",
       nodeVersion: "24.14.1",
       libuvVersion: "1.51.0",
+      locateKimiExecutable: async () => "/usr/local/bin/kimi",
       locatePiExecutable,
       buildPiConfig: (options) =>
         buildIsolatedPiConfig({ ...options, root: tempDirectory }),
@@ -194,6 +207,8 @@ describe("DeepSeek-only doctor diagnostics", () => {
     const report = await collectDoctorReport(
       windowsOptions({
         environment: {
+          ARK_API_KEY: "coding",
+          OPENAI_API_KEY_DOUBAO: "agent",
           OPENAI_API_KEY_DEEPSEEK: "deepseek",
           HELPER_AUTH_TOKEN: secret,
         },
@@ -222,7 +237,9 @@ describe("DeepSeek-only doctor diagnostics", () => {
             ...options,
             root: tempDirectory,
           });
-          await writeFile(config.modelsPath, '{"providers":{}}\n', "utf8");
+          if (options.providers[0] === "deepseek") {
+            await writeFile(config.modelsPath, '{"providers":{}}\n', "utf8");
+          }
           return config;
         },
       }),
@@ -265,6 +282,7 @@ describe("DeepSeek-only doctor diagnostics", () => {
             ...options,
             root: tempDirectory,
           });
+          if (options.providers[0] !== "deepseek") return config;
           const models = JSON.parse(
             await readFile(config.modelsPath, "utf8"),
           ) as PiModelsDocument;

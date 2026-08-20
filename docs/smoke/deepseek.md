@@ -2,7 +2,7 @@
 
 ## 用户范围
 
-2026-08-13，维护者要求恢复 Direct DeepSeek API，由 Pi RPC 承载，并在该 provider 内只启用 `deepseek-v4-flash`。既有 Kimi 与 Ark 路线继续保留；Ark Agent Plan 内的 `ark-agent-deepseek-v4-flash` 是另一条独立路线，证据不可互换。2026-08-14，维护者把本次验收范围收敛为只证明新加入的 Direct DeepSeek 工作正常，不要求刷新或测试既有功能，并暂时跳过额外审阅调用。
+2026-08-13，维护者要求恢复 Direct DeepSeek API，由 Pi RPC 承载，并在该 provider 内只启用 `deepseek-v4-flash`。既有 Kimi 与 Ark 路线继续保留；Ark Agent Plan 内的 `ark-agent-deepseek-v4-flash` 是另一条独立路线，证据不可互换。2026-08-14 的阶段验收只验证 Direct DeepSeek。2026-08-20，维护者要求后续客户端统一可用 Kimi、Ark 与 Direct DeepSeek，因此当前目标改为五模型 beta，并继续跳过额外审阅调用。
 
 ## 当前实现
 
@@ -37,7 +37,7 @@ Ark 与 Direct DeepSeek 使用按 provider 分离的缓存目录：`.../pi/<vers
 - 当前任务插件发现：实时工具注册表没有 `external_review` / `external_delegate`，当前任务未加载本项目插件
 - 活动安装状态：未读取活动配置，不能把此前 `0.1.1` 宿主验收外推为当前 installed/enabled 状态；本候选没有执行 add/remove/upgrade，也没有访问活动 `~/.codex/config.toml`
 - 本次收敛验收：Direct batch immutable verifier 再次通过；真实 delegate evidence SHA-256 为 `7bbb2b11cc45e193a8b77e5ce1215b93f02ca80268b1914325d4f0c6490ea342`，实际 `provider=deepseek`、`model=deepseek-v4-flash`、`endpointHost=api.deepseek.com`、单次 client invocation、零 retry/fallback、owned process drained，全部 checks 为 true
-- 本次定向回归：当前候选 build 通过，6 个 Direct DeepSeek 定向测试命令合计 14 passed / 0 failed；没有运行新的真实模型或 review 调用，也没有运行 Ark/Kimi 资格
+- 五模型候选复核：运行时代码已收敛到 Direct 两项指纹继续 current 的既有实现；十项历史 evidence 均 valid，Kimi/Ark 八项 stale；尚未运行新的真实模型调用
 
 `npm run smoke:deepseek -- --llm deepseek-v4-flash --task review|delegate` 是独立真实 smoke 入口。缺少凭据时不得运行；standalone smoke 不能自行改写能力索引。标准资格入口使用仅含两项能力的 `direct-deepseek-v1` 计划；原八项继续使用 `four-llm-v1`。两个计划分别绑定 DeepSeek-only 与 Ark-only Pi 配置哈希，不能混合、拼接或互换 evidence。已通过的 Direct case 按能力粒度政策独立晋级；整个候选仍须等旧八项 current 后才能通过发布 verifier。
 
@@ -57,10 +57,10 @@ Ark 与 Direct DeepSeek 使用按 provider 分离的缓存目录：`.../pi/<vers
 - 官方临时插件生命周期与 committed report 一致性通过；npm pack dry-run 为 26 files，精确包含 Direct manifest 与两项 case evidence，未生成持久 `.tgz`
 - release smoke 在能力索引阶段按预期失败关闭；机器分析只报告 Direct 2 current 与原路线 8 stale
 
-## 本次结论与未来边界
+## 当前结论与后续边界
 
-1. 按维护者 2026-08-14 的最新验收范围，Direct DeepSeek 实现与真实 delegate 能力已经验证完成；既有功能不属于本次完成条件。
-2. 本次不再因 Ark Coding Plan 额度等待或重跑 `four-llm-v1`，也不发起新的 review 调用。
-3. 原八项 stale 事实仍如实保留。若未来要求发布包含全部既有路线的新版本或升级活动官方插件，仍须先恢复其 current 资格并通过完整 package/release 门禁；本次范围收敛不构成发布或活动升级授权。
+1. Direct DeepSeek review/delegate 已由不可变真实证据支持，当前运行时指纹保持 current，无需重复调用。
+2. 五模型 beta 仍受 Kimi/Ark 八项 stale 阻断；Ark Coding Plan 额度恢复后，按既有单次、首错停协议启动新的 `four-llm-v1` 批次。
+3. 十项全部 current 后才能生成最终发布标记、执行隔离包验收并进入发布。活动插件升级仍是发布后的独立授权动作。
 
 资格拆分依据见 [Direct DeepSeek 双计划资格设计](../superpowers/specs/2026-08-14-direct-deepseek-qualification-design.md)。

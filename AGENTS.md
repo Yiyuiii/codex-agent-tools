@@ -12,6 +12,7 @@
 - 2026-08-14：维护者说明本机用户环境已存在 `OPENAI_API_KEY_DEEPSEEK`。Direct DeepSeek 只使用该宿主变量，不要求另建 `DEEPSEEK_API_KEY`；插件、doctor、资格与文档必须统一使用现有变量名，仍不得保存或输出其值。
 - 2026-08-14（本次验收范围）：维护者只要求验证新加入的 Direct DeepSeek 工作正常，不要求刷新或测试既有 Kimi/Ark 功能，并要求暂时跳过额外审阅步骤。该范围足以结束本次开发验证，但不改变未来整包发布或活动插件升级必须满足的既有 release verifier；未经另行授权仍不发布或升级。
 - 2026-08-14（DeepSeek-only beta 发布授权）：维护者明确同意准备并公开发布 DeepSeek-only beta。当前目标版本为 `0.1.2-beta.0`，仅公开逻辑 LLM `deepseek-v4-flash`，保留 `external_review` 与 `external_delegate` 两个工具；历史 Kimi/Ark 实现和不可变证据留库但不进入 beta 注册表、凭据白名单、能力索引或 npm 证据集合。授权覆盖 `next` PR/合并、不可变 beta 标签、GitHub Release、GitHub Actions OIDC npm `next` 发布及公共精确包隔离验收；不授权活动插件安装/升级、活动 `config.toml` 访问或 Claude Code 变更。
+- 2026-08-20（当前产品面要求）：维护者覆盖 DeepSeek-only 产品边界，要求后续客户端可正常使用 Kimi、Ark 与 Direct DeepSeek。当前目标公开面为 `kimi-k3`、`ark-coding-plan`、`ark-agent-plan`、`ark-agent-deepseek-v4-flash`、`deepseek-v4-flash`，仍只公开 `external_review` 与 `external_delegate`；Direct DeepSeek provider 内仍只启用 `deepseek-v4-flash`。本阶段继续跳过额外外部审阅。统一 beta 的公开发布与活动插件升级分别按现行资格、发布和活动配置边界执行，不能由历史 DeepSeek-only 发布授权自动推导。
 - 原 `codex-cc-tools` 中其余可用来源尽量迁移到 Pi；Kimi 使用本机 Kimi Code。
 - 终端用户不手工维护插件或 Pi 配置，由 Codex 随项目版本维护。
 - 当前迁移不需要额外外部审阅，由 Codex 自主推进；未经明确授权不公开发布 npm。
@@ -36,7 +37,8 @@
 
 ## 当前事实状态
 
-- 2026-08-14 DeepSeek-only beta 候选：版本已设为 `0.1.2-beta.0`；公开注册表、doctor、插件凭据白名单、能力索引、包证据集合和隔离验收均收窄为 Direct `deepseek-v4-flash`。公开工具仍为 `external_review` 与 `external_delegate`。Direct review/delegate 两项沿用同一精确运行时指纹的真实 passed evidence，当前 verifier 为 2 current / 0 legacy；旧 Kimi/Ark 代码和证据仅作历史审计。发布仍须完成新运行时冻结凭据、全量离线/隔离门禁、`next` CI、OIDC 发布与公共 npm 精确验收，且不触碰活动插件或配置。
+- 2026-08-14 DeepSeek-only beta 候选（历史）：版本曾设为 `0.1.2-beta.0`，产品面曾收窄为 Direct `deepseek-v4-flash`。该边界已由 2026-08-20 五模型要求覆盖；历史 release marker、npm 验收与隔离报告保持不可变，不代表当前候选。
+- 2026-08-20 五模型 beta 候选：隔离分支 `codex/multi-model-beta-0.1.2` 目标版本为 `0.1.2-beta.1`。公开注册表、doctor、插件凭据白名单、npm 证据闭包和隔离验收恢复五个逻辑 LLM，能力索引恢复十项。运行时代码保持与既有 Direct 真实证据相同的资格输入，因此 Direct 两项 evidence valid / fingerprint current；Kimi/Ark 八项 evidence valid / fingerprint stale。完整 verifier 与 release smoke 在八项刷新前必须 fail closed；当前尚未发布或变更活动插件。
 - 2026-07-18：产品设计和 Kimi、Pi/Gemini、Ark/cutover 三阶段实现已完成。公开面只有 `external_review` 与 `external_delegate`，`llm` 始终必填。
 - 本机 Kimi Code 0.34.0 通过官方 ACP SDK 接入；当前公开面只保留 `kimi-k3`，2026-07-25 串行复跑的 review/delegate 两项真实门禁均通过并生成新证据。`kimi-k2.7` 与 `kimi-k2.7-highspeed` 的四项 passed 证据只作为历史记录保留，不再属于当前公开面。0.34.0 的 ACP 不公开 `swarm` 模式且思考值域只有 `on`；一次强制 `AgentSwarm` 的双文件窄任务四分钟无终态，不登记 PASS，也不增加公开参数，详见 [Kimi 0.34.0 AgentSwarm / ACP 探测](docs/research/kimi-0.34-swarm-acp.md)与 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
 - 本机 `@earendil-works/pi-coding-agent` 0.80.10 通过严格 RPC JSONL 接入。版本化隔离配置位于应用自有缓存，不读取或修改用户 `~/.pi/agent`，也不保存真实凭据。

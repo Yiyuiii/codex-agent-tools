@@ -101,9 +101,6 @@ const DEFAULT_PROFILES: readonly LlmProfile[] = [
   },
 ];
 
-const PUBLIC_PROFILE_IDS = Object.freeze(["deepseek-v4-flash"] as const);
-const PUBLIC_PROFILE_ID_SET = new Set<string>(PUBLIC_PROFILE_IDS);
-
 export function createLlmRegistry(profiles: readonly LlmProfile[]): LlmRegistry {
   const byId = new Map<string, LlmProfile>();
 
@@ -208,24 +205,15 @@ function immutableProfile(profile: LlmProfile): LlmProfile {
 const registry = createLlmRegistry(DEFAULT_PROFILES);
 
 export function supportedLlmIds(): string[] {
-  return [...PUBLIC_PROFILE_IDS];
+  return registry.ids();
 }
 
 export function credentialEnvironmentNames(): string[] {
   return [
-    ...new Set(
-      PUBLIC_PROFILE_IDS.flatMap(
-        (id) => registry.resolve(id).credentialEnv,
-      ),
-    ),
+    ...new Set(DEFAULT_PROFILES.flatMap((profile) => profile.credentialEnv)),
   ];
 }
 
 export function resolveLlm(id: string, task?: TaskKind): LlmProfile {
-  if (task !== undefined && !PUBLIC_PROFILE_ID_SET.has(id)) {
-    throw new Error(
-      `Unknown logical llm "${id}". Supported llms: ${PUBLIC_PROFILE_IDS.join(", ")}`,
-    );
-  }
   return registry.resolve(id, task);
 }
