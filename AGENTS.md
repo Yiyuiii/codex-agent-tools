@@ -39,6 +39,7 @@
 
 - 2026-08-14 DeepSeek-only beta 候选（历史）：版本曾设为 `0.1.2-beta.0`，产品面曾收窄为 Direct `deepseek-v4-flash`。该边界已由 2026-08-20 五模型要求覆盖；历史 release marker、npm 验收与隔离报告保持不可变，不代表当前候选。
 - 2026-08-20 五模型 beta 候选：隔离分支 `codex/multi-model-beta-0.1.2` 目标版本为 `0.1.2-beta.1`。公开注册表、doctor、插件凭据白名单、npm 证据闭包和隔离验收恢复五个逻辑 LLM，能力索引恢复十项。运行时代码保持与既有 Direct 真实证据相同的资格输入，因此 Direct 两项 evidence valid / fingerprint current；Kimi/Ark 八项 evidence valid / fingerprint stale。完整 verifier 与 release smoke 在八项刷新前必须 fail closed；当前尚未发布或变更活动插件。
+- 2026-08-20 五模型 runtime 冻结：runtime commit 为 `1840931a18b929bbab16a0980f43f56c79103f08`；当前宿主凭据位于 `.release-validation/evidence/current-host-1840931a18b929bbab16a0980f43f56c79103f08.json`。native preflight、native artifact verify 与 observer deterministic verify 均通过；凭据记录 10 evidence valid、Direct 2 current、Kimi/Ark 8 stale，真实模型调用、活动配置访问、活动插件变更和发布均为 0。该冻结只允许在 Ark 额度恢复证据出现后进入新的 `four-llm-v1`，不构成发布或活动升级授权。
 - 2026-07-18：产品设计和 Kimi、Pi/Gemini、Ark/cutover 三阶段实现已完成。公开面只有 `external_review` 与 `external_delegate`，`llm` 始终必填。
 - 本机 Kimi Code 0.34.0 通过官方 ACP SDK 接入；当前公开面只保留 `kimi-k3`，2026-07-25 串行复跑的 review/delegate 两项真实门禁均通过并生成新证据。`kimi-k2.7` 与 `kimi-k2.7-highspeed` 的四项 passed 证据只作为历史记录保留，不再属于当前公开面。0.34.0 的 ACP 不公开 `swarm` 模式且思考值域只有 `on`；一次强制 `AgentSwarm` 的双文件窄任务四分钟无终态，不登记 PASS，也不增加公开参数，详见 [Kimi 0.34.0 AgentSwarm / ACP 探测](docs/research/kimi-0.34-swarm-acp.md)与 [Kimi 真实能力门禁](docs/smoke/kimi.md)。
 - 本机 `@earendil-works/pi-coding-agent` 0.80.10 通过严格 RPC JSONL 接入。版本化隔离配置位于应用自有缓存，不读取或修改用户 `~/.pi/agent`，也不保存真实凭据。
