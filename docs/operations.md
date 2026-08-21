@@ -41,7 +41,7 @@ npm run gate:offline
 
 Direct `deepseek-v4-flash` 使用独立的 `direct-deepseek-v1` 两项计划；Kimi 与三条 Ark 路线使用 `four-llm-v1` 八项计划。两个计划的配置哈希、执行顺序和 evidence 不得拼接或互换。
 
-当前候选的十项历史 evidence 均有效；Direct DeepSeek 两项指纹 current，Kimi/Ark 八项指纹 stale。2026-08-21 维护者已确认 Ark Coding Plan 有剩余额度。随后唯一一次标准入口在调用模型前被最终 beta marker 的循环预飞断言阻断，没有创建 batch 或 case evidence；修复与验证见 [2026-08-21 资格预飞 marker 阻断](release/four-llm-preflight-marker-block-2026-08-21.md)。下一次真实刷新只能从该修复形成的新 clean frozen commit 启动独立 fresh `four-llm-v1` 批次；不使用探测性调用、重试或 fallback 消耗额度。
+当前候选的十项 evidence 均有效。Direct DeepSeek 两项与最新 `ark-coding-plan/delegate` 指纹 current，其余 Kimi/Ark 七项 stale。2026-08-21 的最新独立 `four-llm-v1` 批次在 ordinal 1 delegate passed 后，于 ordinal 2 `ark-coding-plan/review` 以 `adapter_failure` 首错停止；其余六项 notRun，终态 blocked 且 immutable verifier passed。passed delegate 已按能力粒度规则更新索引；完整 `verify:capabilities` 仍失败关闭。前序 marker 与当前宿主原生预飞修复分别见 [marker 阻断](release/four-llm-preflight-marker-block-2026-08-21.md)和[原生预飞阻断及修复](release/four-llm-native-preflight-block-2026-08-21.md)。不得补跑失败单项、拼接 blocked manifest 或用新批掩盖该终态。
 
 ## 4. 隔离官方插件生命周期
 

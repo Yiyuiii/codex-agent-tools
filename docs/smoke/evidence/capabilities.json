@@ -60,15 +60,15 @@
     {
       "llm": "ark-coding-plan",
       "task": "delegate",
-      "runtimeFingerprintSha256": "e40a16e5716211c178013c3545229c59feaa98286322ddbe4a12bd2c013383d8",
+      "runtimeFingerprintSha256": "70dd30f419c1ecf239548f68a3cf95e6fde31a01ff8aed8a00fa16f46ed25247",
       "source": {
         "kind": "batch-case",
-        "manifestPath": "docs/smoke/evidence/batches/2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923/manifest.json",
-        "manifestSha256": "835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac",
-        "evidencePath": "docs/smoke/evidence/batches/2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923/cases/2026-08-03T02-12-42.581Z-ark-coding-plan-delegate-ark.json",
-        "evidenceSha256": "b40ddc82e7bdd09ae6815a965f329bc66937133af62d72f53b988f33ddb64c45",
-        "frozenCommit": "9054cbc45aaf1c91c2c62817244be5288032ede8",
-        "buildIdentitySha256": "843b91b84dd2a6836402e1396a47b8cd3f805eec9d786c462905c738f59105de"
+        "manifestPath": "docs/smoke/evidence/batches/2026-08-21T03-00-25.070Z-6d98cc4f-ebab-46d8-ba5f-8f34810a2777/manifest.json",
+        "manifestSha256": "229271ec481fdc3d609e9c1320f80a8f41f006b33758ee55f39f0b6743b74347",
+        "evidencePath": "docs/smoke/evidence/batches/2026-08-21T03-00-25.070Z-6d98cc4f-ebab-46d8-ba5f-8f34810a2777/cases/2026-08-21T03-08-32.013Z-ark-coding-plan-delegate-ark.json",
+        "evidenceSha256": "773d4757992d19615dff46ea22749f0edf7f58ed71037392d899d0bc52a59bf0",
+        "frozenCommit": "406a1479d478f9dc6d6d52a5f1d7fcda596ca86e",
+        "buildIdentitySha256": "4e72ef31d1f71dafde958bfbc20da77ad2b9780edf7b8edbf648e694a8902750"
       }
     },
     {
