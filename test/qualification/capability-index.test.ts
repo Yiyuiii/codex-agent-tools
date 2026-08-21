@@ -1047,7 +1047,7 @@ describe("capability qualification evidence source", () => {
 });
 
 describe("current capability index qualification", () => {
-  it("keeps Direct DeepSeek current while shared protocol changes stale the prior eight capabilities", async () => {
+  it("keeps Direct DeepSeek and the refreshed Ark Coding delegate current", async () => {
     let canonicalCollections = 0;
     const analysis = await analyzeCapabilityIndex(
       { repositoryRoot: process.cwd() },
@@ -1067,17 +1067,28 @@ describe("current capability index qualification", () => {
     const directEntries = analysis.entries.filter(
       ({ llm }) => llm === "deepseek-v4-flash",
     );
-    const priorEntries = analysis.entries.filter(
-      ({ llm }) => llm !== "deepseek-v4-flash",
+    const refreshedArkCodingDelegate = analysis.entries.filter(
+      ({ llm, task }) => llm === "ark-coding-plan" && task === "delegate",
+    );
+    const staleEntries = analysis.entries.filter(
+      ({ llm, task }) =>
+        llm !== "deepseek-v4-flash" &&
+        !(llm === "ark-coding-plan" && task === "delegate"),
     );
     expect(directEntries).toHaveLength(2);
     expect(
       directEntries.map((entry) => entry.runtimeFingerprintStatus),
     ).toEqual(["current", "current"]);
-    expect(priorEntries).toHaveLength(8);
+    expect(refreshedArkCodingDelegate).toHaveLength(1);
     expect(
-      priorEntries.map((entry) => entry.runtimeFingerprintStatus),
-    ).toEqual(Array.from({ length: 8 }, () => "stale"));
+      refreshedArkCodingDelegate.map(
+        (entry) => entry.runtimeFingerprintStatus,
+      ),
+    ).toEqual(["current"]);
+    expect(staleEntries).toHaveLength(7);
+    expect(
+      staleEntries.map((entry) => entry.runtimeFingerprintStatus),
+    ).toEqual(Array.from({ length: 7 }, () => "stale"));
     expect(
       analysis.entries.every((entry) =>
         /^[a-f0-9]{64}$/u.test(entry.currentRuntimeFingerprintSha256 ?? ""),
