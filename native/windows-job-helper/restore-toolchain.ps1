@@ -4,10 +4,28 @@ $ErrorActionPreference = "Stop"
 function Get-VerifiedHash {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Algorithm
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("SHA256", "SHA512")]
+        [string]$Algorithm
     )
 
-    return (Get-FileHash -LiteralPath $Path -Algorithm $Algorithm).Hash.ToLowerInvariant()
+    $hasher = switch ($Algorithm) {
+        "SHA256" { [System.Security.Cryptography.SHA256]::Create() }
+        "SHA512" { [System.Security.Cryptography.SHA512]::Create() }
+    }
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        try {
+            $digest = $hasher.ComputeHash($stream)
+        }
+        finally {
+            $stream.Dispose()
+        }
+    }
+    finally {
+        $hasher.Dispose()
+    }
+    return [System.BitConverter]::ToString($digest).Replace("-", "").ToLowerInvariant()
 }
 
 function Assert-Archive {

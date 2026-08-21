@@ -1326,6 +1326,8 @@ describe("Windows native helper build contract", () => {
     expect(build).toContain(
       'Write-Output "windows-native-helper: generated protocol constants verified"',
     );
+    expect(build).toContain("[System.Security.Cryptography.SHA256]::Create()");
+    expect(build).not.toContain("Get-FileHash");
 
     const restore = readRepositoryFile(
       "native/windows-job-helper/restore-toolchain.ps1",
@@ -1339,6 +1341,8 @@ describe("Windows native helper build contract", () => {
     ]) {
       expect(restore).toContain(fragment);
     }
+    expect(restore).toContain("[System.Security.Cryptography.SHA512]::Create()");
+    expect(restore).not.toContain("Get-FileHash");
 
     const runner = readRepositoryFile("scripts/windows-native-helper.mjs");
     expect(runner).toContain('process.arch !== "x64"');

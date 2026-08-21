@@ -10,6 +10,33 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Get-VerifiedHash {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("SHA256", "SHA512")]
+        [string]$Algorithm
+    )
+
+    $hasher = switch ($Algorithm) {
+        "SHA256" { [System.Security.Cryptography.SHA256]::Create() }
+        "SHA512" { [System.Security.Cryptography.SHA512]::Create() }
+    }
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        try {
+            $digest = $hasher.ComputeHash($stream)
+        }
+        finally {
+            $stream.Dispose()
+        }
+    }
+    finally {
+        $hasher.Dispose()
+    }
+    return [System.BitConverter]::ToString($digest).Replace("-", "").ToLowerInvariant()
+}
+
 $nativeRoot = [System.IO.Path]::GetFullPath($PSScriptRoot)
 $configuration = Get-Content -LiteralPath (Join-Path $nativeRoot "build.config.json") -Raw -Encoding UTF8 | ConvertFrom-Json
 $protocol = Get-Content -LiteralPath (Join-Path $nativeRoot "protocol.v1.json") -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -476,7 +503,7 @@ function Assert-CanonicalArtifact {
     if (-not (Test-ExactBytes -Left $ExpectedBytes -Right $actualBytes)) {
         throw "windows-native-helper: canonical artifact verification failed"
     }
-    $digest = (Get-FileHash -LiteralPath $Paths.Executable -Algorithm SHA256).Hash.ToLowerInvariant()
+    $digest = Get-VerifiedHash -Path $Paths.Executable -Algorithm "SHA256"
     $manifestBytes = [System.IO.File]::ReadAllBytes($Paths.Manifest)
     $expectedManifest = [System.Text.UTF8Encoding]::new($false).GetBytes(
         $digest + "  codex-agent-job-helper.exe`n"
@@ -773,7 +800,7 @@ finally {
         $temporaryStream.Dispose()
     }
 }
-if ((Get-FileHash -LiteralPath $generatedPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedGeneratedSha256) {
+if ((Get-VerifiedHash -Path $generatedPath -Algorithm "SHA256") -cne $expectedGeneratedSha256) {
     throw "windows-native-helper: generated protocol source verification failed"
 }
 Write-Output "windows-native-helper: generated protocol constants verified"
@@ -1006,7 +1033,7 @@ if ($Action -eq "verify" -or $Action -eq "update-artifact") {
     $paths = Get-CanonicalArtifactPaths -Create ($Action -eq "update-artifact")
 
     if ($Action -eq "update-artifact") {
-        $digest = (Get-FileHash -LiteralPath $nativeOutput -Algorithm SHA256).Hash.ToLowerInvariant()
+        $digest = Get-VerifiedHash -Path $nativeOutput -Algorithm "SHA256"
         $manifestBytes = [System.Text.UTF8Encoding]::new($false).GetBytes(
             $digest + "  codex-agent-job-helper.exe`n"
         )

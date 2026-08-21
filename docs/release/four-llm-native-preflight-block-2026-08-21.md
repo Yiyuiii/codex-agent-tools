@@ -40,3 +40,23 @@
 ## 停止条件
 
 本次授权对应的标准入口已经调用并在预飞阶段失败。按照单入口、首错停和不启动第二批的边界，本处理链到此停止。后续若继续，应先修复或消除当前宿主测试隔离兼容阻断，形成新的 clean frozen candidate，再单独启动新的资格入口；不得把本次零模型调用记录解释成八项能力通过。
+
+## 继续推进与修复
+
+维护者随后明确要求继续开展工作，开启新的离线修复处理链。进一步窄诊断确认：Vitest 子进程继承的 `PSModulePath` 中，Codex PowerShell 7 的 `Microsoft.PowerShell.Utility` 位于系统 Windows PowerShell 5.1 模块之前。系统 `powershell.exe` 在该路径下可以枚举两个同名模块，但无法自动解析 `Get-FileHash`。native wrapper 的 fd3 报错发生在同一 build 前置路径，移除哈希 cmdlet 依赖后也随之消失。
+
+修复保持 native helper 协议与编译源不变：
+
+- `native/windows-job-helper/build.ps1` 和 `restore-toolchain.ps1` 改用 `System.Security.Cryptography` 的 SHA-256/SHA-512 实现；
+- 回归测试明确禁止这两个入口重新依赖 `Get-FileHash`；
+- `observer:update-artifact` 只重算包含 `restore-toolchain.ps1` 的输入闭包，observer 可执行文件仍为原字节，SHA-256 仍为 `dd20110b1cbcae984ab9f3560ece1bfa8e7b1a0e542b206cec5d9ff5047f5a64`。
+
+修复验证：
+
+- 原 3 个失败文件现在 3 files passed / 18 tests passed；
+- `npm run typecheck` passed；
+- `npm run native:preflight` passed，Node v24.14.1 / libuv 1.51.0 / 5 cases；
+- `npm run observer:verify` passed；
+- `git diff --check` passed。
+
+修复阶段没有调用真实模型。完整 deterministic suite 留给新的独立标准资格入口内置 preflight，避免修复阶段重复全库测试。原 candidate `bc6a300...` 的零模型、无 batch 预飞失败事实保持不变。
