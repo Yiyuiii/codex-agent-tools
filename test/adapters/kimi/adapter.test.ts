@@ -103,4 +103,72 @@ describe("KimiAdapter", () => {
     expect(runClient.mock.calls[0]![0].sessionId).toBe("existing-session");
     expect(runClient.mock.calls[0]![0]).not.toHaveProperty("timeoutMs");
   });
+
+  it("fails closed when the Kimi client reports a different model", async () => {
+    const adapter = new KimiAdapter({
+      locateExecutable: async () => "kimi.exe",
+      runClient: async () => ({
+        status: "completed",
+        text: "unexpected model output",
+        actualModel: "kimi-code/other",
+        elapsedMs: 10,
+        events: [],
+        diagnostics: [],
+        executionTelemetry: {
+          adapterClientInvocationCount: 1,
+          adapterRetryCount: 0,
+          runtimeReportedAutoRetryCount: 0,
+          adapterReportedFallbackUsed: false,
+          source: "kimi-acp-observable",
+        },
+      }),
+    });
+
+    const result = await adapter.run({
+      profile: resolveLlm("kimi-k3"),
+      task: "review",
+      cwd: process.cwd(),
+      prompt: "Review",
+      parentEnvironment: { PATH: "x" },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.diagnostics).toContain(
+      "Model binding violation: expected kimi-code/k3 but Kimi reported kimi-code/other",
+    );
+    expect(result.executionTelemetry?.adapterReportedFallbackUsed).toBe(true);
+  });
+
+  it("fails closed when a completed Kimi invocation reports no model", async () => {
+    const adapter = new KimiAdapter({
+      locateExecutable: async () => "kimi.exe",
+      runClient: async () => ({
+        status: "completed",
+        text: "missing model output",
+        elapsedMs: 10,
+        events: [],
+        diagnostics: [],
+        executionTelemetry: {
+          adapterClientInvocationCount: 1,
+          adapterRetryCount: 0,
+          runtimeReportedAutoRetryCount: 0,
+          adapterReportedFallbackUsed: false,
+          source: "kimi-acp-observable",
+        },
+      }),
+    });
+
+    const result = await adapter.run({
+      profile: resolveLlm("kimi-k3"),
+      task: "delegate",
+      cwd: process.cwd(),
+      prompt: "Implement",
+      parentEnvironment: { PATH: "x" },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.diagnostics).toContain(
+      "Model binding violation: expected kimi-code/k3 but Kimi reported no model",
+    );
+  });
 });

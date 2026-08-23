@@ -41,6 +41,8 @@
 
 `external_review` 会比较调用前后的工作区，并拒绝 Pi 的命令、编辑或写入事件。`external_delegate` 明确可写，调用方应提供合适的 worktree 或其它隔离目录。
 
+`external_review` 的只读保证属于应用层约束：Kimi ACP 拒绝写入，Pi 只启用只读工具，服务再比较 `cwd` 内的工作区变化。它不是操作系统沙箱；`.git`、`node_modules`、`dist` 与 `cwd` 外路径不属于文件快照证据范围。
+
 ## 运行要求
 
 - Node.js 24+；

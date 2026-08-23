@@ -31,13 +31,13 @@ Ark 与 Direct DeepSeek 使用按 provider 分离的缓存目录：`.../pi/<vers
 - Direct DeepSeek delegate：passed；evidence valid / fingerprint current
 - 真实 Direct DeepSeek 调用：2；每项单次 client invocation、零 retry/fallback、owned process drained
 - 真实 Direct 批次：`2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69`，2/2 passed，manifest SHA-256 `f0d564aef9d1d62cfe9348b74e54a99f53912e810dd662830704b9860d17279d`
-- 现行旧证据：八份历史 evidence 仍有效；资格协议属于共享指纹输入，因此六项 Pi 与两项 Kimi 能力当前全部 stale
-- 旧八项刷新批次：`2026-08-14T03-03-14.120Z-3312323b-63e0-4b47-b88c-8fb98bb06e4e` 在首项 `ark-coding-plan/delegate` 因 `account_quota_exceeded` blocked，其余七项 notRun
-- 发布资格：blocked；十项索引为 Direct 2 current + 原路线 8 stale，`npm run verify:capabilities` 与 release smoke 必须 fail closed
-- 当前任务插件发现：实时工具注册表没有 `external_review` / `external_delegate`，当前任务未加载本项目插件
-- 活动安装状态：未读取活动配置，不能把此前 `0.1.1` 宿主验收外推为当前 installed/enabled 状态；本候选没有执行 add/remove/upgrade，也没有访问活动 `~/.codex/config.toml`
+- 现行旧证据：八份历史 evidence 仍有效；2026-08-21 fresh batch 已把 `ark-coding-plan/delegate` 更新为 current，其余五项 Ark 与两项 Kimi 当前 stale
+- 最新刷新批次：`2026-08-21T03-00-25.070Z-6d98cc4f-ebab-46d8-ba5f-8f34810a2777` 的 `ark-coding-plan/delegate` passed，`ark-coding-plan/review` 单次调用后 adapter failure，其余六项 notRun；终态保持 blocked，passed case 已按能力粒度写入索引
+- 发布资格：blocked；十项索引为 Direct 2 + Ark Coding delegate 1 current、其余 7 stale，`npm run verify:capabilities` 与 release smoke 必须 fail closed
+- 当前任务插件发现：活动注册表已暴露 `external_review` / `external_delegate`；Kimi、Ark Coding 与 Direct DeepSeek 三条代表性 review 均真实 completed、零诊断、零文件变化
+- 活动安装状态：官方列表显示本地 staging `0.1.2-beta.1+codex.20260822121123` installed/enabled；该状态不代表公共 `0.1.2-beta.1` 已发布或安装
 - 本次收敛验收：Direct batch immutable verifier 再次通过；真实 delegate evidence SHA-256 为 `7bbb2b11cc45e193a8b77e5ce1215b93f02ca80268b1914325d4f0c6490ea342`，实际 `provider=deepseek`、`model=deepseek-v4-flash`、`endpointHost=api.deepseek.com`、单次 client invocation、零 retry/fallback、owned process drained，全部 checks 为 true
-- 五模型候选复核：运行时代码已收敛到 Direct 两项指纹继续 current 的既有实现；十项历史 evidence 均 valid，Kimi/Ark 八项 stale；尚未运行新的真实模型调用
+- 五模型候选复核：十项历史 evidence 均 valid，机器分析为 3 current / 7 stale；2026-08-23 三次活动宿主 review 是可用性证据，不是资格 case
 
 `npm run smoke:deepseek -- --llm deepseek-v4-flash --task review|delegate` 是独立真实 smoke 入口。缺少凭据时不得运行；standalone smoke 不能自行改写能力索引。标准资格入口使用仅含两项能力的 `direct-deepseek-v1` 计划；原八项继续使用 `four-llm-v1`。两个计划分别绑定 DeepSeek-only 与 Ark-only Pi 配置哈希，不能混合、拼接或互换 evidence。已通过的 Direct case 按能力粒度政策独立晋级；整个候选仍须等旧八项 current 后才能通过发布 verifier。
 
@@ -53,14 +53,14 @@ Ark 与 Direct DeepSeek 使用按 provider 分离的缓存目录：`.../pi/<vers
 - 临时 `CODEX_HOME` 官方插件验收中，Direct 与 Ark Agent DeepSeek 分别恰好调用一次 fake Pi，并验证逐路线目标凭据隔离
 - `direct-deepseek-v1` 的协议、锁、preflight、ledger、coordinator、verifier、能力索引与 smoke 上下文 TDD
 - `direct-deepseek-v1` 真实 2/2 passed、immutable/frozen verifier、证据提交与 current 索引
-- 当前候选完整 build、类型检查、70 个测试文件的单 worker 回归（1276 passed / 5 平台条件 skipped / 0 failed）
+- 2026-08-23 Kimi 模型绑定加固后完成 build、类型检查、聚焦 6 文件 / 108 tests 与完整单 worker 回归（70 files passed / 1 file skipped，1275 passed / 6 skipped / 0 failed）
 - 官方临时插件生命周期与 committed report 一致性通过；npm pack dry-run 为 26 files，精确包含 Direct manifest 与两项 case evidence，未生成持久 `.tgz`
-- release smoke 在能力索引阶段按预期失败关闭；机器分析只报告 Direct 2 current 与原路线 8 stale
+- release smoke 在能力索引阶段按预期失败关闭；机器分析报告 Direct 2 + Ark Coding delegate 1 current 与其余 7 stale
 
 ## 当前结论与后续边界
 
 1. Direct DeepSeek review/delegate 已由不可变真实证据支持，当前运行时指纹保持 current，无需重复调用。
-2. 五模型 beta 仍受 Kimi/Ark 八项 stale 阻断；Ark Coding Plan 额度恢复后，按既有单次、首错停协议启动新的 `four-llm-v1` 批次。
+2. 五模型 beta 仍受 Kimi/Ark 七项 stale 阻断；标准入口只运行当前 stale 能力，保持单次、首错停、无 resume/retry/fallback。
 3. 十项全部 current 后才能生成最终发布标记、执行隔离包验收并进入发布。活动插件升级仍是发布后的独立授权动作。
 
 资格拆分依据见 [Direct DeepSeek 双计划资格设计](../superpowers/specs/2026-08-14-direct-deepseek-qualification-design.md)。

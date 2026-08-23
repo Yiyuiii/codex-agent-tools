@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-Kimi 公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。当前能力索引引用 2026-08-03 新批次中的 Kimi review/delegate passed case；两份 evidence 仍有效，五模型开发候选的共享资格输入已变化，因此两项运行时指纹当前为 stale，发布前须由新的 `four-llm-v1` 批次刷新。
+Kimi 公开面只支持 `kimi-k3`，固定使用 Kimi ACP、实际模型 `kimi-code/k3` 与 direct 网络策略。当前能力索引引用 2026-08-03 新批次中的 Kimi review/delegate passed case；两份 evidence 仍有效，五模型开发候选的共享资格输入已变化，因此两项运行时指纹当前为 stale，发布前须由新的 `four-llm-v1` 批次刷新。2026-08-23 资格前加固又使 Kimi adapter 在 client 回报不同模型或 completed 但缺少模型身份时 fail closed；该防御不改变 ACP 已有的显式模型选择。
 
 现行调用省略 `timeoutMs` 时不会向 Kimi Code 设置 deadline，而是保留 Kimi Code 原生执行预算。宿主取消、stdio 断开或进程信号会传播 SDK abort，并等待完整 owned ACP 进程树归零；只有调用方显式设置的单次 `timeoutMs` 到期才报告 timed out。项目没有给 Kimi 设置全局或默认 step、turn、tool、context、token 或执行时长上限。
 
