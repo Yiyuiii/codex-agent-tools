@@ -35,7 +35,7 @@ Ark 与 Direct DeepSeek 使用按 provider 分离的缓存目录：`.../pi/<vers
 - 最新刷新批次：`2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60` 在 frozen commit `388f0fdc37db02b5c6104988aa68baa793eda791` 上 7/7 passed，manifest SHA-256 `968c00d5ecf9a612fd8e9b5bff34ef84c31126ac6598078d9f9c74ee4f48e550`
 - 发布资格：十项索引为 10 current / 0 stale / 0 legacy，`npm run verify:capabilities` 与 release smoke 通过
 - 当前任务插件发现：活动注册表已暴露 `external_review` / `external_delegate`；Kimi、Ark Coding 与 Direct DeepSeek 三条代表性 review 均真实 completed、零诊断、零文件变化
-- 活动安装状态：官方列表显示本地 staging `0.1.2-beta.1+codex.20260822121123` installed/enabled；该状态不代表公共 `0.1.2-beta.1` 已发布或安装
+- 活动安装状态：官方列表显示本地 staging `0.1.2-beta.1+codex.20260822121123` installed/enabled；公共 `0.1.2-beta.1` 已发布并通过隔离验收，但活动插件尚未升级到公共包
 - 本次收敛验收：Direct batch immutable verifier 再次通过；真实 delegate evidence SHA-256 为 `7bbb2b11cc45e193a8b77e5ce1215b93f02ca80268b1914325d4f0c6490ea342`，实际 `provider=deepseek`、`model=deepseek-v4-flash`、`endpointHost=api.deepseek.com`、单次 client invocation、零 retry/fallback、owned process drained，全部 checks 为 true
 - 五模型候选复核：十项 evidence 均 valid/current；2026-08-23 三次活动宿主 review 仍只作为可用性证据，不是资格 case
 
