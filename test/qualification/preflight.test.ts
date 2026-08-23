@@ -33,7 +33,7 @@ const roots: string[] = [];
 const commit = "a".repeat(40);
 const authorizationReferenceSha256 = "b".repeat(64);
 const piConfigSha256 = "c".repeat(64);
-const packageVersion = "0.1.2-beta.1";
+const packageVersion = "0.1.2-beta.2";
 
 function verifiedPiInvocation(): PiInvocation {
   return Object.freeze({

@@ -1,6 +1,6 @@
 # 从 codex-cc-tools 迁移到五模型 beta
 
-`codex-agent-tools@0.1.2-beta.1` 使用 MCP 服务 `codex_external_agents`，只公开 `external_review` 与 `external_delegate`。两个工具都要求显式选择 `llm`。
+`codex-agent-tools@0.1.2-beta.2` 使用 MCP 服务 `codex_external_agents`，只公开 `external_review` 与 `external_delegate`。两个工具都要求显式选择 `llm`。
 
 可选逻辑 LLM：
 
@@ -9,6 +9,8 @@
 - `ark-agent-plan`
 - `ark-agent-deepseek-v4-flash`
 - `deepseek-v4-flash`
+
+日常任务优先选择 `kimi-k3` 或合适的 Ark Plan 路线。`ark-agent-deepseek-v4-flash` 属于 Ark Agent Plan；Direct `deepseek-v4-flash` 使用独立 DeepSeek API 计费，只在明确要求该路线或 Plan 路线不适用时选择。工具不会自动 retry、fallback 或静默换模。
 
 Direct DeepSeek 固定使用 Pi RPC / provider `deepseek` / `https://api.deepseek.com` / `openai-completions` / 模型 `deepseek-v4-flash`。Ark 与 Kimi 的固定绑定见 [README](../README.md)。Gemini、Claude 与 OpenAI/Codex 路线不属于公开产品面。
 

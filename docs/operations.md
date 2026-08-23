@@ -1,12 +1,14 @@
 # 五模型 beta 运维流程
 
-本文适用于 `codex-agent-tools@0.1.2-beta.1` 候选。公开工具为 `external_review` 与 `external_delegate`，公开逻辑 LLM 为：
+本文适用于 `codex-agent-tools@0.1.2-beta.2` 候选。公开工具为 `external_review` 与 `external_delegate`，公开逻辑 LLM 为：
 
 - `kimi-k3`
 - `ark-coding-plan`
 - `ark-agent-plan`
 - `ark-agent-deepseek-v4-flash`
 - `deepseek-v4-flash`
+
+日常审阅与委派优先选择 `kimi-k3` 或合适的 Ark Plan 路线。Direct `deepseek-v4-flash` 使用独立 DeepSeek API 计费，只在调用方明确要求该路线，或 Plan 路线不适合当前任务时使用。该选择策略只影响调用方选型，不改变 `llm` 必填、固定 provider/model/credential 绑定、无自动 retry/fallback 或精确路线验收边界。
 
 ## 1. 前置条件
 
@@ -57,16 +59,16 @@ npm run acceptance:plugin:isolated:built
 
 beta 只通过 `.github/workflows/release.yml` 的 GitHub Actions OIDC 路线发布到 npm `next`，禁止本地 `npm publish`。发布前必须确认：
 
-- `0.1.2-beta.1` 在 npm 尚不存在；
+- `0.1.2-beta.2` 在 npm 尚不存在；
 - 候选已进入发布分支并通过 CI；
-- `v0.1.2-beta.1` 指向精确候选提交；
-- `.release-validation/v0.1.2-beta.1.json` 绑定最终 runtime、十项能力索引、插件树与宿主冻结证据；
+- `v0.1.2-beta.2` 指向精确候选提交；
+- `.release-validation/v0.1.2-beta.2.json` 绑定最终 runtime、十项能力索引、插件树与宿主冻结证据；
 - tag workflow 全绿并创建 GitHub prerelease。
 
 发布后运行：
 
 ```powershell
-npm run acceptance:npm-package -- --version 0.1.2-beta.1
+npm run acceptance:npm-package -- --version 0.1.2-beta.2
 ```
 
 该命令从公共 npm registry 安装精确版本，禁用 lifecycle scripts，并在临时目录和临时 `CODEX_HOME` 中验证 CLI、doctor、MCP、官方插件生命周期与包内证据闭包。

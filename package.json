@@ -1,6 +1,6 @@
 {
   "name": "codex-agent-tools",
-  "version": "0.1.2-beta.1",
+  "version": "0.1.2-beta.2",
   "description": "Codex-facing external LLM review and delegation tools",
   "type": "module",
   "license": "MIT",

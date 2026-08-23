@@ -2,6 +2,8 @@
 
 ## 用户原始要求
 
+- 2026-08-23：Direct 逻辑 LLM `deepseek-v4-flash` 使用用户的 DeepSeek API 计费接口；Kimi 与 Ark 为 Plan 路线。日常外部审阅和委派应尽可能优先使用 Kimi 或 Ark，Direct DeepSeek 只在用户明确要求该精确路线或 Plan 路线不适用时使用；不得自动 retry、fallback 或静默换模。
+
 - 本项目必须与 `D:\Codes\codex-cc-tools` 隔离，使用独立仓库和代码目录。
 - MCP 服务名为 `codex_external_agents`，公开工具名为 `external_review` 与 `external_delegate`。
 - 两个工具都要求调用者显式传入 `llm`；调用者不选择 backend、provider 或代理。
@@ -36,6 +38,8 @@
 - 2026-08-07（Kimi swarm 与旧工具退役授权）：维护者要求尝试启用 Kimi 集群模式，并在只有 Kimi 可用的当前环境中评估、移除旧 `codex_cc_tools`，同时同步全局提示词。允许升级本机 Kimi、运行窄真实探测、通过官方 Codex MCP 命令移除旧工具和更新全局 `AGENTS.md`；仍不得直接读写活动 `~/.codex/config.toml`，不得为 Kimi 或其它外部 CLI 设置 default/global 步数、时长、token 或并发上限。协议或真实证据不能证明 swarm 时，不得以提示词包装成已启用功能。
 
 ## 当前事实状态
+
+- 2026-08-23 公共 beta.1 真实宿主验收纠正：重启后的新任务同时发现两个公开工具，Kimi、Ark Coding 与 Direct DeepSeek 三次只读 review 均 completed、实际模型正确、诊断与文件变化为空。最初报告的 Direct Pi/Helper “残留”创建于验收任务收到提示之前，并早于 Direct 调用约 80 秒，不能归因给该调用。活动 App 的全机进程是共享动态状态；未来宿主验收必须先取 PID+创建时间基线再比较新增集合，或使用 invocation-scoped telemetry/observer receipt。不得依据后置绝对总数误报泄漏或终止所有权不明的进程。完整时间线见[真实宿主验收](docs/release/real-host-acceptance.md)。
 
 - 2026-08-14 DeepSeek-only beta 候选（历史）：版本曾设为 `0.1.2-beta.0`，产品面曾收窄为 Direct `deepseek-v4-flash`。该边界已由 2026-08-20 五模型要求覆盖；历史 release marker、npm 验收与隔离报告保持不可变，不代表当前候选。
 - 2026-08-20 五模型 beta 候选：隔离分支 `codex/multi-model-beta-0.1.2` 目标版本为 `0.1.2-beta.1`。公开注册表、doctor、插件凭据白名单、npm 证据闭包和隔离验收恢复五个逻辑 LLM，能力索引恢复十项。运行时代码保持与既有 Direct 真实证据相同的资格输入，因此 Direct 两项 evidence valid / fingerprint current；Kimi/Ark 八项 evidence valid / fingerprint stale。完整 verifier 与 release smoke 在八项刷新前必须 fail closed；当前尚未发布或变更活动插件。

@@ -9,6 +9,6 @@ describe("package identity", () => {
   });
 
   it("uses the unified multi-model beta version", () => {
-    expect(VERSION).toBe("0.1.2-beta.1");
+    expect(VERSION).toBe("0.1.2-beta.2");
   });
 });

@@ -1,7 +1,7 @@
 {
   "name": "codex-external-agents",
-  "version": "0.1.2-beta.1",
-  "description": "Use explicitly selected external LLMs for review and delegated coding tasks.",
+  "version": "0.1.2-beta.2",
+  "description": "Prefer plan-backed Kimi and Ark for review and delegation; keep Direct DeepSeek explicit.",
   "author": {
     "name": "codex-agent-tools maintainers"
   },
@@ -9,8 +9,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Codex External Agents",
-    "shortDescription": "Review and delegate with explicitly selected external LLMs",
-    "longDescription": "Use explicitly selected Kimi and Pi-backed LLMs for Codex review and delegated coding tasks.",
+    "shortDescription": "Plan-preferred external review and delegation",
+    "longDescription": "Prefer plan-backed Kimi and Ark routes for routine Codex review and delegation. Use API-billed Direct DeepSeek only when it is explicitly required or the plan routes are unsuitable.",
     "developerName": "codex-agent-tools maintainers",
     "category": "Productivity",
     "capabilities": [
@@ -19,8 +19,7 @@
     ],
     "defaultPrompt": [
       "Review my current changes with kimi-k3.",
-      "Delegate this coding task to ark-coding-plan.",
-      "Review this document with deepseek-v4-flash."
+      "Delegate this coding task to ark-coding-plan."
     ]
   }
 }

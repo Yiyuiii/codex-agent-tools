@@ -1,6 +1,14 @@
 # 真实 Codex App 宿主验收记录
 
-最近更新：2026-08-07
+## 2026-08-23 公共 beta.1 三源宿主验收与进程归因纠正
+
+活动插件切换到公共 `0.1.2-beta.1` 并完整重启后，新任务 `01a02ea4-ce10-79f0-8aac-f058c9c3e93d` 同时发现 `external_review` 与 `external_delegate`。随后按固定顺序分别只调用一次 `kimi-k3`、`ark-coding-plan` 和 Direct `deepseek-v4-flash` 的只读 review；三次都返回 `completed`，实际模型分别为 `kimi-code/k3`、`ark-code-latest`、`deepseek-v4-flash`，诊断与文件变化均为空。没有 retry、fallback、模型切换或 delegate 调用，目标工作树前后保持干净。因此公共 beta.1 的真实 App 加载与三条代表性 review 路线通过。
+
+验收任务最初把调用后的全机 Pi/Helper 快照误报为本次 Direct 调用残留。时间线复核推翻了该归因：被报告的 `deepseek-v4-flash` Pi RPC 与 Job Helper 创建于本地时间 `20:42:29`，而任务提示直到 `20:42:32.498` 才进入新任务，真正的 Direct 工具调用从 `20:43:49.116` 开始、于 `20:44:05.719` 完成。该进程早于任务输入，更早于 Direct 调用约 80 秒，不能作为本次调用泄漏证据。活动 App 同时承载其它任务，后续只读快照还观察到新的 Ark Plan 进程，进一步证明绝对进程总数不能代替调用归因。
+
+后续真实宿主验收必须在任何业务调用前记录 PID 与创建时间基线，调用后只检查新增集合；需要强生命周期结论时使用同一调用的 owned-process telemetry、observer receipt 或隔离 transport 证据。不得把调用后全机非零总数归因于当前调用，也不得终止所有权不明的共享进程。本次纠正后的结论是：功能验收通过；该次 Direct 调用没有已建立的泄漏证据；后置全机快照本身不提供 invocation-scoped cleanup 结论。
+
+最近更新：2026-08-23
 
 状态：**stable published / host Stop skipped — 0.1.1 已公开发布、公共验收并完成官方升级；维护者终止的普通 Stop 验收仍为 `host_stop_unverified`，未取得 `cancelled + owned-zero` receipt**
 
