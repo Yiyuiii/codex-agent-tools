@@ -10,11 +10,11 @@
 
 `0.1.1` 发布快照结论：**stable 已完成 Node 24 离线门禁、PR/双重 CI、不可变标签、GitHub Actions OIDC 发布、公共精确包隔离验收与活动官方插件升级；该发布快照的能力索引为 8 current / 0 legacy。npm 为 `latest=0.1.1`、`next=0.1.1-beta.4`，当时活动插件 installed/enabled `0.1.1`，旧 `codex_cc_tools` 仍 enabled。维护者完整退出重开后，新任务发现两个公开工具，官方 MCP cwd 指向 `0.1.1` 缓存且插件进程属于新 app-server。维护者于 2026-08-07 跳过普通 Stop 验收；两次会话均没有 PASS receipt，真实 Stop 保持 `skipped / unverified`。稳定版证据使用严格 `skipped_by_maintainer / host_stop_unverified` 决策状态，GitHub Release 没有把它显示为宿主验收通过。**
 
-当前 `0.1.2-beta.1` 开发候选新增 Direct DeepSeek，且共享资格输入已经变化。本清单以下“8 current”均描述 `0.1.1` 发布快照。2026-08-21 fresh 批次使 `ark-coding-plan/delegate` passed 并更新为 current；2026-08-23 资格前 Kimi adapter 模型绑定加固后，机器分析为 Direct 两项与 Ark Coding delegate 一项 current，其余七项 evidence valid / fingerprint stale。当天一次广覆盖批次误跑 current delegate 后按精确命令门禁 blocked，没有晋级任何能力；候选现增加只接受上述七项的 `capability-refresh-v1` 定向入口。整个候选仍未通过、未公开发布；活动 App 只加载了本地 staging。实时状态见 [能力刷新资格设计与阻断记录](capability-refresh-qualification-2026-08-23.md)。
+当前 `0.1.2-beta.1` 开发候选新增 Direct DeepSeek，且共享资格输入已经变化。本清单以下“8 current”均描述 `0.1.1` 发布快照。2026-08-21 fresh 批次使 `ark-coding-plan/delegate` passed 并更新为 current；2026-08-23 资格前 Kimi adapter 模型绑定加固后，机器分析为 Direct 两项与 Ark Coding delegate 一项 current，其余七项 evidence valid / fingerprint stale。当天一次广覆盖批次误跑 current delegate 后按精确命令门禁 blocked；首次七项定向入口又因 smoke evidence 白名单遗漏新 plan ID 在 adapter/模型调用前 blocked，真实模型调用为 0。两个历史终态保持不可变，没有晋级任何能力。整个候选仍未通过、未公开发布；活动 App 只加载了本地 staging。实时状态见 [能力刷新资格设计与阻断记录](capability-refresh-qualification-2026-08-23.md)。
 
 `0.1.1` 最近的八项 passed 批次绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`，批次 ID 为 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`；标准入口和 execution cell 各只有一个，八项全部 passed，没有 resume、retry、fallback 或补跑。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，immutable-evidence 与 frozen-candidate verifier 均通过，owned process 全部 drained、锁为空；不可变证据由提交 `c09ce74` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。
 
-当前开发候选此前的局部门禁证据为：build、类型检查、临时 `CODEX_HOME` 官方插件生命周期与 26-file npm pack dry-run 均通过；Direct 与 blocked Ark 批次的 immutable verifier 都通过。2026-08-23 新加固的聚焦 6 文件 / 108 tests、类型检查与完整单 worker 回归（70 files passed / 1 file skipped，1275 passed / 6 skipped / 0 failed）通过。完整 release smoke 仍会在七项 stale 能力处按预期非零；上述局部通过不构成第 1 层或整个候选通过。
+当前开发候选此前的局部门禁证据为：build、类型检查、临时 `CODEX_HOME` 官方插件生命周期与精确 npm pack dry-run 均通过；Direct 与 blocked Ark/refresh 批次的 immutable verifier 都通过。2026-08-23 定向入口修复后的聚焦 10 files / 413 passed / 1 skipped、完整单 worker 回归（70 files passed / 1 file skipped，1285 passed / 6 skipped / 0 failed）、native/helper/observer、隔离插件与 27-file npm 文档链接闭包通过。完整 release smoke 仍会在七项 stale 能力处按预期非零；上述局部通过不构成第 1 层或整个候选通过。
 
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 

@@ -60,7 +60,7 @@
     {
       "llm": "ark-coding-plan",
       "task": "delegate",
-      "runtimeFingerprintSha256": "443966e9b2331ba61dec0bea5ce21e1a8c47ac8e7e2bfcdb5e9d0e7ca8d2816e",
+      "runtimeFingerprintSha256": "dae868c949dc9789240330c13a02e7a355204141e24a48a46403eedf097edac5",
       "source": {
         "kind": "batch-case",
         "manifestPath": "docs/smoke/evidence/batches/2026-08-21T03-00-25.070Z-6d98cc4f-ebab-46d8-ba5f-8f34810a2777/manifest.json",
@@ -88,7 +88,7 @@
     {
       "llm": "deepseek-v4-flash",
       "task": "delegate",
-      "runtimeFingerprintSha256": "1cf1482981e8daa892823d4a54d9357799637ca216cea207a0f36c68c1934a5b",
+      "runtimeFingerprintSha256": "3fc11c6260412ede3290bd6f0ccdfea08d1e2e02fc178708fc3605320d14e60b",
       "source": {
         "kind": "batch-case",
         "manifestPath": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/manifest.json",
@@ -102,7 +102,7 @@
     {
       "llm": "deepseek-v4-flash",
       "task": "review",
-      "runtimeFingerprintSha256": "02a44f9614b44f5369deaabff4ee8ab7904367b86787e7563a442002f4e9b18a",
+      "runtimeFingerprintSha256": "16f9b3077a0b589457452b4a9627a8ea0ced74db7e55aed4c6bb7bf10931b49f",
       "source": {
         "kind": "batch-case",
         "manifestPath": "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/manifest.json",

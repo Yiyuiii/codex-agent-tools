@@ -11,6 +11,7 @@ import { types as nodeUtilTypes } from "node:util";
 import { resolveLlm } from "../llms/registry.js";
 import {
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   qualificationSchedule,
   type CurrentQualificationPlanId,
@@ -297,7 +298,8 @@ export function normalizeSmokeQualificationContext(
     descriptors.orchestratorFallbackUsed?.value;
   const currentPlan =
     qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID ||
-    qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+    qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID ||
+    qualificationPlanId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
       ? qualificationPlanId
       : null;
   const activeIdentity =

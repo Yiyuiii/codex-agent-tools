@@ -20,10 +20,19 @@
 
 这次失败不表示 Ark Coding 模型、路由或结果文件能力退化。它证明旧广覆盖入口会违反“不重复硬跑 current 能力”的当前资格政策；历史 blocked manifest 和 case evidence保持不可变。
 
+## 首次定向入口的预模型阻断
+
+定向计划在 clean frozen commit `6af9ef6097bd4ea94f07d041c5abd5d6c01ac1b7` 上只调用一次，创建 batch `2026-08-23T10-52-03.095Z-30f6d895-552e-4aa8-bd34-35c081e13610`。完整 deterministic preflight 通过并发布 `batch_started` 与 ordinal 1 `ark-coding-plan/review` 的 `case_running`，随后 smoke evidence 层以 `Smoke qualification context is invalid` 在 adapter 和真实模型调用前失败。
+
+terminal 为 `blocked / infrastructure_failure`，0 completed cases、无 case evidence、`uncommittedEvidence=null`，ordinal 2–7 notRun；manifest SHA-256 为 `f99b83a1b8c5da58dd4649de3afbc2cf5c54fb9ac504a499287f3f337f714511`，immutable verifier passed，不可变证据提交为 `c8cc02e`。资格锁释放，Kimi ACP / Pi RPC / real-smoke 为 0/0/0；真实模型调用为 0，没有 retry、fallback、resume、补跑、第二入口或第二批。
+
+根因是 `src/smoke/evidence.ts` 的严格资格上下文白名单仍只接受 `four-llm-v1` 与 `direct-deepseek-v1`。TDD 修复只加入 `capability-refresh-v1`，每个 context 仍必须匹配该计划的精确 ordinal/LLM/task；模型、路由、凭据、提示词、validator 和执行语义不变。该资格基础设施变化机械改变共享指纹，因此只迁移三项原 current 能力到新计算值，七项 stale 仍必须由真实 case 刷新。
+
 ## 实现边界
 
 - 新计划复用现行 schema v3 manifest/checkpoint、schema v4 evidence、Ark-only Pi 配置、模型绑定、凭据、网络、提示词、validator、single-attempt、首错停止、零资格 retry/fallback 和 owned-process 合同。
 - 新计划有独立 plan ID、固定七项 schedule、锁身份、preflight、ledger 与 immutable verifier 支持。
+- smoke evidence 层只接受三个现行计划，并继续按各自固定 schedule 校验精确 case 身份；未知计划和跨计划 identity 均失败关闭。
 - 能力索引允许非 Direct passed case 来自 `four-llm-v1` 或 `capability-refresh-v1`；Direct evidence 仍只能来自 `direct-deepseek-v1`。manifest、case evidence 与 verifier 返回的计划身份必须精确一致。
 - 七项目标文件是资格选择元数据，不改变产品运行时、模型、提示词或 acceptance；它从能力运行时指纹输入中排除，但其变化会通过固定 schedule 的 immutable verifier 使不匹配批次失败。
 - 资格基础设施变化机械改变共享指纹。已有三项 current 能力的证据、产品运行时和 acceptance 未变，因此只把这三项索引指纹迁移到同一候选的新计算值；七项 stale 记录不迁移，必须由新真实 case 刷新。

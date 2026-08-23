@@ -219,6 +219,25 @@ describe("qualification evidence identity", () => {
     ).toThrow("Invalid smoke qualification context");
   });
 
+  it("normalizes an exact identity from the capability refresh schedule", () => {
+    const refreshContext = {
+      ...validContext,
+      qualificationPlanId: "capability-refresh-v1" as const,
+      ordinal: 1,
+      llm: "ark-coding-plan",
+    };
+
+    expect(normalizeSmokeQualificationContext(refreshContext)).toEqual(
+      refreshContext,
+    );
+    expect(() =>
+      normalizeSmokeQualificationContext({
+        ...refreshContext,
+        task: "delegate",
+      }),
+    ).toThrow("Invalid smoke qualification context");
+  });
+
   it.each([
     { ...validContext, qualificationPlanId: "five-llm-v1" },
     { ...validContext, qualificationPlanId: "unknown-plan" },

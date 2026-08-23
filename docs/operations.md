@@ -41,7 +41,7 @@ npm run gate:offline
 
 Direct `deepseek-v4-flash` 使用独立的 `direct-deepseek-v1` 两项计划。`four-llm-v1` 保留 Kimi 与三条 Ark 路线的八项广覆盖回归顺序；开发候选只刷新当前失效能力时使用 `capability-refresh-v1`。刷新入口启动前会把固定七项目标与机器能力分析逐项比较；目标为空、重复、包含 current 能力或漏掉非 Direct 的 stale/invalid 能力都会在锁和模型调用前失败关闭。三个计划的配置哈希、执行顺序和 evidence 不得拼接或互换。
 
-当前候选的十项 evidence 均有效。Direct DeepSeek 两项与最新 `ark-coding-plan/delegate` 指纹 current，其余 Kimi/Ark 七项 stale。2026-08-23 在 Kimi 固定模型校验提交上误用广覆盖 `four-llm-v1`，批次首先重复运行了已经 current 的 `ark-coding-plan/delegate`；真实结果文件、状态命令、模型、路由、single-attempt 和进程回收均正确，但精确写入命令只被归类为 `raw_input/other/success`，因此以 `requiredCommandObserved=false` 首错停止。终态 blocked，immutable verifier passed，没有重试、fallback、补跑或第二入口。根因与新的定向入口见 GitHub 上的[能力刷新资格设计与阻断记录](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/capability-refresh-qualification-2026-08-23.md)。完整 `verify:capabilities` 继续失败关闭。
+当前候选的十项 evidence 均有效。Direct DeepSeek 两项与最新 `ark-coding-plan/delegate` 指纹 current，其余 Kimi/Ark 七项 stale。2026-08-23 在 Kimi 固定模型校验提交上误用广覆盖 `four-llm-v1`，批次首先重复运行了已经 current 的 `ark-coding-plan/delegate`，并按精确命令观察门禁首错停止。随后首次 `capability-refresh-v1` 通过完整 preflight，但 smoke evidence 白名单遗漏新计划，在 ordinal 1 adapter/真实模型调用前以 infrastructure failure 停止；0 completed cases、0 真实模型调用。两个终态均 blocked 且 immutable verifier passed，没有重试、fallback、补跑或第二入口。根因、哈希与修复见 GitHub 上的[能力刷新资格设计与阻断记录](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/capability-refresh-qualification-2026-08-23.md)。完整 `verify:capabilities` 继续失败关闭。
 
 ## 4. 隔离官方插件生命周期
 
