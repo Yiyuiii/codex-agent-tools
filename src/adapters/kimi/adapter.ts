@@ -61,6 +61,37 @@ export class KimiAdapter implements ExternalAgentAdapter {
     if (request.onProgress !== undefined) {
       clientRequest.onProgress = request.onProgress;
     }
-    return this.#runClient(clientRequest);
+    const result = await this.#runClient(clientRequest);
+    if (
+      result.actualModel !== undefined &&
+      result.actualModel !== request.profile.model
+    ) {
+      return {
+        ...result,
+        status: "failed",
+        diagnostics: [
+          ...result.diagnostics,
+          `Model binding violation: expected ${request.profile.model} but Kimi reported ${result.actualModel}`,
+        ],
+        executionTelemetry:
+          result.executionTelemetry === null
+            ? null
+            : {
+                ...result.executionTelemetry,
+                adapterReportedFallbackUsed: true,
+              },
+      };
+    }
+    if (result.status === "completed" && result.actualModel === undefined) {
+      return {
+        ...result,
+        status: "failed",
+        diagnostics: [
+          ...result.diagnostics,
+          `Model binding violation: expected ${request.profile.model} but Kimi reported no model`,
+        ],
+      };
+    }
+    return result;
   }
 }

@@ -4,17 +4,21 @@
 
 当前 Ark 公开面共有三项固定 Pi/direct 路线：
 
-- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；delegate/review 的历史 passed case 仍有效，当前开发候选的运行时指纹 stale。
-- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；review/delegate 的历史 passed case 仍有效，当前开发候选的运行时指纹 stale。
-- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；review/delegate 不使用 legacy evidence，历史 passed case 仍有效，当前开发候选的运行时指纹 stale。
+- `ark-coding-plan` → provider `ark-coding-plan` / model `ark-code-latest`；delegate 保留 2026-08-21 passed case，review 使用 2026-08-23 定向刷新 passed case，两项指纹 current。
+- `ark-agent-plan` → provider `ark-agent-plan` / model `ark-code-latest`；review/delegate 使用 2026-08-23 定向刷新 passed case，两项指纹 current。
+- `ark-agent-deepseek-v4-flash` → provider `ark-agent-plan` / model `deepseek-v4-flash`；review/delegate 使用 2026-08-23 定向刷新 passed case，两项指纹 current，且不使用 legacy evidence。
 
-现行公共调用省略 `timeoutMs` 时，三条 Ark/Pi 路线都不设置模型执行 deadline；只有调用方显式传入的单次值会建立 deadline。Pi 生产路径的原生 retry 保持不变，资格模式仍单独执行 single-attempt、零 retry/fallback。项目不给 Pi 或其外部 CLI 设置全局/default 模型能力上限。现行 `capabilities.json` 仍保留已发布 `0.1.1` 的 passed evidence，历史 batch manifest 与 case evidence永久不可变；共享资格输入变化使当前开发候选的六项 Ark 指纹 stale。
+现行公共调用省略 `timeoutMs` 时，三条 Ark/Pi 路线都不设置模型执行 deadline；只有调用方显式传入的单次值会建立 deadline。Pi 生产路径的原生 retry 保持不变，资格模式仍单独执行 single-attempt、零 retry/fallback。项目不给 Pi 或其外部 CLI 设置全局/default 模型能力上限。现行 `capabilities.json` 的六项 Ark 能力 evidence 与运行时指纹均为 current。
 
-最新真实批次 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923` 绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`。六项 Ark case 的模型、provider、direct route、凭据隔离、single-attempt、零 retry/fallback 与 owned process drain 均符合合同并全部 passed；整个八项批次为 `passed`、`promotionEligible=true`。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，不可变证据提交为 `c09ce74`。
+最新定向真实批次 `2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60` 绑定 frozen commit `388f0fdc37db02b5c6104988aa68baa793eda791`。其中五项 Ark case 的模型、provider、direct route、凭据隔离、single-attempt、零 retry/fallback 与 owned process drain 均符合合同并全部 passed；整个七项批次为 `passed`、`promotionEligible=true`。manifest SHA-256 为 `968c00d5ecf9a612fd8e9b5bff34ef84c31126ac6598078d9f9c74ee4f48e550`，不可变证据提交为 `0d45d88`，immutable-evidence 与 detached frozen-candidate verifier 均通过。
 
 两个 Agent Plan 逻辑 LLM 共享并发上限为 1 的 `ark-agent-plan` 配额池。2026-07-20 对旧 `ark-agent-glm-5.2` 与 `ark-agent-doubao-seed-2.0-pro` 完成的四项 passed 证据现仅作为历史事实保留，不属于当前公开面，也不得用于晋级两个新 Agent Plan 路线。原始 evidence JSON 保持不变。
 
-Gemini 退役后的已发布 `0.1.1` 共有四个逻辑 LLM、八项能力。当前开发候选另登记 Direct `deepseek-v4-flash`，形成五个逻辑 LLM、十项能力。资格单位仍是精确的逻辑 LLM × 任务；[`capabilities.json`](evidence/capabilities.json) 由 verifier 比较 evidence 哈希、case 身份、registry anchor 与运行时指纹。候选当前为旧八项 evidence valid / fingerprint stale，Direct 两项 evidence valid / fingerprint current；详情见 [Direct DeepSeek 接入状态](deepseek.md)。
+Gemini 退役后的已发布 `0.1.1` 共有四个逻辑 LLM、八项能力。当前开发候选另登记 Direct `deepseek-v4-flash`，形成五个逻辑 LLM、十项能力。资格单位仍是精确的逻辑 LLM × 任务；[`capabilities.json`](evidence/capabilities.json) 由 verifier 比较 evidence 哈希、case 身份、registry anchor 与运行时指纹。候选当前为 10 current / 0 stale / 0 legacy；详情见 [Direct DeepSeek 接入状态](deepseek.md)。
+
+2026-08-23 的一次 `four-llm-v1` 广覆盖入口在 frozen commit `069350fba7418a465bf6e80c4174229c3bdf3798` 上创建批次 `2026-08-23T10-02-06.915Z-c7a6a3d9-0fef-470d-b0f6-ce6cf57b24a8`。它先重复运行了已经 current 的 `ark-coding-plan/delegate`；固定模型、provider、direct route、28 字节结果文件、状态命令、single-attempt、零 retry/fallback 和进程回收都正确，但精确写入命令只被归类为 `raw_input/other/success`，`requiredCommandObserved=false`，因此以 `acceptance_failed` 首错停止。manifest SHA-256 为 `d3c38de4d0eb9a8955a29c7fb704b34567ee6a1671c2d02bf077cdcf7890130f`，immutable verifier passed，证据提交为 `8e01b16`；没有重试、补跑或第二入口。该结果不撤销 current delegate，也没有刷新七项 stale 能力。后续定向入口见[能力刷新资格设计与阻断记录](../release/capability-refresh-qualification-2026-08-23.md)。
+
+2026-08-21 的最新刷新批次 `2026-08-21T03-00-25.070Z-6d98cc4f-ebab-46d8-ba5f-8f34810a2777` 绑定 frozen commit `406a1479d478f9dc6d6d52a5f1d7fcda596ca86e`。ordinal 1 `ark-coding-plan/delegate` passed；ordinal 2 `ark-coding-plan/review` 一次调用后以 `adapter_failure` failed，空输出、诊断计数 1、工作区未变；其余六项 notRun。两个 case 均为一次 client invocation、零 adapter/runtime retry、零 fallback、owned process drained。终态 `blocked / case_failed`、`promotionEligible=false`，immutable verifier passed，manifest SHA-256 为 `229271ec481fdc3d609e9c1320f80a8f41f006b33758ee55f39f0b6743b74347`，不可变 evidence 提交为 `f31cea8`。passed delegate 已更新能力索引；review 失败与未运行项没有被拼接或补跑。
 
 2026-08-14 的刷新批次 `2026-08-14T03-03-14.120Z-3312323b-63e0-4b47-b88c-8fb98bb06e4e` 绑定 frozen commit `9c34156975864d529f18d21500872cf8e9d3fd5b`。ordinal 1 `ark-coding-plan/delegate` 以 `account_quota_exceeded` failed 后，协调器按合同首错停止；其余七项 notRun，终态 `blocked / case_failed`、`promotionEligible=false`。该 case 为一次 client invocation、零 adapter/runtime retry、零 fallback、owned process drained；immutable verifier 通过，manifest SHA-256 为 `7a1ca09d3f1dc1128596ec9c9d77f74aaf0239391ded50faf7f299cc7f74ca31`。没有 resume、补跑或第二批；账户额度变化前不重复真实运行。
 
@@ -52,13 +56,13 @@ Ark Coding 的本机用户环境变量实际命名为 `API_KEY_DOUBAO_CODING`。
 
 ## 当前证据矩阵
 
-当前 [`capabilities.json`](evidence/capabilities.json) 的三条 Ark 路线六项记录全部引用 2026-08-03 passed batch case，evidence SHA-256 仍由 verifier 验证有效；共享资格输入变化使当前开发候选的六项运行时指纹 stale。以下 2026-07-25 条目只保留为历史基线，不代表当前候选资格。
+当前 [`capabilities.json`](evidence/capabilities.json) 的 `ark-coding-plan/delegate` 引用 2026-08-21 passed case；其余五项 Ark 能力引用 2026-08-23 定向刷新 passed cases。六项 evidence SHA-256 与运行时指纹均由 verifier 验证为 current。以下 2026-07-25 条目只保留为历史基线，不代表当前候选资格。
 
 | 逻辑 LLM                      | evidence | 开发候选指纹 | 当前来源摘要 |
 | ----------------------------- | -------- | ------------ | ------------ |
-| `ark-coding-plan`             | passed cases | stale | 2026-08-03 batch；2026-08-14 刷新被账户额度阻断 |
-| `ark-agent-plan`              | passed cases | stale | 2026-08-03 batch |
-| `ark-agent-deepseek-v4-flash` | passed cases | stale | 2026-08-03 batch；0 legacy |
+| `ark-coding-plan`             | passed cases | current | 2026-08-21 delegate；2026-08-23 review |
+| `ark-agent-plan`              | passed cases | current | 2026-08-23 定向刷新 batch |
+| `ark-agent-deepseek-v4-flash` | passed cases | current | 2026-08-23 定向刷新 batch；0 legacy |
 
 ## 历史 2026-07-25 逐项基线
 

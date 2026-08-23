@@ -10,6 +10,8 @@ import {
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_CASES,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_CASES,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   type CurrentQualificationPlanId,
@@ -147,6 +149,11 @@ const directDeepSeekPreflight = Object.freeze({
   ]),
 }) satisfies FrozenPreflightRecord;
 
+const capabilityRefreshPreflight = Object.freeze({
+  ...preflight,
+  qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+}) satisfies FrozenPreflightRecord;
+
 function lockForPlan(
   qualificationPlanId: CurrentQualificationPlanId,
 ): QualificationLockHandle {
@@ -169,7 +176,9 @@ function terminal(
   const selectedPreflight =
     qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
       ? directDeepSeekPreflight
-      : preflight;
+      : qualificationPlanId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
+        ? capabilityRefreshPreflight
+        : preflight;
   return {
     schemaVersion: 3,
     qualificationPlanId,
@@ -207,7 +216,9 @@ function makeDependencies(options?: {
   const selectedPreflight =
     qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
       ? directDeepSeekPreflight
-      : preflight;
+      : qualificationPlanId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
+        ? capabilityRefreshPreflight
+        : preflight;
   const events: string[] = [];
   let inFlight = 0;
   let maximumInFlight = 0;
@@ -410,6 +421,37 @@ describe("qualification coordinator", () => {
       vi.mocked(fixture.dependencies.createLedger).mock.calls[0]?.[0],
     ).toMatchObject({
       qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    });
+  });
+
+  it("runs only the seven frozen capability refresh targets", async () => {
+    const fixture = makeDependencies({
+      qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+    });
+
+    const result = await runQualificationBatch(
+      {
+        repositoryRoot: "D:/repo",
+        authorizationReference: AUTHORIZATION_REFERENCE,
+        qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+      },
+      fixture.dependencies,
+    );
+
+    expect(result).toMatchObject({
+      schemaVersion: 3,
+      qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+      status: "passed",
+    });
+    expect(
+      vi
+        .mocked(fixture.dependencies.runCase)
+        .mock.calls.map(([input]) => input.identity),
+    ).toEqual(CAPABILITY_REFRESH_QUALIFICATION_CASES);
+    expect(
+      vi.mocked(fixture.dependencies.acquireLock).mock.calls[0]?.[0],
+    ).toMatchObject({
+      qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
     });
   });
 

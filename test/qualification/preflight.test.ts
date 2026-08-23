@@ -33,7 +33,7 @@ const roots: string[] = [];
 const commit = "a".repeat(40);
 const authorizationReferenceSha256 = "b".repeat(64);
 const piConfigSha256 = "c".repeat(64);
-const packageVersion = "0.1.2-beta.0";
+const packageVersion = "0.1.2-beta.1";
 
 function verifiedPiInvocation(): PiInvocation {
   return Object.freeze({
@@ -308,7 +308,10 @@ async function harness(
 function run(
   repositoryRoot: string,
   dependencies: QualificationPreflightDependencies,
-  qualificationPlanId?: "four-llm-v1" | "direct-deepseek-v1",
+  qualificationPlanId?:
+    | "four-llm-v1"
+    | "direct-deepseek-v1"
+    | "capability-refresh-v1",
 ) {
   return runQualificationPreflight(
     {
@@ -364,6 +367,27 @@ describe("qualification build identity", () => {
     expect(() =>
       computeQualificationBuildIdentitySha256(identity.buildArtifacts),
     ).toThrow();
+  });
+
+  it("uses the active artifact and locator closure for capability refresh", async () => {
+    const repositoryRoot = await tempRepository();
+    const state = await harness(repositoryRoot);
+
+    const record = await run(
+      repositoryRoot,
+      state.dependencies,
+      "capability-refresh-v1",
+    );
+
+    expect(record).toMatchObject({
+      schemaVersion: 3,
+      qualificationPlanId: "capability-refresh-v1",
+    });
+    expect(record.buildArtifacts.map(({ path: artifactPath }) => artifactPath))
+      .toEqual(QUALIFICATION_BUILD_ARTIFACT_PATHS);
+    expect(state.locatorCalls).toEqual(["kimi", "pi-invocation"]);
+    expect(state.piConfigPlans).toEqual(["capability-refresh-v1"]);
+    expect(record.logicalLlms).toHaveLength(4);
   });
 
   it("rejects oversized build artifacts before hashing unbounded input", async () => {

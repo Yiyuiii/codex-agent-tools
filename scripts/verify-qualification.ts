@@ -7,7 +7,9 @@ import type {
 } from "../src/qualification/verifier.js";
 import {
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+  type CurrentQualificationPlanId,
 } from "../src/qualification/protocol.js";
 
 const HELP = `Usage: npm run verify:qualification -- --mode frozen-candidate --manifest <batch-manifest>
@@ -73,6 +75,16 @@ export function parseQualificationVerifierArguments(
   throw new Error("Invalid qualification verifier arguments");
 }
 
+export function isSupportedQualificationVerificationPlan(
+  value: string,
+): value is CurrentQualificationPlanId {
+  return (
+    value === ACTIVE_QUALIFICATION_PLAN_ID ||
+    value === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID ||
+    value === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+  );
+}
+
 async function verifyProduction(options: {
   repositoryRoot: string;
   manifestPath: string;
@@ -86,10 +98,7 @@ async function verifyProduction(options: {
     assertFrozenCandidate: (input) =>
       preflight.assertQualificationFrozenCandidate(input),
     collectCurrentCandidate: (repositoryRoot, qualificationPlanId) => {
-      if (
-        qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID &&
-        qualificationPlanId !== DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
-      ) {
+      if (!isSupportedQualificationVerificationPlan(qualificationPlanId)) {
         throw new Error("Qualification plan mismatch");
       }
       return preflight.collectQualificationCurrentSnapshot({

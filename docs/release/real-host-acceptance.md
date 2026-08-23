@@ -427,3 +427,33 @@ codex plugin marketplace remove codex-external-agents-local
 ```
 
 不得手工修补活动 `config.toml`。
+
+## 2026-08-23 本地 0.1.2-beta.1 三源宿主修复
+
+维护者明确授权把活动官方插件精确切换到完整本地五模型候选，并终止旧插件 MCP
+进程。官方 App CLI 最终显示
+`codex-external-agents@codex-external-agents-local` installed/enabled
+`0.1.2-beta.1+codex.20260822121123`；缓存包含单文件 runtime、`.mcp.json`、
+plugin manifest 与 Windows x64 helper/哈希侧车，helper `--probe-v1` exit 0。
+
+宿主缓存完成重建后，当前任务活动注册表同时暴露 `external_review` 与
+`external_delegate`。对同一份运行规则只读调用三条代表性 review 路线，各调用一次：
+
+| 逻辑 LLM | 实际模型 | 状态 | 耗时 | 诊断 / 文件变化 |
+| --- | --- | --- | ---: | --- |
+| `kimi-k3` | `kimi-code/k3` | completed | 28.958 秒 | 0 / 0 |
+| `ark-coding-plan` | `ark-code-latest` | completed | 63.988 秒 | 0 / 0 |
+| `deepseek-v4-flash` | `deepseek-v4-flash` | completed | 58.286 秒 | 0 / 0 |
+
+调用层没有第二次工具调用、fallback 或模型切换。三次结束后只剩 App 管理的插件 MCP
+宿主；Kimi、Pi 与 job helper 后代均为 0。项目根工作树调用前后都保持 HEAD
+`34a1d5e8f18653d8eeeb7ec77295828ae8a53916` 和既有 `M AGENTS.md`，没有本次文件
+修改。受保护配置继续是 `approval_policy="never"`、
+`sandbox_mode="danger-full-access"`、Superpowers disabled，并已由配置维护脚本确认新
+指纹。
+
+该证据闭合的是本地 staging 的工具发现、Windows helper 与 Kimi/Ark Coding/Direct
+DeepSeek review 可用性。它不替代 npm 公共包验收、`external_delegate` 真实写入验收、
+普通 Stop receipt，也不把当前候选的 stale 能力晋级为 current。外审发现的 Kimi
+adapter 最终模型身份缺口随后在候选源码中单独按 TDD 加固；活动插件仍对应加固前的
+精确 staging 字节。

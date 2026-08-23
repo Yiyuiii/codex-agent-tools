@@ -2,20 +2,29 @@
 
 > 2026-07-29 状态：本手册继续约束需要真实运行的 batch 承载、首错停止、证据冻结和 fail-closed 行为，但“必须同批 8/8 才能形成任何资格”的晋级规则已被[能力粒度资格设计](../superpowers/specs/2026-07-29-capability-scoped-qualification-design.md)取代。当前资格以固定 [`capabilities.json`](../smoke/evidence/capabilities.json) 为准；只有 stale、缺失、新增或证据失效的能力才需要运行。历史 batch 的终态不得修改。
 
-> 2026-08-14 补充：当前生产协议有两个互不混合的计划。`four-llm-v1` 保留原四路线八项顺序；`direct-deepseek-v1` 只含 Direct DeepSeek review/delegate 两项。前者绑定 Ark-only Pi 配置哈希，后者绑定 DeepSeek-only Pi 配置哈希。拆分依据见[Direct DeepSeek 双计划资格设计](../superpowers/specs/2026-08-14-direct-deepseek-qualification-design.md)。
+> 2026-08-23 补充：当前生产协议有三个互不混合的计划。`four-llm-v1` 保留原四路线八项广覆盖回归顺序；`capability-refresh-v1` 只收集当前机器分析确认需要刷新的七项非 Direct 能力；`direct-deepseek-v1` 只含 Direct DeepSeek review/delegate 两项。前两者绑定 Ark-only Pi 配置哈希，后者绑定 DeepSeek-only Pi 配置哈希。Direct 拆分依据见[双计划资格设计](../superpowers/specs/2026-08-14-direct-deepseek-qualification-design.md)，定向刷新依据见[能力刷新资格设计与阻断记录](capability-refresh-qualification-2026-08-23.md)。
 
 状态：维护者运行合同；不是可执行授权脚本，也不授予任何资格批次、安装或发布权限。
 
 ## 当前状态
 
-Direct DeepSeek 开发候选已在独立 `direct-deepseek-v1` 批次取得 2/2 passed evidence，并按能力粒度政策写入索引为 current。资格协议属于 Kimi/Pi 共享指纹输入，因此现行八份历史 evidence 虽仍有效，八项旧能力的指纹全部 stale；`npm run verify:capabilities` 当前必须 fail closed。后续 `four-llm-v1` 刷新批次已在首项被 Ark Coding Plan 账户额度阻断；外部额度状态变化前不得重复。历史 batch manifest 与 case evidence永久不可变，registry 文案不能替代 verifier。
+当前十项机器分析为 10 current / 0 stale / 0 legacy；`npm run verify:capabilities` 与 release smoke 通过。2026-08-23 的一次 `four-llm-v1` 入口错误地先重复运行了 current delegate，并按精确命令观察门禁首错停止；首次定向入口又在真实模型调用前暴露计划白名单遗漏，两个 blocked 终态均保持不可变。修复后的 `capability-refresh-v1` 在任何锁或模型调用前，把固定七项 schedule 与当时候选的非 Direct stale/invalid 集合逐项相等校验，并完成七项 passed 刷新。
 
 标准入口形状为：
 
 - `four-llm-v1`：`npm run --silent qualify:gates -- --authorization-ref <fresh-uuid>`
+- `capability-refresh-v1`：`npm run --silent qualify:gates -- --plan capability-refresh-v1 --authorization-ref <fresh-uuid>`
 - `direct-deepseek-v1`：`npm run --silent qualify:gates -- --plan direct-deepseek-v1 --authorization-ref <fresh-uuid>`
 
 `fresh-uuid` 只在受控执行 cell 内生成；明文不得写入仓库或报告。
+
+`four-llm-v1` 只用于明确需要八项广覆盖回归的独立实验，不能作为能力粒度刷新入口。`capability-refresh-v1` 的固定顺序为 Ark Coding review、Kimi review/delegate、Ark Agent Plan review/delegate、Ark Agent DeepSeek review/delegate；当前 delegate 不得重复运行。
+
+2026-08-23 的 blocked 批次 `2026-08-23T10-02-06.915Z-c7a6a3d9-0fef-470d-b0f6-ce6cf57b24a8` 绑定 frozen commit `069350fba7418a465bf6e80c4174229c3bdf3798`。唯一 `four-llm-v1` 入口只执行 ordinal 1 `ark-coding-plan/delegate`：一次 client invocation、零 retry/fallback、固定模型和 direct 路由正确、28 字节结果文件及精确状态命令通过、owned process drained；写入命令观察为 `raw_input/other/success`，未满足精确命令合同，故 `acceptance_failed` 后首错停止。terminal 为 `blocked / case_failed`，其余七项 notRun，immutable verifier passed，manifest SHA-256 为 `d3c38de4d0eb9a8955a29c7fb704b34567ee6a1671c2d02bf077cdcf7890130f`，不可变证据提交为 `8e01b16`。没有重试、fallback、补跑、第二入口或第二批。
+
+首次 `capability-refresh-v1` 在 frozen commit `6af9ef6097bd4ea94f07d041c5abd5d6c01ac1b7` 上创建 batch `2026-08-23T10-52-03.095Z-30f6d895-552e-4aa8-bd34-35c081e13610`。完整 preflight 通过，ordinal 1 `ark-coding-plan/review` 发布 `case_running` 后被 smoke evidence 的旧计划白名单拒绝，早于 adapter 和真实模型调用。terminal 为 `blocked / infrastructure_failure`，0 completed、无 case evidence、`uncommittedEvidence=null`，manifest SHA-256 为 `f99b83a1b8c5da58dd4649de3afbc2cf5c54fb9ac504a499287f3f337f714511`；immutable verifier passed，证据提交为 `c8cc02e`，锁与目标进程为零。真实模型调用 0，没有 retry、fallback、补跑、第二入口或第二批。
+
+修复后的 `capability-refresh-v1` 在 frozen commit `388f0fdc37db02b5c6104988aa68baa793eda791` 上创建 batch `2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60`。固定七项全部 passed；每项一次 client invocation、零 adapter/runtime retry、零 fallback，模型/provider/direct route 正确且 owned process drained。terminal 为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `968c00d5ecf9a612fd8e9b5bff34ef84c31126ac6598078d9f9c74ee4f48e550`，不可变证据提交为 `0d45d88`。immutable-evidence verifier 直接通过；修复生产 verifier 对新计划的精确接纳后，又在 detached frozen worktree 与 manifest 的四个原构建工件上通过 frozen-candidate verifier。七项新 case 已写入能力索引，十项均 current。
 
 standing authorization 下的 Direct 批次 `2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69` 绑定 frozen commit `469129d708eb90a3b68071c7b01313b7e70c65a2`。唯一标准入口完成两项；每项一次 client invocation、零 retry/fallback、owned process drained，终态 `passed`、`promotionEligible=true`，immutable-evidence 与 frozen-candidate verifier 通过，manifest SHA-256 为 `f0d564aef9d1d62cfe9348b74e54a99f53912e810dd662830704b9860d17279d`，资格锁为空，不可变证据提交为 `9c34156`。
 
@@ -100,7 +109,7 @@ active long-term goal、4 小时内层预算、短周期 wait 和现有锁/check
 
 ### 成功终态
 
-terminal 已存在且所选计划的完整固定 schedule 全部 passed 时（`four-llm-v1` 为 8/8，`direct-deepseek-v1` 为 2/2），只读验证 terminal、case evidence、冻结身份、不可变证据、锁释放与 owned process drain，然后停止并汇报。成功资格只表示可进入后续索引与发布门禁，不自动授权活动安装、旧工具移除、发布或正式工作树变更。
+terminal 已存在且所选计划的完整固定 schedule 全部 passed 时（`four-llm-v1` 为 8/8，`capability-refresh-v1` 为 7/7，`direct-deepseek-v1` 为 2/2），只读验证 terminal、case evidence、冻结身份、不可变证据、锁释放与 owned process drain，然后停止并汇报。成功资格只表示可进入后续索引与发布门禁，不自动授权活动安装、旧工具移除、发布或正式工作树变更。
 
 ### 失败终态
 

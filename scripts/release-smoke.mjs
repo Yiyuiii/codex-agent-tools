@@ -45,8 +45,20 @@ const pluginBundlePath = path.join(
 );
 const packageRelative = (absolutePath) =>
   path.relative(root, absolutePath).replaceAll("\\", "/");
-const exactLogicalLlms = ["deepseek-v4-flash"];
-const expectedPluginEnvironmentVariables = ["OPENAI_API_KEY_DEEPSEEK"];
+const exactLogicalLlms = [
+  "ark-agent-deepseek-v4-flash",
+  "ark-agent-plan",
+  "ark-coding-plan",
+  "deepseek-v4-flash",
+  "kimi-k3",
+];
+const expectedPluginEnvironmentVariables = [
+  "ARK_API_KEY",
+  "VOLCENGINE_API_KEY",
+  "API_KEY_DOUBAO_CODING",
+  "OPENAI_API_KEY_DOUBAO",
+  "OPENAI_API_KEY_DEEPSEEK",
+];
 const worktreeMarker = `${path.sep}.worktrees${path.sep}`;
 const worktreeMarkerIndex = root
   .toLocaleLowerCase("en-US")

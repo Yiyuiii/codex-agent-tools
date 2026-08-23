@@ -259,14 +259,14 @@ describe("npm-installed package acceptance contract", () => {
     ).toThrow(/installed package contract/iu);
   });
 
-  it("accepts only an all-green doctor report with DeepSeek", () => {
+  it("accepts only an all-green doctor report with every registered llm", () => {
     const checks = acceptedDoctorChecks();
 
     expect(() => assertDoctorAcceptance({ ok: true, checks })).not.toThrow();
     expect(() =>
       assertDoctorAcceptance({
         ok: true,
-        checks: checks.filter(({ name }) => name !== "LLM deepseek-v4-flash"),
+        checks: checks.filter(({ name }) => name !== "LLM kimi-k3"),
       }),
     ).toThrow(/doctor acceptance/iu);
     expect(() =>

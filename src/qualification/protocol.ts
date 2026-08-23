@@ -1,13 +1,17 @@
 import type { QualificationCaseIdentity } from "./types.js";
+import { CAPABILITY_REFRESH_TARGETS } from "./capability-refresh-targets.js";
 
 export const LEGACY_QUALIFICATION_PLAN_ID = "five-llm-v1" as const;
 export const ACTIVE_QUALIFICATION_PLAN_ID = "four-llm-v1" as const;
 export const DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID =
   "direct-deepseek-v1" as const;
+export const CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID =
+  "capability-refresh-v1" as const;
 
 export type CurrentQualificationPlanId =
   | typeof ACTIVE_QUALIFICATION_PLAN_ID
-  | typeof DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID;
+  | typeof DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+  | typeof CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID;
 
 export type QualificationPlanId =
   | typeof LEGACY_QUALIFICATION_PLAN_ID
@@ -55,6 +59,10 @@ export const DIRECT_DEEPSEEK_QUALIFICATION_CASES = frozenSchedule([
   { ordinal: 2, llm: "deepseek-v4-flash", task: "delegate" },
 ]);
 
+export const CAPABILITY_REFRESH_QUALIFICATION_CASES = frozenSchedule(
+  CAPABILITY_REFRESH_TARGETS,
+);
+
 export function qualificationSchedule(
   planId: typeof LEGACY_QUALIFICATION_PLAN_ID,
 ): typeof LEGACY_QUALIFICATION_CASES;
@@ -65,17 +73,22 @@ export function qualificationSchedule(
   planId: typeof DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
 ): typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES;
 export function qualificationSchedule(
-  planId: QualificationPlanId,
-):
-  | typeof LEGACY_QUALIFICATION_CASES
-  | typeof ACTIVE_QUALIFICATION_CASES
-  | typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES;
+  planId: typeof CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+): typeof CAPABILITY_REFRESH_QUALIFICATION_CASES;
 export function qualificationSchedule(
   planId: QualificationPlanId,
 ):
   | typeof LEGACY_QUALIFICATION_CASES
   | typeof ACTIVE_QUALIFICATION_CASES
-  | typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES {
+  | typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES
+  | typeof CAPABILITY_REFRESH_QUALIFICATION_CASES;
+export function qualificationSchedule(
+  planId: QualificationPlanId,
+):
+  | typeof LEGACY_QUALIFICATION_CASES
+  | typeof ACTIVE_QUALIFICATION_CASES
+  | typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES
+  | typeof CAPABILITY_REFRESH_QUALIFICATION_CASES {
   if (planId === LEGACY_QUALIFICATION_PLAN_ID) {
     return LEGACY_QUALIFICATION_CASES;
   }
@@ -84,6 +97,9 @@ export function qualificationSchedule(
   }
   if (planId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID) {
     return DIRECT_DEEPSEEK_QUALIFICATION_CASES;
+  }
+  if (planId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID) {
+    return CAPABILITY_REFRESH_QUALIFICATION_CASES;
   }
   throw new Error(`Unknown qualification plan: ${String(planId)}`);
 }
@@ -104,7 +120,8 @@ export function qualificationPlanForEnvelope(
   if (
     schemaVersion === 3 &&
     (recordedPlanId === ACTIVE_QUALIFICATION_PLAN_ID ||
-      recordedPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID)
+      recordedPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID ||
+      recordedPlanId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID)
   ) {
     return recordedPlanId;
   }

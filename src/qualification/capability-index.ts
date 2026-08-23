@@ -20,8 +20,10 @@ import {
 } from "../release/canonical-runtime-inputs.js";
 import {
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   type CurrentQualificationPlanId,
+  type QualificationPlanId,
 } from "./protocol.js";
 
 const MAX_RUNTIME_INPUT_BYTES = 4 * 1024 * 1024;
@@ -35,6 +37,8 @@ const QUALIFICATION_RUNTIME_INPUT_ROOTS = Object.freeze([
   "src/qualification/types.ts",
   "src/qualification/verifier.ts",
 ] as const);
+const CAPABILITY_REFRESH_TARGETS_PATH =
+  "src/qualification/capability-refresh-targets.ts" as const;
 
 const SHARED_RUNTIME_INPUT_ROOTS = Object.freeze([
   "host-acceptance/protocol/observer-protocol.v1.json",
@@ -395,7 +399,10 @@ export function capabilityRuntimeInputRoots(
 }
 
 export function capabilityRuntimeInputExclusions(): readonly string[] {
-  return CANONICAL_RUNTIME_TYPESCRIPT_WRAPPER_PATHS;
+  return Object.freeze([
+    ...CANONICAL_RUNTIME_TYPESCRIPT_WRAPPER_PATHS,
+    CAPABILITY_REFRESH_TARGETS_PATH,
+  ]);
 }
 
 export async function collectCapabilityRuntimeInputs(options: {
@@ -576,12 +583,17 @@ function batchIdFromManifestPath(manifestPath: string): string {
   return batchId;
 }
 
-function expectedQualificationPlanId(
+function qualificationPlanAllowedForEntry(
   entry: CapabilityQualificationEntry,
-): CurrentQualificationPlanId {
-  return entry.llm === "deepseek-v4-flash"
-    ? DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
-    : ACTIVE_QUALIFICATION_PLAN_ID;
+  planId: QualificationPlanId,
+): planId is CurrentQualificationPlanId {
+  if (entry.llm === "deepseek-v4-flash") {
+    return planId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID;
+  }
+  return (
+    planId === ACTIVE_QUALIFICATION_PLAN_ID ||
+    planId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
+  );
 }
 
 function validateBatchEvidence(
@@ -591,10 +603,10 @@ function validateBatchEvidence(
   source: BatchCaseCapabilitySource,
   batchId: string,
   currentOwnedEvidence: boolean,
+  qualificationPlanId: CurrentQualificationPlanId,
 ): void {
   const evidence = plainRecord(evidenceValue);
   const qualification = plainRecord(evidence.qualification);
-  const qualificationPlanId = expectedQualificationPlanId(entry);
   if (
     evidence.schemaVersion !== (currentOwnedEvidence ? 4 : 3) ||
     evidence.llm !== entry.llm ||
@@ -669,7 +681,6 @@ async function verifyBatchCapabilityEvidence(
     throw capabilityQualificationError();
   }
   const batchId = batchIdFromManifestPath(source.manifestPath);
-  const qualificationPlanId = expectedQualificationPlanId(options.entry);
   const expectedEvidencePrefix = `docs/smoke/evidence/batches/${batchId}/cases/`;
   if (
     !source.evidencePath.startsWith(expectedEvidencePrefix) ||
@@ -699,7 +710,10 @@ async function verifyBatchCapabilityEvidence(
     verification.verified !== true ||
     verification.mode !== "immutable-evidence" ||
     verification.batchId !== batchId ||
-    verification.qualificationPlanId !== qualificationPlanId
+    !qualificationPlanAllowedForEntry(
+      options.entry,
+      verification.qualificationPlanId,
+    )
   ) {
     throw capabilityQualificationError();
   }
@@ -714,6 +728,7 @@ async function verifyBatchCapabilityEvidence(
     throw capabilityQualificationError();
   }
   const manifest = plainRecord(manifestFile.value);
+  const qualificationPlanId = verification.qualificationPlanId;
   const currentOwnedEvidence = manifest.schemaVersion === 3;
   if (
     (manifest.schemaVersion !== 2 && manifest.schemaVersion !== 3) ||
@@ -751,6 +766,7 @@ async function verifyBatchCapabilityEvidence(
     source,
     batchId,
     currentOwnedEvidence,
+    qualificationPlanId,
   );
   return Object.freeze({ sourceKind: "batch-case" });
 }

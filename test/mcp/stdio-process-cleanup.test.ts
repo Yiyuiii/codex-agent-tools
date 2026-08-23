@@ -758,7 +758,7 @@ describe("MCP stdio owned-process cleanup", () => {
     );
   });
 
-  it.skip("retained Kimi cleanup path is outside the DeepSeek-only beta matrix", async () => {
+  it("aborts a real Kimi request and waits for its complete owned tree cleanup", async () => {
     const cwd = await makeTempDirectory();
     const stateDirectory = await makeTempDirectory();
     const rootPidPath = path.join(stateDirectory, "root.pid");

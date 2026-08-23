@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 4,
+  "qualification": {
+    "qualificationPlanId": "capability-refresh-v1",
+    "batchId": "2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60",
+    "ordinal": 7,
+    "llm": "ark-agent-deepseek-v4-flash",
+    "task": "delegate",
+    "frozenCommit": "388f0fdc37db02b5c6104988aa68baa793eda791",
+    "frozenBuildIdentity": "053655245f5f4e9ffb1c575f451ffd575cc62f2e23ab5c77deb24624b83ee4c7",
+    "authorizationReferenceSha256": "becdf3ec108712da8882e84773c979132ec00abf5e2426becf0ad385d7010940",
+    "orchestratorFallbackUsed": false
+  },
+  "timestamp": "2026-08-23T11:18:40.767Z",
+  "llm": "ark-agent-deepseek-v4-flash",
+  "actualModel": "deepseek-v4-flash",
+  "expectedModel": "deepseek-v4-flash",
+  "runtime": "pi-rpc",
+  "provider": "ark-agent-plan",
+  "endpointHost": "ark.cn-beijing.volces.com",
+  "route": "direct",
+  "credentialEnv": "CODEX_AGENT_ARK_AGENT_KEY",
+  "configSha256": "3b1e8827e21207d0d41d3189a7409d0f722ce7fece8aa41049046a14bc04349e",
+  "task": "delegate",
+  "status": "completed",
+  "passed": true,
+  "failureReason": null,
+  "elapsedMs": 9552,
+  "outputSha256": "1e01afe6ed74d26813fcc0f1677f6d617ac216b1fbda3209902120f4b4c3e561",
+  "filesChanged": [
+    "ark-agent-deepseek-v4-flash-smoke.txt"
+  ],
+  "commandCount": 3,
+  "diagnosticCount": 0,
+  "adapterClientInvocationCount": 1,
+  "adapterRetryCount": 0,
+  "runtimeReportedAutoRetryCount": 0,
+  "adapterReportedFallbackUsed": false,
+  "ownedProcessDrained": true,
+  "orchestratorFallbackUsed": false,
+  "executionTelemetrySource": "pi-rpc-observable",
+  "checks": {
+    "actualModelMatches": true,
+    "environmentIsolated": true,
+    "ownedProcessDrained": true,
+    "resultFileValid": true,
+    "resultFileObserved": true,
+    "onlyExpectedFileChanged": true,
+    "requiredCommandObserved": true,
+    "executionTelemetryValid": true
+  },
+  "resultFileReadStatus": "read",
+  "expectedResultNormalizedSha256": "4d1629b1666419e2a60c5bdfa6d98305698c7b8f4ad90906d544c4dcb6ca19ab",
+  "resultFileByteLength": 41,
+  "resultFileRawSha256": "b98bbe69dd5eef3c814ce86814f7d53f18215b1f99bde005f02b8889697d8b20",
+  "resultFileNormalizedSha256": "4d1629b1666419e2a60c5bdfa6d98305698c7b8f4ad90906d544c4dcb6ca19ab",
+  "resultFileNormalizedLineCount": 1,
+  "resultFileContainsExpectedLine": true,
+  "writeCommandObservations": [
+    {
+      "source": "raw_input",
+      "match": "exact",
+      "outcome": "success"
+    },
+    {
+      "source": "raw_input",
+      "match": "status_exact",
+      "outcome": "success"
+    },
+    {
+      "source": "raw_input",
+      "match": "other",
+      "outcome": "success"
+    }
+  ]
+}

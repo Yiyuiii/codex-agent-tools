@@ -198,7 +198,7 @@ describe("logical LLM registry", () => {
     );
   });
 
-  it("exposes only Direct DeepSeek while retaining historical profiles for evidence inspection", () => {
+  it("exposes five qualified logical routes", () => {
     expect(resolveLlm("kimi-k3")).toMatchObject({
       runtime: "kimi-acp",
       model: "kimi-code/k3",
@@ -208,10 +208,13 @@ describe("logical LLM registry", () => {
     expectTypeOf<
       "timeoutMs" extends keyof LlmProfile ? false : true
     >().toEqualTypeOf<true>();
-    expect(supportedLlmIds()).toEqual(["deepseek-v4-flash"]);
-    expect(() => resolveLlm("kimi-k3", "review")).toThrow(
-      /Supported llms: deepseek-v4-flash/u,
-    );
+    expect(supportedLlmIds()).toEqual([
+      "ark-agent-deepseek-v4-flash",
+      "ark-agent-plan",
+      "ark-coding-plan",
+      "deepseek-v4-flash",
+      "kimi-k3",
+    ]);
     expect(() => resolveLlm("gemini-3.5-flash")).toThrow(
       /Unknown logical llm/u,
     );
@@ -246,11 +249,10 @@ describe("logical LLM registry", () => {
         },
       },
     });
-    const retainedRegistry = createLlmRegistry([profile]);
-    expect(retainedRegistry.resolve("ark-coding-plan", "review").model).toBe(
+    expect(resolveLlm("ark-coding-plan", "review").model).toBe(
       "ark-code-latest",
     );
-    expect(retainedRegistry.resolve("ark-coding-plan", "delegate").model).toBe(
+    expect(resolveLlm("ark-coding-plan", "delegate").model).toBe(
       "ark-code-latest",
     );
   });
@@ -293,14 +295,19 @@ describe("logical LLM registry", () => {
           },
         },
       });
-      const retainedRegistry = createLlmRegistry([profile]);
-      expect(retainedRegistry.resolve(id, "review").model).toBe(model);
-      expect(retainedRegistry.resolve(id, "delegate").model).toBe(model);
+      expect(resolveLlm(id, "review").model).toBe(model);
+      expect(resolveLlm(id, "delegate").model).toBe(model);
     },
   );
 
-  it("derives the DeepSeek-only MCP credential allowlist", () => {
-    expect(credentialEnvironmentNames()).toEqual(["OPENAI_API_KEY_DEEPSEEK"]);
+  it("derives the complete MCP credential allowlist from logical profiles", () => {
+    expect(credentialEnvironmentNames()).toEqual([
+      "ARK_API_KEY",
+      "VOLCENGINE_API_KEY",
+      "API_KEY_DOUBAO_CODING",
+      "OPENAI_API_KEY_DOUBAO",
+      "OPENAI_API_KEY_DEEPSEEK",
+    ]);
     expect(credentialEnvironmentNames()).not.toContain("GEMINI_API_KEY");
     expect(credentialEnvironmentNames()).not.toContain("GOOGLE_API_KEY");
     expect(credentialEnvironmentNames()).not.toContain(
@@ -332,7 +339,7 @@ describe("logical LLM registry", () => {
   ] as const)(
     "enables %s %s only with its real-smoke evidence",
     (id, task, anchor) => {
-      const profile = createLlmRegistry([resolveLlm(id)]).resolve(id, task);
+      const profile = resolveLlm(id, task);
       expect(profile.capabilities[task]).toBe(true);
       expect(profile.qualityGates[task]).toEqual({
         status: "passed",

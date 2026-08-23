@@ -223,6 +223,32 @@ describe("qualification lock", () => {
     await releaseQualificationLock(handle);
   });
 
+  it("persists and recovers the capability refresh plan in a current lock owner", async () => {
+    const fixture = await tempFixture();
+    const handle = await acquireQualificationLock({
+      repositoryRoot: fixture.repository,
+      tempDirectory: fixture.temp,
+      batchId: "capability-refresh-batch",
+      authorizationReferenceSha256: authHash,
+      qualificationPlanId: "capability-refresh-v1",
+      processId: 123,
+      processIdentityInspector: liveInspector,
+      nonce: "11111111-1111-4111-8111-111111111111",
+    });
+
+    await expect(
+      readQualificationLockOwner(handle.lockDirectory),
+    ).resolves.toMatchObject({
+      schemaVersion: 2,
+      qualificationPlanId: "capability-refresh-v1",
+      batchId: "capability-refresh-batch",
+    });
+    expect(qualificationPlanForOwner(handle.owner)).toBe(
+      "capability-refresh-v1",
+    );
+    await releaseQualificationLock(handle);
+  });
+
   it("rejects a prebuilt lock-root directory link without writing through it", async () => {
     const fixture = await tempFixture();
     const external = path.join(

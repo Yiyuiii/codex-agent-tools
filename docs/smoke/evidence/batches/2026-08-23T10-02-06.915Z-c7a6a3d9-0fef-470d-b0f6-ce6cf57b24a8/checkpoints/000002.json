@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 3,
+  "qualificationPlanId": "four-llm-v1",
+  "sequence": 2,
+  "kind": "case_completed",
+  "batchId": "2026-08-23T10-02-06.915Z-c7a6a3d9-0fef-470d-b0f6-ce6cf57b24a8",
+  "recordedAt": "2026-08-23T10:08:51.121Z",
+  "repositoryCommit": "069350fba7418a465bf6e80c4174229c3bdf3798",
+  "buildIdentitySha256": "f72a3d2fab820dc551187be22168536ce866d7830318e1ef6b742d68784939e9",
+  "preflightSha256": "47b3e80abeb8861114190b855eb62438181108e28ef4f7b2d02a29a0a01cb00c",
+  "ordinal": 1,
+  "llm": "ark-coding-plan",
+  "task": "delegate",
+  "result": "failed",
+  "evidence": {
+    "path": "docs/smoke/evidence/batches/2026-08-23T10-02-06.915Z-c7a6a3d9-0fef-470d-b0f6-ce6cf57b24a8/cases/2026-08-23T10-08-50.574Z-ark-coding-plan-delegate-ark.json",
+    "sha256": "efba45268224d8acb0531818ea87684aef44d70d1ca90ee3ebc5823140347b3a"
+  },
+  "adapterClientInvocationCount": 1,
+  "adapterRetryCount": 0,
+  "runtimeReportedAutoRetryCount": 0,
+  "adapterReportedFallbackUsed": false,
+  "orchestratorFallbackUsed": false,
+  "executionTelemetrySource": "pi-rpc-observable",
+  "ownedProcessDrained": true,
+  "failureReason": "acceptance_failed"
+}

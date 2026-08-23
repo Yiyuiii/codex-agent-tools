@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 3,
+  "qualificationPlanId": "capability-refresh-v1",
+  "batchId": "2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60",
+  "status": "passed",
+  "authorizationReferenceSha256": "becdf3ec108712da8882e84773c979132ec00abf5e2426becf0ad385d7010940",
+  "repositoryCommit": "388f0fdc37db02b5c6104988aa68baa793eda791",
+  "buildIdentitySha256": "053655245f5f4e9ffb1c575f451ffd575cc62f2e23ab5c77deb24624b83ee4c7",
+  "preflightSha256": "ba1422276e2a7f2132289fd4e4da3f849eeacc425980e2de5d2c18bfeb308bd9",
+  "preflight": {
+    "schemaVersion": 3,
+    "qualificationPlanId": "capability-refresh-v1",
+    "repositoryCommit": "388f0fdc37db02b5c6104988aa68baa793eda791",
+    "repositoryBranch": "codex/multi-model-beta-0.1.2",
+    "repositoryDirty": false,
+    "packageVersion": "0.1.2-beta.1",
+    "packageLockSha256": "da001e21a02d7cc7e06f94e5b5abedb29fe62db76be34a061d462357c3f01bdb",
+    "buildArtifacts": [
+      {
+        "path": "dist/ark-smoke.js",
+        "sha256": "766a1535202462fc583c9f8daa4d687241a778f166dc2de14b240f524df395fa"
+      },
+      {
+        "path": "dist/kimi-smoke.js",
+        "sha256": "61a7e6ccb4e58c3418125f0c0db82c721379b363087ab4a131bd5dadcf1700ac"
+      },
+      {
+        "path": "dist/smoke-evidence.js",
+        "sha256": "9b733ae864c11b5faf2d0c54ca87d27cd1d00e97c8ed49c4a1fb8b94c128e08b"
+      },
+      {
+        "path": "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+        "sha256": "176b1edc8aacfe5b0ac920d4c22d0bed0384268485044f1e5b5b61e2f9e361e9"
+      }
+    ],
+    "buildIdentitySha256": "053655245f5f4e9ffb1c575f451ffd575cc62f2e23ab5c77deb24624b83ee4c7",
+    "runtimeVersions": {
+      "node": "v24.14.1",
+      "codex": "codex-cli 0.135.0"
+    },
+    "piConfigSha256": "3b1e8827e21207d0d41d3189a7409d0f722ce7fece8aa41049046a14bc04349e",
+    "logicalLlms": [
+      {
+        "llm": "ark-agent-deepseek-v4-flash",
+        "runtime": "pi-rpc",
+        "model": "deepseek-v4-flash",
+        "provider": "ark-agent-plan",
+        "route": "direct"
+      },
+      {
+        "llm": "ark-agent-plan",
+        "runtime": "pi-rpc",
+        "model": "ark-code-latest",
+        "provider": "ark-agent-plan",
+        "route": "direct"
+      },
+      {
+        "llm": "ark-coding-plan",
+        "runtime": "pi-rpc",
+        "model": "ark-code-latest",
+        "provider": "ark-coding-plan",
+        "route": "direct"
+      },
+      {
+        "llm": "kimi-k3",
+        "runtime": "kimi-acp",
+        "model": "kimi-code/k3",
+        "provider": null,
+        "route": "direct"
+      }
+    ],
+    "credentialMatches": [
+      {
+        "llm": "ark-agent-deepseek-v4-flash",
+        "environmentVariableName": "OPENAI_API_KEY_DOUBAO"
+      },
+      {
+        "llm": "ark-agent-plan",
+        "environmentVariableName": "OPENAI_API_KEY_DOUBAO"
+      },
+      {
+        "llm": "ark-coding-plan",
+        "environmentVariableName": "API_KEY_DOUBAO_CODING"
+      },
+      {
+        "llm": "kimi-k3",
+        "environmentVariableName": null
+      }
+    ]
+  },
+  "cases": [
+    {
+      "ordinal": 1,
+      "llm": "ark-coding-plan",
+      "task": "review",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-17-05.954Z-ark-coding-plan-review-ark.json",
+        "sha256": "a8ab8276fab38c22f1e1da98bdf06f3db5d4c087bd15d87e8838a192b9e1dc5f"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable",
+      "ownedProcessDrained": true
+    },
+    {
+      "ordinal": 2,
+      "llm": "kimi-k3",
+      "task": "review",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-17-22.728Z-kimi-k3-review.json",
+        "sha256": "0fe9d1201e28f5d8a85779a182c74a64380d11b750c1723e8964321f22d130ed"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "kimi-acp-observable",
+      "ownedProcessDrained": true
+    },
+    {
+      "ordinal": 3,
+      "llm": "kimi-k3",
+      "task": "delegate",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-17-44.476Z-kimi-k3-delegate.json",
+        "sha256": "db2f2c2383e51a19a145921d36eb4eec5d0a5a78d154f0a7bca1404fa7235312"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "kimi-acp-observable",
+      "ownedProcessDrained": true
+    },
+    {
+      "ordinal": 4,
+      "llm": "ark-agent-plan",
+      "task": "review",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-17-57.149Z-ark-agent-plan-review-ark.json",
+        "sha256": "db563a7e4e708a9bec0254bd8fe3f75d58254a6c4e62e42f6abbecf85e436fb8"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable",
+      "ownedProcessDrained": true
+    },
+    {
+      "ordinal": 5,
+      "llm": "ark-agent-plan",
+      "task": "delegate",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-18-17.090Z-ark-agent-plan-delegate-ark.json",
+        "sha256": "b1afada1d903dd375bf0062d953fe21d18b5d8b57a3035c4c92070b08f18e3b4"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable",
+      "ownedProcessDrained": true
+    },
+    {
+      "ordinal": 6,
+      "llm": "ark-agent-deepseek-v4-flash",
+      "task": "review",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-18-29.483Z-ark-agent-deepseek-v4-flash-review-ark.json",
+        "sha256": "9fd2f6a151112c183881e290154487524e2586510b9175597405993c2fbeee39"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable",
+      "ownedProcessDrained": true
+    },
+    {
+      "ordinal": 7,
+      "llm": "ark-agent-deepseek-v4-flash",
+      "task": "delegate",
+      "result": "passed",
+      "evidence": {
+        "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-18-40.767Z-ark-agent-deepseek-v4-flash-delegate-ark.json",
+        "sha256": "0a770360e8133c005721d63c2cfb4811e250b193afbf68079faf6ba104fe603d"
+      },
+      "failureReason": null,
+      "adapterClientInvocationCount": 1,
+      "adapterRetryCount": 0,
+      "runtimeReportedAutoRetryCount": 0,
+      "adapterReportedFallbackUsed": false,
+      "orchestratorFallbackUsed": false,
+      "executionTelemetrySource": "pi-rpc-observable",
+      "ownedProcessDrained": true
+    }
+  ],
+  "uncommittedEvidence": null,
+  "checkpoints": [
+    {
+      "sequence": 0,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000000.json",
+      "sha256": "130c530b791560b0aba5dbb94850fdd92c6041be3963c1668bf0b2c3e03e8eec"
+    },
+    {
+      "sequence": 1,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000001.json",
+      "sha256": "73b0374a907f2fa51904f2b7b43585d883713c1fdb8157e9c438dfd8b6085732"
+    },
+    {
+      "sequence": 2,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000002.json",
+      "sha256": "fb71662484da4a063f477f589bb1abea672a229c3508c6dcf37f5f7c07f4737f"
+    },
+    {
+      "sequence": 3,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000003.json",
+      "sha256": "4dba35697390c98df9d67c9356776c7962d45ba02d5352979482da733423a1a6"
+    },
+    {
+      "sequence": 4,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000004.json",
+      "sha256": "0aac610ebdde6eb2d6ed83e71c860191a87a274c9d07d7dae10dcd27b2945fba"
+    },
+    {
+      "sequence": 5,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000005.json",
+      "sha256": "281697ec40a12fa8b620a3e4b00edd1770abb37af3e50fc05ef29d98dfed4bcb"
+    },
+    {
+      "sequence": 6,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000006.json",
+      "sha256": "63d9d9d21451ac08dfcc59502d3787db8084404e169fc81f869c8eee31f30f2d"
+    },
+    {
+      "sequence": 7,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000007.json",
+      "sha256": "45d1ccb7c6bde0e9daae058a404ad2af1c7f437f2cccbdb50f2bd0d1b6063ff1"
+    },
+    {
+      "sequence": 8,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000008.json",
+      "sha256": "622c4ea6013cd7b6e55504974baf04d761e4395c29e07ca97048e53a771177aa"
+    },
+    {
+      "sequence": 9,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000009.json",
+      "sha256": "da83e40e516ae95ee1d6e99b9e714edb77aed4970c1521e785851078e664a5eb"
+    },
+    {
+      "sequence": 10,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000010.json",
+      "sha256": "ec3e5a58daa6b703a28e0b55cac9729f37ae00a2057457b4f3358a3ea62524ba"
+    },
+    {
+      "sequence": 11,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000011.json",
+      "sha256": "c88eae5684351396c1a05b87376146638ac9584e740643dda742a322da5a6a5e"
+    },
+    {
+      "sequence": 12,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000012.json",
+      "sha256": "40ab2bf5361d3b7deb47506efc9e2fb15cfeb05bf138521c46e34d00e2b6dbc7"
+    },
+    {
+      "sequence": 13,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000013.json",
+      "sha256": "05af798c532291ea7526ce82137113e74ecf5debd1bd9bcd2f8f11ff4382ddf2"
+    },
+    {
+      "sequence": 14,
+      "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/checkpoints/000014.json",
+      "sha256": "d6c4bf3d8cfaa82e73be0c97698ab3496d5523ea06c4e78ff6a32846cf076f59"
+    }
+  ],
+  "stopReason": null,
+  "notRun": [],
+  "promotionEligible": true,
+  "completedAt": "2026-08-23T11:18:41.799Z"
+}

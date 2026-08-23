@@ -60,12 +60,12 @@
     },
     {
       "path": "native/windows-job-helper/restore-toolchain.ps1",
-      "sha256": "27f0ccd82a1ae6b9ec14d44ea664d8d171e97eef86ae5f1058e8ff446d04cf49"
+      "sha256": "a281851dc49fa148892959a3bb6e4caeda41273c51fca6b0aa34c1b5373e7988"
     },
     {
       "path": "native/windows-job-helper/toolchain.lock.json",
       "sha256": "b0b211b75e6f3996f9ca228273d56aaeef602022426fb95fe164de1e9b4cf172"
     }
   ],
-  "inputsDigestSha256": "143abde38da931e552aa2d0b02ed0d436a59aac901381a6447967cdb11e0a136"
+  "inputsDigestSha256": "d8fe423ce10d755829eba4a1d2f355896b4c3ee83cbe9e3480883260fcb78fc0"
 }

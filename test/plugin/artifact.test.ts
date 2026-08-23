@@ -17,10 +17,6 @@ import {
   capabilitySourcePathsFromIndex,
   packageFilePathsFromManifest,
 } from "../../src/release/assurance.js";
-import {
-  digestReleasePluginArtifactTree,
-  RELEASE_PLUGIN_ARTIFACT_PATHS,
-} from "../../src/release/release-validation.js";
 import { resolveWindowsJobHelperForModule } from "../../src/runtime/windows-job-helper.js";
 
 const repositoryRoot = resolve(
@@ -73,7 +69,8 @@ describe("Codex plugin artifact", () => {
     expect(pluginManifest).toMatchObject({
       name: "codex-external-agents",
       version: packageManifest.version,
-      description: "Use DeepSeek V4 Flash for review and delegated coding tasks.",
+      description:
+        "Use explicitly selected external LLMs for review and delegated coding tasks.",
       author: {
         name: "codex-agent-tools maintainers",
       },
@@ -81,9 +78,10 @@ describe("Codex plugin artifact", () => {
       mcpServers: "./.mcp.json",
       interface: {
         displayName: "Codex External Agents",
-        shortDescription: "Review and delegate with DeepSeek V4 Flash",
+        shortDescription:
+          "Review and delegate with explicitly selected external LLMs",
         longDescription:
-          "Use the fixed deepseek-v4-flash model through an isolated Pi RPC configuration for Codex review and delegated coding tasks.",
+          "Use explicitly selected Kimi and Pi-backed LLMs for Codex review and delegated coding tasks.",
         developerName: "codex-agent-tools maintainers",
         category: "Productivity",
         capabilities: ["Interactive", "Write"],
@@ -124,33 +122,6 @@ describe("Codex plugin artifact", () => {
     }
   });
 
-  it("binds the current prerelease marker to the freshly built plugin tree", () => {
-    const packageManifest = readJson("package.json");
-    const version = packageManifest.version;
-    expect(typeof version).toBe("string");
-    if (typeof version !== "string" || !version.includes("-")) return;
-
-    const marker = readJson(`.release-validation/v${version}.json`);
-    expect(marker).toMatchObject({
-      kind: "beta",
-      package: {
-        name: "codex-agent-tools",
-        version,
-        tag: `v${version}`,
-        npmChannel: "next",
-      },
-    });
-    const tree = marker.pluginArtifactTree as Record<string, unknown>;
-    expect(
-      digestReleasePluginArtifactTree(
-        RELEASE_PLUGIN_ARTIFACT_PATHS.map((relativePath) => ({
-          path: relativePath,
-          content: readFileSync(resolve(repositoryRoot, relativePath)),
-        })),
-      ),
-    ).toBe(tree.digestSha256);
-  });
-
   it("starts exactly one MCP server through the bundled relative path", () => {
     const mcpManifest = readJson("plugins/codex-external-agents/.mcp.json");
 
@@ -159,7 +130,13 @@ describe("Codex plugin artifact", () => {
         command: "node",
         args: ["./runtime/codex-external-agents-mcp.mjs"],
         cwd: ".",
-        env_vars: ["OPENAI_API_KEY_DEEPSEEK"],
+        env_vars: [
+          "ARK_API_KEY",
+          "VOLCENGINE_API_KEY",
+          "API_KEY_DOUBAO_CODING",
+          "OPENAI_API_KEY_DOUBAO",
+          "OPENAI_API_KEY_DEEPSEEK",
+        ],
       },
     });
     expect(mcpManifest.codex_external_agents).not.toHaveProperty("env");

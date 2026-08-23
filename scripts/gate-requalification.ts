@@ -9,6 +9,8 @@ import type {
 } from "../src/qualification/types.js";
 import {
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_CASES,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   type CurrentQualificationPlanId,
 } from "../src/qualification/protocol.js";
@@ -24,6 +26,7 @@ const DEFAULT_REPOSITORY_ROOT = path.resolve(
 );
 
 const HELP = `Usage: npm run --silent qualify:gates -- --authorization-ref <uuid>
+       npm run --silent qualify:gates -- --plan capability-refresh-v1 --authorization-ref <uuid>
        npm run --silent qualify:gates -- --plan direct-deepseek-v1 --authorization-ref <uuid>
        npm run --silent qualify:gates -- --recover-interrupted <batchId>
        npm run --silent qualify:gates -- --help
@@ -59,14 +62,15 @@ export function parseGateRequalificationArguments(
   if (
     args.length === 4 &&
     args[0] === "--plan" &&
-    args[1] === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID &&
+    (args[1] === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID ||
+      args[1] === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID) &&
     args[2] === "--authorization-ref" &&
     typeof args[3] === "string" &&
     AUTHORIZATION_REFERENCE_PATTERN.test(args[3])
   ) {
     return Object.freeze({
       kind: "qualify",
-      qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+      qualificationPlanId: args[1],
       authorizationReference: args[3],
     });
   }
@@ -192,9 +196,51 @@ function assertCurrentQualificationPlan(
 ): asserts qualificationPlanId is CurrentQualificationPlanId {
   if (
     qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID &&
-    qualificationPlanId !== DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+    qualificationPlanId !== DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID &&
+    qualificationPlanId !== CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
   ) {
     throw new Error("Qualification plan mismatch");
+  }
+}
+
+export async function assertCapabilityRefreshSelection(
+  repositoryRoot: string,
+  analyze?: (
+    repositoryRoot: string,
+  ) => Promise<{
+    entries: readonly {
+      llm: string;
+      task: "review" | "delegate";
+      runtimeFingerprintStatus: "current" | "stale" | "invalid";
+    }[];
+  }>,
+): Promise<void> {
+  const analysis = await (
+    analyze ??
+    (async (root) => {
+      const capabilityIndex = await import(
+        "../src/qualification/capability-index.js"
+      );
+      return capabilityIndex.analyzeCapabilityIndex({ repositoryRoot: root });
+    })
+  )(repositoryRoot);
+  const expected = analysis.entries
+    .filter(
+      (entry) =>
+        entry.llm !== "deepseek-v4-flash" &&
+        entry.runtimeFingerprintStatus !== "current",
+    )
+    .map((entry) => `${entry.llm}/${entry.task}`)
+    .sort((left, right) => left.localeCompare(right, "en"));
+  const selected = CAPABILITY_REFRESH_QUALIFICATION_CASES.map(
+    (entry) => `${entry.llm}/${entry.task}`,
+  ).sort((left, right) => left.localeCompare(right, "en"));
+  if (
+    selected.length === 0 ||
+    new Set(selected).size !== selected.length ||
+    JSON.stringify(selected) !== JSON.stringify(expected)
+  ) {
+    throw new Error("Capability refresh target selection mismatch");
   }
 }
 
@@ -204,6 +250,11 @@ async function runProductionQualification(options: {
   qualificationPlanId: CurrentQualificationPlanId;
   writeStderr: (text: string) => void;
 }): Promise<QualificationTerminalManifest> {
+  if (
+    options.qualificationPlanId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
+  ) {
+    await assertCapabilityRefreshSelection(options.repositoryRoot);
+  }
   const [coordinator, lock, manifest, preflight] = await Promise.all(
     [
       import("../src/qualification/coordinator.js"),

@@ -1,7 +1,7 @@
 {
   "name": "codex-agent-tools",
-  "version": "0.1.2-beta.0",
-  "description": "Codex review and delegation through DeepSeek V4 Flash",
+  "version": "0.1.2-beta.1",
+  "description": "Codex-facing external LLM review and delegation tools",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -38,7 +38,17 @@
     "docs/smoke/evidence/capabilities.json",
     "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/cases/2026-08-14T03-01-19.339Z-deepseek-v4-flash-review-deepseek.json",
     "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/cases/2026-08-14T03-01-30.618Z-deepseek-v4-flash-delegate-deepseek.json",
-    "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/manifest.json"
+    "docs/smoke/evidence/batches/2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69/manifest.json",
+    "docs/smoke/evidence/batches/2026-08-21T03-00-25.070Z-6d98cc4f-ebab-46d8-ba5f-8f34810a2777/cases/2026-08-21T03-08-32.013Z-ark-coding-plan-delegate-ark.json",
+    "docs/smoke/evidence/batches/2026-08-21T03-00-25.070Z-6d98cc4f-ebab-46d8-ba5f-8f34810a2777/manifest.json",
+    "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-17-05.954Z-ark-coding-plan-review-ark.json",
+    "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-17-22.728Z-kimi-k3-review.json",
+    "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-17-44.476Z-kimi-k3-delegate.json",
+    "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-17-57.149Z-ark-agent-plan-review-ark.json",
+    "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-18-17.090Z-ark-agent-plan-delegate-ark.json",
+    "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-18-29.483Z-ark-agent-deepseek-v4-flash-review-ark.json",
+    "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-18-40.767Z-ark-agent-deepseek-v4-flash-delegate-ark.json",
+    "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/manifest.json"
   ],
   "bin": {
     "codex-agent-tools": "dist/cli.js",

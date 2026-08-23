@@ -13,6 +13,8 @@ import {
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_CASES,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_CASES,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
 } from "../../src/qualification/protocol.js";
@@ -251,6 +253,7 @@ function acceptanceChecks(identity: QualificationCaseIdentity) {
 function evidenceForCase(
   identity: QualificationCaseIdentity,
   preflight: FrozenPreflightRecord,
+  evidenceBatchId = batchId,
 ): Record<string, unknown> {
   const logicalIdentity = preflight.logicalLlms.find(
     (candidate) => candidate.llm === identity.llm,
@@ -263,7 +266,7 @@ function evidenceForCase(
         "qualificationPlanId" in preflight
           ? preflight.qualificationPlanId
           : ACTIVE_QUALIFICATION_PLAN_ID,
-      batchId,
+      batchId: evidenceBatchId,
       ordinal: identity.ordinal,
       llm: identity.llm,
       task: identity.task,
@@ -474,6 +477,72 @@ async function createPassedDirectDeepSeekBatch(
       "evidence",
       "batches",
       batchId,
+      "manifest.json",
+    ),
+    preflight,
+  };
+}
+
+async function createPassedCapabilityRefreshBatch(
+  repositoryRoot: string,
+): Promise<{ manifestPath: string; preflight: FrozenPreflightRecord }> {
+  const preflight = freezePreflightRecord({
+    ...frozenPreflight(),
+    qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+  });
+  const refreshBatchId = "batch-capability-refresh-2026-08-23";
+  const ledger = createQualificationLedger({
+    repositoryRoot,
+    batchId: refreshBatchId,
+    qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+  });
+  await ledger.publishBatchStarted({
+    authorizationReferenceSha256: authorizationHash,
+    preflight,
+    recordedAt: "2026-08-23T00:00:00.000Z",
+  });
+  for (const identity of CAPABILITY_REFRESH_QUALIFICATION_CASES) {
+    await ledger.publishCaseRunning({
+      ...identity,
+      recordedAt: "2026-08-23T00:00:00.000Z",
+    });
+    const evidencePath = path.join(
+      repositoryRoot,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      refreshBatchId,
+      "cases",
+      `${String(identity.ordinal).padStart(2, "0")}.json`,
+    );
+    await mkdir(path.dirname(evidencePath), { recursive: true });
+    await writeFile(
+      evidencePath,
+      `${JSON.stringify(evidenceForCase(identity, preflight, refreshBatchId))}\n`,
+      { encoding: "utf8", flag: "wx" },
+    );
+    await ledger.publishCaseCompleted({
+      ...identity,
+      result: "passed",
+      evidencePath,
+      recordedAt: "2026-08-23T00:00:00.000Z",
+    });
+  }
+  await ledger.publishTerminalManifest({
+    status: "passed",
+    stopReason: null,
+    notRun: [],
+    completedAt: "2026-08-23T00:10:00.000Z",
+  });
+  return {
+    manifestPath: path.join(
+      repositoryRoot,
+      "docs",
+      "smoke",
+      "evidence",
+      "batches",
+      refreshBatchId,
       "manifest.json",
     ),
     preflight,
@@ -846,6 +915,47 @@ describe("qualification verifier", () => {
       qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
     });
     expect(frozenAssertions).toBe(2);
+  });
+
+  it("verifies the capability refresh plan as immutable and frozen-candidate evidence", async () => {
+    const repositoryRoot = await tempRepository();
+    const { manifestPath, preflight } =
+      await createPassedCapabilityRefreshBatch(repositoryRoot);
+
+    await expect(
+      verifyQualification({
+        repositoryRoot,
+        manifestPath,
+        mode: "immutable-evidence",
+      }),
+    ).resolves.toMatchObject({
+      verified: true,
+      qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+      status: "passed",
+      promotionEligible: true,
+    });
+    await expect(
+      verifyQualification(
+        {
+          repositoryRoot,
+          manifestPath,
+          mode: "frozen-candidate",
+        },
+        {
+          assertFrozenCandidate: async () => undefined,
+          collectCurrentCandidate: async (_receivedRoot, receivedPlanId) => {
+            expect(receivedPlanId).toBe(
+              CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+            );
+            return frozenCandidate(preflight);
+          },
+        },
+      ),
+    ).resolves.toMatchObject({
+      verified: true,
+      mode: "frozen-candidate",
+      qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+    });
   });
 
   it("verifies the real historical blocked batch as immutable five-llm-v1 evidence", async () => {

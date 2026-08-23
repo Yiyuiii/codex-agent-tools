@@ -18,6 +18,7 @@ import { execa } from "execa";
 
 import {
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_PLAN_ID,
   type CurrentQualificationPlanId,
@@ -260,7 +261,9 @@ function normalizeOwner(value: unknown): QualificationLockOwner {
       : record.schemaVersion === 2 &&
           (record.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID ||
             record.qualificationPlanId ===
-              DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID)
+              DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID ||
+            record.qualificationPlanId ===
+              CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID)
         ? CURRENT_OWNER_KEYS
         : null;
   if (
@@ -731,7 +734,8 @@ function normalizeTerminalInspection(
     SHA256_PATTERN.test(record.authorizationReferenceSha256) &&
     (record.qualificationPlanId === LEGACY_QUALIFICATION_PLAN_ID ||
       record.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID ||
-      record.qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID)
+      record.qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID ||
+      record.qualificationPlanId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID)
   ) {
     return Object.freeze({
       state: "valid",
