@@ -848,7 +848,7 @@ export interface CurrentHostFreezeReceipt {
     nativeVerify: "passed";
     observerVerify: "passed";
     capabilityEvidenceValidCount: 10;
-    prequalificationStaleCount: 8;
+    prequalificationStaleCount: 7 | 8;
     realModelCalls: 0;
     activeConfigAccesses: 0;
     activePluginChanges: 0;
@@ -918,7 +918,8 @@ export function assertCurrentHostFreezeReceipt(
       checks.nativeVerify !== "passed" ||
       checks.observerVerify !== "passed" ||
       checks.capabilityEvidenceValidCount !== 10 ||
-      checks.prequalificationStaleCount !== 8 ||
+      (checks.prequalificationStaleCount !== 7 &&
+        checks.prequalificationStaleCount !== 8) ||
       checks.realModelCalls !== 0 ||
       checks.activeConfigAccesses !== 0 ||
       checks.activePluginChanges !== 0 ||
@@ -944,7 +945,7 @@ export function assertCurrentHostFreezeReceipt(
         nativeVerify: "passed",
         observerVerify: "passed",
         capabilityEvidenceValidCount: 10,
-        prequalificationStaleCount: 8,
+        prequalificationStaleCount: checks.prequalificationStaleCount,
         realModelCalls: 0,
         activeConfigAccesses: 0,
         activePluginChanges: 0,

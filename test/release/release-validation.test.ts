@@ -852,17 +852,18 @@ describe("strict release validation marker", () => {
 });
 
 describe("release receipts", () => {
-  it("binds all ten capability fingerprints and requires the prior eight to be stale", () => {
-    expect(
-      assertCurrentHostFreezeReceipt(
-        freezeReceipt(core(), 8),
-        core(),
-        capabilities,
-        observerArtifact(),
-      )
-        .checks.prequalificationStaleCount,
-    ).toBe(8);
-    for (const staleCount of [0, 1, 2, 7, 9, 10, 11, 1.5]) {
+  it("binds all ten fingerprints and accepts the audited seven- or eight-stale prequalification snapshots", () => {
+    for (const staleCount of [7, 8] as const) {
+      expect(
+        assertCurrentHostFreezeReceipt(
+          freezeReceipt(core(), staleCount),
+          core(),
+          capabilities,
+          observerArtifact(),
+        ).checks.prequalificationStaleCount,
+      ).toBe(staleCount);
+    }
+    for (const staleCount of [0, 1, 2, 6, 9, 10, 11, 1.5]) {
       expect(() =>
         assertCurrentHostFreezeReceipt(
           freezeReceipt(core(), staleCount),

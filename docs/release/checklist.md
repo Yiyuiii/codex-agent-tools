@@ -14,7 +14,7 @@
 
 `0.1.1` 最近的八项 passed 批次绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`，批次 ID 为 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`；标准入口和 execution cell 各只有一个，八项全部 passed，没有 resume、retry、fallback 或补跑。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，immutable-evidence 与 frozen-candidate verifier 均通过，owned process 全部 drained、锁为空；不可变证据由提交 `c09ce74` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。
 
-当前开发候选的资格前门禁证据为：build、类型检查、临时 `CODEX_HOME` 官方插件生命周期、精确 npm pack dry-run、聚焦 10 files / 413 passed / 1 skipped、完整单 worker 回归（70 files passed / 1 file skipped，1285 passed / 6 skipped / 0 failed）、native/helper/observer 与 27-file npm 文档链接闭包通过。资格后最终 `gate:offline` 通过：70 个测试文件 passed / 1 skipped，1286 passed / 6 skipped / 0 failed，十项能力 current，release smoke 与精确包闭包通过；第 1 层现已闭合。
+当前开发候选的资格前门禁证据为：build、类型检查、临时 `CODEX_HOME` 官方插件生命周期、精确 npm pack dry-run、聚焦 10 files / 413 passed / 1 skipped、完整单 worker 回归（70 files passed / 1 file skipped，1285 passed / 6 skipped / 0 failed）、native/helper/observer 与 27-file npm 文档链接闭包通过。资格后最终 `gate:offline` 通过：70 个测试文件 passed / 1 skipped，1286 passed / 6 skipped / 0 failed，十项能力 current，release smoke 与精确包闭包通过；第 1 层现已闭合。严格 beta marker `.release-validation/v0.1.2-beta.1.json` 已绑定 frozen runtime `388f0fd...`、新七项 prequalification freeze、十项索引、插件树、helper 与 observer provenance；marker/schema 聚焦 28/28、native preflight/verify、observer verify 与能力 verifier 通过，精确 tag verifier 仍须在最终提交上通过后才能推送 tag。
 
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 
