@@ -288,6 +288,7 @@ async function resolveInstalledPluginRoot() {
   }
   return {
     root: installedRoot,
+    version: pluginManifest.version,
     relativePath: path
       .relative(isolatedHome, installedRoot)
       .split(path.sep)
@@ -488,6 +489,8 @@ function renderPaths(paths) {
 
 function renderReport({
   codexVersion,
+  candidateVersion,
+  acceptanceDate,
   steps,
   installedRelativePath,
   configStates,
@@ -511,6 +514,10 @@ function renderReport({
     .join("\n");
 
   return `# Codex 官方插件隔离状态取证
+
+候选版本：\`${candidateVersion}\`
+
+实际执行日期：${acceptanceDate}
 
 ## 隔离边界
 
@@ -805,6 +812,8 @@ try {
   });
   const report = renderReport({
     codexVersion,
+    candidateVersion: installed.version,
+    acceptanceDate: new Date().toISOString().slice(0, 10),
     steps,
     installedRelativePath: installed.relativePath,
     configStates,

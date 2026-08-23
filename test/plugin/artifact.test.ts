@@ -70,7 +70,7 @@ describe("Codex plugin artifact", () => {
       name: "codex-external-agents",
       version: packageManifest.version,
       description:
-        "Use explicitly selected external LLMs for review and delegated coding tasks.",
+        "Prefer plan-backed Kimi and Ark for review and delegation; keep Direct DeepSeek explicit.",
       author: {
         name: "codex-agent-tools maintainers",
       },
@@ -79,9 +79,9 @@ describe("Codex plugin artifact", () => {
       interface: {
         displayName: "Codex External Agents",
         shortDescription:
-          "Review and delegate with explicitly selected external LLMs",
+          "Plan-preferred external review and delegation",
         longDescription:
-          "Use explicitly selected Kimi and Pi-backed LLMs for Codex review and delegated coding tasks.",
+          "Prefer plan-backed Kimi and Ark routes for routine Codex review and delegation. Use API-billed Direct DeepSeek only when it is explicitly required or the plan routes are unsuitable.",
         developerName: "codex-agent-tools maintainers",
         category: "Productivity",
         capabilities: ["Interactive", "Write"],
@@ -98,14 +98,17 @@ describe("Codex plugin artifact", () => {
 
     expect(Array.isArray(defaultPrompt)).toBe(true);
     if (!Array.isArray(defaultPrompt)) return;
-    expect(defaultPrompt.length).toBeGreaterThanOrEqual(1);
-    expect(defaultPrompt.length).toBeLessThanOrEqual(3);
+    expect(defaultPrompt).toEqual([
+      "Review my current changes with kimi-k3.",
+      "Delegate this coding task to ark-coding-plan.",
+    ]);
     for (const prompt of defaultPrompt) {
       expect(typeof prompt).toBe("string");
       if (typeof prompt !== "string") continue;
       expect(prompt.trim().length).toBeGreaterThan(0);
       expect(prompt.length).toBeLessThanOrEqual(128);
     }
+    expect(defaultPrompt.join("\n")).not.toContain("deepseek-v4-flash");
   });
 
   it("keeps release plugin text artifacts LF-only for byte-stable OIDC builds", () => {
