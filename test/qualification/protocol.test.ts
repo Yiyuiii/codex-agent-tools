@@ -2,6 +2,8 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_CASES,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_CASES,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
@@ -85,6 +87,32 @@ describe("qualification protocol", () => {
     ]);
   });
 
+  it("freezes the seven stale capabilities without rerunning the current Ark delegate", () => {
+    expect(CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID).toBe(
+      "capability-refresh-v1",
+    );
+    expect(CAPABILITY_REFRESH_QUALIFICATION_CASES).toEqual([
+      { ordinal: 1, llm: "ark-coding-plan", task: "review" },
+      { ordinal: 2, llm: "kimi-k3", task: "review" },
+      { ordinal: 3, llm: "kimi-k3", task: "delegate" },
+      { ordinal: 4, llm: "ark-agent-plan", task: "review" },
+      { ordinal: 5, llm: "ark-agent-plan", task: "delegate" },
+      {
+        ordinal: 6,
+        llm: "ark-agent-deepseek-v4-flash",
+        task: "review",
+      },
+      {
+        ordinal: 7,
+        llm: "ark-agent-deepseek-v4-flash",
+        task: "delegate",
+      },
+    ]);
+    expect(qualificationSchedule(CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID)).toBe(
+      CAPABILITY_REFRESH_QUALIFICATION_CASES,
+    );
+  });
+
   it("dispatches envelopes without guessing a plan", () => {
     expect(qualificationPlanForEnvelope(1, undefined)).toBe(
       LEGACY_QUALIFICATION_PLAN_ID,
@@ -101,6 +129,12 @@ describe("qualification protocol", () => {
         DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
       ),
     ).toBe(DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID);
+    expect(
+      qualificationPlanForEnvelope(
+        3,
+        CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+      ),
+    ).toBe(CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID);
     expect(() => qualificationPlanForEnvelope(1, "four-llm-v1")).toThrow();
     expect(() => qualificationPlanForEnvelope(2, undefined)).toThrow();
     expect(() => qualificationPlanForEnvelope(2, "five-llm-v1")).toThrow();
@@ -193,6 +227,7 @@ describe("qualification protocol", () => {
 
     expectTypeOf<ReturnType<typeof selectSchedule>>().toEqualTypeOf<
       | typeof ACTIVE_QUALIFICATION_CASES
+      | typeof CAPABILITY_REFRESH_QUALIFICATION_CASES
       | typeof DIRECT_DEEPSEEK_QUALIFICATION_CASES
       | typeof LEGACY_QUALIFICATION_CASES
     >();

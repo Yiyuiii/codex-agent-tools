@@ -534,6 +534,18 @@ describe("qualification maintainer script entrypoints", () => {
     });
     expect(
       parseGateRequalificationArguments([
+        "--plan",
+        "capability-refresh-v1",
+        "--authorization-ref",
+        authorizationReference,
+      ]),
+    ).toEqual({
+      kind: "qualify",
+      qualificationPlanId: "capability-refresh-v1",
+      authorizationReference,
+    });
+    expect(
+      parseGateRequalificationArguments([
         "--recover-interrupted",
         "batch-2026-07-26",
       ]),
@@ -566,6 +578,68 @@ describe("qualification maintainer script entrypoints", () => {
         "Invalid gate requalification arguments",
       );
     }
+  });
+
+  it("accepts the refresh plan only when its targets exactly match non-current active capabilities", async () => {
+    const { assertCapabilityRefreshSelection } = await import(
+      "../../scripts/gate-requalification.js"
+    );
+    const stale = [
+      ["ark-coding-plan", "review"],
+      ["kimi-k3", "review"],
+      ["kimi-k3", "delegate"],
+      ["ark-agent-plan", "review"],
+      ["ark-agent-plan", "delegate"],
+      ["ark-agent-deepseek-v4-flash", "review"],
+      ["ark-agent-deepseek-v4-flash", "delegate"],
+    ] as const;
+    const entries = [
+      {
+        llm: "ark-coding-plan",
+        task: "delegate" as const,
+        runtimeFingerprintStatus: "current" as const,
+      },
+      ...stale.map(([llm, task]) => ({
+        llm,
+        task,
+        runtimeFingerprintStatus: "stale" as const,
+      })),
+      {
+        llm: "deepseek-v4-flash",
+        task: "review" as const,
+        runtimeFingerprintStatus: "current" as const,
+      },
+      {
+        llm: "deepseek-v4-flash",
+        task: "delegate" as const,
+        runtimeFingerprintStatus: "current" as const,
+      },
+    ];
+
+    await expect(
+      assertCapabilityRefreshSelection("C:\\candidate", async () => ({
+        entries,
+      })),
+    ).resolves.toBeUndefined();
+    await expect(
+      assertCapabilityRefreshSelection("C:\\candidate", async () => ({
+        entries: entries.map((entry) =>
+          entry.llm === "ark-coding-plan" && entry.task === "delegate"
+            ? { ...entry, runtimeFingerprintStatus: "stale" as const }
+            : entry,
+        ),
+      })),
+    ).rejects.toThrow("Capability refresh target selection mismatch");
+  });
+
+  it("matches the committed refresh targets to the current repository analysis", async () => {
+    const { assertCapabilityRefreshSelection } = await import(
+      "../../scripts/gate-requalification.js"
+    );
+
+    await expect(
+      assertCapabilityRefreshSelection(process.cwd()),
+    ).resolves.toBeUndefined();
   });
 
   it("accepts only the two fixed verifier modes and a safe manifest path", async () => {
@@ -698,7 +772,10 @@ describe("qualification maintainer script entrypoints", () => {
       async (_options: {
         repositoryRoot: string;
         authorizationReference: string;
-        qualificationPlanId: "four-llm-v1" | "direct-deepseek-v1";
+        qualificationPlanId:
+          | "four-llm-v1"
+          | "direct-deepseek-v1"
+          | "capability-refresh-v1";
         writeStderr: (text: string) => void;
       }) => manifest,
     );

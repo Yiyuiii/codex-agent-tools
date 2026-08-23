@@ -39,9 +39,9 @@ npm run gate:offline
 
 ## 3. 真实资格刷新
 
-Direct `deepseek-v4-flash` 使用独立的 `direct-deepseek-v1` 两项计划；Kimi 与三条 Ark 路线使用 `four-llm-v1` 八项计划。两个计划的配置哈希、执行顺序和 evidence 不得拼接或互换。
+Direct `deepseek-v4-flash` 使用独立的 `direct-deepseek-v1` 两项计划。`four-llm-v1` 保留 Kimi 与三条 Ark 路线的八项广覆盖回归顺序；开发候选只刷新当前失效能力时使用 `capability-refresh-v1`。刷新入口启动前会把固定七项目标与机器能力分析逐项比较；目标为空、重复、包含 current 能力或漏掉非 Direct 的 stale/invalid 能力都会在锁和模型调用前失败关闭。三个计划的配置哈希、执行顺序和 evidence 不得拼接或互换。
 
-当前候选的十项 evidence 均有效。Direct DeepSeek 两项与最新 `ark-coding-plan/delegate` 指纹 current，其余 Kimi/Ark 七项 stale。2026-08-21 的最新独立 `four-llm-v1` 批次在 ordinal 1 delegate passed 后，于 ordinal 2 `ark-coding-plan/review` 以 `adapter_failure` 首错停止；其余六项 notRun，终态 blocked 且 immutable verifier passed。passed delegate 已按能力粒度规则更新索引；完整 `verify:capabilities` 仍失败关闭。额度重置后在下一 clean candidate 上启动的唯一入口又因测试期望和 npm evidence 闭包未同步而在 ledger 前停止，零模型调用；最小修复与验证见[能力索引与 npm 证据闭包预飞阻断](release/four-llm-package-closure-preflight-block-2026-08-21.md)。前序 marker 与当前宿主原生预飞修复分别见 [marker 阻断](release/four-llm-preflight-marker-block-2026-08-21.md)和[原生预飞阻断及修复](release/four-llm-native-preflight-block-2026-08-21.md)。不得补跑失败单项、拼接 blocked manifest 或用新批掩盖该终态。
+当前候选的十项 evidence 均有效。Direct DeepSeek 两项与最新 `ark-coding-plan/delegate` 指纹 current，其余 Kimi/Ark 七项 stale。2026-08-23 在 Kimi 固定模型校验提交上误用广覆盖 `four-llm-v1`，批次首先重复运行了已经 current 的 `ark-coding-plan/delegate`；真实结果文件、状态命令、模型、路由、single-attempt 和进程回收均正确，但精确写入命令只被归类为 `raw_input/other/success`，因此以 `requiredCommandObserved=false` 首错停止。终态 blocked，immutable verifier passed，没有重试、fallback、补跑或第二入口。根因与新的定向入口见 GitHub 上的[能力刷新资格设计与阻断记录](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/capability-refresh-qualification-2026-08-23.md)。完整 `verify:capabilities` 继续失败关闭。
 
 ## 4. 隔离官方插件生命周期
 

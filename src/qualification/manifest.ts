@@ -20,6 +20,8 @@ import { validateCurrentEvidenceContract } from "./evidence-contract.js";
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_CASES,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_CASES,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
@@ -281,10 +283,24 @@ const DIRECT_DEEPSEEK_PROTOCOL: QualificationProtocol = Object.freeze({
   freezePreflight: freezeCurrentPreflightRecord,
 });
 
+const CAPABILITY_REFRESH_PROTOCOL: QualificationProtocol = Object.freeze({
+  planId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+  manifestSchemaVersion: 3,
+  checkpointSchemaVersion: 3,
+  evidenceSchemaVersion: 4,
+  schedule: CAPABILITY_REFRESH_QUALIFICATION_CASES,
+  allowGoogleFreeTierQuota: false,
+  freezePreflight: freezeCurrentPreflightRecord,
+});
+
 function isCurrentProtocol(
   protocol: QualificationProtocol,
 ): boolean {
-  return protocol === CURRENT_PROTOCOL || protocol === DIRECT_DEEPSEEK_PROTOCOL;
+  return (
+    protocol === CURRENT_PROTOCOL ||
+    protocol === DIRECT_DEEPSEEK_PROTOCOL ||
+    protocol === CAPABILITY_REFRESH_PROTOCOL
+  );
 }
 
 export class QualificationLedgerError extends Error {
@@ -389,6 +405,12 @@ function protocolForEnvelope(value: unknown): QualificationProtocol {
   ) {
     return DIRECT_DEEPSEEK_PROTOCOL;
   }
+  if (
+    envelope.schemaVersion === 3 &&
+    envelope.qualificationPlanId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
+  ) {
+    return CAPABILITY_REFRESH_PROTOCOL;
+  }
   throw new QualificationLedgerError();
 }
 
@@ -397,6 +419,9 @@ function protocolForPlanId(planId: unknown): QualificationProtocol {
   if (planId === ACTIVE_QUALIFICATION_PLAN_ID) return CURRENT_PROTOCOL;
   if (planId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID) {
     return DIRECT_DEEPSEEK_PROTOCOL;
+  }
+  if (planId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID) {
+    return CAPABILITY_REFRESH_PROTOCOL;
   }
   throw new QualificationLedgerError();
 }
@@ -765,6 +790,8 @@ function freezeCurrentPreflightRecord(
   if (
     record.schemaVersion !== 3 ||
     (record.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID &&
+      record.qualificationPlanId !==
+        CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID &&
       !directDeepSeek)
   ) {
     throw new QualificationLedgerError();

@@ -33,6 +33,8 @@ import {
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_CASES,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_CASES,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
@@ -839,6 +841,73 @@ describe("frozen qualification preflight", () => {
       batchId: directBatchId,
       authorizationReferenceSha256: authHash,
       qualificationPlanId: DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
+    });
+  });
+
+  it("publishes a seven-case capability refresh terminal without the current delegate", async () => {
+    const repository = await tempRepository();
+    const refreshBatchId = "capability-refresh-batch";
+    const refreshPreflight = freezePreflightRecord({
+      ...preflight(),
+      qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+    });
+    if (refreshPreflight.schemaVersion !== 3) {
+      throw new Error("expected a current refresh preflight");
+    }
+    const ledger = createQualificationLedger({
+      repositoryRoot: repository,
+      batchId: refreshBatchId,
+      qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+    });
+
+    await ledger.publishBatchStarted({
+      authorizationReferenceSha256: authHash,
+      preflight: refreshPreflight,
+      recordedAt: "2026-08-23T00:00:00.000Z",
+    });
+    for (const identity of CAPABILITY_REFRESH_QUALIFICATION_CASES) {
+      await ledger.publishCaseRunning({
+        ...identity,
+        recordedAt: `2026-08-23T00:0${identity.ordinal}:00.000Z`,
+      });
+      await ledger.publishCaseCompleted({
+        ...identity,
+        result: "passed",
+        evidencePath: await publishEvidence(repository, identity, true, {
+          batchId: refreshBatchId,
+          preflight: refreshPreflight,
+        }),
+        recordedAt: `2026-08-23T00:0${identity.ordinal}:30.000Z`,
+      });
+    }
+    const terminal = await ledger.publishTerminalManifest({
+      status: "passed",
+      stopReason: null,
+      notRun: [],
+      completedAt: "2026-08-23T00:08:00.000Z",
+    });
+
+    expect(terminal).toMatchObject({
+      schemaVersion: 3,
+      qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+      status: "passed",
+      promotionEligible: true,
+    });
+    expect(terminal.cases).toHaveLength(7);
+    expect(terminal.cases).not.toContainEqual(
+      expect.objectContaining({
+        llm: "ark-coding-plan",
+        task: "delegate",
+      }),
+    );
+    await expect(
+      inspectQualificationTerminal({
+        repositoryRoot: repository,
+        batchId: refreshBatchId,
+      }),
+    ).resolves.toMatchObject({
+      state: "valid",
+      qualificationPlanId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
     });
   });
 

@@ -77,4 +77,4 @@ npm run acceptance:npm-package -- --version 0.1.2-beta.1
 - beta 只通过 GitHub Actions OIDC 发布，禁止本地 `npm publish`。
 - 发布不自动安装或升级活动插件；该动作需要独立授权、官方插件命令、完整重启和新任务验收。
 
-能力状态见 [Kimi](docs/smoke/kimi.md)、[Ark](docs/smoke/ark.md) 与 [Direct DeepSeek](docs/smoke/deepseek.md)，维护流程见 [官方插件运维说明](docs/operations.md)。
+能力状态见 GitHub 上的 [Kimi](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/kimi.md)、[Ark](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/ark.md) 与 [Direct DeepSeek](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/smoke/deepseek.md)，维护流程见 [官方插件运维说明](docs/operations.md)。

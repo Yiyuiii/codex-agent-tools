@@ -20,6 +20,7 @@ import {
 } from "./manifest.js";
 import {
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   type CurrentQualificationPlanId,
 } from "./protocol.js";
@@ -403,7 +404,10 @@ export function computeQualificationBuildIdentitySha256(
 export function qualificationBuildArtifactPaths(
   qualificationPlanId: CurrentQualificationPlanId,
 ): readonly string[] {
-  if (qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID) {
+  if (
+    qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID ||
+    qualificationPlanId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
+  ) {
     return QUALIFICATION_BUILD_ARTIFACT_PATHS;
   }
   if (qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID) {
@@ -746,7 +750,10 @@ async function assertStaticLocators(options: {
         ? options.locatePiInvocation()
         : options.locatePosixPiExecutable();
     let piLaunch: PiInvocation | string;
-    if (options.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID) {
+    if (
+      options.qualificationPlanId === ACTIVE_QUALIFICATION_PLAN_ID ||
+      options.qualificationPlanId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
+    ) {
       const [kimiExecutable, activePiLaunch] = await Promise.all([
         options.locateKimiExecutable(),
         locatePiLaunch(),
@@ -847,7 +854,9 @@ function validateInput(options: QualificationPreflightOptions): void {
     (options.qualificationPlanId !== undefined &&
       options.qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID &&
       options.qualificationPlanId !==
-        DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID)
+        DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID &&
+      options.qualificationPlanId !==
+        CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID)
   ) {
     throw new QualificationPreflightError("input");
   }
@@ -1032,7 +1041,8 @@ export async function collectQualificationCurrentSnapshot(
       options.qualificationPlanId ?? ACTIVE_QUALIFICATION_PLAN_ID;
     if (
       qualificationPlanId !== ACTIVE_QUALIFICATION_PLAN_ID &&
-      qualificationPlanId !== DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
+      qualificationPlanId !== DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID &&
+      qualificationPlanId !== CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
     ) {
       throw new QualificationPreflightError("current_snapshot");
     }

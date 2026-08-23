@@ -69,6 +69,7 @@ describe("capability qualification runtime fingerprint", () => {
       "src/runtime/windows-owned-agent-process.ts",
       "src/runtime/windows-job-helper.ts",
       "src/runtime/windows-job-protocol.ts",
+      "src/qualification/capability-refresh-targets.ts",
     ]);
     expect(piRoots.some((entry) => entry.startsWith("docs/"))).toBe(false);
     expect(kimiRoots.some((entry) => entry.startsWith("docs/"))).toBe(false);
@@ -487,6 +488,9 @@ function directDeepSeekProfile() {
 async function batchFixture(
   root: string,
   currentOwnedEvidence = false,
+  qualificationPlanId:
+    | "four-llm-v1"
+    | "capability-refresh-v1" = "four-llm-v1",
 ): Promise<{
   entry: CapabilityQualificationEntry;
   manifestPath: string;
@@ -501,12 +505,13 @@ async function batchFixture(
     "2026-07-29T00-00-01.000Z-ark-coding-plan-review-ark.json";
   const frozenCommit = "a".repeat(40);
   const buildIdentitySha256 = "b".repeat(64);
+  const ordinal = qualificationPlanId === "capability-refresh-v1" ? 1 : 2;
   const evidence = {
     schemaVersion: currentOwnedEvidence ? 4 : 3,
     qualification: {
-      qualificationPlanId: "four-llm-v1",
+      qualificationPlanId,
       batchId,
-      ordinal: 2,
+      ordinal,
       llm: "ark-coding-plan",
       task: "review",
       frozenCommit,
@@ -548,14 +553,14 @@ async function batchFixture(
   const evidenceSha256 = await writeJson(root, evidencePath, evidence);
   const manifest = {
     schemaVersion: currentOwnedEvidence ? 3 : 2,
-    qualificationPlanId: "four-llm-v1",
+    qualificationPlanId,
     batchId,
     status: "blocked",
     repositoryCommit: frozenCommit,
     buildIdentitySha256,
     cases: [
       {
-        ordinal: 2,
+        ordinal,
         llm: "ark-coding-plan",
         task: "review",
         result: "passed",
@@ -641,6 +646,35 @@ describe("capability qualification evidence source", () => {
             qualificationPlanId: "four-llm-v1",
             status: "blocked",
             promotionEligible: false,
+          }),
+        },
+      ),
+    ).resolves.toEqual({ sourceKind: "batch-case" });
+  });
+
+  it("accepts current non-Direct evidence from the fixed capability refresh plan", async () => {
+    const root = await temporaryRoot();
+    const fixture = await batchFixture(
+      root,
+      true,
+      "capability-refresh-v1",
+    );
+
+    await expect(
+      verifyCapabilityEvidenceSource(
+        {
+          repositoryRoot: root,
+          entry: fixture.entry,
+          profile: codingProfile(),
+        },
+        {
+          verifyBatchManifest: async () => ({
+            verified: true,
+            mode: "immutable-evidence",
+            batchId: "2026-07-29T00-00-00.000Z-batch",
+            qualificationPlanId: "capability-refresh-v1",
+            status: "passed",
+            promotionEligible: true,
           }),
         },
       ),

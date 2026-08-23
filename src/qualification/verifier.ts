@@ -15,6 +15,8 @@ import {
 import {
   ACTIVE_QUALIFICATION_CASES,
   ACTIVE_QUALIFICATION_PLAN_ID,
+  CAPABILITY_REFRESH_QUALIFICATION_CASES,
+  CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
   DIRECT_DEEPSEEK_QUALIFICATION_CASES,
   DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID,
   LEGACY_QUALIFICATION_CASES,
@@ -111,10 +113,18 @@ const DIRECT_DEEPSEEK_VERIFIER_PROTOCOL: VerifierProtocol = Object.freeze({
   schedule: DIRECT_DEEPSEEK_QUALIFICATION_CASES,
 });
 
+const CAPABILITY_REFRESH_VERIFIER_PROTOCOL: VerifierProtocol = Object.freeze({
+  planId: CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID,
+  manifestSchemaVersion: 3,
+  evidenceSchemaVersion: 4,
+  schedule: CAPABILITY_REFRESH_QUALIFICATION_CASES,
+});
+
 function isCurrentVerifierProtocol(protocol: VerifierProtocol): boolean {
   return (
     protocol === CURRENT_VERIFIER_PROTOCOL ||
-    protocol === DIRECT_DEEPSEEK_VERIFIER_PROTOCOL
+    protocol === DIRECT_DEEPSEEK_VERIFIER_PROTOCOL ||
+    protocol === CAPABILITY_REFRESH_VERIFIER_PROTOCOL
   );
 }
 
@@ -137,6 +147,12 @@ function verifierProtocolForEnvelope(value: unknown): VerifierProtocol {
     envelope.qualificationPlanId === DIRECT_DEEPSEEK_QUALIFICATION_PLAN_ID
   ) {
     return DIRECT_DEEPSEEK_VERIFIER_PROTOCOL;
+  }
+  if (
+    envelope.schemaVersion === 3 &&
+    envelope.qualificationPlanId === CAPABILITY_REFRESH_QUALIFICATION_PLAN_ID
+  ) {
+    return CAPABILITY_REFRESH_VERIFIER_PROTOCOL;
   }
   throw new QualificationVerificationError();
 }
