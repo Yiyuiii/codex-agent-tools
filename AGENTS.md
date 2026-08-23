@@ -39,6 +39,8 @@
 
 ## 当前事实状态
 
+- 2026-08-23 `0.1.2-beta.2` Plan 优先 beta 已公开发布：PR #21 合并提交与不可变标签均为 `dac733b863548602758b071293ad3966102cf6a5`，Release run `32643186815` 通过 GitHub Actions OIDC 发布并验证 `next=0.1.2-beta.2`，GitHub prerelease 已创建。公共精确包隔离验收全绿，npm integrity 为 `sha512-+K/LGlsQivBJxanDPrLKfYcaPM1Npmw6OfS1uvqfQL7mvVQJ2Zq8J2aoB/IefIjLbnsfJK6diHN5arP3VpB1Gg==`，shasum 为 `6f787eedc04fdc153eb7a8ea9de165e66ede360f`，真实模型调用 0；报告见[0.1.2-beta.2 npm 验收](docs/release/0.1.2-beta.2-npm-acceptance.md)。该发布只改变 Plan 优先的插件元数据、文档和验收归因规则，canonical runtime 与十项能力索引保持不变。活动插件尚未升级到 beta.2；官方活动升级、完整 App 重启和新任务验收仍是独立步骤。
+
 - 2026-08-23 公共 beta.1 真实宿主验收纠正：重启后的新任务同时发现两个公开工具，Kimi、Ark Coding 与 Direct DeepSeek 三次只读 review 均 completed、实际模型正确、诊断与文件变化为空。最初报告的 Direct Pi/Helper “残留”创建于验收任务收到提示之前，并早于 Direct 调用约 80 秒，不能归因给该调用。活动 App 的全机进程是共享动态状态；未来宿主验收必须先取 PID+创建时间基线再比较新增集合，或使用 invocation-scoped telemetry/observer receipt。不得依据后置绝对总数误报泄漏或终止所有权不明的进程。完整时间线见[真实宿主验收](docs/release/real-host-acceptance.md)。
 
 - 2026-08-14 DeepSeek-only beta 候选（历史）：版本曾设为 `0.1.2-beta.0`，产品面曾收窄为 Direct `deepseek-v4-flash`。该边界已由 2026-08-20 五模型要求覆盖；历史 release marker、npm 验收与隔离报告保持不可变，不代表当前候选。
