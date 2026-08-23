@@ -1081,7 +1081,7 @@ describe("capability qualification evidence source", () => {
 });
 
 describe("current capability index qualification", () => {
-  it("keeps Direct DeepSeek and the refreshed Ark Coding delegate current", async () => {
+  it("keeps all ten qualified capabilities current", async () => {
     let canonicalCollections = 0;
     const analysis = await analyzeCapabilityIndex(
       { repositoryRoot: process.cwd() },
@@ -1098,31 +1098,9 @@ describe("current capability index qualification", () => {
     expect(analysis.entries.map((entry) => entry.evidenceStatus)).toEqual(
       Array.from({ length: 10 }, () => "valid"),
     );
-    const directEntries = analysis.entries.filter(
-      ({ llm }) => llm === "deepseek-v4-flash",
-    );
-    const refreshedArkCodingDelegate = analysis.entries.filter(
-      ({ llm, task }) => llm === "ark-coding-plan" && task === "delegate",
-    );
-    const staleEntries = analysis.entries.filter(
-      ({ llm, task }) =>
-        llm !== "deepseek-v4-flash" &&
-        !(llm === "ark-coding-plan" && task === "delegate"),
-    );
-    expect(directEntries).toHaveLength(2);
     expect(
-      directEntries.map((entry) => entry.runtimeFingerprintStatus),
-    ).toEqual(["current", "current"]);
-    expect(refreshedArkCodingDelegate).toHaveLength(1);
-    expect(
-      refreshedArkCodingDelegate.map(
-        (entry) => entry.runtimeFingerprintStatus,
-      ),
-    ).toEqual(["current"]);
-    expect(staleEntries).toHaveLength(7);
-    expect(
-      staleEntries.map((entry) => entry.runtimeFingerprintStatus),
-    ).toEqual(Array.from({ length: 7 }, () => "stale"));
+      analysis.entries.map((entry) => entry.runtimeFingerprintStatus),
+    ).toEqual(Array.from({ length: 10 }, () => "current"));
     expect(
       analysis.entries.every((entry) =>
         /^[a-f0-9]{64}$/u.test(entry.currentRuntimeFingerprintSha256 ?? ""),
@@ -1130,6 +1108,10 @@ describe("current capability index qualification", () => {
     ).toBe(true);
     await expect(
       verifyCapabilityIndex({ repositoryRoot: process.cwd() }),
-    ).rejects.toThrow(/capability qualification/iu);
+    ).resolves.toMatchObject({
+      verified: true,
+      entryCount: 10,
+      legacyEntryCount: 0,
+    });
   });
 });

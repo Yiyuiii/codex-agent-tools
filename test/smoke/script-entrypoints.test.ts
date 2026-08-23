@@ -632,14 +632,14 @@ describe("qualification maintainer script entrypoints", () => {
     ).rejects.toThrow("Capability refresh target selection mismatch");
   });
 
-  it("matches the committed refresh targets to the current repository analysis", async () => {
+  it("rejects replaying the committed refresh targets once the repository is current", async () => {
     const { assertCapabilityRefreshSelection } = await import(
       "../../scripts/gate-requalification.js"
     );
 
     await expect(
       assertCapabilityRefreshSelection(process.cwd()),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow("Capability refresh target selection mismatch");
   });
 
   it("accepts only the two fixed verifier modes and a safe manifest path", async () => {
@@ -685,6 +685,25 @@ describe("qualification maintainer script entrypoints", () => {
         "Invalid qualification verifier arguments",
       );
     }
+  });
+
+  it("admits all three current plans to production frozen-candidate collection", async () => {
+    const { isSupportedQualificationVerificationPlan } = await import(
+      "../../scripts/verify-qualification.js"
+    );
+
+    expect(isSupportedQualificationVerificationPlan("four-llm-v1")).toBe(
+      true,
+    );
+    expect(
+      isSupportedQualificationVerificationPlan("capability-refresh-v1"),
+    ).toBe(true);
+    expect(
+      isSupportedQualificationVerificationPlan("direct-deepseek-v1"),
+    ).toBe(true);
+    expect(isSupportedQualificationVerificationPlan("five-llm-v1")).toBe(
+      false,
+    );
   });
 
   it.each([

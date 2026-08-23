@@ -10,17 +10,17 @@
 
 `0.1.1` 发布快照结论：**stable 已完成 Node 24 离线门禁、PR/双重 CI、不可变标签、GitHub Actions OIDC 发布、公共精确包隔离验收与活动官方插件升级；该发布快照的能力索引为 8 current / 0 legacy。npm 为 `latest=0.1.1`、`next=0.1.1-beta.4`，当时活动插件 installed/enabled `0.1.1`，旧 `codex_cc_tools` 仍 enabled。维护者完整退出重开后，新任务发现两个公开工具，官方 MCP cwd 指向 `0.1.1` 缓存且插件进程属于新 app-server。维护者于 2026-08-07 跳过普通 Stop 验收；两次会话均没有 PASS receipt，真实 Stop 保持 `skipped / unverified`。稳定版证据使用严格 `skipped_by_maintainer / host_stop_unverified` 决策状态，GitHub Release 没有把它显示为宿主验收通过。**
 
-当前 `0.1.2-beta.1` 开发候选新增 Direct DeepSeek，且共享资格输入已经变化。本清单以下“8 current”均描述 `0.1.1` 发布快照。2026-08-21 fresh 批次使 `ark-coding-plan/delegate` passed 并更新为 current；2026-08-23 资格前 Kimi adapter 模型绑定加固后，机器分析为 Direct 两项与 Ark Coding delegate 一项 current，其余七项 evidence valid / fingerprint stale。当天一次广覆盖批次误跑 current delegate 后按精确命令门禁 blocked；首次七项定向入口又因 smoke evidence 白名单遗漏新 plan ID 在 adapter/模型调用前 blocked，真实模型调用为 0。两个历史终态保持不可变，没有晋级任何能力。整个候选仍未通过、未公开发布；活动 App 只加载了本地 staging。实时状态见 [能力刷新资格设计与阻断记录](capability-refresh-qualification-2026-08-23.md)。
+当前 `0.1.2-beta.1` 开发候选新增 Direct DeepSeek。本清单以下“8 current”均描述 `0.1.1` 发布快照。2026-08-23 修复后的七项定向 batch `2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60` 在 frozen commit `388f0fdc37db02b5c6104988aa68baa793eda791` 上 7/7 passed；每项单次调用、零 retry/fallback、owned process drained，manifest SHA-256 为 `968c00d5ecf9a612fd8e9b5bff34ef84c31126ac6598078d9f9c74ee4f48e550`。immutable-evidence 与 detached frozen-candidate verifier 均通过，索引更新后机器分析为 10 current / 0 stale / 0 legacy，`verify:capabilities` 与 release smoke 通过。此前广覆盖误跑与首次定向预模型阻断保持不可变。候选尚未公开发布；活动 App 只加载了本地 staging。实时状态见 [能力刷新资格设计与阻断记录](capability-refresh-qualification-2026-08-23.md)。
 
 `0.1.1` 最近的八项 passed 批次绑定 frozen commit `9054cbc45aaf1c91c2c62817244be5288032ede8`，批次 ID 为 `2026-08-03T02-04-45.497Z-44fcbde6-a2bd-4f58-80c5-d723a374a923`；标准入口和 execution cell 各只有一个，八项全部 passed，没有 resume、retry、fallback 或补跑。manifest SHA-256 为 `835224ccc7893d1e5f930bf2f63f29ef0bbb0a1daddaf7e85e807e626c79ecac`，immutable-evidence 与 frozen-candidate verifier 均通过，owned process 全部 drained、锁为空；不可变证据由提交 `c09ce74` 保存。执行边界见[承载手册](four-llm-qualification-execution-runbook.md)。
 
-当前开发候选此前的局部门禁证据为：build、类型检查、临时 `CODEX_HOME` 官方插件生命周期与精确 npm pack dry-run 均通过；Direct 与 blocked Ark/refresh 批次的 immutable verifier 都通过。2026-08-23 定向入口修复后的聚焦 10 files / 413 passed / 1 skipped、完整单 worker 回归（70 files passed / 1 file skipped，1285 passed / 6 skipped / 0 failed）、native/helper/observer、隔离插件与 27-file npm 文档链接闭包通过。完整 release smoke 仍会在七项 stale 能力处按预期非零；上述局部通过不构成第 1 层或整个候选通过。
+当前开发候选的资格前门禁证据为：build、类型检查、临时 `CODEX_HOME` 官方插件生命周期、精确 npm pack dry-run、聚焦 10 files / 413 passed / 1 skipped、完整单 worker 回归（70 files passed / 1 file skipped，1285 passed / 6 skipped / 0 failed）、native/helper/observer 与 27-file npm 文档链接闭包通过。资格后最终 `gate:offline` 通过：70 个测试文件 passed / 1 skipped，1286 passed / 6 skipped / 0 failed，十项能力 current，release smoke 与精确包闭包通过；第 1 层现已闭合。
 
 每层都必须独立成立。上层通过不能替代下层证据；任一层失败或证据缺失时，按该层停止条件执行。
 
 ## `0.1.1` 资格闭合（历史发布快照）
 
-`0.1.1` 的 `capabilities.json` 已用当时新批次的八个 passed case 更新，发布快照的八项运行时指纹全部 current，legacy 条目为 0。历史 batch manifest 与 case evidence 永久不可变；registry 文案仍不能替代唯一机器发布权威 `npm run verify:capabilities`。当前开发候选的十项索引与失败关闭状态以上方 2026-08-14 覆盖说明为准。
+`0.1.1` 的 `capabilities.json` 已用当时新批次的八个 passed case 更新，发布快照的八项运行时指纹全部 current，legacy 条目为 0。历史 batch manifest 与 case evidence 永久不可变；registry 文案仍不能替代唯一机器发布权威 `npm run verify:capabilities`。当前开发候选的十项索引状态以上方 2026-08-23 覆盖说明为准。
 
 beta.1 handoff 只证明旧宿主断开会留下服务端任务，不是 stable Stop gate 的唯一证据。
 
@@ -48,7 +48,7 @@ git diff --check
 
 - npm pack 精确包含 marketplace、plugin manifest、`.mcp.json` 与单文件 runtime；
 - npm pack 必须包含固定产品文档清单：资格结果、历史授权审阅、真实插件状态、隔离插件状态、历史执行计划，以及资格承载演练和执行手册；
-- release smoke 必须先验证八项能力索引、不可变 source evidence、注册表 anchor 与当前运行时指纹；
+- release smoke 必须先验证候选声明的完整能力索引（`0.1.2-beta.1` 为十项）、不可变 source evidence、注册表 anchor 与当前运行时指纹；
 - 固定清单只定义“必须打包”的产品文件，不限制扫描范围；release smoke 必须从实际 pack 文件面选出全部 Markdown/HTML，逐份完成敏感信息扫描和包内本地链接闭包，缺失目标、未检查文档或越界链接立即失败；
 - HTML 与其它打包文本一并接受秘密值和开发机绝对路径扫描；
 - runtime bundle 不依赖安装目录外生产模块，不泄漏开发机绝对路径或环境凭据值；

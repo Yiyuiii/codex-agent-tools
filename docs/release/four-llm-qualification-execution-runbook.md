@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-当前十项机器分析为 Direct DeepSeek 两项与 `ark-coding-plan/delegate` 一项 current，其余七项 evidence valid / fingerprint stale；`npm run verify:capabilities` 必须 fail closed。2026-08-23 的一次 `four-llm-v1` 入口错误地先重复运行了 current delegate，并按精确命令观察门禁首错停止；该 blocked 终态保持不可变。新的 `capability-refresh-v1` 在任何锁或模型调用前，必须把固定七项 schedule 与当前索引分析逐项相等校验，借此落实“只运行 stale、缺失、新增或证据失效能力”的资格政策。
+当前十项机器分析为 10 current / 0 stale / 0 legacy；`npm run verify:capabilities` 与 release smoke 通过。2026-08-23 的一次 `four-llm-v1` 入口错误地先重复运行了 current delegate，并按精确命令观察门禁首错停止；首次定向入口又在真实模型调用前暴露计划白名单遗漏，两个 blocked 终态均保持不可变。修复后的 `capability-refresh-v1` 在任何锁或模型调用前，把固定七项 schedule 与当时候选的非 Direct stale/invalid 集合逐项相等校验，并完成七项 passed 刷新。
 
 标准入口形状为：
 
@@ -23,6 +23,8 @@
 2026-08-23 的 blocked 批次 `2026-08-23T10-02-06.915Z-c7a6a3d9-0fef-470d-b0f6-ce6cf57b24a8` 绑定 frozen commit `069350fba7418a465bf6e80c4174229c3bdf3798`。唯一 `four-llm-v1` 入口只执行 ordinal 1 `ark-coding-plan/delegate`：一次 client invocation、零 retry/fallback、固定模型和 direct 路由正确、28 字节结果文件及精确状态命令通过、owned process drained；写入命令观察为 `raw_input/other/success`，未满足精确命令合同，故 `acceptance_failed` 后首错停止。terminal 为 `blocked / case_failed`，其余七项 notRun，immutable verifier passed，manifest SHA-256 为 `d3c38de4d0eb9a8955a29c7fb704b34567ee6a1671c2d02bf077cdcf7890130f`，不可变证据提交为 `8e01b16`。没有重试、fallback、补跑、第二入口或第二批。
 
 首次 `capability-refresh-v1` 在 frozen commit `6af9ef6097bd4ea94f07d041c5abd5d6c01ac1b7` 上创建 batch `2026-08-23T10-52-03.095Z-30f6d895-552e-4aa8-bd34-35c081e13610`。完整 preflight 通过，ordinal 1 `ark-coding-plan/review` 发布 `case_running` 后被 smoke evidence 的旧计划白名单拒绝，早于 adapter 和真实模型调用。terminal 为 `blocked / infrastructure_failure`，0 completed、无 case evidence、`uncommittedEvidence=null`，manifest SHA-256 为 `f99b83a1b8c5da58dd4649de3afbc2cf5c54fb9ac504a499287f3f337f714511`；immutable verifier passed，证据提交为 `c8cc02e`，锁与目标进程为零。真实模型调用 0，没有 retry、fallback、补跑、第二入口或第二批。
+
+修复后的 `capability-refresh-v1` 在 frozen commit `388f0fdc37db02b5c6104988aa68baa793eda791` 上创建 batch `2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60`。固定七项全部 passed；每项一次 client invocation、零 adapter/runtime retry、零 fallback，模型/provider/direct route 正确且 owned process drained。terminal 为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `968c00d5ecf9a612fd8e9b5bff34ef84c31126ac6598078d9f9c74ee4f48e550`，不可变证据提交为 `0d45d88`。immutable-evidence verifier 直接通过；修复生产 verifier 对新计划的精确接纳后，又在 detached frozen worktree 与 manifest 的四个原构建工件上通过 frozen-candidate verifier。七项新 case 已写入能力索引，十项均 current。
 
 standing authorization 下的 Direct 批次 `2026-08-14T02-55-25.557Z-f96e5e84-7ab0-4c0f-b071-ea2dd5b94f69` 绑定 frozen commit `469129d708eb90a3b68071c7b01313b7e70c65a2`。唯一标准入口完成两项；每项一次 client invocation、零 retry/fallback、owned process drained，终态 `passed`、`promotionEligible=true`，immutable-evidence 与 frozen-candidate verifier 通过，manifest SHA-256 为 `f0d564aef9d1d62cfe9348b74e54a99f53912e810dd662830704b9860d17279d`，资格锁为空，不可变证据提交为 `9c34156`。
 

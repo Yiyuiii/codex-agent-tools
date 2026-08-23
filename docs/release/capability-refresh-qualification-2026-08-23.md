@@ -1,6 +1,12 @@
 # 能力刷新资格设计与阻断记录
 
-## 结论
+## 当前结论
+
+七项定向刷新已经完成。`capability-refresh-v1` batch `2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60` 绑定 clean frozen commit `388f0fdc37db02b5c6104988aa68baa793eda791`，七项全部 passed；terminal 为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `968c00d5ecf9a612fd8e9b5bff34ef84c31126ac6598078d9f9c74ee4f48e550`。每项均为一次 client invocation、零 adapter/runtime retry、零 fallback，实际模型、provider、direct route 与预期一致，owned process 全部 drained。
+
+immutable-evidence verifier 直接通过。生产 verifier 的计划入口最初遗漏 `capability-refresh-v1`；TDD 修复后，三个现行计划被精确接受、历史计划继续拒绝。为避免证据提交后的 HEAD 漂移掩盖 frozen candidate，另在精确 detached worktree `388f0fd...` 中复制该 batch 与 manifest 所列四个构建工件，frozen-candidate verifier 通过。能力索引已引用七项新 case，机器验证为 10 current / 0 stale / 0 legacy；release smoke 通过。
+
+## 刷新前设计结论
 
 当前开发候选的机器状态是十项 evidence 均有效，其中 Direct DeepSeek review/delegate 与 `ark-coding-plan/delegate` 三项指纹 current，其余七项非 Direct 能力 stale。现行能力粒度政策只允许刷新这七项；旧 `four-llm-v1` 固定八项 schedule 继续用于明确授权的广覆盖回归，不能再作为本候选的定向刷新入口。
 
@@ -37,13 +43,13 @@ terminal 为 `blocked / infrastructure_failure`，0 completed cases、无 case e
 - 七项目标文件是资格选择元数据，不改变产品运行时、模型、提示词或 acceptance；它从能力运行时指纹输入中排除，但其变化会通过固定 schedule 的 immutable verifier 使不匹配批次失败。
 - 资格基础设施变化机械改变共享指纹。已有三项 current 能力的证据、产品运行时和 acceptance 未变，因此只把这三项索引指纹迁移到同一候选的新计算值；七项 stale 记录不迁移，必须由新真实 case 刷新。
 
-## 进入真实刷新前门禁
+## 进入真实刷新前门禁（已满足）
 
 1. 新入口及三类计划的协议、preflight、ledger、lock、verifier 和能力索引测试全绿。
 2. 类型检查、构建、完整单 worker 确定性回归、native/helper/observer 与隔离官方插件生命周期通过。
-3. `verify:capabilities` 仍精确报告 3 current / 7 stale；定向选择器精确接受这七项。
+3. 刷新前 `verify:capabilities` 精确报告 3 current / 7 stale；定向选择器精确接受这七项。
 4. npm dry-run 文件面的所有 Markdown/HTML 都通过包内链接闭包；仓库状态资料使用 GitHub 绝对链接，不扩大精确包文件面。
 5. 候选形成新的 clean frozen commit，资格锁不存在，Kimi ACP / Pi RPC / real-smoke 为 0/0/0，active long-term goal 仍有效。
 6. 只生成一个 fresh 内部执行引用，只调用一次 `capability-refresh-v1`；首错后停止，不补跑或重开。
 
-七项全部 passed 后，才允许把各自新 case、manifest 哈希和当前指纹写入能力索引，再进入完整 release 门禁。活动插件、活动 `config.toml` 与公开发布不属于本设计的资格刷新动作。
+七项已经全部 passed，各自新 case、manifest 哈希和当前指纹已写入能力索引；当前进入完整 release 门禁。资格刷新期间没有修改活动插件或活动 `config.toml`，公开发布仍由独立发布门禁控制。

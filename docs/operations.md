@@ -41,7 +41,7 @@ npm run gate:offline
 
 Direct `deepseek-v4-flash` 使用独立的 `direct-deepseek-v1` 两项计划。`four-llm-v1` 保留 Kimi 与三条 Ark 路线的八项广覆盖回归顺序；开发候选只刷新当前失效能力时使用 `capability-refresh-v1`。刷新入口启动前会把固定七项目标与机器能力分析逐项比较；目标为空、重复、包含 current 能力或漏掉非 Direct 的 stale/invalid 能力都会在锁和模型调用前失败关闭。三个计划的配置哈希、执行顺序和 evidence 不得拼接或互换。
 
-当前候选的十项 evidence 均有效。Direct DeepSeek 两项与最新 `ark-coding-plan/delegate` 指纹 current，其余 Kimi/Ark 七项 stale。2026-08-23 在 Kimi 固定模型校验提交上误用广覆盖 `four-llm-v1`，批次首先重复运行了已经 current 的 `ark-coding-plan/delegate`，并按精确命令观察门禁首错停止。随后首次 `capability-refresh-v1` 通过完整 preflight，但 smoke evidence 白名单遗漏新计划，在 ordinal 1 adapter/真实模型调用前以 infrastructure failure 停止；0 completed cases、0 真实模型调用。两个终态均 blocked 且 immutable verifier passed，没有重试、fallback、补跑或第二入口。根因、哈希与修复见 GitHub 上的[能力刷新资格设计与阻断记录](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/capability-refresh-qualification-2026-08-23.md)。完整 `verify:capabilities` 继续失败关闭。
+当前候选的十项 evidence 与十项运行时指纹均为 current。2026-08-23 的 `capability-refresh-v1` passed batch `2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60` 绑定 frozen commit `388f0fdc37db02b5c6104988aa68baa793eda791`，固定七项全部通过；每项一次 client invocation、零 adapter/runtime retry、零 fallback、模型/provider/direct route 正确且 owned process drained。terminal 为 `passed`、`promotionEligible=true`，manifest SHA-256 为 `968c00d5ecf9a612fd8e9b5bff34ef84c31126ac6598078d9f9c74ee4f48e550`；immutable-evidence 与精确 frozen-candidate verifier 均通过。能力索引已用七项新 case 更新，`npm run verify:capabilities` 与 release smoke 通过。此前误用广覆盖入口和首次定向入口的两个 blocked 终态保持不可变；根因、哈希与修复见 GitHub 上的[能力刷新资格设计与阻断记录](https://github.com/Yiyuiii/codex-agent-tools/blob/main/docs/release/capability-refresh-qualification-2026-08-23.md)。
 
 ## 4. 隔离官方插件生命周期
 
