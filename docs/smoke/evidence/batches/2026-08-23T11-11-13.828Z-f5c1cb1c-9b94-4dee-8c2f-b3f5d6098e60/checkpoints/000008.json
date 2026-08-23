@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 3,
+  "qualificationPlanId": "capability-refresh-v1",
+  "sequence": 8,
+  "kind": "case_completed",
+  "batchId": "2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60",
+  "recordedAt": "2026-08-23T11:17:57.633Z",
+  "repositoryCommit": "388f0fdc37db02b5c6104988aa68baa793eda791",
+  "buildIdentitySha256": "053655245f5f4e9ffb1c575f451ffd575cc62f2e23ab5c77deb24624b83ee4c7",
+  "preflightSha256": "ba1422276e2a7f2132289fd4e4da3f849eeacc425980e2de5d2c18bfeb308bd9",
+  "ordinal": 4,
+  "llm": "ark-agent-plan",
+  "task": "review",
+  "result": "passed",
+  "evidence": {
+    "path": "docs/smoke/evidence/batches/2026-08-23T11-11-13.828Z-f5c1cb1c-9b94-4dee-8c2f-b3f5d6098e60/cases/2026-08-23T11-17-57.149Z-ark-agent-plan-review-ark.json",
+    "sha256": "db563a7e4e708a9bec0254bd8fe3f75d58254a6c4e62e42f6abbecf85e436fb8"
+  },
+  "adapterClientInvocationCount": 1,
+  "adapterRetryCount": 0,
+  "runtimeReportedAutoRetryCount": 0,
+  "adapterReportedFallbackUsed": false,
+  "orchestratorFallbackUsed": false,
+  "executionTelemetrySource": "pi-rpc-observable",
+  "ownedProcessDrained": true,
+  "failureReason": null
+}
