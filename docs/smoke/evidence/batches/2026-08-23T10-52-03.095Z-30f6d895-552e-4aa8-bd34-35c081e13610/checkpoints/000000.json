@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 3,
+  "qualificationPlanId": "capability-refresh-v1",
+  "sequence": 0,
+  "kind": "batch_started",
+  "batchId": "2026-08-23T10-52-03.095Z-30f6d895-552e-4aa8-bd34-35c081e13610",
+  "recordedAt": "2026-08-23T10:57:48.055Z",
+  "authorizationReferenceSha256": "b49354c6755f814027c90e7995a943320e4ab82dac5190395aab86ca1eee2077",
+  "preflightSha256": "4c7546c7128215163830e54868ddc0c186d8042bff2f9666e65601ee55c0f573",
+  "preflight": {
+    "schemaVersion": 3,
+    "qualificationPlanId": "capability-refresh-v1",
+    "repositoryCommit": "6af9ef6097bd4ea94f07d041c5abd5d6c01ac1b7",
+    "repositoryBranch": "codex/multi-model-beta-0.1.2",
+    "repositoryDirty": false,
+    "packageVersion": "0.1.2-beta.1",
+    "packageLockSha256": "da001e21a02d7cc7e06f94e5b5abedb29fe62db76be34a061d462357c3f01bdb",
+    "buildArtifacts": [
+      {
+        "path": "dist/ark-smoke.js",
+        "sha256": "f1dd739a1cda382ac12b887d869139896a4008ae10992c96df6e311cd23cae8c"
+      },
+      {
+        "path": "dist/kimi-smoke.js",
+        "sha256": "2f74599c05bc42c9b8e59699989dfca3f50f3688dfbd4ba7a92c3f25bdc8b272"
+      },
+      {
+        "path": "dist/smoke-evidence.js",
+        "sha256": "535dbba782d91542cf7385c9283a20bd0c632be7dbc190bc17ed27210a77948d"
+      },
+      {
+        "path": "plugins/codex-external-agents/runtime/codex-external-agents-mcp.mjs",
+        "sha256": "176b1edc8aacfe5b0ac920d4c22d0bed0384268485044f1e5b5b61e2f9e361e9"
+      }
+    ],
+    "buildIdentitySha256": "6e7724018f106f73a53b6077b6d83ea5cc80f39618bc6672403e1f15f7b95755",
+    "runtimeVersions": {
+      "node": "v24.14.1",
+      "codex": "codex-cli 0.135.0"
+    },
+    "piConfigSha256": "3b1e8827e21207d0d41d3189a7409d0f722ce7fece8aa41049046a14bc04349e",
+    "logicalLlms": [
+      {
+        "llm": "ark-agent-deepseek-v4-flash",
+        "runtime": "pi-rpc",
+        "model": "deepseek-v4-flash",
+        "provider": "ark-agent-plan",
+        "route": "direct"
+      },
+      {
+        "llm": "ark-agent-plan",
+        "runtime": "pi-rpc",
+        "model": "ark-code-latest",
+        "provider": "ark-agent-plan",
+        "route": "direct"
+      },
+      {
+        "llm": "ark-coding-plan",
+        "runtime": "pi-rpc",
+        "model": "ark-code-latest",
+        "provider": "ark-coding-plan",
+        "route": "direct"
+      },
+      {
+        "llm": "kimi-k3",
+        "runtime": "kimi-acp",
+        "model": "kimi-code/k3",
+        "provider": null,
+        "route": "direct"
+      }
+    ],
+    "credentialMatches": [
+      {
+        "llm": "ark-agent-deepseek-v4-flash",
+        "environmentVariableName": "OPENAI_API_KEY_DOUBAO"
+      },
+      {
+        "llm": "ark-agent-plan",
+        "environmentVariableName": "OPENAI_API_KEY_DOUBAO"
+      },
+      {
+        "llm": "ark-coding-plan",
+        "environmentVariableName": "API_KEY_DOUBAO_CODING"
+      },
+      {
+        "llm": "kimi-k3",
+        "environmentVariableName": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 3,
+  "qualificationPlanId": "capability-refresh-v1",
+  "sequence": 1,
+  "kind": "case_running",
+  "batchId": "2026-08-23T10-52-03.095Z-30f6d895-552e-4aa8-bd34-35c081e13610",
+  "recordedAt": "2026-08-23T10:57:48.564Z",
+  "repositoryCommit": "6af9ef6097bd4ea94f07d041c5abd5d6c01ac1b7",
+  "buildIdentitySha256": "6e7724018f106f73a53b6077b6d83ea5cc80f39618bc6672403e1f15f7b95755",
+  "preflightSha256": "4c7546c7128215163830e54868ddc0c186d8042bff2f9666e65601ee55c0f573",
+  "ordinal": 1,
+  "llm": "ark-coding-plan",
+  "task": "review"
+}
